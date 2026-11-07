@@ -1,11 +1,13 @@
 name: Publish crapsTV
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       source_ref:
-        description: 'Repository branch or commit to publish'
+        description: "Repository branch or commit to publish"
         required: true
-        default: 'main'
+        default: "main"
 permissions:
   contents: read
   pages: write

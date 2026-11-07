@@ -1,0 +1,218 @@
+{
+  "model": "hexgrad/Kokoro-82M",
+  "modelLicense": "Apache-2.0",
+  "voice": "am_michael",
+  "modelRevision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+  "engine": "kokoro",
+  "speed": 1.02,
+  "seed": 20261107,
+  "sampleRate": 44100,
+  "codec": "MP3 / libmp3lame",
+  "bitrate": "128kbps mono",
+  "files": {
+    "welcome": {
+      "sha256": "3a3ce61412b66844e26c8622b021d3affe24249719a54ece2f0e9576f6aaa1c9",
+      "text": "Welcome to Craps TV. Your table is ready. Let's roll!"
+    },
+    "betting-open": {
+      "sha256": "c7c62dd5358c584aa07f4266205bd627bfb60c775bca2427e2f3546980bc7bbf",
+      "text": "Place your bets. The table is open."
+    },
+    "bets-locked": {
+      "sha256": "ff75698193fc72377130a5c4a7c596f874f7503493c0403b756f4df16555be45",
+      "text": "All bets are locked. Here come the dice!"
+    },
+    "come-out": {
+      "sha256": "80b6c3d1ba6729041e5729e8812ba077f36533783ec827b7fea07533ac4895db",
+      "text": "Coming out. A brand new roll!"
+    },
+    "point-set": {
+      "sha256": "2d956ca276ca9453c9343f10e06191dcec8a6eb99b9c0506eafcfe3d101a05eb",
+      "text": "The point is set. Let's bring it home."
+    },
+    "point-hit": {
+      "sha256": "e2e44bea0a70b4c8968ac68c1929f9d91e34ce9656cc6d8eb640afcf0c9d9c48",
+      "text": "That's the point! Pay the line!"
+    },
+    "seven-out": {
+      "sha256": "2c54cd4add45b8e3217b75159ce0e7e494e92da5c903b9e81dd15464397f151e",
+      "text": "Seven out. A new shooter steps up."
+    },
+    "natural": {
+      "sha256": "69baa7b3ce3983c32a67eec4d981e51f90f93ff2b243ee2ac19569a426489304",
+      "text": "Winner, winner! Pay the pass line!"
+    },
+    "craps": {
+      "sha256": "8c73e907d3b601e2cff641bfd20f1d9bb19fcbded2df8608428fdf3d3829f353",
+      "text": "Craps. The pass line loses this one."
+    },
+    "push": {
+      "sha256": "197a9a8944021133b937a1e81367a30c43fee02094362c4348b4792b43cc439d",
+      "text": "That's a push. Your bet stays on the table."
+    },
+    "player-joined": {
+      "sha256": "5db7e4a61db640d0a7559e99f1d22284da345b7d7bf02436f2646d8feabeea77",
+      "text": "Another player at the table. Welcome aboard!"
+    },
+    "player-left": {
+      "sha256": "ff21ec1a77591e0d1fbbab9f59b9c847839731b5eb37a6ada1bc3b2a17779727",
+      "text": "Cashing out. Thanks for playing!"
+    },
+    "re-up": {
+      "sha256": "fa03d214472c2d0f3cb9d5ee97c51c2990cb9b7b8ad9bd739f1a11a14f194af1",
+      "text": "A fresh stack. You're back in the game!"
+    },
+    "session-ended": {
+      "sha256": "5deced4a69df088a66db9f70bc036aa2b820363120462cb7389bdcb2d8453d88",
+      "text": "That's a wrap. Let's see how you rolled!"
+    },
+    "your-roll": {
+      "sha256": "1ae2bacc0ad566d7540400289f5ef52de69010deac14345912bfeb38380eb162",
+      "text": "Shooter, the dice are yours!"
+    },
+    "game-started": {
+      "sha256": "6fd44bbb01430b95da8a673b7702416122bca779f19ae6448b14ebcf66fdf2e5",
+      "text": "The table is live. Good luck, everyone!"
+    },
+    "crapless": {
+      "sha256": "52dc2de6663a3321e1b81e108191267c6fdbcd439d2cbfc7cfbd92ab7375a600",
+      "text": "Crapless craps. Every number but seven can be the point."
+    },
+    "classic": {
+      "sha256": "628f93240a9321dbcd06edfd965df21295f1734c3322f65eefee33eed938ef2c",
+      "text": "Classic craps. Seven or eleven wins on the come out."
+    },
+    "teach-mode": {
+      "sha256": "991260472ef94118a23c1cc02dae07434c3784ab7ddc3626d6f49aca59e0f04c",
+      "text": "Teach mode is on. Check your phone for odds and payouts."
+    },
+    "big-win": {
+      "sha256": "4b322c27eb4659e5bc55e68f1ceb16a22b2e486ba6b5b44774400edf9042d0b8",
+      "text": "Now that's a big win. Nice shooting!"
+    },
+    "bust": {
+      "sha256": "52a482a980aa788114df6d976c5d6f061c7b39dc6cb69d136b1bf4319e2aa598",
+      "text": "Out of chips? Take a fresh stack and stay in the action."
+    },
+    "disconnected": {
+      "sha256": "1ca4f979fc85a0ef4ec8927c00ccd4c9f5ed19577995568fb5484c93140f1859",
+      "text": "Waiting for the table to reconnect."
+    },
+    "connected": {
+      "sha256": "5a5e3ac34512ce7ce2ecf6e3e2e1b7e061e70db0845008218cd63cb539a78c9b",
+      "text": "We're back at the table."
+    },
+    "dont-pass-win": {
+      "sha256": "774b92559b0f86b35c8367f839a56fe519b85df202e6b3de06622e2fdc88c62a",
+      "text": "Pay the don't pass line."
+    },
+    "field-win": {
+      "sha256": "842febce5916bbe4dc6b55c3855fd6fc7b3b29599a4fe83b7a9c0ec259669a18",
+      "text": "Winner in the field!"
+    },
+    "hardway": {
+      "sha256": "70d9aec9a1e5d0caec4c5dabfc19c8fca5db645556723a7294e21c72f9a09ba2",
+      "text": "The hard way! Nice roll!"
+    },
+    "roll-2": {
+      "sha256": "480a3e642f2503756db80f02c71bd6048cd1c37fb91838273a6e5e95a0313284",
+      "text": "Two. Snake eyes!"
+    },
+    "point-2": {
+      "sha256": "ab6f8e1f519a3240a3e93f080b85ade4b3cd5b794264b0502410ad7435993015",
+      "text": "The point is 2. Let's hit it!"
+    },
+    "roll-3": {
+      "sha256": "6a9fb041b807ed78315d5ddf18ef84ec27337af0e75eb18561d7dede668c0d9d",
+      "text": "Three. Ace deuce!"
+    },
+    "point-3": {
+      "sha256": "427db63365c9545a265a475e0f643d6a4c8426798f85073ca4a6bc021d055e32",
+      "text": "The point is 3. Let's hit it!"
+    },
+    "roll-4": {
+      "sha256": "2e676a953b5b7f6e92747508b745b7e5585b72cf77de810cc6c9cd333cbe9f49",
+      "text": "Four. Little Joe!"
+    },
+    "point-4": {
+      "sha256": "69bc230fb7023563878f07990f44061b92baa3b23e0996d335a1f5b09d0a08d0",
+      "text": "The point is 4. Let's hit it!"
+    },
+    "roll-5": {
+      "sha256": "2f5c83ca10be592e5264dc5a8fd187d36608dda03ebf341298ccd779643ef549",
+      "text": "Five. Five alive!"
+    },
+    "point-5": {
+      "sha256": "0df6a408b696b404b1395aebdae9f8f50ab87f5c438587a242c7fecf1bb8031d",
+      "text": "The point is 5. Let's hit it!"
+    },
+    "roll-6": {
+      "sha256": "e53947cc5b368bf71271799e7d2d0b3d56b5e375a4f93e268761b98f5b4c3e6f",
+      "text": "Six. Easy six!"
+    },
+    "point-6": {
+      "sha256": "f61358efd350a9a54609e4e216889bd9475aa60da3036678e1f91c3ec822742f",
+      "text": "The point is 6. Let's hit it!"
+    },
+    "roll-7": {
+      "sha256": "178649af8269b0e49153c7ec3161fe7308206e276bd8d6a784f0e8a42cef4c47",
+      "text": "Seven!"
+    },
+    "roll-8": {
+      "sha256": "351aff22aec4f2ec1510dbd7e01e602b8e619ecaab7133dc46d446b2bf1ec6d1",
+      "text": "Eight. The eighter from Decatur!"
+    },
+    "point-8": {
+      "sha256": "df2d2de552f5a3a03f86be02bb4da0fa3b39e099354564ed1f1d40680ee6c520",
+      "text": "The point is 8. Let's hit it!"
+    },
+    "roll-9": {
+      "sha256": "24364763d357313f6f0ddf66b89807329dde3b2b4989cfae05e05fdc9f606c21",
+      "text": "Nine. Center field!"
+    },
+    "point-9": {
+      "sha256": "664bb4e593358b08a1d0e5e99761e89db18b48cd6101deea205a1b7b35679796",
+      "text": "The point is 9. Let's hit it!"
+    },
+    "roll-10": {
+      "sha256": "6f80b6053208f55ecc5295ad59abece8391173becf6fcd5b5bd75bd5059a30bb",
+      "text": "Ten. The big one!"
+    },
+    "point-10": {
+      "sha256": "eaed3cdf14cb848008fb68294357c79495889e69bff0c99f0d19d6c8a0375fe7",
+      "text": "The point is 10. Let's hit it!"
+    },
+    "roll-11": {
+      "sha256": "193982338ff26d108e8489fb0935435335bf91c33a2ef53df4683b19df8a9be7",
+      "text": "Eleven. Yo eleven!"
+    },
+    "point-11": {
+      "sha256": "bd0b706685f6e21d0c34ff0f1f384d3265cfab12589c53e0350d19090bb19f86",
+      "text": "The point is 11. Let's hit it!"
+    },
+    "roll-12": {
+      "sha256": "f34c7b221d6fdca19768891fbf0b69bc5d673c9170829c5b7e632e13d61fa093",
+      "text": "Twelve. Boxcars!"
+    },
+    "point-12": {
+      "sha256": "84b4e5bdc86aff456e4baf8252fcacad1ddbe90bafae0fbd8eb11de391e5d2c4",
+      "text": "The point is 12. Let's hit it!"
+    },
+    "hard-4": {
+      "sha256": "29d5214c9548f8e223f5d660c2b58ef5396f9a764d4151c83f091615f30bc885",
+      "text": "Hard four! Two and two!"
+    },
+    "hard-6": {
+      "sha256": "9b15455f9818aebc8b6dc5333f9a049cc924c9768996d034dbfa23cd2ef985b6",
+      "text": "Hard six! A pair of threes!"
+    },
+    "hard-8": {
+      "sha256": "27de49dfd2edd157ca87c87423799aaae70bcd4a600403270c4fc07080231cd0",
+      "text": "Hard eight! A pair of fours!"
+    },
+    "hard-10": {
+      "sha256": "456615916be0211db2f931bf7e47bda35afe31d6b3ac72fce797227819eb687b",
+      "text": "Hard ten! A pair of fives!"
+    }
+  }
+}

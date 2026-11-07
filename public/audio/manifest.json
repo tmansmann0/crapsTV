@@ -1,0 +1,206 @@
+{
+  "welcome": {
+    "file": "welcome.mp3",
+    "text": "Welcome to Craps TV. Your table is ready. Let's roll!"
+  },
+  "betting-open": {
+    "file": "betting-open.mp3",
+    "text": "Place your bets. The table is open."
+  },
+  "bets-locked": {
+    "file": "bets-locked.mp3",
+    "text": "All bets are locked. Here come the dice!"
+  },
+  "come-out": {
+    "file": "come-out.mp3",
+    "text": "Coming out. A brand new roll!"
+  },
+  "point-set": {
+    "file": "point-set.mp3",
+    "text": "The point is set. Let's bring it home."
+  },
+  "point-hit": {
+    "file": "point-hit.mp3",
+    "text": "That's the point! Pay the line!"
+  },
+  "seven-out": {
+    "file": "seven-out.mp3",
+    "text": "Seven out. A new shooter steps up."
+  },
+  "natural": {
+    "file": "natural.mp3",
+    "text": "Winner, winner! Pay the pass line!"
+  },
+  "craps": {
+    "file": "craps.mp3",
+    "text": "Craps. The pass line loses this one."
+  },
+  "push": {
+    "file": "push.mp3",
+    "text": "That's a push. Your bet stays on the table."
+  },
+  "player-joined": {
+    "file": "player-joined.mp3",
+    "text": "Another player at the table. Welcome aboard!"
+  },
+  "player-left": {
+    "file": "player-left.mp3",
+    "text": "Cashing out. Thanks for playing!"
+  },
+  "re-up": {
+    "file": "re-up.mp3",
+    "text": "A fresh stack. You're back in the game!"
+  },
+  "session-ended": {
+    "file": "session-ended.mp3",
+    "text": "That's a wrap. Let's see how you rolled!"
+  },
+  "your-roll": {
+    "file": "your-roll.mp3",
+    "text": "Shooter, the dice are yours!"
+  },
+  "game-started": {
+    "file": "game-started.mp3",
+    "text": "The table is live. Good luck, everyone!"
+  },
+  "crapless": {
+    "file": "crapless.mp3",
+    "text": "Crapless craps. Every number but seven can be the point."
+  },
+  "classic": {
+    "file": "classic.mp3",
+    "text": "Classic craps. Seven or eleven wins on the come out."
+  },
+  "teach-mode": {
+    "file": "teach-mode.mp3",
+    "text": "Teach mode is on. Check your phone for odds and payouts."
+  },
+  "big-win": {
+    "file": "big-win.mp3",
+    "text": "Now that's a big win. Nice shooting!"
+  },
+  "bust": {
+    "file": "bust.mp3",
+    "text": "Out of chips? Take a fresh stack and stay in the action."
+  },
+  "disconnected": {
+    "file": "disconnected.mp3",
+    "text": "Waiting for the table to reconnect."
+  },
+  "connected": {
+    "file": "connected.mp3",
+    "text": "We're back at the table."
+  },
+  "dont-pass-win": {
+    "file": "dont-pass-win.mp3",
+    "text": "Pay the don't pass line."
+  },
+  "field-win": {
+    "file": "field-win.mp3",
+    "text": "Winner in the field!"
+  },
+  "hardway": {
+    "file": "hardway.mp3",
+    "text": "The hard way! Nice roll!"
+  },
+  "roll-2": {
+    "file": "roll-2.mp3",
+    "text": "Two. Snake eyes!"
+  },
+  "point-2": {
+    "file": "point-2.mp3",
+    "text": "The point is 2. Let's hit it!"
+  },
+  "roll-3": {
+    "file": "roll-3.mp3",
+    "text": "Three. Ace deuce!"
+  },
+  "point-3": {
+    "file": "point-3.mp3",
+    "text": "The point is 3. Let's hit it!"
+  },
+  "roll-4": {
+    "file": "roll-4.mp3",
+    "text": "Four. Little Joe!"
+  },
+  "point-4": {
+    "file": "point-4.mp3",
+    "text": "The point is 4. Let's hit it!"
+  },
+  "roll-5": {
+    "file": "roll-5.mp3",
+    "text": "Five. Five alive!"
+  },
+  "point-5": {
+    "file": "point-5.mp3",
+    "text": "The point is 5. Let's hit it!"
+  },
+  "roll-6": {
+    "file": "roll-6.mp3",
+    "text": "Six. Easy six!"
+  },
+  "point-6": {
+    "file": "point-6.mp3",
+    "text": "The point is 6. Let's hit it!"
+  },
+  "roll-7": {
+    "file": "roll-7.mp3",
+    "text": "Seven!"
+  },
+  "roll-8": {
+    "file": "roll-8.mp3",
+    "text": "Eight. The eighter from Decatur!"
+  },
+  "point-8": {
+    "file": "point-8.mp3",
+    "text": "The point is 8. Let's hit it!"
+  },
+  "roll-9": {
+    "file": "roll-9.mp3",
+    "text": "Nine. Center field!"
+  },
+  "point-9": {
+    "file": "point-9.mp3",
+    "text": "The point is 9. Let's hit it!"
+  },
+  "roll-10": {
+    "file": "roll-10.mp3",
+    "text": "Ten. The big one!"
+  },
+  "point-10": {
+    "file": "point-10.mp3",
+    "text": "The point is 10. Let's hit it!"
+  },
+  "roll-11": {
+    "file": "roll-11.mp3",
+    "text": "Eleven. Yo eleven!"
+  },
+  "point-11": {
+    "file": "point-11.mp3",
+    "text": "The point is 11. Let's hit it!"
+  },
+  "roll-12": {
+    "file": "roll-12.mp3",
+    "text": "Twelve. Boxcars!"
+  },
+  "point-12": {
+    "file": "point-12.mp3",
+    "text": "The point is 12. Let's hit it!"
+  },
+  "hard-4": {
+    "file": "hard-4.mp3",
+    "text": "Hard four! Two and two!"
+  },
+  "hard-6": {
+    "file": "hard-6.mp3",
+    "text": "Hard six! A pair of threes!"
+  },
+  "hard-8": {
+    "file": "hard-8.mp3",
+    "text": "Hard eight! A pair of fours!"
+  },
+  "hard-10": {
+    "file": "hard-10.mp3",
+    "text": "Hard ten! A pair of fives!"
+  }
+}
