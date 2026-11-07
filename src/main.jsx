@@ -199,6 +199,7 @@ function App() {
           kind: "local",
           code: local.code,
           joinOrigin: local.joinOrigin,
+          lanOrigin: local.lanOrigin,
         });
         setJoinCode(local.code);
       } else if (route.controller && initialCode) {
@@ -240,6 +241,7 @@ function App() {
         }
         setState({
           ...m.state,
+          snapshotAt: m.sentAt || Date.now(),
           clockOffsetMs:
             clockOffset ??
             (typeof m.sentAt === "number" ? m.sentAt - Date.now() : 0),
@@ -349,6 +351,10 @@ function App() {
   }, [status, state?.code]);
   const roomCode = state?.code || session?.code || "";
   const joinLink = controllerURL(roomCode, session?.joinOrigin);
+  const fallbackJoinLink =
+    session?.lanOrigin && session.lanOrigin !== session.joinOrigin
+      ? controllerURL(roomCode, session.lanOrigin)
+      : null;
   const sceneAction = async (action) => {
     if (action === "settings") setSettingsOpen((v) => !v);
     if (action === "join") window.open(joinLink, "_blank", "noopener");
@@ -359,12 +365,14 @@ function App() {
       else await document.documentElement.requestFullscreen?.().catch(() => {});
     }
     if (action === "reconnect") location.reload();
-    if (action === "copy") {
+    if (action === "copy" || action === "copy-ip") {
+      const link =
+        action === "copy-ip" ? fallbackJoinLink || joinLink : joinLink;
       try {
-        await navigator.clipboard.writeText(joinLink);
+        await navigator.clipboard.writeText(link);
         toast("Join link copied");
       } catch {
-        toast(joinLink);
+        toast(link);
       }
     }
   };
@@ -383,6 +391,7 @@ function App() {
           sound={sound}
           settingsOpen={settingsOpen}
           joinURL={joinLink}
+          fallbackJoinURL={fallbackJoinLink}
           onAction={sceneAction}
         />
         <div className="scene-accessibility" aria-label="Table controls">
@@ -513,6 +522,7 @@ function App() {
           connected={status === "connected"}
           onDisplayAction={sceneAction}
           serverError={error}
+          fallbackJoinURL={fallbackJoinLink}
         />
       )}
       {confirm && (
@@ -610,6 +620,7 @@ function Phone({
   connected,
   onDisplayAction,
   serverError,
+  fallbackJoinURL,
 }) {
   const disabled = state.rolling || !connected;
   const settingsArea = (
@@ -660,6 +671,14 @@ function Phone({
               >
                 Copy invite
               </button>
+              {fallbackJoinURL && (
+                <button
+                  className="button outline small"
+                  onClick={() => onDisplayAction("copy-ip")}
+                >
+                  Copy IP invite
+                </button>
+              )}
               <button
                 className="button outline small"
                 onClick={() => onDisplayAction("join")}

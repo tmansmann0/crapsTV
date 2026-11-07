@@ -118,7 +118,10 @@ export class RoomHub {
           game.setDiceAppearance(s, pid, message.appearance);
         else if (type === "display")
           game.setDisplaySettings(s, pid, message.settings);
-        else if (type === "bet")
+        else if (type === "bet-preview") {
+          if (!game.previewBet(s, pid, message.amount, message.betId ?? null))
+            return;
+        } else if (type === "bet")
           game.place(s, pid, message.betId, message.amount);
         else if (type === "remove") game.remove(s, pid, message.betId);
         else if (type === "reup") game.reup(s, pid);
@@ -149,6 +152,8 @@ export class RoomHub {
       }
       this.broadcast();
     } catch (error) {
+      // Preparation is ephemeral; a stale preview must never look like a failed wager.
+      if (message?.type === "bet-preview") return;
       this.send(id, { type: "error", message: error.message });
     }
   }

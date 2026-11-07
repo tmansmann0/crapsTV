@@ -4,6 +4,19 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { money } from "./game.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import {
+  SEAT_LAYOUT,
+  seatStackSlot,
+  lineWagerX,
+  bankRoute,
+  betRoute,
+  routeKey,
+  planChipFlows,
+  sampleChipFlow,
+  arcPosition,
+  visualChipAmount,
+  bankChipStacks,
+} from "./chip-flow.js";
+import {
   createChipFactory,
   chipStackForAmount,
   CHIP_DENOMINATIONS,
@@ -32,8 +45,8 @@ export function chipLocation(bet, mode) {
   } else if (bet.type === "field") y = 710;
   else if (kind === "hard") {
     const i = [4, 6, 8, 10].indexOf(Number(num));
-    x = mode === "classic" ? (i % 2 ? 370 : 210) : 1740;
-    y = mode === "classic" ? (i < 2 ? 640 : 735) : 520 + i * 67;
+    x = mode !== "crapless" ? (i % 2 ? 370 : 210) : 1671;
+    y = mode !== "crapless" ? (i < 2 ? 640 : 735) : 520 + i * 67;
   } else if (kind === "prop" || bet.type === "craps") {
     const row =
       bet.type === "craps"
@@ -43,329 +56,618 @@ export function chipLocation(bet, mode) {
           : [2, 12].includes(Number(num))
             ? 2
             : 3;
-    x = mode === "classic" ? 1750 : 1940;
+    x = mode !== "crapless" ? 1750 : 1837;
     y = 520 + row * 67;
   } else if (kind === "big") {
     x = Number(num) === 6 ? 720 : 1320;
     y = 785;
   }
-  return [(x / 2048 - 0.5) * 10.84, ((y * 0.82) / 1024 - 0.5) * 5.4];
+  return [
+    (x / 2048 - 0.5) * 10.84 * (1588 / 1776),
+    ((y * 0.82) / 1024 - 0.5) * 5.4,
+  ];
 }
-export const SEATS = [
-  ...[-4, -2, 0, 2, 4].map((x) => [x, 2.98, 0]),
-  ...[-4, -2, 0, 2, 4].map((x) => [x, -2.98, Math.PI]),
-  [-5.7, 0, Math.PI / 2],
-  [5.7, 0, -Math.PI / 2],
-];
+export const SEATS = SEAT_LAYOUT.map((s) => [s.center[0], s.center[2], 0]);
 const hash = (s) =>
   [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
+
 export function createTablePieces(scene, renderer, { software = false } = {}) {
   let alive = true,
     chipFactory = null,
     dealerRoot = null,
-    dealerRack = null,
-    chipVersion = 0,
-    lastChips = "",
+    dealerRack = null;
+  let lastDice = "",
     lastLabels = "",
-    lastDice = "";
-  const loader = new GLTFLoader(),
-    tl = new THREE.TextureLoader(),
-    materials = new Set(),
+    lastStatic = "",
+    lastPreview = "";
+  let previousState = null,
+    snapshotRef = null,
+    connectedBefore = true,
+    reconnectBaseline = null;
+  let flows = [],
+    seatLayout = SEAT_LAYOUT,
+    layoutRevision = 0;
+  const flightObjects = new Map();
+  const materials = new Set(),
     textures = new Set(),
     geometries = new Set();
-  function linearTexture(n) {
-    const t = tl.load(asset(n));
-    t.colorSpace = THREE.NoColorSpace;
-    t.flipY = false;
-    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-    textures.add(t);
-    return t;
-  }
-  const diceNormals = [1, 2, 3].map((i) => linearTexture(`dice-wear-${i}.png`)),
-    diceRoughness = linearTexture("dice-roughness.png");
-  const chips = new THREE.Group(),
-    labels = new THREE.Group();
-  scene.add(chips, labels);
-  const dice = [new THREE.Group(), new THREE.Group()];
-  dice.forEach((d, i) => {
-    d.scale.setScalar(DICE_SIZE);
-    d.position.set(i ? 0.36 : -0.36, DICE_SIZE / 2 + 0.02, 0);
-    scene.add(d);
-  });
   const diceMaterialCache = new Map(),
     ownerMaterialCache = new Map();
-  const ownerRingGeometry = new THREE.TorusGeometry(0.221, 0.009, 6, 40);
-  geometries.add(ownerRingGeometry);
-  function remember(object) {
-    object.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-        geometries.add(o.geometry);
-        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-          materials.add(m);
-          for (const value of Object.values(m))
-            if (value?.isTexture) textures.add(value);
-        }
-      }
-    });
+  const chips = new THREE.Group(),
+    banks = new THREE.Group(),
+    labels = new THREE.Group();
+  const previews = new THREE.Group(),
+    transfers = new THREE.Group();
+  chips.name = "Live wagers";
+  banks.name = "Player bankrolls";
+  previews.name = "Prepared bets";
+  transfers.name = "Chip transfers";
+  scene.add(chips, banks, labels, previews, transfers);
+  const ringGeometry = new THREE.TorusGeometry(0.195, 0.008, 6, 36);
+  geometries.add(ringGeometry);
+  const dice = [new THREE.Group(), new THREE.Group()];
+  dice.forEach((die, i) => {
+    die.scale.setScalar(DICE_SIZE);
+    die.position.set(i ? 0.36 : -0.36, DICE_SIZE / 2 + 0.02, 0);
+    scene.add(die);
+  });
+  const textureLoader = new THREE.TextureLoader();
+  function linearTexture(name) {
+    const texture = textureLoader.load(asset(name));
+    texture.flipY = false;
+    texture.colorSpace = THREE.NoColorSpace;
+    textures.add(texture);
+    return texture;
   }
-  loader.load(asset("dice.glb"), (g) => {
+  const diceNormals = [1, 2, 3].map((n) => linearTexture(`dice-wear-${n}.png`));
+  const diceRoughness = linearTexture("dice-roughness.png");
+  const diceReady = new Promise((resolve, reject) => {
+    new GLTFLoader().load(
+      asset("dice.glb"),
+      (gltf) => {
+        if (!alive) {
+          disposeModel(gltf.scene);
+          resolve();
+          return;
+        }
+        gltf.scene.traverse((object) => {
+          if (!object.isMesh) return;
+          object.castShadow = object.receiveShadow = true;
+          geometries.add(object.geometry);
+          for (const material of Array.isArray(object.material)
+            ? object.material
+            : [object.material]) {
+            materials.add(material);
+            for (const value of Object.values(material))
+              if (value?.isTexture) textures.add(value);
+          }
+        });
+        dice.forEach((die) => die.add(gltf.scene.clone(true)));
+        resolve();
+      },
+      undefined,
+      reject,
+    );
+  });
+  const layoutReady = fetch(asset("table-player-rails-layout.json"))
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (!alive || !data?.seats || data.seats.length !== 12) return;
+      seatLayout = data.seats.map((s) => ({
+        center: s.bankBase,
+        tangent: s.tangent,
+        outward: s.outward,
+        label: s.labelPosition,
+        slots: s.stackSlots.map((slot) => slot.position),
+      }));
+      layoutRevision++;
+    })
+    .catch(() => {});
+  const chipReady = createChipFactory(renderer).then((factory) => {
     if (!alive) {
-      disposeModel(g.scene);
+      factory.dispose();
       return;
     }
-    remember(g.scene);
-    dice.forEach((d) => d.add(g.scene.clone(true)));
-    lastDice = "";
+    chipFactory = factory;
+    buildDealerRack();
   });
-  createChipFactory(renderer)
-    .then((factory) => {
-      if (!alive) {
-        factory.dispose();
-        return;
-      }
-      chipFactory = factory;
-      chipVersion++;
-      buildDealerRack();
-    })
-    .catch((error) =>
-      console.error("Could not load modeled casino chips", error),
-    );
-  function buildDealerRack() {
-    if (!chipFactory || !dealerRoot || dealerRack) return;
-    dealerRoot.traverse((object) => {
-      if (/^Dealer chip stack \d+$/.test(object.name)) object.visible = false;
-    });
-    dealerRack = new THREE.Group();
-    dealerRack.name = "Modeled dealer chip inventory";
-    CHIP_DENOMINATIONS.forEach(({ value }, column) => {
-      for (let row = 0; row < 8; row++) {
-        const chip = chipFactory.create({
-          denomination: value,
-          wear: (column + row) % 3,
-          diameter: 0.278,
-          thicknessScale: 1,
-        });
-        chip.rotation.x = Math.PI / 2;
-        chip.rotation.y = (column + row) * 0.13;
-        chip.position.set(-0.94 + column * 0.376, 1.09, -2.9 - row * 0.038);
-        dealerRack.add(chip);
-      }
-    });
-    dealerRoot.add(dealerRack);
-  }
-  function clearWagers() {
-    chips.traverse((object) => {
+  const ready = Promise.all([diceReady, chipReady, layoutReady]);
+  ready.catch((error) =>
+    console.error("Could not prepare table pieces", error),
+  );
+
+  function clearGroup(group) {
+    group.traverse((object) => {
       if (object.isSprite) {
         object.material.map?.dispose();
         object.material.dispose();
-      }
+      } else if (object.isInstancedMesh) object.dispose();
     });
-    chips.clear();
+    group.clear();
   }
-  function ownerLabel(player, amount) {
+  function ownerMaterial(color) {
+    if (!ownerMaterialCache.has(color)) {
+      const material = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.45,
+        metalness: 0.15,
+      });
+      materials.add(material);
+      ownerMaterialCache.set(color, material);
+    }
+    return ownerMaterialCache.get(color);
+  }
+  function ring(color, radius = 1) {
+    const mesh = new THREE.Mesh(ringGeometry, ownerMaterial(color));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.scale.setScalar(radius);
+    return mesh;
+  }
+  function textLabel(text, color, width = 0.78, aspect = 5) {
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 128;
-    const context = canvas.getContext("2d");
-    context.fillStyle = "rgba(10,16,14,.94)";
-    context.beginPath();
-    context.roundRect(3, 3, 506, 122, 32);
-    context.fill();
-    context.strokeStyle = player.color;
-    context.lineWidth = 6;
-    context.stroke();
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillStyle = "#f7f0df";
-    context.font = "700 45px Manrope,Arial";
-    const initials = player.name
-      .trim()
-      .split(/\s+/)
-      .map((s) => s[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-    context.fillText(`${initials} · ${money(amount)}`, 256, 65, 460);
+    canvas.width = 640;
+    canvas.height = Math.round(640 / aspect);
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(7,18,13,.94)";
+    ctx.beginPath();
+    ctx.roundRect(3, 3, 634, canvas.height - 6, 28);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = "#f5ecdc";
+    ctx.font = `700 ${aspect < 5 ? Math.round(canvas.height * 0.62) : 46}px Manrope,Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, 320, canvas.height / 2, 590);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    return new THREE.Sprite(
+    const sprite = new THREE.Sprite(
       new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
         depthWrite: false,
       }),
     );
+    sprite.scale.set(width, width / aspect, 1);
+    return sprite;
   }
-  function clearLabels() {
-    while (labels.children.length) {
-      const group = labels.children[0];
-      group.traverse((o) => {
-        if (!o.isSprite) o.geometry?.dispose();
-        if (o.material) {
-          o.material.map?.dispose();
-          o.material.dispose();
+  function layout(player) {
+    return seatLayout[player?.seat ?? 0] || seatLayout[0];
+  }
+  function wagerPosition(route, state) {
+    const [x, z] = chipLocation(route.bet, state.config.mode);
+    const player = state.players.find((p) => p.id === route.playerId);
+    const index = player?.seat ?? 0;
+    if (isLineWager(route.bet)) return [lineWagerX(index), 0.014, z];
+    if (route.bet.point || route.bet.type.startsWith("place-")) {
+      const columns = state.config.mode === "crapless" ? 3 : 4;
+      const rows = Math.ceil(12 / columns);
+      return [
+        x + ((index % columns) - (columns - 1) / 2) * 0.24,
+        0.014,
+        z + (Math.floor(index / columns) - (rows - 1) / 2) * 0.17,
+      ];
+    }
+    if (["come", "field"].includes(route.bet.type)) {
+      return [
+        x + ((index % 4) - 1.5) * 0.63,
+        0.014,
+        z + (Math.floor(index / 4) - 1) * 0.23,
+      ];
+    }
+    return [
+      x + ((index % 3) - 1) * 0.28,
+      0.014,
+      z + (Math.floor(index / 3) - 1.5) * 0.24,
+    ];
+  }
+  function isLineWager(bet) {
+    return (
+      ["pass", "dont"].includes(bet.type) ||
+      (bet.type === "odds" && bet.parentType === "pass")
+    );
+  }
+  function routePosition(route, state) {
+    if (route.kind === "dealer") return [0, 1.2, -3.03];
+    const player = state.players.find((p) => p.id === route.playerId);
+    if (route.kind === "bank") {
+      const seat = layout(player);
+      return [seat.center[0], seat.center[1] + 0.13, seat.center[2]];
+    }
+    const p = wagerPosition(route, state);
+    p[1] += 0.12;
+    return p;
+  }
+  function pileSpecs(
+    amount,
+    { diameter = 0.33, max = 8, opacity = 1, seed = "pile" } = {},
+  ) {
+    const height = 0.13 * diameter * 1.3;
+    return chipStackForAmount(amount, max).chips.map((denomination, n) => ({
+      denomination,
+      wear: (hash(seed) + n) % 3,
+      diameter,
+      thicknessScale: 1.3,
+      opacity,
+      position: [
+        Math.sin(n * 2.1) * 0.006,
+        height / 2 + n * (height + 0.002),
+        Math.cos(n * 1.7) * 0.006,
+      ],
+      rotation: [0, (hash(seed + n) % 628) / 100, 0],
+    }));
+  }
+  function buildDealerRack() {
+    if (!chipFactory || !dealerRoot || dealerRack) return;
+    dealerRoot.traverse((o) => {
+      if (/^Dealer chip stack \d+$/.test(o.name)) o.visible = false;
+    });
+    const specs = [];
+    CHIP_DENOMINATIONS.forEach(({ value }, column) => {
+      for (let row = 0; row < 8; row++)
+        specs.push({
+          denomination: value,
+          wear: (column + row) % 3,
+          diameter: 0.278,
+          thicknessScale: 1,
+          rotation: [Math.PI / 2, (column + row) * 0.13, 0],
+          position: [-0.94 + column * 0.376, 1.09, -2.9 - row * 0.038],
+        });
+    });
+    dealerRack = chipFactory.createBatch(specs);
+    dealerRack.name = "Modeled dealer chip inventory";
+    dealerRoot.add(dealerRack);
+  }
+  function updateDice(state, players) {
+    const shooter = players.find((p) => p.id === state?.shooterId),
+      appearance = shooter?.dice || { color: "red", finish: "solid" };
+    const key = JSON.stringify([appearance, shooter?.id]);
+    if (key === lastDice || !dice[0].children.length) return;
+    lastDice = key;
+    dice.forEach((die, i) =>
+      die.traverse((object) => {
+        if (!object.isMesh || !object.material?.name.includes("DiceBody"))
+          return;
+        const wear = diceWearIndex(shooter?.id, i),
+          id = `${appearance.color}/${appearance.finish}/${wear}`;
+        if (!diceMaterialCache.has(id)) {
+          const material = createDiceMaterial(
+            appearance,
+            diceNormals[wear],
+            diceRoughness,
+            software,
+          );
+          materials.add(material);
+          diceMaterialCache.set(id, material);
         }
+        object.material = diceMaterialCache.get(id);
+      }),
+    );
+  }
+  function buildStatic(state, players, now) {
+    const bankAmounts = players.map((p) =>
+      visualChipAmount(p.bank, bankRoute(p.id), flows, now),
+    );
+    const routes = new Map();
+    players.forEach((p) =>
+      p.bets.forEach((bet) => {
+        const route = betRoute(p.id, bet, p.bets);
+        routes.set(routeKey(route), { route, amount: bet.amount, player: p });
+      }),
+    );
+    for (const flow of flows)
+      if (
+        flow.from.kind === "bet" &&
+        now < flow.startAt &&
+        !routes.has(routeKey(flow.from))
+      ) {
+        const player = players.find((p) => p.id === flow.playerId);
+        if (player)
+          routes.set(routeKey(flow.from), {
+            route: flow.from,
+            amount: 0,
+            player,
+          });
+      }
+    const wagers = [...routes.values()].map((entry) => ({
+      ...entry,
+      visible: visualChipAmount(entry.amount, entry.route, flows, now),
+    }));
+    const key = JSON.stringify([
+      layoutRevision,
+      players.map((p, i) => [p.id, p.seat, bankAmounts[i]]),
+      wagers.map((w) => [routeKey(w.route), w.visible]),
+    ]);
+    if (key === lastStatic) return;
+    lastStatic = key;
+    clearGroup(banks);
+    clearGroup(chips);
+    const specs = [];
+    players.forEach((player, i) => {
+      const seat = layout(player);
+      bankChipStacks(bankAmounts[i], {
+        maxVisible: software ? 18 : 30,
+      }).forEach((stack, slot) => {
+        const center = seatStackSlot(seat, slot),
+          height = 0.13 * 0.23 * 1.15;
+        for (let n = 0; n < stack.visibleCount; n++)
+          specs.push({
+            denomination: stack.denomination,
+            wear: (hash(player.id) + n) % 3,
+            diameter: 0.23,
+            thicknessScale: 1.15,
+            position: [
+              center[0],
+              center[1] + height / 2 + n * (height + 0.002),
+              center[2],
+            ],
+            rotation: [0, (hash(player.id + slot + n) % 628) / 100, 0],
+          });
       });
-      labels.remove(group);
+    });
+    if (specs.length) banks.add(chipFactory.createBatch(specs));
+    wagers.forEach(({ route, player, visible }) => {
+      if (visible <= 0) return;
+      const pile = new THREE.Group();
+      pile.position.fromArray(wagerPosition(route, state));
+      const compact =
+        !isLineWager(route.bet) &&
+        (route.bet.point || route.bet.type.startsWith("place-"));
+      const diameter = compact ? 0.22 : 0.31;
+      const batch = chipFactory.createBatch(
+        pileSpecs(visible, { seed: route.bet.id, diameter }),
+      );
+      pile.add(batch);
+      const marker = ring(player.color, diameter / 0.33);
+      marker.position.y = 0.016;
+      pile.add(marker);
+      const initials = player.name
+        .trim()
+        .split(/\s+/)
+        .map((s) => s[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      const label = textLabel(
+        compact || isLineWager(route.bet)
+          ? money(visible)
+          : `${initials} · ${money(visible)}`,
+        player.color,
+        compact ? 0.24 : isLineWager(route.bet) ? 0.45 : 0.54,
+        compact || isLineWager(route.bet) ? 2.6 : 5,
+      );
+      label.position.y =
+        0.13 * diameter * 1.3 * Math.min(8, batch.userData.chipCount) + 0.08;
+      pile.add(label);
+      pile.userData = {
+        playerId: player.id,
+        betId: route.bet.id,
+        amount: visible,
+      };
+      chips.add(pile);
+    });
+  }
+  function updatePreviews(state, players) {
+    const key = JSON.stringify([
+      layoutRevision,
+      players.map((p) => [p.id, p.seat, p.betPreview]),
+    ]);
+    if (key === lastPreview) return;
+    lastPreview = key;
+    clearGroup(previews);
+    for (const player of players) {
+      const preview = player.betPreview;
+      if (!preview?.amount || player.connected === false || state.rolling)
+        continue;
+      const seat = layout(player),
+        group = new THREE.Group();
+      const preparedSlot = seatStackSlot(seat, 7);
+      group.position.set(
+        preparedSlot[0],
+        seat.center[1] + 0.31,
+        preparedSlot[2],
+      );
+      group.add(
+        chipFactory.createBatch(
+          pileSpecs(preview.amount, {
+            diameter: 0.24,
+            max: 5,
+            opacity: 0.8,
+            seed: player.id,
+          }),
+        ),
+      );
+      const caption = textLabel(
+        `READY ${money(preview.amount)}`,
+        player.color,
+        0.75,
+      );
+      caption.position.y = 0.35;
+      group.add(caption);
+      previews.add(group);
+      if (!preview.betId) continue;
+      const parent = preview.betId.startsWith("odds:")
+        ? player.bets.find((b) => b.id === preview.betId.slice(5))
+        : null;
+      const bet = parent
+        ? {
+            id: "preview",
+            type: "odds",
+            parent: parent.id,
+            point: parent.point,
+          }
+        : { id: "preview", type: preview.betId };
+      const route = betRoute(player.id, bet, player.bets),
+        ghost = new THREE.Group();
+      ghost.position.fromArray(wagerPosition(route, state));
+      ghost.position.y += 0.018;
+      ghost.add(
+        chipFactory.createBatch(
+          pileSpecs(preview.amount, {
+            diameter: 0.33,
+            max: 5,
+            opacity: 0.26,
+            seed: player.id,
+          }),
+        ),
+      );
+      const marker = ring(
+        preview.valid === false ? "#ef6c60" : "#e5ca83",
+        1.18,
+      );
+      marker.position.y = 0.025;
+      ghost.add(marker);
+      previews.add(ghost);
     }
   }
-  function update(state) {
-    const players = state?.players.filter((p) => !p.left) || [],
-      shooter = players.find((p) => p.id === state?.shooterId);
-    const appearance = shooter?.dice || { color: "red", finish: "solid" };
-    const diceKey = JSON.stringify([appearance, shooter?.id]);
-    if (diceKey !== lastDice && dice[0].children.length) {
-      lastDice = diceKey;
-      dice.forEach((d, i) =>
-        d.traverse((o) => {
-          if (!o.isMesh || !o.material?.name.includes("DiceBody")) return;
-          const variant = diceWearIndex(shooter?.id, i),
-            key = `${appearance.color}/${appearance.finish}/${variant}`;
-          if (!diceMaterialCache.has(key)) {
-            const m = createDiceMaterial(
-              appearance,
-              diceNormals[variant],
-              diceRoughness,
-              software,
-            );
-            materials.add(m);
-            diceMaterialCache.set(key, m);
-          }
-          o.material = diceMaterialCache.get(key);
-        }),
-      );
+  function updateFlights(state, now) {
+    const currentIds = new Set(flows.map((f) => f.id));
+    for (const [id, group] of flightObjects)
+      if (!currentIds.has(id)) {
+        clearGroup(group);
+        transfers.remove(group);
+        flightObjects.delete(id);
+      }
+    for (const flow of flows) {
+      let group = flightObjects.get(flow.id);
+      if (!group) {
+        group = new THREE.Group();
+        group.name = `Chip ${flow.kind}`;
+        group.add(
+          chipFactory.createBatch(
+            pileSpecs(flow.amount, { diameter: 0.28, max: 6, seed: flow.id }),
+          ),
+        );
+        const caption = textLabel(
+          money(flow.amount),
+          flow.kind === "loss" ? "#b86960" : "#d7bd79",
+          0.6,
+        );
+        caption.position.y = 0.4;
+        group.add(caption);
+        group.userData.flow = flow;
+        transfers.add(group);
+        flightObjects.set(flow.id, group);
+      }
+      const sample = sampleChipFlow(flow, now);
+      group.visible = sample.active;
+      if (sample.active) {
+        group.position.fromArray(
+          arcPosition(
+            routePosition(flow.from, state),
+            routePosition(flow.to, state),
+            sample.progress,
+          ),
+        );
+        group.rotation.y = Math.sin(sample.progress * Math.PI) * 0.32;
+      }
     }
-    const key = JSON.stringify([
-      chipVersion,
-      state?.config.mode,
-      players.map((p) => [p.id, p.color, p.bets]),
-    ]);
-    if (key !== lastChips && chipFactory) {
-      lastChips = key;
-      clearWagers();
-      players.forEach((p, i) =>
-        p.bets.forEach((b) => {
-          const parent = p.bets.find((x) => x.id === b.parent),
-            [x, z] = chipLocation(
-              { ...b, parentType: parent?.type },
-              state.config.mode,
-            );
-          const pile = new THREE.Group(),
-            diameter = 0.38,
-            thicknessScale = 1.3;
-          const height = 0.13 * diameter * thicknessScale;
-          // Seat the full modeled sidewall above the felt, not halfway inside it.
-          const columns = state.config.mode === "crapless" ? 2 : 3;
-          pile.position.set(
-            x + ((i % columns) - (columns - 1) / 2) * 0.47,
-            0,
-            z + Math.floor(i / columns) * 0.48,
-          );
-          const stack = chipStackForAmount(b.amount, 8);
-          stack.chips.forEach((denomination, n) => {
-            const group = chipFactory.create({
-              denomination,
-              wear: (hash(b.id) + n) % 3,
-              diameter,
-              thicknessScale,
-            });
-            group.position.set(
-              n ? Math.sin(n * 2.1) * 0.01 : 0,
-              0.014 + height / 2 + n * (height + 0.002),
-              n ? Math.cos(n * 1.7) * 0.01 : 0,
-            );
-            group.rotation.y = (hash(b.id + String(n)) % 628) / 100;
-            pile.add(group);
-          });
-          if (!ownerMaterialCache.has(p.color)) {
-            const material = new THREE.MeshStandardMaterial({
-              color: p.color,
-              roughness: 0.4,
-              metalness: 0.22,
-            });
-            materials.add(material);
-            ownerMaterialCache.set(p.color, material);
-          }
-          const ring = new THREE.Mesh(
-            ownerRingGeometry,
-            ownerMaterialCache.get(p.color),
-          );
-          ring.rotation.x = -Math.PI / 2;
-          ring.position.y = 0.025;
-          ring.castShadow = true;
-          pile.add(ring);
-          const label = ownerLabel(p, b.amount);
-          label.position.set(0, 0.014 + height * stack.chips.length + 0.12, 0);
-          label.scale.set(0.66, 0.165, 1);
-          pile.add(label);
-          pile.userData = {
-            playerId: p.id,
-            betId: b.id,
-            amount: b.amount,
-            truncatedStack: stack.truncated,
-          };
-          chips.add(pile);
-        }),
-      );
-    }
-    const labelKey = JSON.stringify(
-      players.map((p, i) => [
+  }
+  function updateLabels(state, players, now) {
+    const displayedBanks = new Map(
+      players.map((p) => [
         p.id,
-        p.name,
-        p.bank,
-        p.color,
-        p.seat ?? i,
-        p.id === state?.shooterId,
+        visualChipAmount(p.bank, bankRoute(p.id), flows, now),
       ]),
     );
-    if (labelKey !== lastLabels) {
-      lastLabels = labelKey;
-      clearLabels();
-      players.forEach((p, i) => {
-        const seat = p.seat ?? i % 12,
-          [x, z, angle] = SEATS[seat],
-          c = document.createElement("canvas");
-        c.width = 768;
-        c.height = 210;
-        const ctx = c.getContext("2d");
-        ctx.textAlign = "center";
-        ctx.shadowColor = "rgba(0,0,0,.95)";
-        ctx.shadowBlur = 14;
-        ctx.shadowOffsetY = 4;
-        ctx.lineWidth = 10;
-        ctx.strokeStyle = "rgba(0,0,0,.75)";
-        ctx.fillStyle = p.color;
-        ctx.font = "700 66px Manrope,Arial";
-        ctx.strokeText(p.name, 384, 87);
-        ctx.fillText(p.name, 384, 87);
-        ctx.fillStyle = "#f2e9d7";
-        ctx.font = "500 45px Manrope,Arial";
-        const bankText = `${p.id === state?.shooterId ? "●  " : ""}${money(p.bank)}`;
-        ctx.strokeText(bankText, 384, 151);
-        ctx.fillText(bankText, 384, 151);
-        const t = new THREE.CanvasTexture(c);
-        t.colorSpace = THREE.SRGBColorSpace;
-        const material = new THREE.SpriteMaterial({
-          map: t,
-          transparent: true,
-          depthWrite: false,
-          depthTest: false,
-        });
-        const group = new THREE.Sprite(material);
-        group.position.set(x, 1.06, z);
-        group.scale.set(1.8, 0.49, 1);
-        group.renderOrder = 30;
-        group.userData.playerId = p.id;
-        labels.add(group);
-      });
+    const key = JSON.stringify([
+      layoutRevision,
+      players.map((p) => [
+        p.id,
+        p.name,
+        displayedBanks.get(p.id),
+        p.bank,
+        p.color,
+        p.seat,
+        p.id === state.shooterId,
+      ]),
+    ]);
+    if (key === lastLabels) return;
+    lastLabels = key;
+    clearGroup(labels);
+    for (const player of players) {
+      const seat = layout(player),
+        sprite = textLabel(
+          `${player.id === state.shooterId ? "● " : ""}${player.name}  ·  ${money(displayedBanks.get(player.id))}`,
+          player.color,
+          1.65,
+        );
+      const pos = [...seat.label];
+      // Tray labels sit outboard at tray height, so they do not mask bank stacks.
+      sprite.position.fromArray(pos);
+      sprite.renderOrder = 30;
+      sprite.material.depthTest = false;
+      sprite.userData.playerId = player.id;
+      sprite.userData.displayedBank = displayedBanks.get(player.id);
+      sprite.userData.authoritativeBank = player.bank;
+      labels.add(sprite);
     }
+  }
+  function update(state, { connected = true } = {}) {
+    const players = state?.players.filter((p) => !p.left) || [];
+    updateDice(state, players);
+    if (!state) {
+      if (previousState) {
+        previousState = snapshotRef = null;
+        flows = [];
+        for (const group of [chips, banks, labels, previews, transfers])
+          clearGroup(group);
+        flightObjects.clear();
+        lastStatic = lastLabels = lastPreview = "";
+      }
+      return;
+    }
+    const now = Date.now() + (state.clockOffsetMs || 0);
+    if (state.status !== "playing") flows = [];
+    if (!connected) {
+      reconnectBaseline = state.snapshotAt ?? state;
+      previousState = null;
+      flows = [];
+      snapshotRef = null;
+      connectedBefore = false;
+    }
+    const waitingForFresh =
+      !connectedBefore &&
+      connected &&
+      (state.snapshotAt ?? state) === reconnectBaseline;
+    if (connected && !waitingForFresh && snapshotRef !== state) {
+      if (chipFactory && connectedBefore && previousState) {
+        const planned = planChipFlows(previousState, state, { now });
+        const ids = new Set(flows.map((f) => f.id));
+        flows.push(...planned.filter((f) => !ids.has(f.id)));
+      }
+      if (
+        !previousState ||
+        previousState.code !== state.code ||
+        previousState.createdAt !== state.createdAt
+      ) {
+        flows = [];
+        lastStatic = "";
+      }
+      previousState = state;
+      snapshotRef = state;
+      connectedBefore = true;
+    }
+    flows = flows.filter((f) => now < f.startAt + f.duration);
+    if (chipFactory) {
+      buildStatic(state, players, now);
+      updatePreviews(state, players);
+      updateFlights(state, now);
+    }
+    updateLabels(state, players, now);
   }
   return {
     dice,
     chips,
+    banks,
     labels,
+    previews,
+    transfers,
+    ready,
+    get isReady() {
+      return !!chipFactory && dice[0].children.length > 0;
+    },
     installDealerRack(tableRoot) {
       dealerRoot = tableRoot;
       buildDealerRack();
@@ -373,15 +675,19 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     update,
     dispose() {
       alive = false;
-      clearLabels();
-      clearWagers();
-      dealerRack?.removeFromParent();
+      for (const group of [chips, banks, labels, previews, transfers]) {
+        clearGroup(group);
+        scene.remove(group);
+      }
+      if (dealerRack) {
+        clearGroup(dealerRack);
+        dealerRack.removeFromParent();
+      }
       chipFactory?.dispose();
       dice.forEach((d) => scene.remove(d));
-      scene.remove(chips, labels);
-      for (const g of geometries) g.dispose();
-      for (const m of materials) m.dispose();
-      for (const t of textures) t.dispose();
+      for (const geometry of geometries) geometry.dispose();
+      for (const material of materials) material.dispose();
+      for (const texture of textures) texture.dispose();
     },
   };
 }

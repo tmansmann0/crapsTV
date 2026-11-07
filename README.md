@@ -20,7 +20,9 @@ npm run build
 npm start
 ```
 
-Open `http://localhost:3000` on the TV computer. The root page is the full-screen 3D table; join code, QR, controls, and player balances are drawn inside the canvas. The terminal also prints a **LAN address**, such as `http://192.168.1.50:3000`. Open that address on the TV to show a scannable QR code; phones must be on the same Wi-Fi. Guest Wi-Fi or client isolation may prevent phones reaching the computer. Allow Node through the OS firewall if asked.
+Open **`http://crapstv.local:3000`** on the TV computer or another device on the same LAN. Keep `:3000` in the URL. The root page is the full-screen 3D table; join code, QR, controls, and player balances are drawn inside the canvas. `http://localhost:3000` also works on the host computer. The terminal prints the actual local hostname and a **LAN-IP fallback**, such as `http://192.168.1.50:3000`, and phone settings can copy that fallback. The TV join card also shows the direct IP address.
+
+The app advertises `crapstv.local` automatically with mDNS; it requires no hosts-file edits or system service installation. If another device owns the name, the app selects a distinct hostname and prints it. Joining devices need mDNS support: Windows/Android resolver behavior varies, and guest Wi-Fi, client isolation, VPNs, or multicast filtering can block discovery. If the hostname fails, use the printed LAN-IP URL or set `CRAPSTV_JOIN_MODE=ip` before starting. Set `CRAPSTV_MDNS=0` to disable discovery entirely. Allow Node through the host firewall if asked. See [local-network.md](docs/local-network.md) for platform-specific commands, hostname/interface overrides, and limitations.
 
 These commands are the same in macOS/Linux terminals, Windows PowerShell, and Windows Terminal. No Blender, Python, model downloads, account, or cloud service is needed at runtime. Fonts, models, artwork, and audio are bundled. After installation, local sessions work offline.
 
@@ -40,7 +42,7 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Starting stack and table minimum.** The first player chooses both.
 - **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
 - **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The visual practice tutorial and rules/payout guide are always available.
-- **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available.
+- **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
 - **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw, and random results come from the authority’s cryptographic random generator.
 - **Re-up without losing your story.** With no open bets and total chips below the minimum, refill to the starting stack. Added chips count as new buy-in, never as winnings.
 - **Cash out or close the table.** Unresolved wagers are returned. Each player gets a personal recap, net-result chart, biggest win, comeback count, and downloadable **1080×1440 PNG** or editable SVG.
@@ -70,6 +72,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `src/game.js` | Deterministic rules, cents-based ledger, probabilities, recaps |
 | `src/hub.js` | Shared room authority, private reconnect tokens, action validation |
 | `server/index.js` | Local HTTP/WebSocket host with same-origin check and heartbeat |
+| `server/local-discovery.js` | mDNS hostname advertisement, collision handling, and LAN-IP fallback |
 | `src/transport.js` | Local sockets or online PeerJS room transport |
 | `src/Table3D.jsx` | Blender models, finite HDR backdrop, cinematic shared dice playback |
 | `src/PhoneGame.jsx` | Compact phone board, chip bundles, results, and safe practice tutorial |
@@ -100,9 +103,9 @@ The TV page has no outer navigation, sidebar, headings, or footer. Every visible
 
 ## Detailed playing pieces and display controls
 
-The actual generated logo is used on the TV. Player names and stacks are 2D labels anchored to their seats around the table, rather than a screen-corner list. The TV settings menu starts closed. Admin controllers have shared announcer and camera settings plus invite/controller/fullscreen actions.
+The generated logo is used on the TV and the felt. Hardways show pairs of dice, and the pass/don’t-pass lanes wrap around both sides of the classic layout. The active table has six front trays and three on each side, with physical chip banks and seat labels. The original table model and Blender source are preserved unchanged; the edited [twelve-seat variant](docs/player-table.md) is a separate asset. The TV settings menu starts closed. Admin controllers have shared announcer and camera settings plus invite/controller/fullscreen actions.
 
-Chips load a real modeled GLB with edge inserts, engraved medallions, and three independently seeded wear/roughness variants. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
+Chips load a real modeled GLB with edge inserts, engraved medallions, and three independently seeded wear/roughness variants. Preparing a phone bundle shows held chips beside that player’s bank and a ghost pile over the selected bet. Accepted stakes travel onto the felt; returned stakes and winnings travel back to the bank. Standing bets stay on the felt when only their profit is paid. Reconnecting uses the current ledger without replaying old payouts. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
 
 Dice animation uses Cannon rigid bodies against the felt and the table’s raised rubber walls. The visual throw does not choose or change the cryptographically generated game result. The dice settle to the authoritative faces after the bounce. The rubber contact boundary is X=±5.42/Z=±2.71 with a .92-unit top rail.
 

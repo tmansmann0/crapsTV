@@ -104,8 +104,16 @@ export function createSceneUI(renderer, onAction) {
     c.stroke();
   }
   function redraw() {
-    const { state, code, status, sound, error, cameraMode, settingsOpen } =
-      current;
+    const {
+      state,
+      code,
+      status,
+      sound,
+      error,
+      cameraMode,
+      settingsOpen,
+      sceneLoading,
+    } = current;
     let p = panels.brand,
       c = begin(p, false);
     if (logo) {
@@ -167,7 +175,9 @@ export function createSceneUI(renderer, onAction) {
     text(
       c,
       status === "connected"
-        ? "Scan with your phone"
+        ? current.fallbackJoinURL
+          ? `IP ${new URL(current.fallbackJoinURL).host}/join`
+          : "Scan with your phone"
         : status === "disconnected"
           ? "Connection lost"
           : "Connecting…",
@@ -193,7 +203,8 @@ export function createSceneUI(renderer, onAction) {
       state?.status === "playing" ||
       state?.status === "ended" ||
       !!error ||
-      status !== "connected";
+      status !== "connected" ||
+      sceneLoading;
     let heading = "Connecting",
       detail = "";
     if (state?.status === "playing") {
@@ -210,6 +221,10 @@ export function createSceneUI(renderer, onAction) {
     if (state?.status === "ended") {
       heading = "SESSION CLOSED";
       detail = "Recaps are ready on your phones";
+    }
+    if (sceneLoading && !error) {
+      heading = "Loading table…";
+      detail = "";
     }
     if (error) {
       heading = "NOTICE";
@@ -264,6 +279,8 @@ export function createSceneUI(renderer, onAction) {
       next.error,
       next.cameraMode,
       next.settingsOpen,
+      next.sceneLoading,
+      next.fallbackJoinURL,
       next.state?.status,
       next.state?.point,
       next.state?.rolling,

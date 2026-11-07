@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { WebSocketServer } from "ws";
 import { RoomHub } from "../src/hub.js";
+import { createLocalDiscovery } from "./local-discovery.js";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.PORT || 3000),
   app = express(),
@@ -16,28 +17,29 @@ const code = Array.from(
   (b) => alphabet[b % alphabet.length],
 ).join("");
 const hub = new RoomHub(code);
-app.get("/api/config", (_req, res) => {
-  const address = Object.values(networkInterfaces())
-    .flat()
-    .find((info) => info && info.family === "IPv4" && !info.internal)?.address;
-  res.json({
-    local: true,
-    code,
-    joinOrigin: address ? `http://${address}:${port}` : null,
-  });
+let devServer;
+const devAllowedHosts = [];
+let resolveAppReady;
+const appReady = new Promise((resolve) => {
+  resolveAppReady = resolve;
 });
-if (process.argv.includes("--dev")) {
-  const { createServer } = await import("vite");
-  const vite = await createServer({
-    root,
-    server: { middlewareMode: true },
-    appType: "spa",
-  });
-  app.use(vite.middlewares);
-} else {
-  app.use(express.static(path.join(root, "dist")));
-  app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
-}
+const discovery = createLocalDiscovery({
+  port,
+  code,
+  log: (message) => console.log(`  ${message}`),
+  onChange: ({ localHostname }) => {
+    if (localHostname && !devAllowedHosts.includes(localHostname)) {
+      devAllowedHosts.push(localHostname);
+      // Vite freezes the host list inside its middleware. A conflict after
+      // startup requires rebuilding that middleware from our updated list.
+      if (devServer) devServer.restart().catch((error) => console.error(error));
+    }
+  },
+});
+app.get("/api/config", async (_req, res) => {
+  await appReady;
+  res.json({ local: true, code, ...discovery.config() });
+});
 const wss = new WebSocketServer({ server, path: "/socket", maxPayload: 8192 });
 wss.on("connection", (ws, req) => {
   // Prevent third-party web pages from silently connecting to a LAN room.
@@ -81,23 +83,66 @@ const heartbeat = setInterval(() => {
     ws.ping();
   }
 }, 30000);
-server.listen(port, "0.0.0.0", () => {
-  console.log(`\n  crapsTV · room ${code}\n  TV: http://localhost:${port}\n`);
-  for (const infos of Object.values(networkInterfaces()))
-    for (const info of infos || [])
-      if (info.family === "IPv4" && !info.internal)
-        console.log(
-          `  Phones: http://${info.address}:${port}/join?code=${code}`,
-        );
-  console.log(
-    "\n  Keep this process running during your session. Ctrl+C to close.\n",
-  );
-});
-function shutdown() {
+let shuttingDown = false;
+async function shutdown(exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   clearInterval(heartbeat);
   hub.close();
   for (const ws of wss.clients) ws.close();
-  server.close(() => process.exit(0));
+  const closingServer = new Promise((resolve) => server.close(resolve));
+  const forceClose = setTimeout(() => {
+    for (const ws of wss.clients) ws.terminate();
+    server.closeAllConnections();
+  }, 1500);
+  forceClose.unref();
+  await Promise.all([discovery.stop(), closingServer, devServer?.close()]);
+  clearTimeout(forceClose);
+  process.exit(exitCode);
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => shutdown());
+process.on("SIGTERM", () => shutdown());
+
+try {
+  // Bind first: a failed/occupied HTTP port must never claim a local hostname.
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "0.0.0.0", resolve);
+  });
+  const local = await discovery.start();
+  if (process.argv.includes("--dev")) {
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      root,
+      server: {
+        middlewareMode: true,
+        allowedHosts: devAllowedHosts,
+      },
+      appType: "spa",
+    });
+    devServer = vite;
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(root, "dist")));
+    app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
+  }
+  resolveAppReady();
+  if (!shuttingDown) {
+    console.log(`\n  crapsTV · room ${code}\n  TV: http://localhost:${port}\n`);
+    if (local.localOrigin) console.log(`  Local: ${local.localOrigin}`);
+    if (local.joinOrigin)
+      console.log(`  Join: ${local.joinOrigin}/join?code=${code}`);
+    for (const infos of Object.values(networkInterfaces()))
+      for (const info of infos || [])
+        if (info.family === "IPv4" && !info.internal)
+          console.log(
+            `  Phones: http://${info.address}:${port}/join?code=${code}`,
+          );
+    console.log(
+      "\n  Keep this process running during your session. Ctrl+C to close.\n",
+    );
+  }
+} catch (error) {
+  console.error(`crapsTV could not start: ${error.message}`);
+  await shutdown(1);
+}

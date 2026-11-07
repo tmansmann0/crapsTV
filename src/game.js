@@ -1,3 +1,4 @@
+import { validBetChoices } from "./bet-options.js";
 import {
   createThrowTimeline,
   sanitizeGesture,
@@ -297,6 +298,7 @@ export function join(s, name) {
         (i) => !s.players.some((p) => !p.left && p.seat === i),
       ) ?? 0,
     dice: { color: "red", finish: "solid" },
+    betPreview: null,
     color: COLORS[s.players.length % COLORS.length],
     bank: s.config.startingBank,
     buyIn: s.config.startingBank,
@@ -383,6 +385,37 @@ export function setTeach(s, id, value) {
   s.config.teach = value;
   if (value) log(s, "Teach mode is on.", "teach-mode");
 }
+export function previewBet(s, id, amount, betId = null, now = Date.now()) {
+  const p = s.players.find((player) => player.id === id);
+  assert(p, "Join the table first.");
+  assert(
+    Number.isSafeInteger(amount) && amount >= 0,
+    "Invalid preview amount.",
+  );
+  if (amount === 0) {
+    p.betPreview = null;
+    return true;
+  }
+  active(s, id);
+  betting(s);
+  assert(amount <= p.bank, "Preview exceeds available chips.");
+  assert(
+    betId === null || typeof betId === "string",
+    "Invalid preview target.",
+  );
+  const row =
+    betId === null ? null : catalogue(s, p).find((row) => row.id === betId);
+  assert(betId === null || row, "Unknown preview target.");
+  if (p.betPreview && now - p.betPreview.at < 90) return false;
+  p.betPreview = {
+    amount,
+    betId,
+    valid: row ? validBetChoices(row, amount, p).valid : true,
+    revision: (p.betPreview?.revision || 0) + 1,
+    at: now,
+  };
+  return true;
+}
 export function place(s, id, betId, amount) {
   betting(s);
   const p = active(s, id),
@@ -415,6 +448,7 @@ export function place(s, id, betId, amount) {
       parent: item.parent || null,
     });
   p.bank -= amount;
+  p.betPreview = null;
   p.stats.wagered += amount;
 }
 export function remove(s, id, betId) {
@@ -540,6 +574,7 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   s.throw = timeline;
   s.aim = null;
   s.rolling = true;
+  for (const player of s.players) player.betPreview = null;
   return timeline;
 }
 function settle(p, b, result, multiplier = 1, stay = false) {
@@ -748,6 +783,7 @@ export function leave(s, id) {
   const p = active(s, id);
   p.bank = equity(p);
   p.bets = [];
+  p.betPreview = null;
   p.left = true;
   p.connected = false;
   p.leftAt = Date.now();
@@ -776,6 +812,7 @@ export function end(s, id) {
   }
   s.status = "ended";
   s.aim = null;
+  for (const player of s.players) player.betPreview = null;
   s.endedAt = Date.now();
   log(s, "That’s a wrap. What a night.", "session-ended");
 }
@@ -783,6 +820,7 @@ export function changeConnection(s, id, connected) {
   const p = s.players.find((x) => x.id === id);
   if (!p || p.left) return;
   p.connected = connected;
+  if (!connected) p.betPreview = null;
   if (!connected && s.aim?.playerId === id) s.aim = null;
 }
 export function transfer(s, id, to) {

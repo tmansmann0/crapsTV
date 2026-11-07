@@ -29,7 +29,7 @@ export default defineConfig({
   webServer: {
     command: "node server/index.js",
     url: "http://127.0.0.1:4321/api/config",
-    env: { PORT: "4321" },
+    env: { PORT: "4321", CRAPSTV_MDNS: "0", CRAPSTV_JOIN_MODE: "ip" },
     reuseExistingServer: false,
     timeout: 20000,
   },

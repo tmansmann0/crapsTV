@@ -44,7 +44,14 @@ export default function Table3D(props) {
       dragStart = null,
       environmentShell = null,
       environmentTarget = null,
-      displayRevision = -1;
+      displayRevision = -1,
+      tableLoaded = false,
+      piecesLoaded = false,
+      detailLoaded = 0,
+      boardsLoaded = 0,
+      stageReady = false,
+      warming = false,
+      stageError = "";
     const { software } = configureRenderer(renderer);
     el.dataset.renderQuality = software ? "software" : "full";
     renderer.setSize(el.clientWidth, el.clientHeight);
@@ -56,9 +63,9 @@ export default function Table3D(props) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#09100e");
     const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 160);
-    camera.position.set(9, 5.3, 15);
+    camera.position.set(10, 6.5, 18);
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.3, 0);
+    controls.target.set(0, 0.4, 0.5);
     controls.enableDamping = true;
     controls.dampingFactor = 0.065;
     controls.enablePan = false;
@@ -93,7 +100,7 @@ export default function Table3D(props) {
       new THREE.ShadowMaterial({ opacity: 0.32 }),
     );
     shadow.rotation.x = -Math.PI / 2;
-    shadow.position.y = -2.15;
+    shadow.position.y = -2.54;
     shadow.receiveShadow = true;
     scene.add(shadow);
     const pmrem = new THREE.PMREMGenerator(renderer);
@@ -183,6 +190,7 @@ export default function Table3D(props) {
       .catch(() => loadEnvironment("casino-studio.hdr", new HDRLoader()))
       .catch(() => {
         el.dataset.environment = "unavailable";
+        stageError = "Casino environment could not load. Refresh to retry.";
       });
     const loader = new GLTFLoader(),
       textures = {};
@@ -195,34 +203,55 @@ export default function Table3D(props) {
       });
       return object;
     }
-    loader.load(asset("table.glb"), (g) => {
-      if (alive) {
-        scene.add(addObject(g.scene));
-        pieces.installDealerRack(g.scene);
-      } else disposeModel(g.scene);
-    });
-    const weaveSize = 128,
-      weave = new Uint8Array(weaveSize * weaveSize * 4);
-    for (let i = 0; i < weaveSize * weaveSize; i++) {
-      const x = i % weaveSize,
-        y = Math.floor(i / weaveSize),
-        j = i * 4;
-      weave[j] = 128 + (x % 2 ? 5 : -5);
-      weave[j + 1] = 128 + (y % 2 ? 5 : -5);
-      weave[j + 2] = 255;
-      weave[j + 3] = 255;
+    loader.load(
+      asset("table-player-rails.glb"),
+      (g) => {
+        if (alive) {
+          scene.add(addObject(g.scene));
+          pieces.installDealerRack(g.scene);
+          tableLoaded = true;
+        } else disposeModel(g.scene);
+      },
+      undefined,
+      () => {
+        stageError = "Table model could not load. Refresh to retry.";
+      },
+    );
+    const detailLoader = new THREE.TextureLoader();
+    const loadDetail = (name) =>
+      detailLoader.load(
+        asset(name),
+        (texture) => {
+          if (!alive) {
+            texture.dispose();
+            return;
+          }
+          detailLoaded++;
+        },
+        undefined,
+        () => {
+          stageError = "Table texture could not load. Refresh to retry.";
+        },
+      );
+    const normal = loadDetail("felt-normal.png"),
+      roughness = loadDetail("felt-roughness.png");
+    for (const texture of [normal, roughness]) {
+      texture.colorSpace = THREE.NoColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(10.84 / 0.46, 5.4 / 0.46);
+      texture.anisotropy = Math.min(
+        8,
+        renderer.capabilities.getMaxAnisotropy(),
+      );
     }
-    const normal = new THREE.DataTexture(weave, weaveSize, weaveSize);
-    normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
-    normal.repeat.set(35, 18);
-    normal.needsUpdate = true;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(10.84, 5.4),
       new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 0.94,
+        roughness: 0.98,
+        roughnessMap: roughness,
         normalMap: normal,
-        normalScale: new THREE.Vector2(0.18, 0.18),
+        normalScale: new THREE.Vector2(0.26, 0.26),
         metalness: 0,
       }),
     );
@@ -232,16 +261,31 @@ export default function Table3D(props) {
     scene.add(board);
     const textureLoader = new THREE.TextureLoader();
     for (const mode of ["classic", "crapless"])
-      textureLoader.load(asset(`board-${mode}.png`), (t) => {
-        if (!alive) {
-          t.dispose();
-          return;
-        }
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        textures[mode] = t;
-      });
+      textureLoader.load(
+        asset(`board-${mode}.png`),
+        (t) => {
+          if (!alive) {
+            t.dispose();
+            return;
+          }
+          t.colorSpace = THREE.SRGBColorSpace;
+          t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          textures[mode] = t;
+          boardsLoaded++;
+        },
+        undefined,
+        () => {
+          stageError = "Table layout could not load. Refresh to retry.";
+        },
+      );
     const pieces = createTablePieces(scene, renderer, { software });
+    pieces.ready
+      .then(() => {
+        if (alive) piecesLoaded = true;
+      })
+      .catch(() => {
+        stageError = "Playing pieces could not load. Refresh to retry.";
+      });
     const dice = pieces.dice;
     const aimArrow = new THREE.ArrowHelper(
       new THREE.Vector3(0, 0, -1),
@@ -403,15 +447,15 @@ export default function Table3D(props) {
             camera.position.sub(mid).setLength(distance).add(mid);
         } else {
           controls.target.lerp(
-            new THREE.Vector3(0, 0.3, 0),
+            new THREE.Vector3(0, 0.4, 0.5),
             Math.min(1, dt * 3),
           );
-          if (cameraMode === "table") targetPosition.set(0.01, 14, 6.5);
-          else if (cameraMode === "room") targetPosition.set(9, 3.0, 16);
+          if (cameraMode === "table") targetPosition.set(0.01, 17, 8);
+          else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
           else {
             const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
-            targetPosition.set(drift, 4.2, 13.2);
+            targetPosition.set(drift, 6.0, 16.2);
           }
         }
         if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
@@ -429,9 +473,13 @@ export default function Table3D(props) {
           .sub(controls.target)
           .setLength(cinematicDistance)
           .add(controls.target);
-      pieces.update(s);
+      pieces.update(s, { connected: current.status === "connected" });
       el.dataset.settingsOpen = String(!!current.settingsOpen);
       el.dataset.playerLabels = String(pieces.labels.children.length);
+      el.dataset.banks = String(pieces.banks.children.length);
+      el.dataset.previews = String(pieces.previews.children.length);
+      el.dataset.transfers = String(pieces.transfers.children.length);
+      el.dataset.sceneReady = String(stageReady);
       el.dataset.chips = String(pieces.chips.children.length);
       el.dataset.diceColor =
         s?.players.find((p) => p.id === s.shooterId)?.dice?.color || "red";
@@ -472,13 +520,37 @@ export default function Table3D(props) {
       puck.position.x = s?.point
         ? ((136 + ((pts.indexOf(s.point) + 0.5) * 1776) / pts.length) / 2048 -
             0.5) *
-          10.84
-        : -4.5;
-      ui.update({ ...current, cameraMode });
+          10.84 *
+          (1588 / 1776)
+        : -4.0;
+      if (
+        !stageReady &&
+        !warming &&
+        tableLoaded &&
+        detailLoaded === 2 &&
+        boardsLoaded === 2 &&
+        piecesLoaded &&
+        readyEnvironment
+      ) {
+        warming = true;
+        Promise.resolve(renderer.compileAsync?.(scene, camera))
+          .then(() => {
+            if (alive) stageReady = true;
+          })
+          .catch(() => {
+            if (alive) stageReady = true;
+          });
+      }
+      ui.update({
+        ...current,
+        cameraMode,
+        sceneLoading: !stageReady,
+        error: current.error || stageError,
+      });
       // Hidden TV tabs still advance shared state, but need no GPU readback.
       if (!document.hidden) {
         renderer.clear();
-        renderer.render(scene, camera);
+        if (stageReady) renderer.render(scene, camera);
         renderer.clearDepth();
         renderer.render(ui.scene, ui.camera);
       }
@@ -509,6 +581,7 @@ export default function Table3D(props) {
       sceneTextures.forEach((t) => t.dispose());
       Object.values(textures).forEach((t) => t.dispose());
       normal.dispose();
+      roughness.dispose();
       readyEnvironment?.dispose();
       environmentTarget?.dispose();
       pmrem.dispose();

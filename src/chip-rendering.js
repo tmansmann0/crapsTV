@@ -69,8 +69,8 @@ export async function createChipFactory(renderer) {
     }
   });
   const cache = new Map();
-  function styled(original, denomination, wear) {
-    const key = `${original.uuid}/${denomination}/${wear}`;
+  function styled(original, denomination, wear, opacity = 1) {
+    const key = `${original.uuid}/${denomination}/${wear}/${opacity}`;
     if (!cache.has(key)) {
       const material = original.clone();
       if (original.name.startsWith("ChipBase"))
@@ -82,6 +82,11 @@ export async function createChipFactory(renderer) {
         material.roughness = 0.78;
       }
       material.envMapIntensity = 0.75;
+      if (opacity < 1) {
+        material.transparent = true;
+        material.opacity = opacity;
+        material.depthWrite = false;
+      }
       materials.add(material);
       cache.set(key, material);
     }
@@ -93,6 +98,7 @@ export async function createChipFactory(renderer) {
       wear = 0,
       diameter = 0.38,
       thicknessScale = 1.3,
+      opacity = 1,
     } = {}) {
       wear = ((wear % 3) + 3) % 3;
       const group = gltf.scene.clone(true);
@@ -107,9 +113,68 @@ export async function createChipFactory(renderer) {
         if (!object.isMesh) return;
         object.castShadow = object.receiveShadow = true;
         object.material = Array.isArray(object.material)
-          ? object.material.map((m) => styled(m, denomination, wear))
-          : styled(object.material, denomination, wear);
+          ? object.material.map((m) => styled(m, denomination, wear, opacity))
+          : styled(object.material, denomination, wear, opacity);
       });
+      return group;
+    },
+    createBatch(specs) {
+      const group = new THREE.Group(),
+        buckets = new Map();
+      gltf.scene.updateMatrixWorld(true);
+      const sourceMeshes = [];
+      gltf.scene.traverse((object) => {
+        if (object.isMesh) sourceMeshes.push(object);
+      });
+      const position = new THREE.Vector3(),
+        quaternion = new THREE.Quaternion(),
+        scale = new THREE.Vector3();
+      for (const spec of specs) {
+        const denomination = spec.denomination ?? 500,
+          wear = (((spec.wear || 0) % 3) + 3) % 3;
+        const diameter = spec.diameter ?? 0.23,
+          thickness = spec.thicknessScale ?? 1.15;
+        position.fromArray(spec.position || [0, 0, 0]);
+        quaternion.setFromEuler(
+          new THREE.Euler(...(spec.rotation || [0, 0, 0])),
+        );
+        scale.set(diameter, diameter * thickness, diameter);
+        const transform = new THREE.Matrix4().compose(
+          position,
+          quaternion,
+          scale,
+        );
+        for (const mesh of sourceMeshes) {
+          const key = `${mesh.uuid}/${denomination}/${wear}/${spec.opacity ?? 1}`;
+          if (!buckets.has(key))
+            buckets.set(key, {
+              mesh,
+              material: styled(
+                mesh.material,
+                denomination,
+                wear,
+                spec.opacity ?? 1,
+              ),
+              matrices: [],
+            });
+          buckets
+            .get(key)
+            .matrices.push(transform.clone().multiply(mesh.matrixWorld));
+        }
+      }
+      for (const { mesh, material, matrices } of buckets.values()) {
+        const batch = new THREE.InstancedMesh(
+          mesh.geometry,
+          material,
+          matrices.length,
+        );
+        matrices.forEach((matrix, index) => batch.setMatrixAt(index, matrix));
+        batch.castShadow = batch.receiveShadow = !material.transparent;
+        batch.instanceMatrix.needsUpdate = true;
+        batch.computeBoundingSphere();
+        group.add(batch);
+      }
+      group.userData.chipCount = specs.length;
       return group;
     },
     dispose() {

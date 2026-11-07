@@ -857,10 +857,43 @@ body:has(.pg-shell) {
   color: var(--pg-brass-ink);
   font-weight: 700;
 }
+.pg-notice-choices {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+.pg-quickbets {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  min-height: 40px;
+}
+.pg-quickbets span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--pg-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pg-shell .pg-quickbets button {
+  flex: none;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 11px;
+  color: var(--pg-ivory);
+  background: var(--pg-felt-deep);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
 .pg-notice-fix {
   flex: none;
-  min-height: 30px;
-  padding: 0 10px;
+  min-height: 40px;
+  padding: 0 9px;
   border: 1.5px solid currentColor;
   border-radius: 999px;
   background: var(--pg-paper);

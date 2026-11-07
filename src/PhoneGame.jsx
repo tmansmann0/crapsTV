@@ -26,6 +26,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { validBetChoices } from "./bet-options.js";
 import { catalogue, describeBet, equity, money, net } from "./game.js";
 import "./phone-game.css";
 
@@ -44,6 +45,9 @@ const FIELD_NUMBERS = [2, 3, 4, 9, 10, 11, 12];
 const PLACE_WORDS = { 6: "SIX", 9: "NINE" };
 const PRACTICE_BANK = 10000;
 const PRACTICE_MIN = 500;
+// Keeps previews under 10/sec and clear of the server's 90ms drop window.
+const PREVIEW_INTERVAL = 110;
+const PREVIEW_VERIFY = 350;
 
 const ChipImages = createContext(null);
 
@@ -119,45 +123,23 @@ const PIPS = {
 };
 
 // Everything the rules engine would reject for this exact amount. Nothing here
-// changes the amount; `fix` is only offered to the player as a button.
+// changes the amount; `lower`/`upper` are only offered to the player as buttons.
 function betIssue(row, amount, { player, state, connected }) {
   if (!connected) return { text: "Reconnecting. Bets are paused." };
   if (state.rolling) return { text: "Dice are out. Bets are locked." };
   if (!row.available) return { text: `${row.name}: ${unavailableLabel(row)}.` };
   if (amount <= 0) return { text: "Tap chips to build a bet first." };
-  const existing = row.parent
-    ? player.bets.find((b) => b.parent === row.parent)?.amount || 0
-    : 0;
-  const room = Math.min(
-    player.bank,
-    row.parent ? row.max - existing : player.bank,
-  );
-  const valid =
-    amount >= row.minimum && amount % row.quantum === 0 && amount <= room;
-  if (valid) return null;
-  const q = row.quantum,
-    up = Math.max(row.minimum, Math.ceil(amount / q) * q),
-    down = Math.floor(amount / q) * q,
-    largest = Math.floor(room / q) * q;
-  const fix =
-    up <= room
-      ? up
-      : down >= row.minimum && down <= room
-        ? down
-        : largest >= row.minimum
-          ? largest
-          : null;
-  let text;
-  if (amount > player.bank)
-    text = `You have ${money(player.bank)} in the bank.`;
-  else if (row.parent && amount > room)
-    text = room
-      ? `Odds limit: ${money(room)} more on this bet.`
-      : "These odds are at the 5× limit.";
-  else if (amount < row.minimum)
-    text = `${row.name} minimum is ${money(row.minimum)}.`;
-  else text = `${row.name} goes up in ${money(q)} steps.`;
-  return { text, fix };
+  const choices = validBetChoices(row, amount, player);
+  if (choices.valid) return null;
+  const { lower, upper, minimum, maximum, step } = choices;
+  let text = choices.reason;
+  if (lower !== null || upper !== null) {
+    if (amount > maximum) text = `${row.name} can take ${money(maximum)} now.`;
+    else if (amount < minimum)
+      text = `${row.name} minimum is ${money(minimum)}.`;
+    else text = `${row.name} goes up in ${money(step)} steps.`;
+  }
+  return { text, lower, upper };
 }
 
 function unavailableLabel(row) {
@@ -263,6 +245,45 @@ function useChipDrag({ enabled, onDrop, ghostAmount }) {
     </div>
   ) : null;
   return { dragging, hoverId, handlers, ghostNode };
+}
+
+// Display-only: tells the TV what this player is holding. Never places a bet.
+function useBetPreview({ send, echo, canSend, held, amount, betId }) {
+  const target = amount > 0 ? betId || null : null;
+  const key = `${amount}:${target || ""}`;
+  const sent = useRef({ key: "0:", at: 0, retries: 0 }),
+    timer = useRef(null),
+    latest = useRef(null);
+  latest.current = { send, echo, canSend, held, amount, target, key };
+  const flush = useCallback(() => {
+    timer.current = null;
+    const now = latest.current,
+      last = sent.current;
+    if (!now.canSend || now.held) return;
+    const echoed = now.echo
+      ? `${now.echo.amount}:${now.echo.betId || ""}`
+      : "0:";
+    if (last.key === now.key) {
+      // The server drops updates that land too close together, so a final
+      // value is resent if it never came back in state.
+      if (echoed === now.key || last.retries >= 2) return;
+      last.retries += 1;
+    } else last.retries = 0;
+    now.send({ type: "bet-preview", amount: now.amount, betId: now.target });
+    last.key = now.key;
+    last.at = Date.now();
+    timer.current = setTimeout(flush, PREVIEW_VERIFY);
+  }, []);
+  useEffect(() => {
+    clearTimeout(timer.current);
+    timer.current = null;
+    // The server clears previews itself when dice fly or a player disconnects.
+    if (!canSend) sent.current.key = "0:";
+    if (!canSend || held || sent.current.key === key) return;
+    const wait = PREVIEW_INTERVAL - (Date.now() - sent.current.at);
+    timer.current = setTimeout(flush, Math.max(0, wait));
+  }, [key, canSend, held, flush]);
+  useEffect(() => () => clearTimeout(timer.current), []);
 }
 
 function Stake({ amount, count }) {
@@ -437,23 +458,61 @@ function BundleBar({
   );
 }
 
-function Notice({ notice, fallback, onFix }) {
-  const tone = notice?.tone || "hint";
+function Notice({ notice, fallback, onBet, locked }) {
+  const tone = notice?.tone || "hint",
+    row = notice?.row;
+  const choices = row
+    ? [
+        ["Bet less", notice.lower],
+        ["Bet more", notice.upper],
+      ].filter(([, value]) => value != null)
+    : [];
   return (
     <div
       className={`pg-notice is-${tone}`}
       role={tone === "error" ? "alert" : "status"}
     >
       <span>{notice?.text || fallback}</span>
-      {notice?.fix != null && (
+      {choices.length > 0 && (
+        <div className="pg-notice-choices">
+          {choices.map(([label, value]) => (
+            <button
+              type="button"
+              key={label}
+              className="pg-notice-fix"
+              disabled={locked}
+              aria-label={`${label}: ${money(value)} on ${row.name}`}
+              onClick={() => onBet(row, value)}
+            >
+              {label} · {money(value)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickBets({ row, player, onBet }) {
+  const { quick } = validBetChoices(row, 0, player);
+  if (!quick.length) return null;
+  return (
+    <div
+      className="pg-quickbets"
+      role="group"
+      aria-label={`Quick bets on ${row.name}`}
+    >
+      <span>{row.name}</span>
+      {quick.map((value) => (
         <button
           type="button"
-          className="pg-notice-fix"
-          onClick={() => onFix(notice.fix)}
+          key={value}
+          aria-label={`Bet ${money(value)} on ${row.name}`}
+          onClick={() => onBet(row, value)}
         >
-          Use {money(notice.fix)}
+          Bet {money(value)}
         </button>
-      )}
+      ))}
     </div>
   );
 }
@@ -605,6 +664,7 @@ function PlayPanel({
   lastAmount,
   canReup,
   send,
+  onDragTarget,
 }) {
   const [view, setView] = useState("board");
   const locked = state.rolling || !connected || busy;
@@ -617,6 +677,11 @@ function PlayPanel({
       if (row) wager(row);
     },
   });
+  const dragTarget = drag.dragging ? drag.hoverId : undefined;
+  useEffect(() => {
+    onDragTarget(dragTarget);
+    return () => onDragTarget(undefined);
+  }, [dragTarget, onDragTarget]);
   const { stakes, counts, travelled, moreStake, oddsCount } = useMemo(() => {
     const stakes = stakeTotals(player.bets),
       counts = {},
@@ -658,6 +723,12 @@ function PlayPanel({
       {children}
     </BetTile>
   );
+  const liveNotice = !connected
+    ? { tone: "error", text: "Reconnecting. Bets are paused." }
+    : state.rolling
+      ? { tone: "lock", text: "Dice are out. Bets are locked." }
+      : notice;
+  const showQuick = !locked && !!selectedRow?.available && !liveNotice?.row;
   const fallback = selectedRow
     ? `${selectedRow.name} · min ${money(selectedRow.minimum)}${
         selectedRow.quantum > 100
@@ -734,18 +805,16 @@ function PlayPanel({
             />
           </>
         )}
-        {!canReup && (
+        {!canReup && (liveNotice || !showQuick || teach) && (
           <Notice
-            notice={
-              !connected
-                ? { tone: "error", text: "Reconnecting. Bets are paused." }
-                : state.rolling
-                  ? { tone: "lock", text: "Dice are out. Bets are locked." }
-                  : notice
-            }
+            notice={liveNotice}
             fallback={fallback}
-            onFix={setAmount}
+            onBet={wager}
+            locked={locked}
           />
+        )}
+        {!canReup && showQuick && (
+          <QuickBets row={selectedRow} player={player} onBet={wager} />
         )}
       </div>
       <div className="pg-board-switch" role="group" aria-label="Betting layout">
@@ -1567,6 +1636,7 @@ export default function PhoneGame({
     [notice, setNotice] = useState(null),
     [lastAmount, setLastAmount] = useState(0),
     [pendingWager, setPendingWager] = useState(null),
+    [dragTarget, setDragTarget] = useState(undefined),
     [bundle, setBundle] = useState(() =>
       state.config.minBet <= player.bank
         ? chipsForAmount(state.config.minBet)
@@ -1618,8 +1688,23 @@ export default function PhoneGame({
   const myEvent = state.lastRoll?.events.find((e) => e.playerId === player.id);
   const outcomes = myEvent?.bets || myEvent?.outcomes || [];
 
+  // Lives here, not in PlayPanel, so leaving the Play tab clears the TV while a
+  // cash-out or session end (which the server clears itself) sends nothing.
+  const staged =
+    tab === "play" && !canReup && amount <= player.bank ? amount : 0;
+  useBetPreview({
+    send,
+    echo: player.betPreview,
+    canSend: connected && !state.rolling && state.status === "playing",
+    held: !!pendingWager,
+    amount: staged,
+    betId: dragTarget !== undefined ? dragTarget : selectedRow?.id,
+  });
+
   useEffect(() => {
-    if (state.rolling) setDetailOpen(false);
+    if (!state.rolling) return;
+    setDetailOpen(false);
+    setNotice(null);
   }, [state.rolling]);
   useEffect(() => {
     if (notice?.tone !== "ok") return undefined;
@@ -1683,22 +1768,31 @@ export default function PhoneGame({
       setNotice({ tone: "error", text: serverError });
     }
   }, [serverError]);
-  function wager(row) {
+  // `exact` is a legal amount the player chose by name; without it the bundle is
+  // the bet. Both are revalidated against the live bank and row before sending.
+  function wager(row, exact) {
     if (pendingWager) return;
-    const issue = betIssue(row, amount, { player, state, connected });
+    const chosen = exact ?? amount;
+    const issue = betIssue(row, chosen, { player, state, connected });
     if (issue) {
       setSelectedId(row.id);
-      setNotice({ tone: "error", text: issue.text, fix: issue.fix });
+      setNotice({
+        tone: "error",
+        text: issue.text,
+        row: issue.lower != null || issue.upper != null ? row : null,
+        lower: issue.lower,
+        upper: issue.upper,
+      });
       return;
     }
     setPendingWager({
       row,
-      amount,
+      amount: chosen,
       before: wagerTotal(row, player.bets),
       deadline: Date.now() + 7000,
     });
     setNotice({ tone: "hint", text: "Placing bet…" });
-    Promise.resolve(send({ type: "bet", betId: row.id, amount }))
+    Promise.resolve(send({ type: "bet", betId: row.id, amount: chosen }))
       .then((result) => {
         if (result === false) {
           setPendingWager(null);
@@ -1853,6 +1947,7 @@ export default function PhoneGame({
               lastAmount={lastAmount}
               canReup={canReup}
               send={send}
+              onDragTarget={setDragTarget}
             />
           )}
           {tab === "bets" && (

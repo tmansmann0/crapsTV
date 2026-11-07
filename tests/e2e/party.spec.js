@@ -30,7 +30,12 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       ws.onMessage((raw) => {
         const message = JSON.parse(raw);
         if (message.type === "join") name = message.name || name;
-        if (name === "Tyler" && message.type === "bet" && !rejectedOnce) {
+        if (
+          name === "Tyler" &&
+          message.type === "bet" &&
+          message.betId === "pass" &&
+          !rejectedOnce
+        ) {
           rejectedOnce = true;
           ws.send(
             JSON.stringify({
@@ -52,7 +57,12 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "casino-room.exr",
       { timeout: 30000 },
     );
-    await tv.waitForTimeout(2300);
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-scene-ready",
+      "true",
+      { timeout: 30000 },
+    );
+    await tv.waitForTimeout(500);
     await tv.locator("canvas").click({
       position: { x: 48, y: 48 },
     });
@@ -109,14 +119,51 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
     await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
+    for (const value of [5, 5, 1, 1, 1, 1])
+      await phone
+        .getByRole("button", { name: `Add $${value} chip`, exact: true })
+        .click();
+    const initialBundle = await phone
+      .getByRole("button", { name: /Bundle of \$19/ })
+      .boundingBox();
+    const sixTarget = await phone
+      .locator('[data-bet-id="place-6"]')
+      .boundingBox();
+    await phone.mouse.move(
+      initialBundle.x + initialBundle.width / 2,
+      initialBundle.y + initialBundle.height / 2,
+    );
+    await phone.mouse.down();
+    await phone.mouse.move(
+      sixTarget.x + sixTarget.width / 2,
+      sixTarget.y + sixTarget.height / 2,
+      { steps: 10 },
+    );
+    await phone.mouse.up();
+    await expect(phone.locator(".pg-wallet")).toContainText("$0");
+    await expect(
+      phone.getByRole("button", { name: /Bet more.*\$24/ }),
+    ).toBeVisible();
+    await phone.getByRole("button", { name: /Bet less.*\$18/ }).click();
+    await expect(phone.locator(".pg-wallet")).toContainText("$18");
+    await expect
+      .poll(async () =>
+        Number(await tv.locator(".table-canvas").getAttribute("data-banks")),
+      )
+      .toBeGreaterThan(0);
+    await phone
+      .getByRole("button", { name: "Add $5 chip", exact: true })
+      .click();
     await phone.locator('[data-bet-id="pass"]').click();
     await phone.getByRole("button", { name: /Place \$5/ }).click();
     await expect(phone.locator(".pg-notice")).toContainText("That bet changed");
     await expect(
       phone.getByRole("button", { name: /Bundle of \$5/ }),
     ).toBeVisible();
-    await phone.getByRole("button", { name: /Place \$5/ }).click();
-    await expect(phone.locator(".pg-wallet")).toContainText("$5");
+    await phone
+      .getByRole("button", { name: "Bet $5 on Pass line", exact: true })
+      .press("Enter");
+    await expect(phone.locator(".pg-wallet")).toContainText("$23");
     await phone
       .getByRole("button", { name: "Add $5 chip", exact: true })
       .click();
@@ -138,7 +185,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       { steps: 10 },
     );
     await phone.mouse.up();
-    await expect(phone.locator(".pg-wallet")).toContainText("$11");
+    await expect(phone.locator(".pg-wallet")).toContainText("$29");
     await expect
       .poll(async () =>
         Number(await tv.locator(".table-canvas").getAttribute("data-chips")),

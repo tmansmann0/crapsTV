@@ -9,7 +9,7 @@ export const newCode = () =>
 export async function detectLocal() {
   try {
     const r = await fetch(new URL("api/config", document.baseURI), {
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) return null;
     const json = await r.json();
