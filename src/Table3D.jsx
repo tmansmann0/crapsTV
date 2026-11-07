@@ -95,6 +95,7 @@ export default function Table3D(props) {
       boardsLoaded = 0,
       stageReady = false,
       warming = false,
+      startupCompile = null,
       stageError = "";
     let tableMaterials = null;
     const { software } = configureRenderer(renderer);
@@ -755,7 +756,7 @@ export default function Table3D(props) {
         readyEnvironment
       ) {
         warming = true;
-        Promise.resolve(renderer.compileAsync?.(scene, camera))
+        startupCompile = Promise.resolve(renderer.compileAsync?.(scene, camera))
           .then(() => {
             if (alive) stageReady = true;
           })
@@ -828,38 +829,46 @@ export default function Table3D(props) {
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
-      textureQuality.dispose();
       observer.disconnect();
       controls.dispose();
-      ui.dispose();
-      pieces.dispose();
-      tableMaterials?.dispose();
       el.removeEventListener("pointerdown", pointerDown, true);
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);
       el.removeEventListener("pointercancel", pointerCancel);
-      const sceneTextures = new Set();
-      scene.traverse((o) => {
-        o.geometry?.dispose();
-        if (o.material)
-          for (const m of Array.isArray(o.material)
-            ? o.material
-            : [o.material]) {
-            for (const value of Object.values(m))
-              if (value?.isTexture) sceneTextures.add(value);
-            m.dispose();
-          }
-      });
-      sceneTextures.forEach((t) => t.dispose());
-      Object.values(textures).forEach((t) => t.dispose());
-      normal.dispose();
-      roughness.dispose();
-      readyEnvironment?.dispose();
-      environmentTarget?.dispose();
-      pmrem.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss();
       renderer.domElement.remove();
+      const disposeResources = () => {
+        textureQuality.dispose();
+        ui.dispose();
+        pieces.dispose();
+        tableMaterials?.dispose();
+        const sceneTextures = new Set();
+        scene.traverse((o) => {
+          o.geometry?.dispose();
+          if (o.material)
+            for (const m of Array.isArray(o.material)
+              ? o.material
+              : [o.material]) {
+              for (const value of Object.values(m))
+                if (value?.isTexture) sceneTextures.add(value);
+              m.dispose();
+            }
+        });
+        sceneTextures.forEach((t) => t.dispose());
+        Object.values(textures).forEach((t) => t.dispose());
+        normal.dispose();
+        roughness.dispose();
+        readyEnvironment?.dispose();
+        environmentTarget?.dispose();
+        pmrem.dispose();
+        renderer.dispose();
+        renderer.forceContextLoss();
+      };
+      // Three's async compiler polls each material's GPU program. A rapid AA
+      // toggle can unmount this renderer while that poll is still pending;
+      // retain its resources until it settles, but detach its UI immediately.
+      if (startupCompile)
+        startupCompile.then(disposeResources, disposeResources);
+      else disposeResources();
     };
   }, [rendererEpoch]);
   return (

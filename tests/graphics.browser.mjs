@@ -43,7 +43,7 @@ try {
     }),
     errors = [],
     glErrors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("pageerror", (e) => errors.push(e.stack || e.message));
   page.on("console", (message) => {
     if (
       /GL_INVALID|INVALID_OPERATION|INVALID_VALUE|texSubImage.*error/i.test(
@@ -61,10 +61,22 @@ try {
     timeout: 20000,
   });
   const click = (x, y) => page.locator("canvas").click({ position: { x, y } });
+  // Auto can already resolve to the requested effective value (e.g. 1K on
+  // SwiftShader). Wait for the rendered requested setting before clicking
+  // again, so a matching effective cap cannot hide an unprocessed click.
+  const requested = (key, value) =>
+    expect
+      .poll(
+        async () =>
+          JSON.parse((await table.getAttribute("data-graphics")) || "{}")[key],
+        { timeout: 20000 },
+      )
+      .toBe(value);
   await click(48, 48);
   await click(130, 400);
   await expect(table).toHaveAttribute("data-graphics-page", "graphics");
   await click(170, 155);
+  await requested("fps", 24);
   await expect(table).toHaveAttribute("data-graphics-fps", "24");
   if (!process.env.CI) {
     await expect
@@ -75,18 +87,15 @@ try {
       .toBe(true);
   }
   await click(170, 155);
+  await requested("fps", 30);
   await expect(table).toHaveAttribute("data-graphics-fps", "30");
   await click(170, 155);
+  await requested("fps", 60);
   await expect(table).toHaveAttribute("data-graphics-fps", "60");
   await click(170, 197); // auto -> on
+  await requested("antialias", "on");
   await click(170, 197); // on -> off, rebuild WebGL
-  await expect
-    .poll(
-      async () =>
-        JSON.parse((await table.getAttribute("data-graphics")) || "{}")
-          .antialias,
-    )
-    .toBe("off");
+  await requested("antialias", "off");
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 45000,
   });
@@ -98,17 +107,23 @@ try {
     false,
   );
   await click(170, 239); // auto -> 75 percent native pixels
+  await requested("resolution", "75");
   await expect
     .poll(() => page.locator("canvas").evaluate((c) => c.width))
     .toBe(960);
   await click(170, 281);
+  await requested("modelDetail", "full");
   await click(170, 281); // auto -> full -> optimized
+  await requested("modelDetail", "optimized");
   await expect(table).toHaveAttribute("data-graphics-model", "optimized");
   await click(170, 323);
+  await requested("textures", "1k");
   await expect(table).toHaveAttribute("data-graphics-textures", "1024");
   await click(170, 323); // 1K -> 2K must reallocate GPU storage safely.
+  await requested("textures", "2k");
   await expect(table).toHaveAttribute("data-graphics-textures", "2048");
   await click(170, 323); // Native
+  await requested("textures", "native");
   const gpuTextureLimit = await page.locator("canvas").evaluate((canvas) => {
     const gl = canvas.getContext("webgl2");
     return gl.getParameter(gl.MAX_TEXTURE_SIZE);
@@ -119,7 +134,9 @@ try {
     )
     .toBe(gpuTextureLimit);
   await click(170, 323); // Auto
+  await requested("textures", "auto");
   await click(170, 323); // 1K again, retained across reload
+  await requested("textures", "1k");
   await expect(table).toHaveAttribute("data-graphics-textures", "1024");
   await click(170, 447);
   await expect(table).toHaveAttribute("data-graphics-intro", "true");
