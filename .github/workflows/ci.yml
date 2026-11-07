@@ -46,9 +46,9 @@ jobs:
           SURFACE_PARITY_WIDTH: "960"
           SURFACE_PARITY_HEIGHT: "540"
       - run: npm run test:tv
-      - run: npm run test:tour
       - run: npm run test:startup
       - run: npm run test:startup-retest
+      - run: npm run test:tour
       - uses: actions/upload-artifact@v4
         if: always()
         with:

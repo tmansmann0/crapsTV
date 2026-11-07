@@ -7,6 +7,7 @@ import { inflateSync } from "node:zlib";
 import { chromium, expect } from "@playwright/test";
 import { WebSocket } from "ws";
 import { clickTV } from "./helpers/tv-actions.mjs";
+import { measureStartupDuration } from "./helpers/startup-duration.mjs";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const listener = createServer();
@@ -411,13 +412,8 @@ try {
   assert(started && ended);
   // The first telemetry interval can arrive several frames into the fade.
   // Recover its clock origin instead of discarding those elapsed milliseconds.
-  const actualDuration = ended.at - started.at + started.elapsed;
-  const uploadPausedMs = ended.uploadPausedMs;
-  const contentDuration = actualDuration - uploadPausedMs;
-  assert(
-    contentDuration >= 29900 && contentDuration < 31000,
-    `opening content ran ${contentDuration}ms (${actualDuration}ms wall, ${uploadPausedMs}ms accounted resource waits) instead of30s`,
-  );
+  const timing = measureStartupDuration(samples);
+  const { actualDuration, uploadPausedMs, contentDuration } = timing;
   assert.equal(
     ended.elapsed,
     30000,
@@ -486,11 +482,13 @@ try {
       0,
       "resource upload happens before or after chip animations",
     );
-    const before = demoSamples
-      .filter(
-        (sample) => sample.at < changed.at && sample.at >= changed.at - 250,
-      )
-      .at(0);
+    const holdStart = change.elapsed - change.holdAge;
+    const before = demoSamples.find(
+      (sample) =>
+        sample.hold === "true" &&
+        sample.elapsed >= holdStart &&
+        sample.at <= changed.at - 300,
+    );
     const after = demoSamples.find((sample) => sample.at >= changed.at + 150);
     assert(
       before && after,
@@ -607,6 +605,8 @@ try {
         actualDuration,
         contentDuration,
         uploadPausedMs,
+        terminalOvershootMs: timing.terminalOvershootMs,
+        completionFrameGapMs: timing.completionFrameGapMs,
         qualityChanges,
         actualChanges,
         samples,

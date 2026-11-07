@@ -64,6 +64,16 @@ instead of jumping into a transfer halfway through. Ending after all 30 seconds
 of content retains the selected settings rather than applying them again.
 Skipping a visible opening also retains its current quality.
 
+Sparse RAF scheduling also cannot skip a calibration window. The isolated
+content clock stops at each unvisited result shot, supplies at least 300 ms of
+actual camera lead, then performs that probe before continuing. Discarded
+scheduler time is accounted with resource waits. The final presentation can
+only complete on a rendered frame: the browser proof verifies the deadline
+crossing bracket and reports its measured terminal frame overshoot separately,
+instead of assuming a fixed frame-interval tolerance. Every active sample must
+agree with actual RAF time minus accounted waits. A slow frame does not permit
+early completion, an unaccounted clock jump, or a missing calibration probe.
+
 Live Retest keeps the current quality during aiming, throws and payout
 animations. It advances one probe at a time after a safe hold and sufficient
 samples; waiting for a real round can extend the retest beyond 30 seconds. It

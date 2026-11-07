@@ -31,6 +31,7 @@ import {
   sampleStartup,
   STARTUP_DURATION_MS,
 } from "./startup-sequence.js";
+import { createStartupClock } from "./startup-clock.js";
 import {
   startupCandidates,
   selectStartupProfile,
@@ -147,6 +148,7 @@ export default function Table3D(props) {
     let introPreviousFrame = null;
     let introReports = [[], [], []],
       introCandidate = 0;
+    let introCheckpointClock = null;
     let introShowcase = null,
       introFinishedAt = introDone.current ? -Infinity : null;
     let introSample = null,
@@ -541,6 +543,7 @@ export default function Table3D(props) {
         liveCalibrationHold = null;
         pendingQualityFrame = null;
         introUploadPausedMs = 0;
+        introCheckpointClock = null;
         introQualityChanges = [];
         introFinishedAt = null;
         if (!introLiveProbe) sceneRevealedAt = performance.now();
@@ -747,7 +750,20 @@ export default function Table3D(props) {
               probeWarmUntil = time + 800;
               if (!introLiveProbe) introShowcase ||= createStartupShowcase();
             }
-            const elapsed = time - introStart;
+            let elapsed = time - introStart;
+            if (!introLiveProbe) {
+              introCheckpointClock ||= createStartupClock(
+                introShowcase.calibrationHolds,
+              );
+              const adjusted = introCheckpointClock.advance({
+                elapsed,
+                now: time,
+                completedProbe: introCandidate,
+              });
+              introStart += adjusted.pausedMs;
+              introUploadPausedMs += adjusted.pausedMs;
+              elapsed = adjusted.elapsed;
+            }
             const liveState = latest.current.state;
             const liveNow = Date.now() + (liveState?.clockOffsetMs || 0);
             const scheduledProbe =
