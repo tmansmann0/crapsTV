@@ -103,6 +103,10 @@ try {
             cinematic:
               document.querySelector(".table-canvas")?.dataset.cinematic ===
               "true",
+            shot:
+              document.querySelector(".table-canvas")?.dataset.cameraVariant ||
+              document.querySelector(".table-canvas")?.dataset.cameraShot ||
+              "overview",
           });
         previousDraws = data.draws;
         previousTriangles = data.triangles;
@@ -189,6 +193,24 @@ try {
     const canvas = document.querySelector(".table-canvas canvas");
     const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
     const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    const shotIntervals = new Map();
+    data.frames.slice(1).forEach((frame, index) => {
+      const previous = data.frames[index];
+      if (previous.shot !== frame.shot) return;
+      const delta = frame.time - previous.time;
+      if (!shotIntervals.has(frame.shot)) shotIntervals.set(frame.shot, []);
+      shotIntervals.get(frame.shot).push(delta);
+    });
+    const shots = Object.fromEntries(
+      [...shotIntervals].map(([shot, intervals]) => {
+        const ordered = [...intervals].sort((a, b) => a - b);
+        return [shot, {
+          intervals: intervals.length,
+          fps: 1000 * intervals.length / intervals.reduce((sum, v) => sum + v, 0),
+          p95Ms: ordered[Math.floor(ordered.length * 0.95)],
+        }];
+      }),
+    );
     return {
       frames: data.frames.length,
       fps: fps(data.frames),
@@ -200,6 +222,7 @@ try {
       width: gl.drawingBufferWidth,
       height: gl.drawingBufferHeight,
       rollingFps: fps(data.frames.filter((f) => f.cinematic)),
+      shots,
       devicePixelRatio,
       viewport: { width: innerWidth, height: innerHeight },
       modules: performance

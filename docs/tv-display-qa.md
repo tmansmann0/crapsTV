@@ -68,3 +68,13 @@ The matching [1080p report](benchmarks/tv-1080.json) verifies 1920×1080 scene/U
 ## Logo chips and Heritage felt update (0.9.0)
 
 The final production update was remeasured on the same Apple M5 Pro with twelve players, Compact UI, explicit 100% scene resolution, AA on, Auto chip detail and native textures. The [native 4K throw sample](benchmarks/v09-native-4k.json) captured 600 rendered frames over ten seconds: 60.00 FPS, 16.7 ms P95, about 111 draws and 887,000 triangles per frame. Both scene and UI buffers were verified at 3840 × 2160, with no browser errors. The [1080p betting sample](benchmarks/v09-native-1080.json) verifies both buffers at 1920 × 1080. These measurements include the new wood UVs/materials, actual logo chips, mapped Heritage board and corrected friction. They describe this device and workload rather than a universal 60 FPS guarantee.
+
+## Close chip cameras and patina (0.10.0)
+
+The final production update was measured with twelve players, Compact UI, explicit 100% scene resolution, AA on, Auto chip detail and native textures on the same Apple M5 Pro. The [4K sample](benchmarks/v010-native-4k.json) verifies both buffers at 3840 × 2160 and records 960 frames over sixteen seconds: 59.94 FPS, 16.8 ms P95, about 69 draws and 1.05 million triangles per frame. The report now separates consecutive frame intervals by camera family; its three-second bank-macro and bank-sweep segments both measured approximately 60 FPS. The [1080p throw sample](benchmarks/v010-native-1080.json) verifies native scene/UI buffers and 60.00 FPS with a 16.8 ms P95. Both recorded no browser errors. These are this device's measured samples, not guarantees for other GPUs or every possible game state.
+
+The new actual-renderer tour proofs cover all six camera families at native 1080p and 4K. A real physical throw is retained while testing zero-, one- and two-second cooldowns. At positive short windows, the selected camera is already at its planned pose with no active transfer, then the same shot begins its queued flight. The deadline and ledger remain unchanged. The height comparison checks eight actual rendered chip instances against one, rather than relying solely on requested bet amounts.
+
+![Camera arrives before the queued payout](screenshots/camera-payout-sequence.png)
+
+![The same camera family adapts to actual stack height](screenshots/camera-stack-height-comparison.png)

@@ -1,6 +1,7 @@
 // Pure shared physical/presentation layout. No THREE, DOM, or canvas imports.
 import { lineWagerX, betRoute, routeKey } from "./chip-flow.js";
 import { chipStackForAmount } from "./chip-stack.js";
+import { chipHash, chipStackPose, chipStackBounds } from "./chip-character.js";
 import {
   legacyBoardToWorld,
   boardPixelToWorld,
@@ -132,26 +133,18 @@ export function isLineWager(bet) {
   );
 }
 
-const hash = (value) =>
-  [...value].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
-
 export function chipPileSpecs(
   amount,
   { diameter = 0.33, max = 8, opacity = 1, seed = "pile" } = {},
 ) {
-  const height = 0.13 * diameter * 1.3;
   return chipStackForAmount(amount, max).chips.map((denomination, n) => ({
+    id: `${seed}:${n}`,
     denomination,
-    wear: (hash(seed) + n) % 3,
+    wear: (chipHash(seed) + n) % 3,
     diameter,
     thicknessScale: 1.3,
     opacity,
-    position: [
-      Math.sin(n * 2.1) * 0.006,
-      height / 2 + n * (height + 0.002),
-      Math.cos(n * 1.7) * 0.006,
-    ],
-    rotation: [0, (hash(seed + n) % 628) / 100, 0],
+    ...chipStackPose(seed, n, { diameter, thicknessScale: 1.3 }),
   }));
 }
 
@@ -162,8 +155,8 @@ export function wagerPileLayout(route, state, amount = route.bet.amount) {
   const diameter = wagerChipDiameter(route, state);
   const chips = chipPileSpecs(amount, { diameter, seed: route.bet.id });
   const chipCount = chips.length;
-  const chipHeight = 0.13 * diameter * 1.3;
-  const height = chipHeight * chipCount + 0.002 * Math.max(0, chipCount - 1);
+  const bounds = chipStackBounds(chips);
+  const height = bounds.height;
   const basePosition = wagerPosition(route, state);
   return {
     id: routeKey(route),
@@ -174,13 +167,16 @@ export function wagerPileLayout(route, state, amount = route.bet.amount) {
     diameter,
     chipCount,
     height,
-    radius:
-      diameter / 2 +
-      Math.max(
-        0,
-        ...chips.map((chip) => Math.hypot(chip.position[0], chip.position[2])),
-      ),
-    position: [basePosition[0], basePosition[1] + height / 2, basePosition[2]],
+    radius: bounds.radius,
+    bounds: {
+      min: bounds.min.map((v, i) => v + basePosition[i]),
+      max: bounds.max.map((v, i) => v + basePosition[i]),
+    },
+    position: [
+      basePosition[0],
+      basePosition[1] + bounds.center[1],
+      basePosition[2],
+    ],
   };
 }
 

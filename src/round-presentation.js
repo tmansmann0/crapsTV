@@ -1,6 +1,7 @@
 // Shared visual timing only. The ledger has already settled before this runs.
 export const SETTLEMENT_FLIGHT_MS = 1150;
-export const SETTLEMENT_SLOT_MS = 1500;
+export const SETTLEMENT_SLOT_MS = 1800;
+export const SETTLEMENT_CAMERA_LEAD_MS = 450;
 export const SETTLEMENT_RESULT_HOLD_MS = 1600;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const freeze = (value) => {
@@ -276,7 +277,7 @@ export function planOutcomeTour(
   {
     startAt,
     slotMs = SETTLEMENT_SLOT_MS,
-    leadMs = 200,
+    leadMs = SETTLEMENT_CAMERA_LEAD_MS,
     tailMs = 150,
     mode = "fit-window",
     deadline = state.nextRollAt,
@@ -331,13 +332,12 @@ export function planOutcomeTour(
         slotMs,
         mode === "complete" ? slotMs : cutoff - at,
       );
+      // Arrive before the money moves. Short cooldowns compress the flight,
+      // rather than silently consuming all of the camera's preparation time.
+      const lead = Math.min(leadMs, duration * 0.35);
       const tail = Math.min(
         tailMs,
-        Math.max(0, duration - SETTLEMENT_FLIGHT_MS - leadMs),
-      );
-      const lead = Math.min(
-        leadMs,
-        Math.max(0, duration - SETTLEMENT_FLIGHT_MS - tail),
+        Math.max(0, duration - lead - SETTLEMENT_FLIGHT_MS),
       );
       const flightMs = Math.min(
         SETTLEMENT_FLIGHT_MS,
@@ -376,6 +376,8 @@ export function planOutcomeTour(
         playerIds: members.map((a) => a.playerId),
         members: members.map(({ bets, ...actor }) => actor),
         startAt: at,
+        arrivalAt: at,
+        prepareMs: lead,
         transferAt: at + lead,
         endAt: at + duration,
         flightMs,
@@ -420,6 +422,7 @@ export function sampleOutcomeTour(
     kind: slot.kind,
     progress: clamp((now - slot.startAt) / (slot.endAt - slot.startAt), 0, 1),
     transferProgress: clamp((now - slot.transferAt) / slot.flightMs, 0, 1),
+    preparing: now < slot.transferAt,
   };
 }
 /** Current/future transfers are seekable after reconnect; completed ones stay done. */

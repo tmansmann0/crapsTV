@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { chipPatinaParameters } from "./chip-character.js";
 
 // The 32-sided LOD silhouette deviates by D*(1-cos(pi/32))/2 pixels.
 // At 160px diameter that is only 0.386px; above it retain the original model.
@@ -21,6 +22,8 @@ export function createChipBatch(specs, sources, materialFor, lowGeometry) {
       ),
     ),
   );
+  const patina = specs.map(chipPatinaParameters);
+  const color = new THREE.Color();
   const detailed = new Uint8Array(specs.length).fill(1);
   const changedIndices = new Uint8Array(specs.length);
   const dirty = new Set();
@@ -72,11 +75,14 @@ export function createChipBatch(specs, sources, materialFor, lowGeometry) {
         row,
         scratch.copy(matrices[index]).multiply(bucket.source.matrixWorld),
       );
+      if (bucket.material.userData.chipPatina)
+        bucket.meshes[level].setColorAt(row, color.fromArray(patina[index]));
     }
     bucket.meshes.forEach((mesh, level) => {
       mesh.count = counts[level];
       mesh.visible = mesh.count > 0;
       mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     });
   }
   for (const bucket of buckets.values()) {

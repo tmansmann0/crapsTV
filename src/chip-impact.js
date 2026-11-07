@@ -12,6 +12,7 @@ import {
 } from "cannon-es";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow } from "./throw-motion.js";
+import { chipPoseBounds } from "./chip-character.js";
 
 // One-way presentation physics: the recorded dice drive kinematic bodies. They
 // never receive impulses from these chips or alter the authoritative outcome.
@@ -105,10 +106,10 @@ export function findChipImpactCandidates(timeline, stacks) {
     const center = selected[0].position;
     const radius = selected[0].diameter / 2;
     const bottom = Math.min(
-      ...selected.map((c) => c.position[1] - chipHeight(c) / 2),
+      ...selected.map((c) => chipPoseBounds(c).min[1]),
     );
     const top = Math.max(
-      ...selected.map((c) => c.position[1] + chipHeight(c) / 2),
+      ...selected.map((c) => chipPoseBounds(c).max[1]),
     );
     let found = null;
     for (let i = 1; i < timeline.frames.length && !found; i++) {
@@ -191,7 +192,7 @@ function simulateContact(timeline, candidate) {
   );
   const floorY =
     stack.floorY ??
-    Math.min(...stack.chips.map((c) => c.position[1] - chipHeight(c) / 2));
+    Math.min(...stack.chips.map((c) => chipPoseBounds(c).min[1]));
   const floor = new Body({
     mass: 0,
     material: felt,
@@ -205,7 +206,7 @@ function simulateContact(timeline, candidate) {
   const lower = stack.chips.slice(0, -selected.length);
   if (lower.length) {
     const top = Math.max(
-      ...lower.map((c) => c.position[1] + chipHeight(c) / 2),
+      ...lower.map((c) => chipPoseBounds(c).max[1]),
     );
     const support = new Body({
       mass: 0,

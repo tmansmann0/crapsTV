@@ -140,3 +140,20 @@ test("missing denomination albedo also fails the critical asset gate", async () 
   );
   f.allDisposed();
 });
+test("missing shared patina atlas fails the asset gate and cleans up all model/maps", async () => {
+  const f = fixture(),
+    high = f.model(),
+    low = f.model();
+  await assert.rejects(
+    createChipFactory(renderer, {
+      resolveAsset: (n) => n,
+      loadModel: async (n) => (n === "chip-logo.glb" ? high : low),
+      loadTexture: async (n) => {
+        if (n === "chip-patina.png") throw new Error("patina offline");
+        return f.texture();
+      },
+    }),
+    /patina offline/,
+  );
+  f.allDisposed();
+});

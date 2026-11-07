@@ -331,7 +331,7 @@ test("personal bankroll and unusually large payout multiples can supply a meanin
 
 test("tight budgets merge unshown actors instead of repeating them or shortening full flights", () => {
   const state = actionFixture([50000, 10000, 10000, ...Array(9).fill(2500)]);
-  state.nextRollAt = 5300;
+  state.nextRollAt = 5900;
   const plan = planOutcomeTour(state);
   assert.equal(plan.slots.length, 2);
   assert.equal(plan.slots[0].style, "hero");
@@ -368,4 +368,26 @@ test("legacy render-only resolution adds exact before-bet routes without mutatin
   assert.deepEqual(next, before);
   next.lastRoll.presentation = resolved;
   assert.equal(resolveOutcomePresentation(previous, next), resolved);
+});
+
+test("camera preparation remains positive even when a short cooldown compresses all payouts", () => {
+  for (const window of [500, 1000, 2000, 10000]) {
+    const state = fixture(12, 1000 + window);
+    const plan = planOutcomeTour(state);
+    assert(plan.endAt <= state.nextRollAt);
+    for (const slot of plan.slots) {
+      assert.equal(slot.arrivalAt, slot.startAt);
+      assert(slot.prepareMs > 0);
+      assert.equal(slot.transferAt - slot.arrivalAt, slot.prepareMs);
+      assert(slot.transferAt + slot.flightMs <= slot.endAt);
+      const before = sampleOutcomeTour(plan, slot.transferAt - 1);
+      assert.equal(before.preparing, true);
+      assert.equal(before.transferProgress, 0);
+      assert(
+        plan.transfers
+          .filter((flow) => slot.playerIds.includes(flow.playerId))
+          .every((flow) => flow.startAt === slot.transferAt),
+      );
+    }
+  }
 });

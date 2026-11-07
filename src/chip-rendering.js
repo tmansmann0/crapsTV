@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createChipBatch } from "./chip-batch.js";
+import { applyChipPatina } from "./chip-patina.js";
 
 import {
   CHIP_DENOMINATIONS,
@@ -72,6 +73,7 @@ export async function createChipFactory(
       .catch(() => null),
     ...[1, 2, 3].map((i) => loadData(`chip-normal-${i}.png`)),
     ...[1, 2, 3].map((i) => loadData(`chip-roughness-${i}.png`)),
+    loadData("chip-patina.png"),
   ]);
   const failure = loaded.find((result) => result.status === "rejected");
   if (failure) {
@@ -80,7 +82,9 @@ export async function createChipFactory(
   }
   const [gltf, lowDetail, ...wearMaps] = loaded.map((result) => result.value);
   const normalMaps = wearMaps.slice(0, 3),
-    roughnessMaps = wearMaps.slice(3);
+    roughnessMaps = wearMaps.slice(3, 6),
+    patinaMap = wearMaps[6];
+  patinaMap.wrapS = patinaMap.wrapT = THREE.RepeatWrapping;
   try {
     // GLTFLoader.loadTextureImage converts a failed image request to null,
     // allowing loadAsync to resolve. These maps must precede the startup gate.
@@ -123,13 +127,20 @@ export async function createChipFactory(
         material.color.set(chipDenomination(denomination).color);
       if (/^Chip(Base|Inlay)/.test(original.name)) {
         material.normalMap = normalMaps[wear];
-        material.normalScale.set(0.28, 0.28);
+        const relief = [0.3, 0.38, 0.44][wear];
+        material.normalScale.set(relief, relief);
         material.roughnessMap = roughnessMaps[wear];
         // The texture contains the final clay roughness; do not polish it by
         // multiplying it down a second time. Resin dice have a separate finish.
         material.roughness = 1;
         material.metalness = 0;
       }
+      if (/^Chip(Base|Inlay|Engraving)/.test(original.name))
+        applyChipPatina(
+          material,
+          patinaMap,
+          original.name === "ChipEngraving" ? 0.42 : 1,
+        );
       material.envMapIntensity = 0.75;
       if (opacity < 1) {
         material.transparent = true;

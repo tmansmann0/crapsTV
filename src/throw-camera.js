@@ -1,6 +1,13 @@
-import { SEAT_LAYOUT, arcPosition } from "./chip-flow.js";
+import {
+  SEAT_LAYOUT,
+  arcPosition,
+  bankChipStacks,
+  seatStackSlot,
+  betRoute,
+} from "./chip-flow.js";
+import { chipStackPose, chipPoseBounds } from "./chip-character.js";
 import { BOARD_BET_SHIFT_Z } from "./board-layout.js";
-import { wagerPosition } from "./wager-layout.js";
+import { wagerPosition, wagerPileLayout } from "./wager-layout.js";
 import { planOutcomeTour, sampleOutcomeTour } from "./round-presentation.js";
 
 // Table-level rigs are inside the cushion corners. A recorded trajectory
@@ -152,12 +159,68 @@ export function outcomePresentation(state) {
   return outcomePlanCache.get(key);
 }
 
+const corners = (min, max) =>
+  [min[0], max[0]].flatMap((x) =>
+    [min[1], max[1]].flatMap((y) => [min[2], max[2]].map((z) => [x, y, z])),
+  );
+const boundsOf = (points) => ({
+  min: [0, 1, 2].map((axis) => Math.min(...points.map((p) => p[axis]))),
+  max: [0, 1, 2].map((axis) => Math.max(...points.map((p) => p[axis]))),
+});
+const mix = (a, b, t) => a.map((value, axis) => value + (b[axis] - value) * t);
+
+function bankSubject(player, macro = false) {
+  const area = SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0];
+  let stacks = bankChipStacks(player?.bank ?? 100000, { maxVisible: 30 });
+  if (macro && stacks.length) {
+    const tallest = stacks.reduce(
+      (best, stack, index) =>
+        stack.visibleCount > stacks[best].visibleCount ? index : best,
+      0,
+    );
+    stacks = [{ ...stacks[tallest], slot: tallest }];
+  }
+  const points = stacks.flatMap((stack, index) => {
+    const center = seatStackSlot(area, stack.slot ?? index);
+    return Array.from({ length: stack.visibleCount }, (_, n) => {
+      const pose = chipStackPose(
+        `bank:${player.id}:${stack.slot ?? index}`,
+        n,
+        { diameter: 0.23, thicknessScale: 1.15 },
+      );
+      const bounds = chipPoseBounds({
+        ...pose,
+        diameter: 0.23,
+        thicknessScale: 1.15,
+      });
+      return corners(
+        bounds.min.map((v, axis) => v + center[axis]),
+        bounds.max.map((v, axis) => v + center[axis]),
+      );
+    }).flat();
+  });
+  if (!points.length)
+    points.push(
+      ...corners(
+        [area.center[0] - 0.35, area.center[1], area.center[2] - 0.16],
+        [area.center[0] + 0.35, area.center[1] + 0.08, area.center[2] + 0.16],
+      ),
+    );
+  const bounds = boundsOf(points);
+  return { points, height: bounds.max[1] - bounds.min[1], kind: "bank", area };
+}
+function wagerSubject(route, state) {
+  const pile = wagerPileLayout(route, state, route.bet.amount || 500);
+  return {
+    points: corners(pile.bounds.min, pile.bounds.max),
+    height: pile.height,
+    kind: "bet",
+  };
+}
 function routeFocus(route, state) {
   if (route.kind === "dealer") return [0, 1.2, -3.03];
   if (route.kind === "bank") {
-    const player = (state.players || []).find(
-      (player) => player.id === route.playerId,
-    );
+    const player = (state.players || []).find((p) => p.id === route.playerId);
     const area = SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0];
     return [area.center[0], area.center[1] + 0.13, area.center[2]];
   }
@@ -165,7 +228,6 @@ function routeFocus(route, state) {
   point[1] += 0.12;
   return point;
 }
-
 function safeVerticalFraction(viewportHeight, hudRects) {
   if (!viewportHeight || !hudRects.length) return 0.8;
   let top = 0,
@@ -180,8 +242,107 @@ function safeVerticalFraction(viewportHeight, hudRects) {
     Math.min(1 - (2 * top) / viewportHeight, (2 * bottom) / viewportHeight - 1),
   );
 }
+export const CHIP_CAMERA_VARIANTS = Object.freeze([
+  "bank-macro",
+  "bank-overhead",
+  "bet-low-glide",
+  "bet-overhead",
+  "bank-sweep",
+  "bet-cross-sweep",
+]);
 
-/** Frame the selected player's complete transfer paths, not only the bank. */
+/** Fit the actual current chip bounds. Large stacks raise both eye and pitch. */
+function fitChipCamera({
+  points,
+  height = 0,
+  area,
+  seed,
+  progress = 0,
+  aspect = 16 / 9,
+  viewportHeight = 0,
+  hudRects = [],
+  variant = "bank-macro",
+  transfer = false,
+  railClearance = 0,
+}) {
+  const bounds = boundsOf(points);
+  const target = bounds.min.map(
+    (value, axis) => (value + bounds.max[axis]) / 2,
+  );
+  const overhead = variant.endsWith("overhead");
+  const bet = variant.startsWith("bet-");
+  const phase = smooth(clamp(progress, 0, 1));
+  const sign = seed % 2 ? 1 : -1;
+  const motion =
+    (phase - 0.5) * (variant.includes("sweep") ? 0.18 : 0.22) * sign;
+  const yaw = ((seed % 7) - 3) * 0.22 + motion;
+  const outward = area.outward;
+  // A real lateral pass, not just another orbit. Refit the current subjects
+  // against the translated aim point so close chips never slide behind HUD.
+  const travel = variant.includes("sweep") ? 0.65 : overhead ? 0.4 : 0;
+  const lateral = (phase - 0.5) * travel * sign;
+  target[0] += outward[2] * lateral;
+  target[2] -= outward[0] * lateral;
+  // Looking from the inboard side keeps low bet closeups inside the cushion.
+  const facing = bet ? -1 : 1;
+  const base = [outward[0] * facing, 0, outward[2] * facing];
+  let pitch = overhead ? 1.43 : bet ? 0.51 : 0.65;
+  pitch += clamp(height - 0.09, 0, 0.45) * (overhead ? 0.13 : 1.45);
+  pitch = Math.min(1.49, pitch);
+  const horizontal = Math.cos(pitch);
+  const direction = [
+    (base[0] * Math.cos(yaw) + base[2] * Math.sin(yaw)) * horizontal,
+    Math.sin(pitch),
+    (base[2] * Math.cos(yaw) - base[0] * Math.sin(yaw)) * horizontal,
+  ];
+  const right = [direction[2] / horizontal, 0, -direction[0] / horizontal];
+  const up = [
+    -right[2] * direction[1],
+    right[2] * direction[0] - right[0] * direction[2],
+    right[0] * direction[1],
+  ];
+  const fov = overhead ? 38 - phase : 43 - phase * 2;
+  const tangent = Math.tan(radians(fov / 2));
+  const safeY = safeVerticalFraction(viewportHeight, hudRects);
+  let distance = variant === "bank-macro" ? 0.96 : 1.18;
+  for (const point of points) {
+    const q = point.map((v, axis) => v - target[axis]);
+    const depth = q.reduce((sum, v, axis) => sum + v * direction[axis], 0);
+    const x =
+      Math.abs(q.reduce((sum, v, axis) => sum + v * right[axis], 0)) + 0.07;
+    const y =
+      Math.abs(q.reduce((sum, v, axis) => sum + v * up[axis], 0)) + 0.08;
+    distance = Math.max(
+      distance,
+      depth +
+        Math.max(
+          x / (tangent * Math.max(0.2, aspect) * 0.9),
+          y / (tangent * safeY),
+        ),
+    );
+  }
+  const position = target.map(
+    (value, axis) => value + direction[axis] * distance,
+  );
+  // The camera may follow flying payouts across the rail. Clear its top rather
+  // than looking through the cushion; source bet macros remain inside it.
+  if (!bet || railClearance > 0) {
+    const floor = 1.32 + height * 0.45;
+    position[1] += Math.max(0, floor - position[1]) * (bet ? railClearance : 1);
+  }
+  return {
+    position,
+    target,
+    fov,
+    focusPoints: points,
+    subjectHeight: height,
+    shotVariant: variant,
+    pitch,
+    subjectKind: transfer ? "transfer" : bet ? "bet" : "bank",
+  };
+}
+
+/** Prep holds the actual bet. The lens then follows the synchronized chips. */
 export function sampleOutcomeCamera({
   state,
   plan,
@@ -191,8 +352,8 @@ export function sampleOutcomeCamera({
   viewportHeight = 0,
   hudRects = [],
 }) {
-  const slot = sample.slot;
-  const memberIds = slot.playerIds || [slot.playerId];
+  const slot = sample.slot,
+    memberIds = slot.playerIds || [slot.playerId];
   const events = (state.lastRoll?.events || []).filter((event) =>
     memberIds.includes(event.playerId),
   );
@@ -212,205 +373,136 @@ export function sampleOutcomeCamera({
         label: bet.label || bet.type || "Bet",
         result: bet.result,
       })),
-    playerCount: slot.playerIds?.length || 1,
+    playerCount: memberIds.length,
     shotIndex: sample.index,
     shotCount: plan.slots.length,
     progress: sample.progress,
     transferProgress: sample.transferProgress,
+    arrivalAt: slot.arrivalAt ?? slot.startAt,
+    transferAt: slot.transferAt,
+    preparing: now < slot.transferAt,
     shotKey: `outcome:${plan.rollId}:${sample.index}`,
   };
-  if (slot.kind === "group" && (!slot.style || slot.style === "overview")) {
-    let top = 0.13,
-      bottom = 0.88;
-    if (viewportHeight && hudRects.length) {
-      top = 0;
-      bottom = 1;
-      for (const rect of hudRects) {
-        if (rect.y + rect.height <= viewportHeight * 0.5)
-          top = Math.max(top, (rect.y + rect.height) / viewportHeight);
-        else if (rect.y >= viewportHeight * 0.5)
-          bottom = Math.min(bottom, rect.y / viewportHeight);
-      }
-    }
-    return {
-      ...fitBettingCamera({
-        aspect,
-        top,
-        bottom,
-        bounds: { min: [-7.35, 0, -3.65], max: [7.35, 2.7, 4.65] },
-      }),
-      ...metadata,
-      phase: "outcome-group",
-    };
-  }
-  const player =
-    (state.players || []).find((player) => player.id === slot.playerId) || slot;
   const transfers = plan.transfers.filter((flow) =>
     memberIds.includes(flow.playerId),
   );
-  if (!transfers.length && slot.kind !== "group")
+  const player =
+    state.players?.find((p) => p.id === slot.playerId) ||
+    state.players?.find((p) => memberIds.includes(p.id)) ||
+    slot;
+  if (!transfers.length)
     return {
       ...samplePlayerAreaCamera({
         player,
+        state,
         slot,
         now,
         roundId: plan.rollId,
         aspect,
+        viewportHeight,
+        hudRects,
       }),
       ...metadata,
     };
-  let points = transfers.flatMap((flow) => {
-    const from = routeFocus(flow.from, state),
-      to = routeFocus(flow.to, state);
-    return [0, 0.25, 0.5, 0.75, 1].map((progress) =>
-      arcPosition(from, to, progress),
+  const seed = hash(`${plan.rollId}:${sample.index}:${memberIds.join(":")}`);
+  let height = 0,
+    points = [];
+  const p = clamp(sample.transferProgress, 0, 1);
+  for (const flow of transfers) {
+    const subject = wagerSubject(flow.from, state);
+    height = Math.max(height, subject.height);
+    const center = arcPosition(
+      routeFocus(flow.from, state),
+      routeFocus(flow.to, state),
+      p,
     );
-  });
-  const members = memberIds
-    .map(
-      (id) =>
-        (state.players || []).find((player) => player.id === id) ||
-        slot.members?.find((member) => member.playerId === id),
-    )
-    .filter(Boolean);
-  if (!points.length)
-    points = members.flatMap((member) => {
-      const area = SEAT_LAYOUT[member.seat] || SEAT_LAYOUT[0];
-      return [-0.7, 0.7].flatMap((along) =>
-        [0.675, 1.9].map((y) => [
-          area.center[0] + area.tangent[0] * along,
-          y,
-          area.center[2] + area.tangent[2] * along,
-        ]),
-      );
-    });
-  const min = [0, 1, 2].map((axis) =>
-      Math.min(...points.map((point) => point[axis])),
-    ),
-    max = [0, 1, 2].map((axis) =>
-      Math.max(...points.map((point) => point[axis])),
+    const flying = corners(
+      [center[0] - 0.2, center[1] - 0.13, center[2] - 0.2],
+      [
+        center[0] + 0.2,
+        center[1] + Math.max(0.3, subject.height),
+        center[2] + 0.2,
+      ],
     );
-  const target = min.map((value, axis) => (value + max[axis]) / 2);
-  const area =
-    SEAT_LAYOUT[slot.seat ?? player.seat ?? members[0]?.seat ?? 0] ||
-    SEAT_LAYOUT[0];
-  let outward = [...area.outward];
-  if (slot.kind === "group") {
-    const region = slot.focus?.region || slot.reason;
-    if (region === "left") outward = [-1, 0, 0];
-    else if (region === "right") outward = [1, 0, 0];
-    else if (region === "front") outward = [0, 0, 1];
-    else {
-      outward = members.reduce(
-        (sum, member) => {
-          const bank = SEAT_LAYOUT[member.seat] || SEAT_LAYOUT[0];
-          return sum.map((value, axis) => value + bank.outward[axis]);
-        },
-        [0, 0, 0],
-      );
-      const span = Math.hypot(outward[0], outward[2]);
-      outward = span > 0.1 ? outward.map((value) => value / span) : [0, 0, 1];
-    }
-  }
-  const tangentDirection = [outward[2], 0, -outward[0]];
-  const variation =
-    ((hash(`${plan.rollId}:${sample.index}:${slot.playerId}`) % 3) - 1) * 0.18;
-  const direction = [
-    outward[0] * 0.75 + tangentDirection[0] * variation,
-    1,
-    outward[2] * 0.75 + tangentDirection[2] * variation,
-  ];
-  const length = Math.hypot(...direction);
-  direction.forEach((value, axis) => {
-    direction[axis] = value / length;
-  });
-  const horizontal = Math.hypot(direction[0], direction[2]);
-  const right = [direction[2] / horizontal, 0, -direction[0] / horizontal];
-  const up = [
-    -right[2] * direction[1],
-    right[2] * direction[0] - right[0] * direction[2],
-    right[0] * direction[1],
-  ];
-  const tangent = Math.tan(radians(45 / 2)),
-    safeY = safeVerticalFraction(viewportHeight, hudRects);
-  let distance = 3.2;
-  for (const point of points) {
-    const q = point.map((value, axis) => value - target[axis]);
-    const depth = q.reduce(
-      (sum, value, axis) => sum + value * direction[axis],
-      0,
-    );
-    const x =
-      Math.abs(q.reduce((sum, value, axis) => sum + value * right[axis], 0)) +
-      0.23;
-    const y =
-      Math.abs(q.reduce((sum, value, axis) => sum + value * up[axis], 0)) +
-      0.23;
-    distance = Math.max(
-      distance,
-      depth +
-        Math.max(
-          x / (tangent * Math.max(0.2, aspect) * 0.92),
-          y / (tangent * safeY),
-        ),
+    const lift = smooth(clamp(p / 0.12, 0, 1));
+    points.push(
+      ...subject.points.map((point, index) => mix(point, flying[index], lift)),
     );
   }
-  distance += 0.25 * (1 - smooth(sample.progress));
+  const region = slot.focus?.region;
+  const area = { ...(SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0]) };
+  if (slot.kind === "group")
+    area.outward =
+      region === "left"
+        ? [-1, 0, 0]
+        : region === "right"
+          ? [1, 0, 0]
+          : [0, 0, 1];
+  // A shared table-wide result gets an overhead; tightly related actors retain
+  // the same close tracking language as an individual hero.
+  const variant =
+    slot.style === "overview" || memberIds.length > 3
+      ? "bet-overhead"
+      : ["bet-low-glide", "bet-cross-sweep", "bet-overhead"][seed % 3];
+  const shot = fitChipCamera({
+    points,
+    height,
+    area,
+    seed,
+    progress: p,
+    aspect,
+    viewportHeight,
+    hudRects,
+    variant,
+    transfer: p > 0,
+    railClearance: smooth(clamp((p - 0.5) * 2, 0, 1)),
+  });
   return {
+    ...shot,
     ...metadata,
     phase: slot.kind === "group" ? "outcome-group" : "outcome-player",
     seat: slot.seat,
-    position: target.map((value, axis) => value + direction[axis] * distance),
-    target,
-    fov: 49 - 4 * smooth(sample.progress),
-    focusPoints: points,
   };
 }
 
-/** A fixed human perspective with a gentle lateral move and lens change. */
+/** Finite, varied visits: engraved bank faces and passes over current wagers. */
 export function samplePlayerAreaCamera({
   player,
+  state,
   slot,
   now,
   phase = "outcome-player",
   roundId = "idle",
   aspect = 16 / 9,
+  viewportHeight = 0,
+  hudRects = [],
 }) {
   const seat = slot?.seat ?? player?.seat ?? 0;
   const area = SEAT_LAYOUT[seat] || SEAT_LAYOUT[0];
   const startAt = slot?.startAt ?? now,
     endAt = slot?.endAt ?? startAt + IDLE_PLAYER_SHOT_MS;
-  const progress = clamp((now - startAt) / Math.max(1, endAt - startAt), 0, 1),
-    eased = smooth(progress);
-  const variant =
-    (hash(`${roundId}:${player?.id || slot?.playerId || seat}`) % 3) - 1;
-  const idle = phase === "idle-player";
-  const distance = (idle ? 3.0 : 3.25) - eased * 0.2;
-  const lateral = variant * 0.65 + (eased - 0.5) * (idle ? 0.65 : 0.26);
-  const targetY = idle ? 0.9 : 1.02;
-  const target = [area.center[0], targetY, area.center[2]];
-  const position = [
-    area.center[0] + area.outward[0] * distance + area.tangent[0] * lateral,
-    (idle ? 1.15 : 1.65) + Math.sin(progress * Math.PI) * 0.04,
-    area.center[2] + area.outward[2] * distance + area.tangent[2] * lateral,
-  ];
-  const minimumFov = degrees(
-    2 *
-      Math.atan(
-        0.8 /
-          (Math.hypot(
-            position[0] - target[0],
-            position[1] - target[1],
-            position[2] - target[2],
-          ) *
-            Math.min(1, Math.max(0.3, aspect))),
-      ),
-  );
+  const progress = clamp((now - startAt) / Math.max(1, endAt - startAt), 0, 1);
+  const seed = hash(`${roundId}:${player?.id || slot?.playerId || seat}`);
+  let variant = CHIP_CAMERA_VARIANTS[seed % CHIP_CAMERA_VARIANTS.length];
+  const bets = (player?.bets || []).filter((bet) => bet.amount > 0);
+  if (variant.startsWith("bet-") && (!state || !bets.length))
+    variant = ["bank-macro", "bank-overhead", "bank-sweep"][seed % 3];
+  const subject = variant.startsWith("bet-")
+    ? wagerSubject(betRoute(player.id, bets[seed % bets.length], bets), state)
+    : bankSubject(player, variant === "bank-macro");
+  const shot = fitChipCamera({
+    ...subject,
+    area,
+    seed,
+    progress,
+    aspect,
+    viewportHeight,
+    hudRects,
+    variant,
+  });
   return {
+    ...shot,
     phase,
-    position,
-    target,
-    fov: Math.max((idle ? 51 : 46) - eased * 5, minimumFov),
     playerId: player?.id || slot?.playerId,
     seat,
     progress,
@@ -573,11 +665,12 @@ export function sampleTableCamera({
   return {
     ...samplePlayerAreaCamera({
       player,
+      state,
       phase: "idle-player",
       roundId: `${idlePlan.id}:${slot.index}`,
       slot,
       now,
-      aspect,
+      ...viewOptions,
     }),
     ...idleMetadata,
   };

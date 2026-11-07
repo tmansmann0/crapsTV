@@ -22,6 +22,7 @@ import {
   bankChipStacks,
 } from "./chip-flow.js";
 import { createChipFactory, CHIP_DENOMINATIONS } from "./chip-rendering.js";
+import { chipStackPose } from "./chip-character.js";
 import { assetURL as asset } from "./asset-url.js";
 import { createDiceMaterial, diceWearIndex } from "./dice-material.js";
 import {
@@ -428,8 +429,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       bankChipStacks(bankAmounts[i], {
         maxVisible: software ? 18 : 30,
       }).forEach((stack, slot) => {
-        const center = seatStackSlot(seat, slot),
-          height = 0.13 * 0.23 * 1.15;
+        const center = seatStackSlot(seat, slot);
         const impactStack = {
           id: `bank:${player.id}:${slot}`,
           floorY: center[1],
@@ -437,18 +437,18 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         };
         impactStacks.push(impactStack);
         for (let n = 0; n < stack.visibleCount; n++) {
+          const pose = chipStackPose(impactStack.id, n, {
+            diameter: 0.23,
+            thicknessScale: 1.15,
+          });
           const spec = {
             id: `${impactStack.id}:${n}`,
             denomination: stack.denomination,
             wear: (hash(player.id) + n) % 3,
             diameter: 0.23,
             thicknessScale: 1.15,
-            position: [
-              center[0],
-              center[1] + height / 2 + n * (height + 0.002),
-              center[2],
-            ],
-            rotation: [0, (hash(player.id + slot + n) % 628) / 100, 0],
+            position: pose.position.map((value, axis) => value + center[axis]),
+            rotation: pose.rotation,
           };
           specs.push(spec);
           impactStack.chips.push(spec);
@@ -648,12 +648,13 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         : { id: "preview", type: preview.betId };
       const route = betRoute(player.id, bet, player.bets),
         ghost = new THREE.Group();
-      ghost.position.fromArray(wagerPosition(route, state));
+      const pileLayout = wagerPileLayout(route, state, preview.amount);
+      ghost.position.fromArray(pileLayout.basePosition);
       ghost.position.y += 0.018;
       ghost.add(
         chipFactory.createBatch(
           pileSpecs(preview.amount, {
-            diameter: 0.33,
+            diameter: pileLayout.diameter,
             max: 5,
             opacity: 0.26,
             seed: player.id,
@@ -662,7 +663,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       );
       const marker = ring(
         preview.valid === false ? "#ef6c60" : "#e5ca83",
-        1.18,
+        (pileLayout.diameter / 0.33) * 1.18,
       );
       marker.position.y = 0.025;
       ghost.add(marker);

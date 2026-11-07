@@ -795,11 +795,10 @@ export default function Table3D(props) {
       const automaticCamera = !!introSample || (time > userUntil && !dragStart);
       controls.enabled =
         (introDone.current || introLiveProbe) && !dragStart?.overUI;
-      const cameraShot =
+      const autoView =
         automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
-          ? sampleThrowCamera({
-              throwState: s?.throw,
-              pose: shared,
+          ? sampleTableCamera({
+              state: s,
               now: throwTime,
               aspect: camera.aspect,
               viewportWidth: el.clientWidth,
@@ -808,10 +807,18 @@ export default function Table3D(props) {
               reducedMotion: reduced.matches,
             })
           : null;
-      const autoView =
-        automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
-          ? sampleTableCamera({
-              state: s,
+      // A short betting window can schedule camera setup before the usual
+      // dice-result hold finishes. Its shared payout plan owns that handoff.
+      const outcomeReady =
+        !s?.rolling && autoView?.phase?.startsWith("outcome-");
+      const cameraShot =
+        automaticCamera &&
+        cameraMode === "auto" &&
+        (!testing || introLiveProbe) &&
+        !outcomeReady
+          ? sampleThrowCamera({
+              throwState: s?.throw,
+              pose: shared,
               now: throwTime,
               aspect: camera.aspect,
               viewportWidth: el.clientWidth,
@@ -829,7 +836,7 @@ export default function Table3D(props) {
       const directedShot = openingShot || cameraShot || playerShot;
       const cinematic = !!directedShot;
       controls.minDistance = cinematic ? 0.18 : 0.35;
-      controls.minPolarAngle = cameraShot?.phase === "result" ? 0.0001 : 0.15;
+      controls.minPolarAngle = cinematic ? 0.0001 : 0.15;
       controls.maxPolarAngle = directedShot ? Math.PI - 0.01 : 1.43;
       controls.enableDamping = !cinematic;
       const shotKey = openingShot
@@ -843,7 +850,9 @@ export default function Table3D(props) {
         : (directedShot?.fov ??
           autoView?.fov ??
           (cameraMode === "room" ? 60 : 43));
-      camera.fov += (targetFov - camera.fov) * (cut ? 1 : Math.min(1, dt * 5));
+      camera.fov +=
+        (targetFov - camera.fov) *
+        (directedShot ? 1 : Math.min(1, dt * 5));
       camera.updateProjectionMatrix();
       if (automaticCamera) {
         const elapsed = (time - startTime) / 1000;
@@ -852,7 +861,9 @@ export default function Table3D(props) {
           if (cut) controls.update();
           targetPosition.fromArray(directedShot.position);
           shotTarget.fromArray(directedShot.target);
-          controls.target.lerp(shotTarget, cut ? 1 : 1 - Math.exp(-dt * 7));
+          // The shot sampler already supplies its smooth path. A second
+          // follower filter makes the camera trail the chips and miss setup.
+          controls.target.copy(shotTarget);
           camera.position.copy(targetPosition);
         } else {
           if (autoView) shotTarget.fromArray(autoView.target);
@@ -901,6 +912,10 @@ export default function Table3D(props) {
       el.dataset.cameraRig = cameraShot ? String(cameraShot.rig) : "";
       el.dataset.cameraPlayer = playerShot?.playerId || "";
       el.dataset.cameraShotKey = shotKey || "";
+      el.dataset.cameraVariant = directedShot?.shotVariant || "";
+      el.dataset.cameraArrivalAt = String(directedShot?.arrivalAt ?? "");
+      el.dataset.cameraTransferAt = String(directedShot?.transferAt ?? "");
+      el.dataset.cameraSubjectHeight = String(directedShot?.subjectHeight ?? "");
       const connected = !!introSample || current.status === "connected";
       const piecesChanged =
         s !== lastPiecesState ||

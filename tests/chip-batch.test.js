@@ -125,3 +125,56 @@ test("impact culling bounds cover both geometry partitions and transparency keep
   );
   for (const mesh of ghosts.children) assert.equal(mesh.castShadow, false);
 });
+
+test("patina parameters repack with each chip through LOD and motion without mutating shared geometry", () => {
+  const material = new THREE.MeshStandardMaterial();
+  material.userData.chipPatina = true;
+  const source = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.5, 0.13, 16),
+    material,
+  );
+  source.updateMatrixWorld(true);
+  const low = new THREE.CylinderGeometry(0.5, 0.5, 0.13, 8);
+  const specs = [
+    { id: "clean", position: [0, 0, -6], diameter: 1 },
+    { id: "handled", position: [0, 0, -100], diameter: 1 },
+  ];
+  const group = createChipBatch(
+    specs,
+    [source],
+    () => material,
+    new Map([[material.name, low]]),
+  );
+  const batch = group.userData.chipBatch,
+    camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 500);
+  camera.updateMatrixWorld(true);
+  const before = group.children[1].instanceColor.array.slice(0, 6);
+  batch.update(camera, 1080);
+  assert.deepEqual(
+    [...group.children[1].instanceColor.array.slice(0, 3)],
+    [...before.slice(0, 3)],
+  );
+  assert.deepEqual(
+    [...group.children[0].instanceColor.array.slice(0, 3)],
+    [...before.slice(3, 6)],
+  );
+  const moved = batch.getMatrixAt(0, new THREE.Matrix4());
+  moved.setPosition(2, 0, -120);
+  batch.setMatrixAt(0, moved);
+  batch.update(camera, 1080);
+  assert.deepEqual(
+    [...group.children[0].instanceColor.array.slice(0, 3)],
+    [...before.slice(0, 3)],
+  );
+  assert.deepEqual(
+    [...group.children[0].instanceColor.array.slice(3, 6)],
+    [...before.slice(3, 6)],
+  );
+  assert.equal(source.geometry.attributes.instanceColor, undefined);
+  assert.equal(low.attributes.instanceColor, undefined);
+  assert.equal(
+    group.children.length,
+    2,
+    "same one material/high-low mesh pair, no variation batches",
+  );
+});

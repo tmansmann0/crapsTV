@@ -1,5 +1,6 @@
 import { Vector3 } from "three";
 import { PUCK_HEIGHT, PUCK_RADIUS } from "./puck-layout.js";
+import { chipPoseBounds } from "./chip-character.js";
 
 export function puckFootprintBounds(pose) {
   const position = Array.isArray(pose.position)
@@ -56,15 +57,11 @@ export function projectChipFootprints(
       ? stack.id.slice(0, stack.id.lastIndexOf(":"))
       : stack.id;
     for (const chip of stack.chips) {
-      const radius = chip.diameter / 2 + motionPadding;
-      const halfHeight =
-        (0.13 * chip.diameter * (chip.thicknessScale ?? 1.3)) / 2 +
-        motionPadding;
-      const [x, y, z] = chip.position;
+      const bounds = chipPoseBounds(chip);
       include(
         id,
-        [x - radius, y - halfHeight, z - radius],
-        [x + radius, y + halfHeight, z + radius],
+        bounds.min.map((value) => value - motionPadding),
+        bounds.max.map((value) => value + motionPadding),
       );
     }
   }

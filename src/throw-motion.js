@@ -2,7 +2,7 @@ import { createDicePhysics, DICE_SIZE, BOUNDS } from "./dice-physics.js";
 import { diceLaunchPositions } from "./dice-launch.js";
 
 export const THROW_DURATION = 2500;
-export const PHYSICS_VERSION = 4;
+export const PHYSICS_VERSION = 5;
 export const DEFAULT_GESTURE = Object.freeze({ x: 0, power: 0.65 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const rounded = (value) => Math.round(value * 100000) / 100000;

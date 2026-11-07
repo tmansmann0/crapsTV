@@ -11,9 +11,32 @@
   "maskMethod": "Original alpha times smooth threshold of original gold/ivory luminance; burgundy backing excluded, original wordmark/dice/counters preserved",
   "generatedArtwork": false,
   "atlasSize": [
-    1024,
-    1024
+    2048,
+    2048
   ],
+  "mapSizes": {
+    "albedo": [
+      2048,
+      2048
+    ],
+    "normal": [
+      2048,
+      2048
+    ],
+    "roughness": [
+      1024,
+      1024
+    ],
+    "height": [
+      2048,
+      2048
+    ]
+  },
+  "bevelBlurPixels": 2.4,
+  "bevelReference": {
+    "pixels": 1.2,
+    "atlasSize": 1024
+  },
   "logoSceneWidth": 0.56,
   "logoSceneHeight": 0.2340740740740741,
   "cutDepth": 0.0032,

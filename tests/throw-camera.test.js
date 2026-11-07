@@ -417,7 +417,7 @@ test("outcome shots follow the exact shared slots, include pushes, and return co
   );
 });
 
-test("payout views frame every transfer source, arc and destination through each player's slot", () => {
+test("payout views frame the current moving chips throughout each shared slot", () => {
   const state = tourState();
   const plan = state.lastRoll.presentation;
   for (const [width, height] of [
@@ -531,16 +531,17 @@ test("player-area scans use distinct seated human angles with soft deterministic
         now: 3999,
         phase: "idle-player",
       });
-    assert.equal(first.position[1], 1.15);
+    assert.ok(first.position[1] > first.target[1] + 0.3);
+    assert.ok(first.target[1] >= SEAT_LAYOUT[seat].center[1]);
     assert.ok(
       Math.hypot(
         ...first.target.map((v, i) => v - SEAT_LAYOUT[seat].center[i]),
-      ) < 0.3,
+      ) < 0.9,
     );
     assert.ok(
-      Math.hypot(...first.position.map((v, i) => v - last.position[i])) < 0.8,
+      Math.hypot(...first.position.map((v, i) => v - last.position[i])) < 1.5,
     );
-    assert.ok(last.fov < first.fov);
+    assert.ok(last.fov <= first.fov);
     positions.push(first.position.join(","));
   }
   assert.equal(new Set(positions).size, 12);
@@ -750,7 +751,10 @@ test("focused pairs and left clusters frame their own transfers rather than the 
   assert.equal(pair.style, "pair");
   assert.equal(pair.reason, "shared-win");
   assert.ok(pair.target[0] < -1);
-  assert.ok(pair.position[0] < pair.target[0]);
+  assert.ok(
+    pair.position[0] > pair.target[0],
+    "inboard side reveals the left stacks without looking through the cushion",
+  );
   assert.ok(pair.position[1] < wide.position[1]);
   assert.ok(pair.focusPoints.length >= 10);
   const camera = new PerspectiveCamera(pair.fov, 16 / 9, 0.035, 160);
@@ -769,4 +773,107 @@ test("focused pairs and left clusters frame their own transfers rather than the 
   });
   assert.ok(cluster.target[0] < 0);
   assert.equal(cluster.region, "left");
+});
+
+test("payout camera is parked before transfer then tracks its actual current arc closely", () => {
+  const state = tourState(1);
+  const plan = state.lastRoll.presentation,
+    slot = plan.slots[0];
+  const at = (now) =>
+    sampleOutcomeCamera({
+      state,
+      plan,
+      sample: sampleOutcomeTour(plan, now),
+      now,
+    });
+  const arrived = at(slot.arrivalAt),
+    ready = at(slot.transferAt - 1);
+  assert.deepEqual(arrived.position, ready.position);
+  assert.deepEqual(arrived.target, ready.target);
+  assert.equal(ready.preparing, true);
+  assert.equal(ready.arrivalAt, slot.startAt);
+  assert.equal(ready.transferAt, slot.transferAt);
+  const mid = at(slot.transferAt + slot.flightMs / 2);
+  const flown = arcPosition(
+    [
+      wagerPosition(plan.transfers[0].from, state)[0],
+      0.134,
+      wagerPosition(plan.transfers[0].from, state)[2],
+    ],
+    [
+      SEAT_LAYOUT[state.players[0].seat].center[0],
+      0.805,
+      SEAT_LAYOUT[state.players[0].seat].center[2],
+    ],
+    0.5,
+  );
+  assert(Math.hypot(...mid.target.map((v, i) => v - flown[i])) < 0.25);
+  assert(Math.hypot(...arrived.target.map((v, i) => v - mid.target[i])) > 0.5);
+  assert.equal(arrived.shotKey, mid.shotKey);
+  assert.equal(mid.preparing, false);
+  assert(mid.position[1] > mid.target[1]);
+});
+
+test("finite detail visits vary low, overhead and bank angles and elevate for tall chips", () => {
+  const player = {
+    id: "detail",
+    name: "Detail",
+    seat: 2,
+    bank: 100000,
+    bets: [{ id: "tall", type: "pass", amount: 19400 }],
+  };
+  const state = { config: { mode: "craps" }, players: [player] };
+  const slot = { seat: 2, startAt: 1000, endAt: 4000 };
+  const shots = [];
+  for (let i = 0; i < 100; i++)
+    shots.push(
+      samplePlayerAreaCamera({
+        player,
+        state,
+        slot,
+        now: 2500,
+        roundId: `detail${i}`,
+        phase: "idle-player",
+      }),
+    );
+  assert.equal(new Set(shots.map((shot) => shot.shotVariant)).size, 6);
+  const index = shots.findIndex((shot) => shot.shotVariant === "bet-low-glide");
+  assert(index >= 0);
+  const tall = shots[index];
+  const smallPlayer = { ...player, bets: [{ ...player.bets[0], amount: 500 }] };
+  const small = samplePlayerAreaCamera({
+    player: smallPlayer,
+    state: { ...state, players: [smallPlayer] },
+    slot,
+    now: 2500,
+    roundId: `detail${index}`,
+    phase: "idle-player",
+  });
+  const downAngle = (shot) =>
+    Math.atan2(
+      shot.position[1] - shot.target[1],
+      Math.hypot(
+        shot.position[0] - shot.target[0],
+        shot.position[2] - shot.target[2],
+      ),
+    );
+  assert(tall.subjectHeight > small.subjectHeight * 6);
+  assert(tall.position[1] > small.position[1]);
+  assert(downAngle(tall) > downAngle(small) + 0.3);
+  assert(shots.find((shot) => shot.shotVariant === "bet-overhead").pitch > 1.4);
+  assert(
+    shots.find((shot) => shot.shotVariant === "bank-macro").subjectKind ===
+      "bank",
+  );
+  const empty = { ...player, bets: [] };
+  for (let i = 0; i < 15; i++)
+    assert(
+      samplePlayerAreaCamera({
+        player: empty,
+        state: { ...state, players: [empty] },
+        slot,
+        now: 2500,
+        roundId: `empty${i}`,
+      }).shotVariant.startsWith("bank-"),
+    );
 });

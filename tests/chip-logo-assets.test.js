@@ -158,8 +158,20 @@ test("engraving is recessed height with real normal bevels and roughness, preser
       Math.abs(normal.data[i + 1] - 127) > 25
     )
       beveled++;
-    assert(rough.data[i] >= 140 && rough.data[i] <= 195);
   }
+  for (let i = 0; i < rough.data.length; i += 4)
+    assert(rough.data[i] >= 140 && rough.data[i] <= 195);
+  assert.deepEqual([color.width, color.height], meta.mapSizes.albedo);
+  assert.deepEqual([normal.width, normal.height], meta.mapSizes.normal);
+  assert.deepEqual([rough.width, rough.height], meta.mapSizes.roughness);
+  assert.equal(color.width, 2048, "macro albedo retains true source detail");
+  assert.equal(normal.width, 2048, "macro bevel normal has the same detail");
+  assert.equal(rough.width, 1024, "roughness remains a bounded 1K map");
+  assert.equal(
+    meta.bevelBlurPixels / meta.atlasSize[0],
+    1.2 / 1024,
+    "physical bevel width stays unchanged",
+  );
   assert(inside > 1000 && outside > 10000);
   assert(
     insideHeight / inside < outsideHeight / outside - 60,

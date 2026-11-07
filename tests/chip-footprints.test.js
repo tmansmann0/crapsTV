@@ -173,3 +173,29 @@ test("projected bank and wager chip regions exclude labels in overhead and corne
         }
     }
 });
+
+test('tilted worn chips reserve their rendered silhouette in a close camera', () => {
+  const chip = {
+    diameter: 0.31, thicknessScale: 1.3,
+    position: [0, 0.12, 0], rotation: [0.4, 0.7, -0.3],
+  };
+  const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.01, 10);
+  camera.position.set(0.4, 0.5, 0.7);
+  camera.lookAt(...chip.position);
+  camera.updateMatrixWorld(true);
+  const [rect] = projectChipFootprints([{ id: 'bet:tilted', chips: [chip] }], camera, 1920, 1080)
+    .filter((r) => r.id === 'bet:tilted');
+  assert.ok(rect);
+  for (let i = 0; i < 64; i++) for (const sign of [-1, 1]) {
+    const angle = i / 64 * Math.PI * 2;
+    const p = new THREE.Vector3(
+      Math.cos(angle) * chip.diameter / 2,
+      sign * 0.13 * chip.diameter * chip.thicknessScale / 2,
+      Math.sin(angle) * chip.diameter / 2,
+    ).applyEuler(new THREE.Euler(...chip.rotation))
+      .add(new THREE.Vector3(...chip.position)).project(camera);
+    const x = (p.x + 1) * 960, y = (1 - p.y) * 540;
+    assert.ok(x >= rect.x && x <= rect.x + rect.width);
+    assert.ok(y >= rect.y && y <= rect.y + rect.height);
+  }
+});
