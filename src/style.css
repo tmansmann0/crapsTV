@@ -2210,7 +2210,7 @@ footer span span {
 html:has(.immersive-screen),
 body:has(.immersive-screen) {
   overflow: hidden;
-  background: #09100e;
+  background: #000;
 }
 .immersive-screen {
   position: fixed;
@@ -2220,7 +2220,7 @@ body:has(.immersive-screen) {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background: #09100e;
+  background: #000;
 }
 .immersive-canvas {
   position: absolute;

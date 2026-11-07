@@ -2,6 +2,7 @@ import { createDicePhysics, DICE_SIZE, BOUNDS } from "./dice-physics.js";
 import { diceLaunchPositions } from "./dice-launch.js";
 
 export const THROW_DURATION = 2500;
+export const PHYSICS_VERSION = 4;
 export const DEFAULT_GESTURE = Object.freeze({ x: 0, power: 0.65 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const rounded = (value) => Math.round(value * 100000) / 100000;
@@ -236,7 +237,7 @@ export function createThrowTimeline({
   // Hold the unmodified, already sleeping bodies briefly before results show.
   frames.push([duration, ...frames.at(-1).slice(1)]);
   return {
-    version: 3,
+    version: PHYSICS_VERSION,
     id,
     playerId,
     shooterId,

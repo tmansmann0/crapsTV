@@ -19,7 +19,7 @@ const marker = { ...puckHome(9), position: [0, PUCK_HEIGHT / 2 + 0.002, 0] };
 const options = {
   id: "props",
   playerId: "shooter",
-  seed: 39,
+  seed: 87,
   startAt: 1000,
   gesture: { x: 0, power: 0.65 },
 };
@@ -159,8 +159,8 @@ test("game uses its own puck/wager state and retains or resets the puck at settl
   assert.deepEqual(s.throw.props.stacks, stacksBefore);
   // A trusted rules fixture changes the point; it must reset the marker's face.
   game.finishRoll(s, [3, 3]);
-  s.point = 6;
-  s.throw = createThrowTimeline({ ...options, seed: 24, puck: marker });
+  s.throw = createThrowTimeline({ ...options, puck: marker });
+  s.point = s.throw.dice[0] + s.throw.dice[1];
   s.rolling = true;
   game.finishRoll(s);
   assert.equal(s.point, null);
@@ -171,8 +171,8 @@ test("actual point-eight puck position receives physical contact from an ordinar
   const puck = puckHome(8);
   const flight = createThrowTimeline({
     ...options,
-    seed: 3,
-    gesture: { x: 0, power: 0 },
+    seed: 4,
+    gesture: { x: 0.2, power: 0 },
     puck,
   });
   assert(flight.propContacts.some((contact) => contact.kind === "puck"));

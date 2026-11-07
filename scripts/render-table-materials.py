@@ -14,11 +14,11 @@ def tex(mat,key,uv,color=False):
     nodes=mat.node_tree.nodes;t=nodes.new('ShaderNodeTexImage');t.image=image(key.replace('walnut-albedo.png','walnut-albedo.jpg'),color);t.extension='REPEAT'
     u=nodes.new('ShaderNodeUVMap');u.uv_map=uv
     if 'walnut' in key:
-        scale=nodes.new('ShaderNodeVectorMath');scale.operation='SCALE';scale.inputs[3].default_value=.8/6;mat.node_tree.links.new(u.outputs['UV'],scale.inputs[0]);mat.node_tree.links.new(scale.outputs[0],t.inputs['Vector'])
+        scale=nodes.new('ShaderNodeVectorMath');scale.operation='SCALE';scale.inputs[3].default_value=.8/4;mat.node_tree.links.new(u.outputs['UV'],scale.inputs[0]);mat.node_tree.links.new(scale.outputs[0],t.inputs['Vector'])
     else:mat.node_tree.links.new(u.outputs['UV'],t.inputs['Vector'])
     return t
 specs={
-'Hand-polished dark walnut':('walnut',1.1,0,.1),
+'Hand-polished dark walnut':('walnut',.55,0,.16),
 'Deep oxblood leather':('leather',.75,0,.015),
 'Dark pine pyramid bounce rubber':('rubber',1,0,0),
 'Aged champagne brass':('brass',.3,.88,0),
@@ -29,7 +29,7 @@ for name,(prefix,strength,metal,coat) in specs.items():
     if not mat:continue
     mat.use_nodes=True;nodes=mat.node_tree.nodes;nodes.clear();out=nodes.new('ShaderNodeOutputMaterial');bsdf=nodes.new('ShaderNodeBsdfPrincipled');mat.node_tree.links.new(bsdf.outputs['BSDF'],out.inputs['Surface'])
     bsdf.inputs['Base Color'].default_value=(1,1,1,1);bsdf.inputs['Metallic'].default_value=metal
-    bsdf.inputs['Coat Weight'].default_value=coat;bsdf.inputs['Coat Roughness'].default_value=.5 if prefix=='walnut' else .75
+    bsdf.inputs['Coat Weight'].default_value=coat;bsdf.inputs['Coat Roughness'].default_value=.38 if prefix=='walnut' else .75
     color_uv='Material UV' if prefix=='leather' else 'Detail UV'
     t=tex(mat,f'material-table-{prefix}-albedo.png',color_uv,True);mat.node_tree.links.new(t.outputs['Color'],bsdf.inputs['Base Color'])
     t=tex(mat,f'material-table-{prefix}-roughness.png','Detail UV');mat.node_tree.links.new(t.outputs['Color'],bsdf.inputs['Roughness'])

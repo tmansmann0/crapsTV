@@ -25,14 +25,34 @@ export function seededRandom(seed) {
   };
 }
 export const MAX_WAGER_COLLIDERS = 1024;
+function correctContactFriction(world) {
+  // cannon-es 0.20's averaged-friction path swaps body-local contact arms.
+  // Use each original contact instead, sharing the manifold's Coulomb force
+  // budget across its points. This keeps the correct lever arms and resists
+  // flat-face spinning without multiplying a many-sided puck's friction.
+  world.narrowphase.createFrictionFromAverage = function (count) {
+    for (let i = 0; i < count; i++) {
+      const contact = this.result[this.result.length - 1 - i];
+      if (
+        !this.createFrictionEquationsFromContact(contact, this.frictionResult)
+      )
+        continue;
+      for (const equation of this.frictionResult.slice(-2)) {
+        equation.minForce /= count;
+        equation.maxForce /= count;
+      }
+    }
+  };
+}
 export function createDicePhysics({ puck = null, stacks = [] } = {}) {
   const world = new World({ gravity: new Vec3(0, -9.81, 0) });
   world.allowSleep = true;
   world.broadphase = new SAPBroadphase(world);
   world.solver.iterations = 20;
-  // One friction pair per contact manifold; a 24-sided puck must not receive
-  // 24 copies of static friction and become effectively glued to the felt.
+  // Route each manifold through the corrected, distributed force budget;
+  // do not use Cannon's position-dependent averaged anchors.
   world.narrowphase.enableFrictionReduction = true;
+  correctContactFriction(world);
   const resin = new Material("resin"),
     felt = new Material("felt"),
     rubber = new Material("rubber"),

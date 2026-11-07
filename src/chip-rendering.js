@@ -13,52 +13,102 @@ export {
   chipStackForAmount,
 } from "./chip-stack.js";
 
-import { assetURL as asset } from "./asset-url.js";
-
 /** Owns the shared model/texture GPU resources for one renderer or scene. */
-export async function createChipFactory(renderer) {
+export async function createChipFactory(
+  renderer,
+  { resolveAsset, loadModel, loadTexture } = {},
+) {
+  if (!resolveAsset) {
+    const { assetURL } = await import("./asset-url.js");
+    resolveAsset = assetURL;
+  }
   const loader = new GLTFLoader();
   const textureLoader = new THREE.TextureLoader();
+  loadModel ||= (url) => loader.loadAsync(url);
+  loadTexture ||= (url) => textureLoader.loadAsync(url);
   const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const textures = new Set(),
     materials = new Set(),
     geometries = new Set();
+  let disposed = false;
+  const disposeOwned = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
+    for (const texture of textures) texture.dispose();
+  };
+  const collectModel = (gltf) => {
+    gltf.scene.traverse((object) => {
+      if (!object.isMesh) return;
+      geometries.add(object.geometry);
+      for (const material of Array.isArray(object.material)
+        ? object.material
+        : [object.material]) {
+        materials.add(material);
+        for (const value of Object.values(material))
+          if (value?.isTexture) {
+            value.anisotropy = anisotropy;
+            textures.add(value);
+          }
+      }
+    });
+    return gltf;
+  };
   const loadData = async (name) => {
-    const texture = await textureLoader.loadAsync(asset(name));
+    const texture = await loadTexture(resolveAsset(name));
     texture.flipY = false;
     texture.colorSpace = THREE.NoColorSpace;
     texture.anisotropy = anisotropy;
     textures.add(texture);
     return texture;
   };
-  const [gltf, lowDetail, normalMaps, roughnessMaps] = await Promise.all([
-    loader.loadAsync(asset("chip.glb")),
-    loader.loadAsync(asset("chip-lod.glb")).catch(() => null),
-    Promise.all([1, 2, 3].map((i) => loadData(`chip-normal-${i}.png`))),
-    Promise.all([1, 2, 3].map((i) => loadData(`chip-roughness-${i}.png`))),
+  // Wait for every request before rejecting, so a late successful model/map
+  // cannot escape cleanup after another request fails.
+  const loaded = await Promise.allSettled([
+    loadModel(resolveAsset("chip-logo.glb")).then(collectModel),
+    loadModel(resolveAsset("chip-logo-lod.glb"))
+      .then(collectModel)
+      .catch(() => null),
+    ...[1, 2, 3].map((i) => loadData(`chip-normal-${i}.png`)),
+    ...[1, 2, 3].map((i) => loadData(`chip-roughness-${i}.png`)),
   ]);
-  gltf.scene.traverse((object) => {
-    if (!object.isMesh) return;
-    geometries.add(object.geometry);
-    for (const material of Array.isArray(object.material)
-      ? object.material
-      : [object.material]) {
-      materials.add(material);
-      for (const value of Object.values(material))
-        if (value?.isTexture) {
-          value.anisotropy = anisotropy;
-          textures.add(value);
-        }
+  const failure = loaded.find((result) => result.status === "rejected");
+  if (failure) {
+    disposeOwned();
+    throw failure.reason;
+  }
+  const [gltf, lowDetail, ...wearMaps] = loaded.map((result) => result.value);
+  const normalMaps = wearMaps.slice(0, 3),
+    roughnessMaps = wearMaps.slice(3);
+  try {
+    // GLTFLoader.loadTextureImage converts a failed image request to null,
+    // allowing loadAsync to resolve. These maps must precede the startup gate.
+    const detailedMaterials = new Map();
+    gltf.scene.traverse((object) => {
+      if (!object.isMesh) return;
+      for (const m of Array.isArray(object.material)
+        ? object.material
+        : [object.material])
+        detailedMaterials.set(m.name, m);
+    });
+    for (const [name, keys] of [
+      ["ChipBase", ["map"]],
+      ["ChipEngraving", ["map", "normalMap", "roughnessMap"]],
+    ]) {
+      const material = detailedMaterials.get(name);
+      for (const key of keys)
+        if (!material?.[key]?.isTexture)
+          throw new Error(`Chip model is missing required ${name}.${key}`);
     }
-  });
+  } catch (error) {
+    disposeOwned();
+    throw error;
+  }
   const lowGeometry = new Map();
   lowDetail?.scene.traverse((object) => {
     if (!object.isMesh) return;
-    geometries.add(object.geometry);
     lowGeometry.set(object.material.name, object.geometry);
-    materials.add(object.material);
-    for (const value of Object.values(object.material))
-      if (value?.isTexture) textures.add(value);
   });
   const cache = new Map();
   function styled(original, denomination, wear, opacity = 1) {
@@ -134,9 +184,7 @@ export async function createChipFactory(renderer) {
       return changed;
     },
     dispose() {
-      for (const geometry of geometries) geometry.dispose();
-      for (const material of materials) material.dispose();
-      for (const texture of textures) texture.dispose();
+      disposeOwned();
       cache.clear();
     },
   };
@@ -144,7 +192,7 @@ export async function createChipFactory(renderer) {
 
 const thumbnailCache = new Map();
 
-/** Transparent PNG data URLs rendered from chip.glb, for native <img> controls. */
+/** Transparent PNG data URLs rendered from the active logo chip, for native <img> controls. */
 export function renderChipThumbnails(
   values = [500, 2500, 10000, 50000],
   { size = 160 } = {},

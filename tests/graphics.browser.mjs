@@ -58,6 +58,7 @@ try {
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 45000,
   });
+  await page.keyboard.press("Escape");
   await expect(table).toHaveAttribute("data-graphics-intro", "false", {
     timeout: 20000,
   });
@@ -186,6 +187,7 @@ try {
   await expect(table).toHaveAttribute("data-graphics-textures", "1024");
   await click("graphics:retest");
   await expect(table).toHaveAttribute("data-graphics-intro", "true");
+  await page.keyboard.press("Escape");
   await expect(table).toHaveAttribute("data-graphics-intro", "false", {
     timeout: 20000,
   });
@@ -194,6 +196,7 @@ try {
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 45000,
   });
+  await page.keyboard.press("Escape");
   await expect(table).toHaveAttribute("data-graphics-intro", "false", {
     timeout: 20000,
   });

@@ -47,7 +47,10 @@ export function createSceneUI(renderer, onAction) {
     settingsPage = "main",
     layout = createTVLayout(1920, 1080, { uiSize, labelMotion }),
     revision = 0,
-    alive = true;
+    alive = true,
+    presentationOpacity = 1,
+    fontsReady = !document.fonts,
+    logoReady = false;
   const C = {
     ink: "#eee8db",
     muted: "#a7b5ae",
@@ -88,15 +91,27 @@ export function createSceneUI(renderer, onAction) {
   }
   for (const [id, box] of Object.entries(layout.panels))
     panel(id, box.logicalWidth, box.logicalHeight);
-  document.fonts?.ready.then(() => {
-    if (alive) redraw();
-  });
+  if (document.fonts)
+    Promise.all([
+      document.fonts.load("600 36px Manrope"),
+      document.fonts.load("700 78px Manrope"),
+      document.fonts.ready,
+    ])
+      .finally(() => {
+        fontsReady = true;
+        if (alive) redraw();
+      })
+      .catch(() => {});
   const img = new Image();
   img.onload = () => {
+    logoReady = true;
     if (alive) {
       logo = img;
       redraw();
     }
+  };
+  img.onerror = () => {
+    logoReady = true;
   };
   img.src = assetURL("brand-logo.png");
   function begin(p, glass = true) {
@@ -707,6 +722,7 @@ export function createSceneUI(renderer, onAction) {
     }
   }
   function pick(x, y) {
+    if (presentationOpacity < 0.98) return null;
     const r = renderer.domElement.getBoundingClientRect();
     raycaster.setFromCamera(
       new THREE.Vector2(
@@ -731,6 +747,7 @@ export function createSceneUI(renderer, onAction) {
     return null;
   }
   function getActionPoints() {
+    if (presentationOpacity < 0.98) return {};
     const points = {};
     for (const [id, p] of Object.entries(panels)) {
       if (!p.mesh.visible) continue;
@@ -757,6 +774,20 @@ export function createSceneUI(renderer, onAction) {
   return {
     scene,
     camera,
+    get isReady() {
+      return fontsReady && logoReady;
+    },
+    get opacity() {
+      return presentationOpacity;
+    },
+    setPresentation(opacity) {
+      const next = Math.max(0, Math.min(1, opacity));
+      if (next >= 0.98 !== presentationOpacity >= 0.98) revision++;
+      presentationOpacity = next;
+      scene.visible = next > 0.001;
+      scene.position.y = -(1 - next) * 18;
+      for (const p of Object.values(panels)) p.mesh.material.opacity = next;
+    },
     get layout() {
       return layout;
     },
@@ -789,6 +820,7 @@ export function createSceneUI(renderer, onAction) {
     },
     getActionPoints,
     getVisibleRects() {
+      if (presentationOpacity < 0.98) return [];
       return Object.entries(panels)
         .filter(([, p]) => p.mesh.visible)
         .map(([id]) => ({ id, ...layout.panels[id] }));

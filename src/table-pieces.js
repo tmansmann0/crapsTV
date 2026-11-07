@@ -130,8 +130,24 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     scene.add(die);
   });
   const textureLoader = new THREE.TextureLoader();
+  const detailReady = [];
   function linearTexture(name) {
-    const texture = textureLoader.load(asset(name));
+    let loaded, failed;
+    detailReady.push(
+      new Promise((resolve, reject) => {
+        loaded = resolve;
+        failed = reject;
+      }),
+    );
+    const texture = textureLoader.load(
+      asset(name),
+      (map) => {
+        if (!alive) map.dispose();
+        loaded();
+      },
+      undefined,
+      failed,
+    );
     texture.flipY = false;
     texture.colorSpace = THREE.NoColorSpace;
     textures.add(texture);
@@ -189,7 +205,12 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     chipFactory = factory;
     buildDealerRack();
   });
-  const ready = Promise.all([diceReady, chipReady, layoutReady]);
+  const ready = Promise.all([
+    diceReady,
+    chipReady,
+    layoutReady,
+    ...detailReady,
+  ]);
   ready.catch((error) =>
     console.error("Could not prepare table pieces", error),
   );

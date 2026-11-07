@@ -22,12 +22,18 @@ import {
   GRAPHICS_OPTIONS,
   normalizeGraphics,
 } from "./graphics-settings.js";
-import {
-  recommendGraphics,
-  calibrateGraphics,
-  resolveGraphics,
-} from "./graphics-profile.js";
+import { recommendGraphics, resolveGraphics } from "./graphics-profile.js";
 import { createTextureQuality } from "./texture-quality.js";
+import {
+  createStartupShowcase,
+  sampleStartup,
+  STARTUP_DURATION_MS,
+} from "./startup-sequence.js";
+import {
+  startupCandidates,
+  selectStartupProfile,
+  STARTUP_PROBE_AT,
+} from "./startup-calibration.js";
 const GRAPHICS_STORAGE = "crapstv-graphics-v1";
 function savedGraphics() {
   try {
@@ -111,6 +117,9 @@ export default function Table3D(props) {
     capabilities.maxTextureSize = renderer.capabilities.maxTextureSize;
     if (!profileRef.current)
       profileRef.current = recommendGraphics(capabilities);
+    const recommendedProfile = { ...profileRef.current };
+    let candidates = startupCandidates(recommendedProfile, { software });
+    if (!introDone.current) profileRef.current = candidates[0];
     let quality = resolveGraphics(graphics, profileRef.current, capabilities);
     if (
       quality.antialias !==
@@ -130,9 +139,16 @@ export default function Table3D(props) {
     let restarting = false;
     let introStart = null;
     let introPaused = null;
-    let introIntervals = [];
     let introPreviousFrame = null;
-    const introDuration = software ? 900 : 2400;
+    let introReports = [[], [], []],
+      introCandidate = 0;
+    let introShowcase = null,
+      introFinishedAt = introDone.current ? -Infinity : null;
+    let introSample = null,
+      probeWarmUntil = 0;
+    let introLiveProbe = false;
+    let sceneRevealedAt = introDone.current ? -Infinity : null;
+    const introDuration = STARTUP_DURATION_MS;
     const glInfo = renderer
       .getContext()
       .getExtension("WEBGL_debug_renderer_info");
@@ -148,12 +164,30 @@ export default function Table3D(props) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     renderer.autoClear = false;
+    renderer.setClearColor(0x000000, 1);
     const compositor = createTableCompositor(renderer);
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#09100e");
     const camera = new THREE.PerspectiveCamera(43, 1, 0.035, 160);
     camera.position.set(10, 6.5, 18);
+    const fadeScene = new THREE.Scene();
+    const fadeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 2);
+    fadeCamera.position.z = 1;
+    const fadeMaterial = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const fadeQuad = new THREE.Mesh(
+      new THREE.PlaneGeometry(2, 2),
+      fadeMaterial,
+    );
+    fadeQuad.frustumCulled = false;
+    fadeScene.add(fadeQuad);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.4, 0.5);
     if (retainedView.current) {
@@ -459,13 +493,45 @@ export default function Table3D(props) {
       } catch {}
       applyRuntimeQuality();
     }
+    function finishOpening(time, skipped = false) {
+      if (introDone.current) return;
+      const measured = introReports.some((samples) => samples.length >= 8);
+      profileRef.current =
+        skipped && !measured
+          ? recommendedProfile
+          : selectStartupProfile(candidates, introReports, {
+              requestedFps: graphics.fps,
+              software,
+            });
+      introDone.current = true;
+      introFinishedAt = skipped && !introLiveProbe ? time : time - 1200;
+      introLiveProbe = false;
+      introSample = null;
+      applyRuntimeQuality();
+      nextFrameAt = 0;
+    }
+    function skipOpening(event) {
+      if (event.key === "Escape" && !introDone.current) {
+        finishOpening(performance.now(), true);
+      }
+    }
+    window.addEventListener("keydown", skipOpening);
     function handleGraphics(action) {
       const key = action.slice("graphics:".length);
       if (key === "retest") {
         introDone.current = false;
         introStart = null;
         introPreviousFrame = null;
-        introIntervals = [];
+        introReports = [[], [], []];
+        introCandidate = 0;
+        introLiveProbe = latest.current.state?.status === "playing";
+        introFinishedAt = null;
+        if (!introLiveProbe) sceneRevealedAt = performance.now();
+        candidates = startupCandidates(recommendedProfile, { software });
+        if (latest.current.settingsOpen && !introLiveProbe)
+          latest.current.onAction?.("settings");
+        profileRef.current = candidates[0];
+        applyRuntimeQuality();
         return;
       }
       const options = GRAPHICS_OPTIONS[key];
@@ -493,9 +559,13 @@ export default function Table3D(props) {
     });
     ui.setSettingsPage(graphicsPage.current);
     function pointerDown(e) {
+      if (!introDone.current && !introLiveProbe) {
+        controls.enabled = false;
+        return;
+      }
       const overUI = !!ui.pick(e.clientX, e.clientY);
       const pan = !overUI && e.button === 0 && e.shiftKey;
-      dragStart = { x: e.clientX, y: e.clientY, pan };
+      dragStart = { x: e.clientX, y: e.clientY, pan, overUI };
       // OrbitControls already maps Shift + left-drag to screen-space pan.
       // Enable it only for that gesture so ordinary left-drag keeps orbiting.
       controls.enablePan = pan;
@@ -621,19 +691,37 @@ export default function Table3D(props) {
           introStart += time - introPaused;
         introPaused = null;
         if (stageReady && !introDone.current) {
-          if (introStart === null) introStart = time;
-          if (introPreviousFrame !== null && time - introStart > 300)
-            introIntervals.push(time - introPreviousFrame);
-          introPreviousFrame = time;
-          if (time - introStart >= introDuration) {
-            if (!software)
-              profileRef.current = calibrateGraphics(
-                profileRef.current,
-                introIntervals,
-              );
-            introDone.current = true;
-            applyRuntimeQuality();
-            nextFrameAt = 0;
+          if (latest.current.state?.status === "playing" && !introLiveProbe)
+            finishOpening(time, true);
+          else {
+            if (introStart === null) {
+              introStart = time;
+              probeWarmUntil = time + 800;
+              if (!introLiveProbe) introShowcase ||= createStartupShowcase();
+            }
+            const elapsed = time - introStart;
+            const probe =
+              elapsed >= STARTUP_PROBE_AT[3]
+                ? 3
+                : elapsed >= STARTUP_PROBE_AT[2]
+                  ? 2
+                  : elapsed >= STARTUP_PROBE_AT[1]
+                    ? 1
+                    : 0;
+            if (probe !== introCandidate) {
+              introCandidate = probe;
+              introPreviousFrame = null;
+              probeWarmUntil = time + 900;
+              profileRef.current =
+                probe < 3
+                  ? candidates[probe]
+                  : selectStartupProfile(candidates, introReports, {
+                      requestedFps: graphics.fps,
+                      software,
+                    });
+              applyRuntimeQuality();
+            }
+            if (elapsed >= introDuration) finishOpening(time);
           }
         }
       }
@@ -641,28 +729,44 @@ export default function Table3D(props) {
       const frameDelta = (time - lastTime) / 1000;
       const dt = Math.min(frameDelta, 0.06);
       const testing = stageReady && !introDone.current;
-      const interval = 1000 / (testing && !software ? 60 : quality.fps);
+      const interval =
+        1000 /
+        (testing && graphics.fps === "auto" && !software ? 60 : quality.fps);
       // Carry fractional deadlines: 24 FPS on a 60 Hz display needs alternating
       // two/three-refresh gaps, rather than accidentally becoming 20 FPS.
       if (!document.hidden && time + 0.75 < nextFrameAt) return;
       if (!nextFrameAt || time - nextFrameAt > interval) nextFrameAt = time;
       nextFrameAt += interval;
       lastTime = time;
-      const current = latest.current,
-        s = stateForDisplay(current.state),
-        mode = s?.config.mode === "crapless" ? "crapless" : "classic";
-      const graphicsRevision = s?.display?.graphicsRevision ?? 0;
+      const current = latest.current;
+      const live = stateForDisplay(current.state);
+      introSample =
+        !introDone.current && introShowcase && !introLiveProbe
+          ? sampleStartup(
+              introShowcase,
+              introStart === null ? 0 : time - introStart,
+              {
+                aspect: camera.aspect,
+                reducedMotion: reduced.matches,
+              },
+            )
+          : null;
+      if (introSample)
+        introSample.state.clockOffsetMs = introSample.elapsed - Date.now();
+      const s = introSample?.state || live;
+      const mode = s?.config.mode === "crapless" ? "crapless" : "classic";
+      const graphicsRevision = live?.display?.graphicsRevision ?? 0;
       if (
-        s?.display?.graphics &&
+        live?.display?.graphics &&
         graphicsRevision !== remoteGraphicsRevision.current
       ) {
         remoteGraphicsRevision.current = graphicsRevision;
-        if (graphicsRevision > 0) setGraphics(s.display.graphics);
+        if (graphicsRevision > 0) setGraphics(live.display.graphics);
       }
       if (restarting) return;
-      if (s?.display && s.display.revision !== displayRevision) {
-        displayRevision = s.display.revision;
-        cameraMode = s.display.camera;
+      if (live?.display && live.display.revision !== displayRevision) {
+        displayRevision = live.display.revision;
+        cameraMode = live.display.camera;
         userUntil = 0;
         el.dataset.camera = cameraMode;
       }
@@ -688,9 +792,11 @@ export default function Table3D(props) {
       }
       const aiming = s?.aim?.active ? aimDicePose(s.aim, launchProps) : null;
       const pose = aiming || shared;
-      const automaticCamera = time > userUntil && !dragStart;
+      const automaticCamera = !!introSample || (time > userUntil && !dragStart);
+      controls.enabled =
+        (introDone.current || introLiveProbe) && !dragStart?.overUI;
       const cameraShot =
-        automaticCamera && cameraMode === "auto" && !testing
+        automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
           ? sampleThrowCamera({
               throwState: s?.throw,
               pose: shared,
@@ -703,7 +809,7 @@ export default function Table3D(props) {
             })
           : null;
       const autoView =
-        automaticCamera && cameraMode === "auto" && !testing
+        automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
           ? sampleTableCamera({
               state: s,
               now: throwTime,
@@ -715,15 +821,22 @@ export default function Table3D(props) {
             })
           : null;
       const playerShot = !cameraShot && autoView?.shotKey ? autoView : null;
-      const directedShot = cameraShot || playerShot;
+      const openingShot = introSample && {
+        ...introSample.camera,
+        phase: "opening",
+        shotKey: `opening:${introSample.camera.shotKey || introSample.phase}:${s.throw?.id || "establish"}`,
+      };
+      const directedShot = openingShot || cameraShot || playerShot;
       const cinematic = !!directedShot;
       controls.minDistance = cinematic ? 0.18 : 0.35;
       controls.minPolarAngle = cameraShot?.phase === "result" ? 0.0001 : 0.15;
       controls.maxPolarAngle = directedShot ? Math.PI - 0.01 : 1.43;
       controls.enableDamping = !cinematic;
-      const shotKey = cameraShot
-        ? `${s.throw.id}:${cameraShot.phase}`
-        : playerShot?.shotKey || null;
+      const shotKey = openingShot
+        ? openingShot.shotKey
+        : cameraShot
+          ? `${s.throw.id}:${cameraShot.phase}`
+          : playerShot?.shotKey || null;
       const cut = shotKey !== null && shotKey !== previousCameraShot;
       const targetFov = !automaticCamera
         ? camera.fov
@@ -747,15 +860,7 @@ export default function Table3D(props) {
             autoView ? shotTarget : tableTarget,
             Math.min(1, dt * 3),
           );
-          if (testing && !reduced.matches && time > userUntil)
-            targetPosition.set(
-              Math.sin(((time - introStart) / introDuration) * Math.PI * 2) *
-                3.5,
-              7.5 +
-                Math.sin(((time - introStart) / introDuration) * Math.PI) * 2,
-              15.5,
-            );
-          else if (cameraMode === "table") targetPosition.set(0.01, 8.1, 1.2);
+          if (cameraMode === "table") targetPosition.set(0.01, 8.1, 1.2);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
           else if (autoView) targetPosition.fromArray(autoView.position);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
@@ -789,11 +894,14 @@ export default function Table3D(props) {
       labelCameraFov = camera.fov;
       previousCameraShot = shotKey;
       el.dataset.cameraShot =
-        cameraShot?.phase || autoView?.phase || "overview";
+        openingShot?.phase ||
+        cameraShot?.phase ||
+        autoView?.phase ||
+        "overview";
       el.dataset.cameraRig = cameraShot ? String(cameraShot.rig) : "";
       el.dataset.cameraPlayer = playerShot?.playerId || "";
       el.dataset.cameraShotKey = shotKey || "";
-      const connected = current.status === "connected";
+      const connected = !!introSample || current.status === "connected";
       const piecesChanged =
         s !== lastPiecesState ||
         connected !== lastPiecesConnection ||
@@ -900,15 +1008,32 @@ export default function Table3D(props) {
         detailLoaded === 2 &&
         boardsLoaded === 2 &&
         piecesLoaded &&
-        readyEnvironment
+        readyEnvironment &&
+        ui.isReady
       ) {
         warming = true;
+        if (!introDone.current && latest.current.state?.status !== "playing") {
+          try {
+            introShowcase ||= createStartupShowcase();
+            const first = introShowcase.stages[0].state;
+            first.clockOffsetMs = -Date.now();
+            pieces.update(first, { connected: true });
+          } catch {
+            finishOpening(time, true);
+          }
+        }
         startupCompile = Promise.resolve(compositor.compile(scene, camera))
           .then(() => {
-            if (alive) stageReady = true;
+            if (alive) {
+              stageReady = true;
+              sceneRevealedAt ??= performance.now();
+            }
           })
           .catch(() => {
-            if (alive) stageReady = true;
+            if (alive) {
+              stageError = "Table shaders could not load. Refresh to retry.";
+              stageReady = true;
+            }
           });
       }
       ui.update({
@@ -927,7 +1052,7 @@ export default function Table3D(props) {
         sceneLoading: !stageReady,
         error: current.error || stageError,
         graphics,
-        introActive: testing,
+        introActive: false,
         introReducedMotion: reduced.matches,
         graphicsInfo: {
           fps: Number(el.dataset.renderFps) || null,
@@ -941,6 +1066,39 @@ export default function Table3D(props) {
           textureLabel: `${Math.min(quality.textureLimit, textureQuality.maxNativeDimension || quality.textureLimit)}px`,
         },
       });
+      const uiOpacity = introLiveProbe
+        ? 1
+        : stageError
+          ? 1
+          : !stageReady
+            ? 0
+            : introSample
+              ? introSample.uiOpacity
+              : THREE.MathUtils.smoothstep(
+                  time - (introFinishedAt ?? time),
+                  0,
+                  1200,
+                );
+      ui.setPresentation(uiOpacity);
+      const sceneOpacity = stageError
+        ? 1
+        : stageReady
+          ? THREE.MathUtils.smoothstep(
+              time - (sceneRevealedAt ?? time),
+              0,
+              1500,
+            )
+          : 0;
+      el.dataset.startupPhase = !stageReady
+        ? "loading"
+        : introSample?.phase || "live";
+      el.dataset.startupElapsed = String(
+        introStart === null ? 0 : Math.min(introDuration, time - introStart),
+      );
+      el.dataset.startupFade = String(sceneOpacity);
+      el.dataset.startupUiOpacity = String(uiOpacity);
+      el.dataset.demoActive = String(!!introSample && stageReady);
+      el.dataset.startupProbe = String(introCandidate);
       if (uiRevision !== ui.revision) {
         uiRevision = ui.revision;
         uiExclusions = ui.getVisibleRects();
@@ -1007,6 +1165,16 @@ export default function Table3D(props) {
           renderer.clearDepth();
         }
         renderer.render(ui.scene, ui.camera);
+        if (sceneOpacity < 1) {
+          fadeMaterial.opacity = 1 - sceneOpacity;
+          renderer.clearDepth();
+          renderer.render(fadeScene, fadeCamera);
+        }
+        if (testing && introCandidate < 3 && time > probeWarmUntil) {
+          if (introPreviousFrame !== null)
+            introReports[introCandidate].push(time - introPreviousFrame);
+          introPreviousFrame = time;
+        }
         if (stageReady) {
           renderedOnce = true;
           if (!metricStart) metricStart = time;
@@ -1035,11 +1203,14 @@ export default function Table3D(props) {
       el.removeEventListener("pointermove", pointerMove);
       el.removeEventListener("pointercancel", pointerCancel);
       window.removeEventListener("blur", pointerCancel);
+      window.removeEventListener("keydown", skipOpening);
       renderer.domElement.remove();
       const disposeResources = () => {
         textureQuality.dispose();
         ui.dispose();
         compositor.dispose();
+        fadeQuad.geometry.dispose();
+        fadeMaterial.dispose();
         pieces.dispose();
         tableMaterials?.dispose();
         const sceneTextures = new Set();

@@ -4,16 +4,18 @@
   "woodLicense": "CC0-1.0",
   "woodMapping": {
     "uvChannel": 1,
-    "tileSceneUnits": 6,
+    "mappingVersion": 2,
+    "projection": "Board-local mitered panels; upright leg grain",
+    "tileSceneUnits": 4,
     "repeat": [
-      0.13333333333333333,
-      0.13333333333333333
+      0.2,
+      0.2
     ],
     "albedoFormat": "JPEG quality94 subsampling0",
-    "normalScale": 1.1,
-    "clearcoat": 0.1,
-    "clearcoatRoughness": 0.5,
-    "environmentIntensity": 0.6
+    "normalScale": 0.55,
+    "clearcoat": 0.16,
+    "clearcoatRoughness": 0.38,
+    "environmentIntensity": 0.8
   },
   "normalConvention": "OpenGL +Y tangent-space",
   "albedoColorSpace": "sRGB",
@@ -25,8 +27,8 @@
       "width": 2048,
       "height": 2048,
       "min": 0.0,
-      "max": 0.6557,
-      "mean": 0.1796
+      "max": 0.6039,
+      "mean": 0.1633
     },
     "material-table-walnut-normal": {
       "file": "material-table-walnut-normal.png",

@@ -21,7 +21,7 @@ export function puckHome(point, mode = "craps") {
     radius: PUCK_RADIUS,
     height: PUCK_HEIGHT,
     mass: PUCK_MASS,
-    position: [x, PUCK_HEIGHT / 2 + 0.002, -2.1],
+    position: [x, PUCK_HEIGHT / 2 + 0.002, on ? -1.62 : -2.05],
     quaternion: on ? [0, 0, 0, 1] : [1, 0, 0, 0],
   };
 }

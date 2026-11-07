@@ -63,7 +63,7 @@ def normal(name,height,world=.8):
 # Keep the photograph's grain/pore variation: only a per-channel stain multiplier.
 source=ROOT/'assets/source/materials/dark-wood'
 wood=np.asarray(Image.open(source/'dark_wood_diff_2k.jpg').convert('RGB'),dtype=np.float32)/255
-save('material-table-walnut-albedo',wood*np.array([.76,.95,1.12]))
+save('material-table-walnut-albedo',wood*np.array([.70,.86,.99]))
 woodnormal=np.asarray(Image.open(source/'dark_wood_nor_gl_1k.png').convert('RGB'),dtype=np.float32)/255
 save('material-table-walnut-normal',woodnormal)
 woodrough=np.asarray(Image.open(source/'dark_wood_rough_1k.png').convert('L'),dtype=np.float32)/255
@@ -100,7 +100,7 @@ micro=noise(n,n,120,120,100)-.5
 albedo('material-table-black-albedo',(8,16,14),1+.06*micro)
 normal('material-table-black-normal',micro*.00008)
 save('material-table-black-roughness',np.clip(.75+micro*.025,.72,.78))
-atomic_write(OUT/'material-table-metadata.json',lambda p: p.write_text(json.dumps({'generated':'Scanned CC0 Poly Haven wood; original procedural other materials','woodSource':'https://polyhaven.com/a/dark_wood','woodLicense':'CC0-1.0','woodMapping':{'uvChannel':1,'tileSceneUnits':6,'repeat':[.8/6,.8/6],'albedoFormat':'JPEG quality94 subsampling0','normalScale':1.1,'clearcoat':.1,'clearcoatRoughness':.5,'environmentIntensity':.6},'normalConvention':'OpenGL +Y tangent-space','albedoColorSpace':'sRGB','dataColorSpace':'linear/NoColorSpace','roughnessScalar':1,'maps':RANGES},indent=2)+'\n',encoding='utf-8'))
+atomic_write(OUT/'material-table-metadata.json',lambda p: p.write_text(json.dumps({'generated':'Scanned CC0 Poly Haven wood; original procedural other materials','woodSource':'https://polyhaven.com/a/dark_wood','woodLicense':'CC0-1.0','woodMapping':{'uvChannel':1,'mappingVersion':2,'projection':'Board-local mitered panels; upright leg grain','tileSceneUnits':4,'repeat':[.8/4,.8/4],'albedoFormat':'JPEG quality94 subsampling0','normalScale':.55,'clearcoat':.16,'clearcoatRoughness':.38,'environmentIntensity':.8},'normalConvention':'OpenGL +Y tangent-space','albedoColorSpace':'sRGB','dataColorSpace':'linear/NoColorSpace','roughnessScalar':1,'maps':RANGES},indent=2)+'\n',encoding='utf-8'))
 
 # Readable proof sheet. It is not a material input.
 labels=['walnut','leather','rubber','brass','black']

@@ -1,6 +1,6 @@
 {
   "name": "crapstv",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "A living-room craps table. TV is the table. Phones are the chips.",
@@ -20,7 +20,8 @@
     "test:layout": "node tests/phone-layout.browser.mjs",
     "test:learn": "node tests/learn-center.browser.mjs",
     "test:tv": "node tests/tv-readability.browser.mjs && node tests/join-card.browser.mjs",
-    "test:tour": "node tests/tour-camera.browser.mjs"
+    "test:tour": "node tests/tour-camera.browser.mjs",
+    "test:startup": "node tests/startup.browser.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

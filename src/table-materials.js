@@ -25,11 +25,11 @@ const MATERIALS = {
     color: "woodColor",
     normal: "woodNormal",
     rough: "woodRough",
-    strength: 1.1,
+    strength: 0.55,
     metalness: 0,
-    coat: 0.1,
-    coatRoughness: 0.5,
-    environment: 0.6,
+    coat: 0.16,
+    coatRoughness: 0.38,
+    environment: 0.8,
   },
   "Deep oxblood leather": {
     color: "leatherColor",
@@ -130,8 +130,9 @@ export async function createTableMaterials(
             ? "normal"
             : "roughness",
       };
-      // Matched scanned wood: 6 scene-unit tile on the .8-unit physical Detail UV.
-      if (key.startsWith("wood")) texture.repeat.set(0.8 / 6, 0.8 / 6);
+      // Matched scanned wood: a 4-unit tile on board-local physical Detail UV.
+      // Identical isotropic scale keeps pores proportional on tops/aprons/legs.
+      if (key.startsWith("wood")) texture.repeat.set(0.8 / 4, 0.8 / 4);
       // Existing felt fibres were designed as a .46-world-unit tile.
       if (key.startsWith("felt")) texture.repeat.set(0.8 / 0.46, 0.8 / 0.46);
       maps[key] = texture;

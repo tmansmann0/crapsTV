@@ -16,11 +16,13 @@ The display targets are 1920×1080 and 3840×2160. On capable hardware, Auto sta
 
 ## Automatic defaults and the intro
 
-On boot, capability-based defaults limit excessive pixel density and choose lighter settings on low-memory or software-rendered devices. After the models and shaders are ready, a short in-scene intro measures frame intervals during a camera sweep. Reduced-motion preferences suppress camera travel, and hidden tabs pause measurement. The automatic profile can reduce resolution and choose a sustainable 24/30/60 target; explicit choices remain unchanged. Use **Retest automatic settings** to measure again.
+On boot, the screen stays black until the models, surface maps, playing-piece textures, fonts and shaders are ready. A 30-second opening then fades in: close material views, two physical dice throws, real chip stakes and payouts, then the ordinary TV interface. The demonstration owns isolated snapshots and never changes the room's players or money. Escape skips it; an already-playing room goes directly to its live table.
+
+Automatic settings ramp through conservative, medium and capability-recommended resolution, texture and chip-detail candidates. The first frames after each change are excluded from measurement; a final confirmation section uses the selected profile. Explicit choices always override the automatic profile. Low-memory/software devices keep conservative candidates. Reduced motion holds a stable camera; hidden tabs pause the opening and its measurements. See [opening validation](startup.md).
 
 See [TV display QA](tv-display-qa.md) for measured glyph sizes, viewing-distance calculations, exact-resolution benchmarks, and the distinction between font size and visible character height.
 
-The diagnostic uses frame intervals before the requested frame limiter. Otherwise a deliberate 24 FPS preference would be mistaken for a slow GPU. Rendered FPS, actual resolution and texture cap are shown in the panel. This is a short practical calibration, not a guarantee that every later scene or device will sustain its target.
+The diagnostic compares rendered frame intervals against the requested frame budget, including refresh quantization for 24 FPS. Automatic FPS probes target 60 and can fall back to 30 or 24. Sparse measurements retain a conservative candidate; skipped openings without measurements use capability recommendations. Rendered FPS, actual resolution and texture cap are shown in Graphics. This calibration is evidence for this workload, not a guarantee for every later scene. **Retest automatic settings** replays the opening in a lobby; during an active game it measures the real table with the UI visible, without introducing demonstration players or interrupting play.
 
 ## Performance checklist review
 

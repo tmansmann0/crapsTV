@@ -4,9 +4,10 @@ The optimized files are separate variants. The previous table/variant sources an
 
 | Asset                                     | Before  | Optimized | Reduction |
 | ----------------------------------------- | ------- | --------- | --------- |
-| Player table triangles                    | 217,448 | 34,926    | 83.9%     |
+| Player table triangles                    | 217,448 | 34,508    | 84.1%     |
 | Player table mesh/material draws per pass | 102     | 7         | 93.1%     |
-| Chip triangles                            | 10,098  | 1,984     | 80.4%     |
+| Detailed logo chip triangles              | 10,098  | 8,440     | 16.4%     |
+| Distant logo chip triangles               | 10,098  | 1,280     | 87.3%     |
 
 These are asset counts, not an FPS guarantee. A shadow pass draws the applicable meshes again, and the scene's dynamic chips, text, environment and resolution also affect frame rate. Full scene performance is measured separately by the runtime.
 
@@ -20,7 +21,7 @@ Tray geometry uses appropriately sized rounded profiles instead of dense micro-b
 
 ## Chip integration
 
-Use `chip-lod.glb` for distant bank/rack chips and distant wagers. Retain `chip.glb` for close shots and phone/product previews. Both variants have the same four material names (`ChipBase`, `ChipInlay`, `ChipEngraving`, `ChipMetal`), the same face/back/side UV atlas, one-unit X/Z bounds, and 0.13 thickness. Existing recoloring and wear-map application work unchanged. The LOD retains edge inserts, the recessed face profile, brass rings and the readable wordmark; the small engraving details are flattened for distant display.
+The active factory uses `chip-logo-lod.glb` for distant bank/rack chips and wagers, and `chip-logo.glb` for close shots and phone/product previews. The original `chip.glb` and `chip-lod.glb` remain unchanged. Both active variants share the four material names (`ChipBase`, `ChipInlay`, `ChipEngraving`, `ChipMetal`), face/back/side UV atlas, one-unit X/Z bounds, and 0.13 thickness. Recoloring and wear work unchanged. Both carry the actual logo's recessed normal-map engraving; the LOD retains the edge inserts, face recess and brass rings with fewer radial segments. Shared external atlas maps avoid duplicate embedded image payloads. See [chip source and engraving proof](chips.md).
 
 A renderer can select LOD by projected chip size or camera distance and apply hysteresis to avoid rapid switching. Distant banks can always use LOD while the detailed original remains available for close-up product previews.
 
@@ -47,4 +48,4 @@ At native 3840×2160, the measured Auto scene dropped from 2,145,010 drawn trian
 
 Run `npm run benchmark` for the idle scene. Set `BENCH_ROLL=1` for a throw and `BENCH_LABEL=custom-name` for separate JSON/screenshot output in `artifacts/`. Each run uses its own temporary server, twelve test players, and a real WebGL browser; it does not join existing rooms.
 
-The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Denser corner arcs preserve close-up silhouettes; the final active table has 34,926 triangles. See [table materials](table-materials.md) for the coordinated PBR finish.
+The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Board-local UVs keep top-panel miters and vertical leg grain physically coherent. Denser corner arcs preserve close-up silhouettes; removing twelve fully hidden support caps leaves 34,508 active triangles and seven batches. See [table materials](table-materials.md) for the darker satin PBR finish and actual-render comparisons.

@@ -1,11 +1,14 @@
 """Optimize the optional player table without overwriting previous assets.
 Run: blender --background --python scripts/build-optimized-table.py
 """
-import bpy,bmesh,math,json,hashlib,re
+import bpy,bmesh,math,json,hashlib,re,sys
 import numpy as np
 from pathlib import Path
 from mathutils import Vector
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'public/assets';SOURCE=ROOT/'assets/source'
+sys.dont_write_bytecode=True
+sys.path.insert(0,str(ROOT/'scripts'))
+from table_wood_uv import apply_wood_uv,prepare_miter_seams
 preserve=[OUT/'table.glb',SOURCE/'table.blend',OUT/'table-player-rails.glb',SOURCE/'table-player-rails.blend']
 before_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}
 helpers=(ROOT/'scripts/build-models.py').read_text().split('\nclean()\nwood=')[0]
@@ -92,8 +95,14 @@ def continuous_tray(number):
     bm=bmesh.new();bm.from_mesh(mesh);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
     boundary=sum(e.is_boundary for e in bm.edges);nonmanifold=sum(not e.is_manifold for e in bm.edges)
     assert boundary==nonmanifold==0,(number,boundary,nonmanifold)
+    # The separate closed suede bed completely covers this internal support
+    # cap (.660 versus its .6601 bottom). Retain all exterior/profile faces,
+    # but avoid spending 42 triangles per seat on an unreachable hidden plane.
+    hidden=[f for f in bm.faces if len(f.verts)==count and abs(f.calc_center_median().z-.660)<.000001]
+    assert len(hidden)==1
+    bmesh.ops.delete(bm,geom=hidden,context='FACES_ONLY')
     bm.to_mesh(mesh);bm.free();mesh.update()
-    tray_checks.append({'seat':number-1,'boundaryEdges':boundary,'nonManifoldEdges':nonmanifold,'coplanarBaseRimOverlap':False})
+    tray_checks.append({'seat':number-1,'boundaryEdges':boundary,'nonManifoldEdges':nonmanifold,'coplanarBaseRimOverlap':False,'occludedBedSupportCapOmitted':True})
     return shell
 for s in layout['seats']:
     i=s['seat'];center=s['bankBase'];t=s['tangent']
@@ -167,6 +176,29 @@ for o in bpy.data.objects:
 tex=texture_node(rubber,im,'Detail UV');node=rubber.node_tree.nodes.new('ShaderNodeNormalMap');node.uv_map='Detail UV';node.inputs['Strength'].default_value=1
 rubber.node_tree.links.new(tex.outputs['Color'],node.inputs['Color']);rubber.node_tree.links.new(node.outputs['Normal'],rubber.node_tree.nodes.get('Principled BSDF').inputs['Normal'])
 tex=texture_node(rubber,rough,'Detail UV');rubber.node_tree.links.new(tex.outputs['Color'],rubber.node_tree.nodes.get('Principled BSDF').inputs['Roughness'])
+# Unwrap each physical wood part before material batching loses its identity.
+# This replaces ring arc-length UVs and world-projected tray tops. Geometry,
+# collision bounds, UV0, other material maps and the seven draw batches stay put.
+prepare_miter_seams(list(bpy.data.objects),wood)
+wood_faces=apply_wood_uv(list(bpy.data.objects),wood)
+# Keep the editable source and the standalone GLB consistent with the runtime
+# PBR override. All three scan maps share the same board-local UV transform.
+nodes=wood.node_tree.nodes;nodes.clear()
+output=nodes.new('ShaderNodeOutputMaterial');bsdf=nodes.new('ShaderNodeBsdfPrincipled')
+wood.node_tree.links.new(bsdf.outputs['BSDF'],output.inputs['Surface'])
+bsdf.inputs['Coat Weight'].default_value=.16;bsdf.inputs['Coat Roughness'].default_value=.38
+uv=nodes.new('ShaderNodeUVMap');uv.uv_map='Detail UV'
+mapping=nodes.new('ShaderNodeMapping');mapping.inputs['Scale'].default_value=(.2,.2,1)
+wood.node_tree.links.new(uv.outputs['UV'],mapping.inputs['Vector'])
+for file,socket,color in [('material-table-walnut-albedo.jpg','Base Color',True),('material-table-walnut-roughness.png','Roughness',False),('material-table-walnut-normal.png','Normal',False)]:
+    image=bpy.data.images.load(str(OUT/file),check_existing=True)
+    image.colorspace_settings.name='sRGB' if color else 'Non-Color';image.pack()
+    tex=nodes.new('ShaderNodeTexImage');tex.image=image
+    wood.node_tree.links.new(mapping.outputs['Vector'],tex.inputs['Vector'])
+    if socket=='Normal':
+        normal=nodes.new('ShaderNodeNormalMap');normal.uv_map='Detail UV';normal.inputs['Strength'].default_value=.55
+        wood.node_tree.links.new(tex.outputs['Color'],normal.inputs['Color']);wood.node_tree.links.new(normal.outputs['Normal'],bsdf.inputs[socket])
+    else:wood.node_tree.links.new(tex.outputs['Color'],bsdf.inputs[socket])
 premerge=metrics()
 # Static table parts share transforms thereafter. Join by actual material, so
 # the result needs one draw per material rather than one draw per object.
@@ -183,14 +215,20 @@ for mat,objects in groups.items():
     objects[0].data.materials.clear();objects[0].data.materials.append(mat)
     for p in objects[0].data.polygons:p.material_index=0
 optimized=metrics()
+assert optimized['triangles']<=35000,optimized
 export('table-player-rails-optimized.pending.glb')
 (OUT/'table-player-rails-optimized.pending.glb').replace(OUT/'table-player-rails-optimized.glb')
 for im in bpy.data.images:
     if im.name.startswith('table-'):im.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails-optimized.pending.blend'),compress=True)
 (SOURCE/'table-player-rails-optimized.pending.blend').replace(SOURCE/'table-player-rails-optimized.blend')
-stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10}
+stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10,'woodUV':{'version':2,'faces':wood_faces,'mapping':'Board-local mitered panels and upright leg grain; physical UV1'}}
 (OUT/'table-player-rails-optimized-stats.json').write_text(json.dumps(stats,indent=2)+'\n')
+if '--no-preview' in sys.argv:
+    after_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}
+    assert before_hash==after_hash,'A preserved asset changed'
+    print(json.dumps(stats,indent=2))
+    raise SystemExit(0)
 # Matched overview and grazing-angle proof renders. Neither lights nor board
 # plane are part of the exported optimized asset.
 scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=24;scene.world.use_nodes=True

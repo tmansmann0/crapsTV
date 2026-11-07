@@ -1,59 +1,40 @@
-# Detailed casino chips
+# Logo-engraved casino chips
 
-`public/assets/chip.glb` is an original, modeled casino chip, not a plain cylinder. It has a lathed and beveled clay rim, eight aligned cream edge inserts, recessed front/back medallions, a real Boolean-engraved `crapsTV` wordmark, recessed pip marks, and fine brass rings. The GLB embeds its base color, first wear normal map, and packed roughness texture.
+The active models are `public/assets/chip-logo.glb` and `chip-logo-lod.glb`. They retain the beveled clay rim, eight cream edge inserts, recessed medallions and fine brass rings. Both faces now carry the **actual `brand-logo.png` artwork**: its dice, original wordmark, TV counter-shapes and decorative frame. The monochrome stamp derives from the source alpha and gold/ivory luminance; no substitute font, generic dice pits, new generated image or redrawn lettering is used.
 
-## Files
+The original `chip.glb`, `chip-lod.glb`, `assets/source/chip.blend` and `chip-lod.blend` remain byte-for-byte unchanged. The new variants have their own editable, texture-packed `.blend` sources. SHA-256 preservation records are in `public/assets/chip-logo-stats.json`.
 
-- `public/assets/chip.glb`: runtime glTF 2.0 model, 1,227,432 bytes including embedded textures.
-- `public/assets/chip-color.png`: neutral 512 × 512 clay/printed-ring albedo.
-- `public/assets/chip-wear-1.png` through `chip-wear-3.png`: three different 512 × 512 grayscale bump/height patterns.
-- `public/assets/chip-normal-1.png` through `chip-normal-3.png`: matching tangent-space normal maps.
-- `public/assets/chip-roughness-1.png` through `chip-roughness-3.png`: matching surface roughness maps.
-- `public/assets/chip-preview.png`: Blender Cycles product preview showing runtime-style body tints.
-- `assets/source/chip.blend`: editable Blender source with image maps packed inside.
-- `scripts/build-chips.py`: deterministic original modeling and map-generation source.
+| Active model | Triangles | Material batches | GLB bytes |
+| --- | ---: | ---: | ---: |
+| `chip-logo.glb` | 8,440 | 4 | 273,000 |
+| `chip-logo-lod.glb` | 1,280 | 4 | 46,264 |
+| Previous detailed / LOD | 10,098 / 1,984 | 4 / 4 | Original files preserved |
 
-Each wear variant has a distinct seeded distribution of micrograin, circular manufacturing traces, scratches, and edge scuffs. The side strip's procedural wear is periodic across its U seam. These are real texture files intended for normal/bump mapping; no photo or external texture was used.
+Shared textures remain external PNGs, referenced by content-hashed URLs, so the two model files do not embed duplicate maps. Both detail levels use the same engraving atlas. The runtime factory shares the detailed model's materials with the LOD geometry, retaining the existing instancing and projected-size hysteresis.
 
-## Size and axes
+## Engraving and materials
 
-The chip is **1 unit in diameter and 0.13 units thick**, centered at the origin. Exported glTF uses **+Y for the top face**, with width/depth in X/Z. The Blender source uses +Z up. Scale uniformly to the desired game diameter; for example, a 0.22-unit chip uses `scale.setScalar(0.22)` and has a stacked height of 0.0286 units before a small visual gap.
+The actual mark is cut **0.0032 scene units below the clay surface** in a height bake, with a rounded bevel and matched OpenGL normal/roughness maps. This is shallow surface relief; no thousands of boolean letters or fake freestanding pip geometry are required. The medallion itself remains physically recessed inside the modeled rim. Engraving relief uses the shared `ChipEngraving` material, while `ChipBase` retains denomination tint and three worn variations. `ChipInlay` remains cream and `ChipMetal` remains the brass groove ring. The common warm clay medallion keeps the mark legible across denominations.
 
-The source has 5,398 vertices and 10,098 triangles before glTF export's UV/normal splits. It is consolidated into one mesh with four material primitives. The detailed mesh is suitable for nearby chips; use shared geometry/materials or instancing for large chip counts rather than duplicating GPU buffers.
+New maps are `chip-logo-albedo.png`, `chip-logo-normal.png`, `chip-logo-roughness.png` and `chip-logo-height.png`, each 1,024 × 1,024. `chip-logo-mark.png` is the transparent monochrome source-derived mark, and `chip-logo-atlas.json` records its exact source hash, crop, transformation, depth and atlas coordinates. The original neutral clay and three seeded wear sets remain untouched.
 
-## Material tint and wear variation
+## Size and face orientation
 
-| Material name | Intended behavior |
-| --- | --- |
-| `ChipBase` | Neutral clay base; tint `material.color` to a denomination color. Keep its embedded albedo map. |
-| `ChipInlay` | Fixed warm cream edge inserts; leave its color unchanged. |
-| `ChipMetal` | Fine brass ring; leave its metallic/roughness behavior unchanged. |
-| `ChipEngraving` | Dark recessed wordmark floor; leave fixed for legibility. |
+Both models are one unit in diameter and 0.13 units thick, centered at the origin. Exported glTF uses +Y for the top face and X/Z for the horizontal plane. The Blender sources use +Z up. The detailed rim has 96 radial segments; the LOD uses 32 while preserving the same physical bounds.
 
-Clone a material before tinting so one chip denomination does not recolor other chips that share the same material. Apply a chosen wear normal and roughness pair to `ChipBase` and `ChipInlay`. Three.js texture loads of these external files should use `flipY = false` to match the glTF UV orientation, and `NoColorSpace` (linear data) for normal, roughness, and height maps. The albedo file uses sRGB.
+The original atlas layout remains: Blender UV front center `(0.25, 0.37)`, back center `(0.75, 0.37)`, disc radius `0.225`, side strip V `0.80..0.98`. PNG/glTF V centers are `0.63`. The back's local Y projection is reflected before export, so both logo faces read normally when the chip flips about X. This reflection corrects handedness rather than mirroring the wordmark in the texture. Normal/roughness maps use linear data; albedo uses sRGB; runtime textures retain glTF's `flipY=false` convention.
 
-The model already includes normal variant 1. For variant 2 or 3, replace `normalMap` and `roughnessMap` with the corresponding pair. Normal strength about `normalScale.set(0.7, 0.7)` preserves subtle scuffs. An optional `bumpMap` can use the matching `chip-wear-N.png` at a small `bumpScale` (about 0.002 before any stylistic adjustment); a normal map alone is sufficient and avoids exaggerating wear.
-
-## UV atlas
-
-The front disc occupies a circle centered at U=0.25, V=0.37 with radius 0.225. The back disc is centered at U=0.75, V=0.37 with the same radius. The cylindrical side wraps once across U=0..1 in V=0.80..0.98. Top and side edge inlays are actual material regions rather than disconnected decals.
-
-## Rebuild and provenance
+## Rebuild and proof
 
 ```sh
-blender --background --python scripts/build-chips.py
-```
-
-Built and previewed with Blender 4.5 LTS. All geometry, map generation, and textures were authored for crapsTV and follow the repository's asset license. No image generation, stock assets, or external references were used for this model.
-
-Validation: the final Cycles preview was visually inspected; front-cap smoothing was corrected so the engraved cuts remain planar. The GLB structure confirms one mesh, four primitives, embedded PNG material textures, and Y-up bounds of ±0.5 across X/Z and ±0.065 across Y. The three height-map files have distinct hashes and preserve the same UV atlas dimensions.
-
-## Phone tray thumbnails
-
-The five `chip-100.png` through `chip-50000.png` files are transparent, pre-rendered views of this same GLB. They avoid allocating an extra WebGL context on each phone just to draw the 2D tray. Rebuild them after changing the chip model with:
-
-```sh
+python scripts/bake-chip-logo.py
+blender --background --python scripts/build-logo-chips.py
+node scripts/render-chip-logo.mjs after
 node scripts/render-chip-thumbnails.mjs
 ```
 
-The generator uses the shared runtime chip material factory and a temporary local Vite server. It requires the development dependencies and Playwright Chromium.
+The bake requires NumPy/Pillow; geometry generation uses Blender 4.5 LTS. Shared-image GLB packaging is in `scripts/glb_shared_images.py`. Exports publish through complete temporary sibling files. The isolated Three.js proof harness uses the actual runtime factory, casino EXR and an ephemeral port with HMR disabled; it does not touch live rooms.
+
+`docs/screenshots/chip-logo-faces.png` shows detailed chips on the left and optimized chips on the right; top row is front, bottom row is back after flipping. `chip-logo-raking.png` shows the engraved bevel under low light. The identical view with only its normal disabled is saved as `artifacts/chip-logo-after-raking-flat.png`, proving the depth is present beyond the albedo mask. Matched old/new captures and error/draw statistics are in `artifacts/chip-logo-{before,after}*`.
+
+Focused tests verify the exact source-pixel transformation, negative height, normal slopes, both UV orientations, dimensions, shared materials, content hashes, protected original hashes and geometry budgets. Phone tray PNGs `chip-100.png` through `chip-50000.png` are regenerated from this active runtime model without allocating permanent extra WebGL contexts on phones.

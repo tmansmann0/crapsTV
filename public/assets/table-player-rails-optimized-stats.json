@@ -5,16 +5,16 @@
     "materialPrimitives": 102
   },
   "afterRetopology": {
-    "triangles": 34926,
+    "triangles": 34508,
     "meshes": 94,
     "materialPrimitives": 94
   },
   "after": {
-    "triangles": 34926,
+    "triangles": 34508,
     "meshes": 7,
     "materialPrimitives": 7
   },
-  "triangleReductionPercent": 83.9382289099003,
+  "triangleReductionPercent": 84.13045877635112,
   "meshReductionPercent": 93.13725490196079,
   "materialDrawCalls": 7,
   "removedHiddenObjects": [
@@ -100,74 +100,91 @@
       "seat": 0,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 1,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 2,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 3,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 4,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 5,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 6,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 7,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 8,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 9,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 10,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     },
     {
       "seat": 11,
       "boundaryEdges": 0,
       "nonManifoldEdges": 0,
-      "coplanarBaseRimOverlap": false
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
     }
   ],
-  "trayCornerSegments": 10
+  "trayCornerSegments": 10,
+  "woodUV": {
+    "version": 2,
+    "faces": 8069,
+    "mapping": "Board-local mitered panels and upright leg grain; physical UV1"
+  }
 }

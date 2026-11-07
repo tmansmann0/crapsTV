@@ -36,6 +36,7 @@ import Recap from "./recap.jsx";
 import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
 import { catalogue, describeBet, money, equity, net } from "./game.js";
+import { PHYSICS_VERSION } from "./throw-motion.js";
 import {
   detectLocal,
   localTransport,
@@ -175,6 +176,7 @@ function App() {
     [playerId, setPlayerId] = useState(null),
     [status, setStatus] = useState("connecting"),
     [error, setError] = useState(""),
+    [dismissedHostCode, setDismissedHostCode] = useState(""),
     [sound, setSound] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [joinName, setJoinName] = useState(""),
@@ -360,7 +362,9 @@ function App() {
   // An existing local process keeps its loaded rules after the static UI updates.
   // Old hosts cannot gain corrected throws or physical props from a UI refresh.
   const hostWarning =
-    state && (!state.puck || (state.throw && state.throw.version < 3))
+    state &&
+    (state.physicsVersion || 0) < PHYSICS_VERSION &&
+    dismissedHostCode !== roomCode
       ? "Older host: restart this server for current physics."
       : "";
   const visibleError = error || hostWarning;
@@ -482,7 +486,13 @@ function App() {
         <div className="toast" role="alert">
           <Info size={18} />
           {visibleError}
-          <button aria-label="Dismiss" onClick={() => setError("")}>
+          <button
+            aria-label="Dismiss"
+            onClick={() => {
+              setError("");
+              setDismissedHostCode(roomCode);
+            }}
+          >
             <X size={16} />
           </button>
         </div>

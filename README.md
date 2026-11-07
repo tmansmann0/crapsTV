@@ -65,6 +65,7 @@ npm run test:payout     # board-to-bank payout presentation
 npm run test:layout     # stable Play layout across interaction states
 npm run test:tv         # Compact/Large layout and actual 1080p/4K glyph checks
 npm run test:tour       # shared payout/camera sequence and finite idle views
+npm run test:startup    # black asset gate, 30-second opening, calibration and live-room isolation
 npm run test:online     # optional live PeerJS test against the published site
 npm run benchmark       # isolated twelve-player WebGL frame/draw benchmark
 npm run format          # format source, tests, and workflows
@@ -113,9 +114,9 @@ The TV page has no outer navigation, sidebar, headings, or footer. Every visible
 
 ## Detailed playing pieces and display controls
 
-The generated logo is used on the TV and the felt. Hardways show pairs of dice, and the pass/don’t-pass lanes wrap around both sides of the classic layout. The active table has six front trays and three on each side, with physical chip banks and seat labels. The original table model and Blender source are preserved unchanged; the edited [twelve-seat variant](docs/player-table.md) is a separate asset. The TV settings menu starts closed. Admin controllers have shared announcer and camera settings plus invite/controller/fullscreen actions.
+The original logo is used on the TV and the [Heritage Emerald vector felt](docs/board-design.md), developed with Claude after exploring three design directions. Hardways show pairs of dice, and the pass/don’t-pass lanes wrap around both sides of the classic layout. The active table has six front trays and three on each side, with physical chip banks and seat labels. The original table model and Blender source are preserved unchanged; the edited [twelve-seat variant](docs/player-table.md) is a separate asset. The TV settings menu starts closed. Admin controllers have shared announcer and camera settings plus invite/controller/fullscreen actions.
 
-Chips load a real modeled GLB with edge inserts, engraved medallions, and three independently seeded wear/roughness variants. Preparing a phone bundle shows held chips beside that player’s bank and a ghost pile over the selected bet. Accepted stakes travel onto the felt; returned stakes and winnings travel back to the bank. Standing bets stay on the felt when only their profit is paid. Reconnecting uses the current ledger without replaying old payouts. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
+Chips load real modeled GLBs with edge inserts, the actual logo recessed into both medallion faces, and three independently seeded wear/roughness variants. Shared logo normal/roughness maps preserve the engraving in both full and optimized geometry; the original chip models remain available. Preparing a phone bundle shows held chips beside that player’s bank and a ghost pile over the selected bet. Accepted stakes travel onto the felt; returned stakes and winnings travel back to the bank. Standing bets stay on the felt when only their profit is paid. Reconnecting uses the current ledger without replaying old payouts. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
 
 Cannon rigid bodies roll against the felt and the table’s raised rubber walls. The server generates unpredictable initial orientations and spin, then reads the resulting settled faces. No result is preselected and no post-landing rotation is applied. Every phone and TV samples the same recorded physical trajectory. The rubber contact boundary is X=±5.42/Z=±2.71 with a .92-unit top rail.
 
@@ -125,9 +126,9 @@ For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit
 
 [Phone interface and throw synchronization](docs/phone-and-throws.md).
 
-The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the selected 24/30/60 FPS limit. Close camera views retain the original detailed chips.
+The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the selected 24/30/60 FPS limit. Close camera views retain the detailed logo chips. Board-local grain UVs keep darker satin wood from wrapping unnaturally around top panels and legs; matched normal and roughness maps add depth with a restrained environmental reflection.
 
-The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/4K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger. **UI size** is a separate local Compact/Large choice for each TV or display.
+The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/4K/native texture caps. A [30-second opening](docs/startup.md) starts after a black asset-loading gate, shows real modeled dice/chip action while automatic quality ramps, then reveals the room UI. Escape skips it; active games go straight to their live table. Explicit preferences persist. Admin phones can change TV graphics without touching the game ledger. **UI size** is a separate local Compact/Large choice for each TV or display.
 
 Auto uses a wide lobby view and a close, near-top-down betting view. Throws keep one of four felt-level corner positions, then cut overhead to show the settled faces. A shared camera/chip schedule can highlight a standout result, group matching wins, or frame only the active part of the table. It fits the fixed betting window and finishes on a held overview; idle player views do not loop endlessly. Left-drag orbits, Shift + left-drag pans, and the wheel zooms. Manual views and reduced motion take priority.
 

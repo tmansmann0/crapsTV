@@ -1,4 +1,4 @@
-// Rasterize the existing vector artwork at 4K. Original SVG and 2K PNGs stay intact.
+// Rasterize outlined vector artwork identically at 2K and 4K, on any platform.
 import { chromium } from "@playwright/test";
 import { readFile, writeFile, rename, rm } from "node:fs/promises";
 const browser = await chromium.launch({ headless: true });
@@ -9,32 +9,38 @@ try {
       `../public/assets/board-${mode}.svg`,
       import.meta.url,
     );
-    const destination = new URL(
-      `../public/assets/board-${mode}-4k.png`,
-      import.meta.url,
-    );
-    const temporary = new URL(
-      `../public/assets/.board-${mode}-4k.tmp`,
-      import.meta.url,
-    );
-    const svg = (await readFile(source)).toString("base64");
-    const png = await page.evaluate(async (data) => {
-      const image = new Image();
-      image.src = `data:image/svg+xml;base64,${data}`;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = 4096;
-      canvas.height = 2048;
-      canvas.getContext("2d").drawImage(image, 0, 0, 4096, 2048);
-      return canvas.toDataURL("image/png").split(",")[1];
-    }, svg);
-    try {
-      await writeFile(temporary, Buffer.from(png, "base64"));
-      await rename(temporary, destination);
-    } finally {
-      await rm(temporary, { force: true });
+    for (const width of [2048, 4096]) {
+      const suffix = width === 4096 ? "-4k" : "";
+      const destination = new URL(
+        `../public/assets/board-${mode}${suffix}.png`,
+        import.meta.url,
+      );
+      const temporary = new URL(
+        `../public/assets/.board-${mode}${suffix}.tmp`,
+        import.meta.url,
+      );
+      const svg = (await readFile(source)).toString("base64");
+      const png = await page.evaluate(
+        async ({ data, width }) => {
+          const image = new Image();
+          image.src = `data:image/svg+xml;base64,${data}`;
+          await image.decode();
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = width / 2;
+          canvas.getContext("2d").drawImage(image, 0, 0, width, width / 2);
+          return canvas.toDataURL("image/png").split(",")[1];
+        },
+        { data: svg, width },
+      );
+      try {
+        await writeFile(temporary, Buffer.from(png, "base64"));
+        await rename(temporary, destination);
+      } finally {
+        await rm(temporary, { force: true });
+      }
+      console.log(`${mode}: ${width} × ${width / 2}`);
     }
-    console.log(`${mode}: 4096 × 2048`);
   }
 } finally {
   await browser.close();

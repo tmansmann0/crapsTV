@@ -41,3 +41,9 @@ The build uses Blender 4.5 LTS with no add-ons, network calls, or downloaded ass
 The script asserts fewer than 20,000 triangles per die. `dice-metadata.json` records the exact count and physical recess dimensions. The original geometry and procedural maps are created for this project and inherit its repository license.
 
 Validation: the final die has **16,280 triangles**. Direct GLB accessor inspection confirmed all six face values, and the close-up preview was visually checked for recessed paint and clean cavity surfaces.
+
+## Felt friction and settling
+
+The authority uses a corrected contact-manifold friction budget. Cannon 0.20's averaged-friction path swapped body-local contact arms for plane contacts, making a flat die drift sideways depending on its position on the table. The project retains the original contact anchors and divides the friction force budget among those contacts, so the multi-sided puck remains movable without multiplying its friction.
+
+A controlled die launched flat at one scene-unit per second from X=3, Z=1 previously traveled 0.849 units over five seconds and kept drifting sideways. With the correction it travels about 0.048 units, sleeps after 0.542 seconds, and remains still after one second. Regression tests also compare translated floor contacts and real throws. Launch randomness, restitution, damping, and the recorded physical resting faces are unchanged; playback never rotates a die to a selected result. Current hosts advertise physics version 4 so older running processes can be identified.

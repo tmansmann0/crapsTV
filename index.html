@@ -5,6 +5,8 @@
       const routeBase = document.createElement("base");
       routeBase.href = location.pathname.replace(/\/join\/?$/, "/");
       document.head.append(routeBase);
+      if (!/\/join\/?$/.test(location.pathname))
+        document.documentElement.style.background = "#000";
     </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />

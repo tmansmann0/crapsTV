@@ -1,4 +1,5 @@
 import { SEAT_LAYOUT, arcPosition } from "./chip-flow.js";
+import { BOARD_BET_SHIFT_Z } from "./board-layout.js";
 import { wagerPosition } from "./wager-layout.js";
 import { planOutcomeTour, sampleOutcomeTour } from "./round-presentation.js";
 
@@ -67,16 +68,14 @@ export function planFiniteIdleCamera(
     1 + (hash(seed) % IDLE_MAX_SHOTS),
   );
   const id = `idle:${seed}:${origin}:${onlyPlayerIds?.join(",") || "round"}`;
-  const slots = candidates
-    .slice(0, count)
-    .map((player, index) => ({
-      playerId: player.id,
-      seat: player.seat,
-      name: player.name,
-      startAt: origin + IDLE_OVERVIEW_MS + index * IDLE_PLAYER_SHOT_MS,
-      endAt: origin + IDLE_OVERVIEW_MS + (index + 1) * IDLE_PLAYER_SHOT_MS,
-      index,
-    }));
+  const slots = candidates.slice(0, count).map((player, index) => ({
+    playerId: player.id,
+    seat: player.seat,
+    name: player.name,
+    startAt: origin + IDLE_OVERVIEW_MS + index * IDLE_PLAYER_SHOT_MS,
+    endAt: origin + IDLE_OVERVIEW_MS + (index + 1) * IDLE_PLAYER_SHOT_MS,
+    index,
+  }));
   return { id, startAt: origin, endAt: slots.at(-1)?.endAt ?? origin, slots };
 }
 
@@ -509,7 +508,10 @@ export function sampleBettingOverview({
     horizontalLimit: viewportWidth
       ? 1 - (100 * (viewportHeight / 1080)) / viewportWidth
       : 0.95,
-    bounds: { min: [-4.65, 0, -1.85], max: [4.65, 0.45, 2.2] },
+    bounds: {
+      min: [-4.65, 0, -1.85 + BOARD_BET_SHIFT_Z],
+      max: [4.65, 0.45, 2.2 + BOARD_BET_SHIFT_Z],
+    },
     minHeight: 6.8,
   });
 }

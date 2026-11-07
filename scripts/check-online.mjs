@@ -30,6 +30,8 @@ try {
         ?.length === 6,
   );
   await host.getByRole("status").filter({ hasText: "connected" }).waitFor();
+  await host.locator(".table-canvas canvas").waitFor();
+  await host.keyboard.press("Escape");
   const code = await scene.getAttribute("data-room-code");
   await host.waitForTimeout(1500);
   await host.screenshot({

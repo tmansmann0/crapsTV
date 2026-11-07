@@ -1,7 +1,11 @@
 import { createServer } from "vite";
 import { chromium } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
-const server = await createServer({ appType: "custom", server: { port: 0 } });
+const server = await createServer({
+  configFile: false,
+  appType: "custom",
+  server: { host: "127.0.0.1", port: 0, hmr: false },
+});
 server.middlewares.use((req, res, next) => {
   if (req.url === "/__thumbs.html") {
     res.setHeader("content-type", "text/html");
@@ -32,7 +36,7 @@ try {
       `public/assets/chip-${value}.png`,
       Buffer.from(data.split(",")[1], "base64"),
     );
-  console.log("Rendered five chip thumbnails from chip.glb.");
+  console.log("Rendered five chip thumbnails from active chip-logo.glb.");
 } finally {
   await browser?.close();
   await server.close();

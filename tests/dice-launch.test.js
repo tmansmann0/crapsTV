@@ -24,14 +24,23 @@ const state = {
   ],
 };
 const props = { puck: puckHome(6), stacks: wagerStackLayout(state) };
+// A known cylinder overlaps the right launch position independently of any
+// artwork-driven wager-coordinate changes.
+const obstruction = {
+  id: "launch-clearance-regression",
+  position: [0.74, 0.214, 1.9],
+  radius: 0.16,
+  height: 0.4,
+};
+const obstructedProps = { ...props, stacks: [...props.stacks, obstruction] };
 
-test("launch clears the reproduced tall pass-odds stack before the first physics step", () => {
-  const odds = props.stacks[1],
-    physics = createDicePhysics(props);
+test("launch clears a nearby tall stack before the first physics step", () => {
+  const physics = createDicePhysics(obstructedProps);
   physics.throwDice(0, gesture);
   const right = physics.bodies[1];
   assert(
-    right.position.y - DIE_BOUNDING_RADIUS > odds.position[1] + odds.height / 2,
+    right.position.y - DIE_BOUNDING_RADIUS >
+      obstruction.position[1] + obstruction.height / 2,
   );
   assert.equal(right.position.x, 0.74);
   assert.equal(right.position.z, 1.9);
@@ -39,28 +48,29 @@ test("launch clears the reproduced tall pass-odds stack before the first physics
   assert.equal(
     physics.propContacts.length,
     0,
-    "no correction impulse from spawning inside the odds stack",
+    "no correction impulse from spawning inside a stack",
   );
 });
 
 test("aim previews and authoritative launch positions use identical prop clearance", () => {
-  for (const x of [-1, 0, 1])
-    for (const power of [0, 0.5, 1]) {
-      const input = { x, power },
-        physics = createDicePhysics(props);
-      physics.throwDice(15, input);
-      const positions = physics.bodies.map((body) => body.position.toArray());
-      assert.deepEqual(
-        aimDicePose(input, props).dice.map((die) => die.position),
-        positions,
-      );
-      assert.deepEqual(diceLaunchPositions(input, props), positions);
-    }
+  for (const sceneProps of [props, obstructedProps])
+    for (const x of [-1, 0, 1])
+      for (const power of [0, 0.5, 1]) {
+        const input = { x, power },
+          physics = createDicePhysics(sceneProps);
+        physics.throwDice(15, input);
+        const positions = physics.bodies.map((body) => body.position.toArray());
+        assert.deepEqual(
+          aimDicePose(input, sceneProps).dice.map((die) => die.position),
+          positions,
+        );
+        assert.deepEqual(diceLaunchPositions(input, sceneProps), positions);
+      }
 });
 
 test("clearance consumes no RNG values and changes only the obstructed launch height", () => {
   const clear = createDicePhysics(),
-    obstructed = createDicePhysics(props);
+    obstructed = createDicePhysics(obstructedProps);
   clear.throwDice(0, gesture);
   obstructed.throwDice(0, gesture);
   for (let i = 0; i < 2; i++) {

@@ -119,6 +119,8 @@ try {
     null,
     { timeout: 60000 },
   );
+  // The opening has its own end-to-end check; benchmark actual room play.
+  await page.keyboard.press("Escape");
   await page.waitForFunction(
     () =>
       document.querySelector(".table-canvas")?.dataset.graphicsIntro ===

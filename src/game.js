@@ -15,6 +15,7 @@ import {
   createThrowTimeline,
   sanitizeGesture,
   THROW_DURATION,
+  PHYSICS_VERSION,
 } from "./throw-motion.js";
 
 // Shared authoritative rules. All money is integer cents; no browser trusts another player's balance.
@@ -49,7 +50,23 @@ export const money = (n) =>
     currency: "USD",
     maximumFractionDigits: n % 100 ? 2 : 0,
   }).format(n / 100);
-export const uid = () => globalThis.crypto.randomUUID();
+export const uid = () => {
+  if (globalThis.crypto.randomUUID) return globalThis.crypto.randomUUID();
+  // getRandomValues is available on HTTP LAN origins, unlike randomUUID.
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4),
+    hex.slice(4, 6),
+    hex.slice(6, 8),
+    hex.slice(8, 10),
+    hex.slice(10),
+  ]
+    .map((part) => part.join(""))
+    .join("-");
+};
 export const randomDie = () => {
   const a = new Uint32Array(1);
   do {
@@ -63,6 +80,7 @@ const assert = (test, message) => {
 export function createState(code = "LOCAL") {
   return {
     code,
+    physicsVersion: PHYSICS_VERSION,
     status: "lobby",
     config: {
       mode: "craps",
