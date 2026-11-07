@@ -6,6 +6,8 @@ A personal, open-source living-room casino for 1–12 players. Built with React,
 
 [**Play online**](https://tmansmann0.github.io/crapsTV/) · [Rules and architecture](docs/game-and-network.md) · [Asset provenance](docs/visual-assets.md)
 
+![The crapsTV living-room casino](docs/screenshots/table.png)
+
 ## Start a local game
 
 Install [Node.js 22 or later](https://nodejs.org/), then:

@@ -246,6 +246,22 @@ export function catalogue(state, player) {
       Math.ceil(state.config.minBet / (b.quantum || 100)) * (b.quantum || 100),
   }));
 }
+// Active line bets use their own traveled point, independent of the table point.
+export function describeBet(state, player, bet) {
+  const info = catalogue(state, player).find(
+    (item) => item.id === bet.type || item.id === `odds:${bet.parent}`,
+  );
+  if (
+    !info ||
+    !bet.point ||
+    !["pass", "dont", "come", "dontcome"].includes(bet.type)
+  )
+    return info;
+  const against = ["dont", "dontcome"].includes(bet.type);
+  const ways = WAYS[bet.point];
+  return { ...info, prob: against ? 6 / (ways + 6) : ways / (ways + 6) };
+}
+
 function log(s, text, type = "info") {
   s.log.unshift({ id: uid(), text, type, at: Date.now() });
   s.log = s.log.slice(0, 50);
