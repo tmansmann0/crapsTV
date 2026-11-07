@@ -2,6 +2,16 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as g from "../src/game.js";
 import { RoomHub } from "../src/hub.js";
+
+test("active come teach odds follow its own point, not the table point", () => {
+  const [s, p] = table();
+  roll(s, p, 2, 2);
+  g.place(s, p.id, "come", 500);
+  roll(s, p, 3, 3);
+  const bet = p.bets[0];
+  assert.equal(g.describeBet(s, p, bet).prob, 5 / 11);
+  assert.equal(s.point, 4);
+});
 function table(mode = "craps") {
   const s = g.createState("ABCDEF");
   const p = g.join(s, "Alice");

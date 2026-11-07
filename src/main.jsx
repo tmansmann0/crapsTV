@@ -35,7 +35,7 @@ function Table3D(props) {
   );
 }
 import Recap from "./recap.jsx";
-import { catalogue, money, equity, net } from "./game.js";
+import { catalogue, describeBet, money, equity, net } from "./game.js";
 import {
   detectLocal,
   localTransport,
@@ -1101,9 +1101,7 @@ function Phone({ state, player, isAdmin, send, confirm, connected }) {
             <div className="active-bets">
               {player.bets.length ? (
                 player.bets.map((b) => {
-                  const meta = items.find(
-                      (i) => i.id === b.type || i.id === `odds:${b.parent}`,
-                    ),
+                  const meta = describeBet(state, player, b),
                     locked = b.point && ["pass", "come"].includes(b.type),
                     off =
                       !state.point &&
