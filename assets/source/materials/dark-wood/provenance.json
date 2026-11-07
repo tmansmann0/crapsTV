@@ -10,7 +10,7 @@
   },
   "downloaded": "2026-11-07",
   "surface": "Photographed dark cherry/mahogany veneer; stained toward darker walnut for the game. Not a claim of scanned walnut species.",
-  "runtimeTransform": "Diffuse multiplied in sRGB by [0.70,0.86,0.99]; matched OpenGL normal with runtime strength 0.55; roughness remapped to 0.29 + 0.34 * source. All three share one physical UV tile.",
+  "runtimeTransform": "Diffuse multiplied in sRGB by [0.70,0.86,0.99] unchanged; matched 2K OpenGL normal strength 0.82, also applied to varnish at 0.28; roughness 0.29 + 0.34 * source unchanged. Shared subtle pore occlusion estimated from the scanned normal.",
   "files": {
     "dark_wood_nor_gl_1k.png": {
       "sha256": "5e8c1696af50e78c56fb5d719bf3a15c5be54f18055844ec60ff58d1b4181776",
@@ -23,8 +23,13 @@
     "dark_wood_diff_2k.jpg": {
       "sha256": "ff811f97ab46f1148f2753451fd9d64abf0ab9101e85922ed9f45fc3595a3cf2",
       "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dark_wood/dark_wood_diff_2k.jpg"
+    },
+    "dark_wood_nor_gl_2k.png": {
+      "sha256": "5607cf76d8da2844ee285fbabdc79976e18240e13efe6927a368c8cb06bf9148",
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/dark_wood/dark_wood_nor_gl_2k.png"
     }
   },
   "runtimeTexture": "public/assets/material-table-walnut-albedo.jpg (quality 94, no chroma subsampling), matching PNG normal and roughness",
-  "sceneMapping": "UV1 board-local straight/mitered panels, vertical grain on trestle legs. Deterministic per-part offsets. All three maps repeat 0.8/4; one tile is 4 scene units with no nonuniform texture scaling. Original scan files remain unchanged."
+  "sceneMapping": "UV1 board-local straight/mitered panels, vertical grain on trestle legs. Deterministic per-part offsets. All three maps repeat 0.8/4; one tile is 4 scene units with no nonuniform texture scaling. Original scan files remain unchanged.",
+  "runtimeDepthBake": "scripts/build-table-depth.py: normal-derived high-pass microcavity estimate, not scanned displacement. Original scan files remain unchanged."
 }

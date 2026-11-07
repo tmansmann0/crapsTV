@@ -49,6 +49,8 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Cash out or close the table.** Unresolved wagers are returned. Each player gets a personal recap, net-result chart, biggest win, comeback count, and downloadable **1080×1440 PNG** or editable SVG.
 - **Bundled announcer.** Open Settings on the TV to enable the original male Kokoro voice pack. It announces rolls, points, seven-outs, join/leave, re-ups, and other major events. Browsers require that user gesture before sound.
 
+The table uses matched wood grain and pore maps, textured red padding and short-fibre felt. Dice and chips retain separate wear patterns, roughness and engraved details. Betting artwork loads from its outlined SVG source with a dedicated print budget, independent of the material texture setting. When 3D resolution is reduced, a native-resolution felt pass keeps the lettering sharp while preserving lighting, shadows and occlusion by playing pieces.
+
 Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 pays double and 12 triple. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
 
 ## Build, test, and review
@@ -60,6 +62,7 @@ npx playwright install chromium
 npm run test:e2e        # starts an isolated local server; TV + two phones
 npm run test:odds       # isolated real-rules phone odds/layout checks
 npm run test:graphics   # actual WebGL settings, calibration and persistence checks
+npm run test:board      # native 4K SVG-sourced felt print, material caps and occlusion
 npm run test:learn      # animated lesson rules, controls and phone fit
 npm run test:payout     # board-to-bank payout presentation
 npm run test:layout     # stable Play layout across interaction states

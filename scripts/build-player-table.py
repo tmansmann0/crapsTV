@@ -4,6 +4,7 @@ Run: blender --background --python scripts/build-player-table.py
 The shared modeling helpers are read without executing build-models.py's build.
 """
 import hashlib
+import sys
 import json
 import math
 from pathlib import Path
@@ -147,22 +148,13 @@ for image in bpy.data.images:
     if image.name.startswith('table-'):image.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails.blend'),compress=True)
 
-# Independent seamless wool maps requested for the board plane. The field is
-# spectrally filtered random fiber noise, not a regular woven or diagonal grid.
-n=512;rng=np.random.default_rng(8675309)
-freq=np.fft.fftfreq(n);fx,fy=np.meshgrid(freq,freq)
-noise=np.fft.fft2(rng.normal(size=(n,n)))
-band=np.exp(-((fx/.20)**2+(fy/.135)**2))-.82*np.exp(-((fx/.038)**2+(fy/.035)**2))
-fibers=np.fft.ifft2(noise*band).real;fibers=(fibers-fibers.mean())/fibers.std()
-broad=np.fft.ifft2(np.fft.fft2(rng.normal(size=(n,n)))*np.exp(-((fx/.025)**2+(fy/.025)**2))).real
-broad=(broad-broad.mean())/broad.std()
-height=fibers*.00006+broad*.000025
-hx=(np.roll(height,-1,1)-np.roll(height,1,1))/.0018
-hy=(np.roll(height,-1,0)-np.roll(height,1,0))/.0018
-normal=np.stack((-hx,-hy,np.ones_like(hx)),axis=2);normal/=np.linalg.norm(normal,axis=2,keepdims=True)
-im=image_texture('felt-normal',normal*.5+.5);im.colorspace_settings.name='Non-Color'
-rough=np.clip(.94+fibers*.009+broad*.007,.90,.985)
-im=image_texture('felt-roughness',np.repeat(rough[:,:,None],3,axis=2));im.colorspace_settings.name='Non-Color'
+# Independent lighting-only wool maps. Shared baker also supports a maps-only
+# refresh without changing any model, UVs, printed artwork or collision surface.
+sys.path.insert(0, str(ROOT / 'scripts'))
+from surface_maps import felt_maps
+normal, rough = felt_maps()
+im=image_texture('felt-normal',normal);im.colorspace_settings.name='Non-Color'
+im=image_texture('felt-roughness',rough);im.colorspace_settings.name='Non-Color'
 
 # Inspection scene: the saved/exported asset itself has no camera or lights.
 scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=24

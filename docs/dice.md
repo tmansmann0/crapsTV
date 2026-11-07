@@ -26,9 +26,11 @@ The object and material names are stable:
 - **`DiceBody`**: neutral acrylic/resin; replace only this material's color with the shooter's red, green, or blue selection. Use `MeshPhysicalMaterial` for transparent variants with an IOR around 1.49, transmission, thickness, and attenuation; keep an opaque option. The GLB itself is intentionally neutral and opaque.
 - **`DicePips`**: cream inset paint; keep opaque and retain its color when recoloring the body.
 
-`dice-wear-1.png`, `dice-wear-2.png`, and `dice-wear-3.png` are original 512×512 tangent-space normal maps with different subtle hairline scuff patterns. `dice-roughness.png` is the matching low-contrast grayscale resin roughness map. These are real texture files generated deterministically from seeded noise and small scratch paths. The first normal map and roughness map are embedded in the GLB; the other maps can be selected independently for the two dice.
+`dice-wear-1.png`, `dice-wear-2.png`, and `dice-wear-3.png` have always supplied seeded hairline scuffs. Their original relief and roughness contrast were very low, and the clearcoat remained pristine, so these marks were difficult to see. The updated 512×512 maps add fine handling scratches and three corresponding `dice-roughness-1.png` … `dice-roughness-3.png` maps. Each die consistently selects the matching normal/roughness pair. The legacy `dice-roughness.png` aliases variant 1 for existing tools.
 
-External normal and roughness textures should use `THREE.NoColorSpace` and `flipY = false` to match glTF UVs. A normal scale near 0.32 keeps the wear quiet. The body has proper UVs; don't apply the wear normal to the painted pips. The GLB includes a clear-coat material extension; use the imported physical material or preserve its clear-coat settings when replacing it.
+External maps use `THREE.NoColorSpace` and `flipY = false`. The runtime applies 0.42 body normal strength to solid dice and 0.30 to translucent dice, plus a gentler 0.26 normal on the clearcoat itself. Polished resin remains around 0.24 roughness, with localized scratches rising toward 0.45. Only `DiceBody` receives wear; the real recessed pip geometry and cream inset paint are unchanged. All three colors, transmission, and software-renderer fallback retain their previous behavior.
+
+The maps-only baker `python3 scripts/build-surface-maps.py` regenerates these maps and 1K felt normal/roughness maps without rebuilding models. It requires NumPy and Pillow, records hashes/statistics in `surface-detail-metadata.json`, and shares deterministic map functions with both Blender build scripts. The felt uses overlapping short fibres and gentle matted nap rather than a regular weave; the .46-unit physical tile and board coordinates remain fixed. Relief and grazing sheen affect lighting only, with no geometry displacement or printed-art distortion.
 
 ## Rebuild and verify
 
@@ -36,7 +38,7 @@ External normal and roughness textures should use `THREE.NoColorSpace` and `flip
 blender --background --python scripts/build-dice.py
 ```
 
-The build uses Blender 4.5 LTS with no add-ons, network calls, or downloaded assets. It writes the GLB, three normal maps, roughness map, a metadata JSON, an editable `.blend`, and `dice-preview.png`. The preview shows the three opaque colorways under product lighting; colors are applied only after the neutral GLB and source are saved.
+The build uses Blender 4.5 LTS with no add-ons, network calls, or downloaded assets. It writes the GLB, three normal maps, three matching roughness maps plus a legacy alias, a metadata JSON, an editable `.blend`, and `dice-preview.png`. The preview shows the three opaque colorways under product lighting; colors are applied only after the neutral GLB and source are saved.
 
 The script asserts fewer than 20,000 triangles per die. `dice-metadata.json` records the exact count and physical recess dimensions. The original geometry and procedural maps are created for this project and inherit its repository license.
 

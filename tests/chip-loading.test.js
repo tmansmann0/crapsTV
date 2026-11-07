@@ -157,3 +157,63 @@ test("missing shared patina atlas fails the asset gate and cleans up all model/m
   );
   f.allDisposed();
 });
+
+test("scuff relief, roughness and engraving survive both instanced chip detail levels", async () => {
+  const f = fixture(),
+    high = f.model(),
+    low = f.model(),
+    maps = new Map();
+  const factory = await createChipFactory(renderer, {
+    resolveAsset: (n) => n,
+    loadModel: async (n) => (n === "chip-logo.glb" ? high : low),
+    loadTexture: async (n) => {
+      const texture = f.texture();
+      maps.set(n, texture);
+      return texture;
+    },
+  });
+  const batch = factory.createBatch(
+    [0, 1, 2].map((wear) => ({
+      wear,
+      position: [wear, 0, -6],
+      denomination: 500,
+    })),
+  );
+  const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 500);
+  camera.updateMatrixWorld(true);
+  const engraving = high.scene.children.find(
+    (o) => o.material.name === "ChipEngraving",
+  ).material;
+  for (const detail of ["full", "optimized"]) {
+    factory.updateLOD(batch, camera, 2160, detail);
+    const active = batch.children.filter((mesh) => mesh.visible && mesh.count);
+    for (const name of ["ChipBase", "ChipInlay"]) {
+      const clay = active.filter((mesh) => mesh.material.name === name);
+      assert.equal(clay.length, 3);
+      for (const [wear, strength] of [0.3, 0.38, 0.44].entries()) {
+        const material = clay.find(
+          (mesh) =>
+            mesh.material.normalMap === maps.get(`chip-normal-${wear + 1}.png`),
+        )?.material;
+        assert(material, `${detail}: ${name} retains wear pattern ${wear + 1}`);
+        assert.equal(
+          material.roughnessMap,
+          maps.get(`chip-roughness-${wear + 1}.png`),
+        );
+        assert.deepEqual(material.normalScale.toArray(), [strength, strength]);
+        assert.equal(material.userData.chipPatina, true);
+      }
+    }
+    const stamp = active.find(
+      (mesh) => mesh.material.name === "ChipEngraving",
+    ).material;
+    assert.equal(
+      stamp.normalMap,
+      engraving.normalMap,
+      "logo relief stays alongside the clay scuffs",
+    );
+    assert.equal(stamp.userData.chipPatina, true);
+  }
+  factory.dispose();
+  f.allDisposed();
+});

@@ -55,7 +55,7 @@ test("table overrides keep material identities and UVs with true map-encoded rou
   assert.equal(wood.map.repeat.x, 0.8 / 4);
   assert.equal(wood.normalMap.repeat.x, 0.8 / 4);
   assert.equal(wood.map.channel, 1);
-  assert.equal(wood.normalScale.x, 0.55);
+  assert.equal(wood.normalScale.x, 0.82);
   assert.equal(wood.envMapIntensity, 0.8);
   assert.equal(wood.normalMap.channel, 1);
   assert.equal(
@@ -77,7 +77,7 @@ test("only known table materials change and all maps are registered/disposed onc
   root.add(new THREE.Mesh(new THREE.BoxGeometry(), other));
   c.apply(root);
   assert.equal(root.children[0].material, other);
-  assert.equal(c.textures.size, 18);
+  assert.equal(c.textures.size, 20);
   let count = 0;
   for (const t of c.textures) {
     t.addEventListener("dispose", () => count++);
@@ -85,7 +85,7 @@ test("only known table materials change and all maps are registered/disposed onc
   }
   c.dispose();
   c.dispose();
-  assert.equal(count, 18);
+  assert.equal(count, 20);
 });
 
 test("encoded roughness stays in the matte/satin palette and texture budgets remain bounded", async () => {
@@ -105,7 +105,7 @@ test("encoded roughness stays in the matte/satin palette and texture budgets rem
   }
 });
 
-test("standard glTF wood upgrades to physical satin while other materials retain their type", async () => {
+test("standard glTF wood upgrades to physical satin while leather retains its type", async () => {
   const c = await setup();
   const root = new THREE.Group();
   const wood = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
@@ -122,6 +122,103 @@ test("standard glTF wood upgrades to physical satin while other materials retain
   assert.equal(root.children[0].material.side, THREE.DoubleSide);
   assert.equal(root.children[1].material.isMeshPhysicalMaterial, undefined);
   c.dispose();
+});
+
+test("baize and trays share fibre maps with a soft physical grazing sheen", async () => {
+  const c = await setup();
+  const root = new THREE.Group();
+  for (const name of names.slice(-2)) {
+    const material = new THREE.MeshStandardMaterial();
+    material.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+  }
+  c.apply(root);
+  const [baize, tray] = root.children.map((mesh) => mesh.material);
+  assert(baize.isMeshPhysicalMaterial && tray.isMeshPhysicalMaterial);
+  assert.equal(baize.normalMap, tray.normalMap);
+  assert.equal(baize.roughnessMap, tray.roughnessMap);
+  assert.equal(baize.normalScale.x, 0.6);
+  assert.equal(tray.normalScale.x, 0.45);
+  assert.equal(baize.sheen, 0.28);
+  assert.equal(baize.sheenRoughness, 0.9);
+  assert.equal(baize.normalMap.repeat.x, 0.8 / 0.46);
+  assert.equal(baize.clearcoat, 0);
+  c.dispose();
+});
+
+test("pore occlusion and varnish normals stay aligned and shared across all table parts", async () => {
+  const c = await setup();
+  const root = new THREE.Group();
+  for (let i = 0; i < 12; i++) {
+    const original = new THREE.MeshStandardMaterial();
+    original.name = names[0];
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), original));
+  }
+  const original = new THREE.MeshStandardMaterial();
+  original.name = names[1];
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), original));
+  c.apply(root);
+  const wood = root.children[0].material;
+  assert(root.children.slice(0, 12).every((m) => m.material === wood));
+  assert.equal(wood.clearcoatNormalMap, wood.normalMap);
+  assert.equal(wood.clearcoatNormalScale.x, 0.28);
+  assert.equal(wood.aoMapIntensity, 0.5);
+  for (const material of [wood, root.children[12].material]) {
+    assert(c.textures.has(material.aoMap));
+    assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace);
+    assert.equal(material.aoMap.userData.role, "occlusion");
+    assert.equal(material.aoMap.channel, material.normalMap.channel);
+    assert.deepEqual(material.aoMap.repeat, material.normalMap.repeat);
+  }
+  assert.equal(root.children[12].material.aoMapIntensity, 0.55);
+  c.dispose();
+});
+
+test("close-view depth uses real 2K scan and preserves the dark albedo", async () => {
+  const { createHash } = await import("node:crypto");
+  const data = JSON.parse(
+    await readFile(
+      new URL("../public/assets/material-table-metadata.json", import.meta.url),
+    ),
+  );
+  for (const name of ["walnut", "leather"]) {
+    const normal = data.maps[`material-table-${name}-normal`];
+    assert.equal(normal.width, 2048);
+    assert.equal(normal.height, 2048);
+    const ao = data.maps[`material-table-${name}-occlusion`];
+    assert(ao.min >= 0.85 && ao.max <= 1);
+    assert(ao.mean > 0.95);
+  }
+  const provenance = JSON.parse(
+    await readFile(
+      new URL(
+        "../assets/source/materials/dark-wood/provenance.json",
+        import.meta.url,
+      ),
+    ),
+  );
+  const scan = await readFile(
+    new URL(
+      "../assets/source/materials/dark-wood/dark_wood_nor_gl_2k.png",
+      import.meta.url,
+    ),
+  );
+  assert.equal(
+    createHash("sha256").update(scan).digest("hex"),
+    provenance.files["dark_wood_nor_gl_2k.png"].sha256,
+  );
+  // These are the existing dark-stain and oxblood files, not relit substitutes.
+  for (const [name, expected] of Object.entries({
+    "material-table-walnut-albedo.jpg":
+      "06f89130929513beab39392fb99b54f4a4a600ddf4966f7dcef7d0eb23eab175",
+    "material-table-leather-albedo.png":
+      "a61f05c18a5d4140152c02b79bf4d426f13532823403cb08e75081009fe76296",
+  })) {
+    const bytes = await readFile(
+      new URL(`../public/assets/${name}`, import.meta.url),
+    );
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), expected);
+  }
 });
 
 async function exportedWood() {

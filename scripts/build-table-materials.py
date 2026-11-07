@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import os
 import tempfile
+import runpy
 import numpy as np
 from PIL import Image, ImageDraw
 ROOT=Path(__file__).resolve().parents[1]
@@ -101,6 +102,11 @@ albedo('material-table-black-albedo',(8,16,14),1+.06*micro)
 normal('material-table-black-normal',micro*.00008)
 save('material-table-black-roughness',np.clip(.75+micro*.025,.72,.78))
 atomic_write(OUT/'material-table-metadata.json',lambda p: p.write_text(json.dumps({'generated':'Scanned CC0 Poly Haven wood; original procedural other materials','woodSource':'https://polyhaven.com/a/dark_wood','woodLicense':'CC0-1.0','woodMapping':{'uvChannel':1,'mappingVersion':2,'projection':'Board-local mitered panels; upright leg grain','tileSceneUnits':4,'repeat':[.8/4,.8/4],'albedoFormat':'JPEG quality94 subsampling0','normalScale':.55,'clearcoat':.16,'clearcoatRoughness':.38,'environmentIntensity':.8},'normalConvention':'OpenGL +Y tangent-space','albedoColorSpace':'sRGB','dataColorSpace':'linear/NoColorSpace','roughnessScalar':1,'maps':RANGES},indent=2)+'\n',encoding='utf-8'))
+
+# Finish with the close-view microrelief bake. Can also run independently while
+# iterating these two materials without rewriting felt, albedos, or model assets.
+runpy.run_path(str(ROOT/'scripts/build-table-depth.py'),run_name='__main__')
+RANGES=json.loads((OUT/'material-table-metadata.json').read_text())['maps']
 
 # Readable proof sheet. It is not a material input.
 labels=['walnut','leather','rubber','brass','black']

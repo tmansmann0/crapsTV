@@ -1,12 +1,15 @@
 import * as THREE from "three";
+import { createFeltSurfaceSettings, FELT_TILE_SIZE } from "./felt-surface.js";
 
 const MAPS = {
   woodColor: ["material-table-walnut-albedo.jpg", true, 1],
   woodNormal: ["material-table-walnut-normal.png", false, 1],
   woodRough: ["material-table-walnut-roughness.png", false, 1],
+  woodAO: ["material-table-walnut-occlusion.png", false, 1],
   leatherColor: ["material-table-leather-albedo.png", true, 0],
   leatherNormal: ["material-table-leather-normal.png", false, 1],
   leatherRough: ["material-table-leather-roughness.png", false, 1],
+  leatherAO: ["material-table-leather-occlusion.png", false, 1],
   rubberColor: ["material-table-rubber-albedo.png", true, 1],
   rubberNormal: ["table-rubber-normal.png", false, 1],
   rubberRough: ["material-table-rubber-roughness.png", false, 1],
@@ -25,17 +28,22 @@ const MATERIALS = {
     color: "woodColor",
     normal: "woodNormal",
     rough: "woodRough",
-    strength: 0.55,
+    strength: 0.82,
+    occlusion: "woodAO",
+    occlusionStrength: 0.5,
     metalness: 0,
     coat: 0.16,
     coatRoughness: 0.38,
+    coatNormalStrength: 0.28,
     environment: 0.8,
   },
   "Deep oxblood leather": {
     color: "leatherColor",
     normal: "leatherNormal",
     rough: "leatherRough",
-    strength: 0.75,
+    strength: 1,
+    occlusion: "leatherAO",
+    occlusionStrength: 0.55,
     metalness: 0,
     coat: 0.015,
     environment: 0.45,
@@ -68,19 +76,21 @@ const MATERIALS = {
     environment: 0.3,
   },
   "Deep pine baize": {
+    felt: true,
     color: "feltColor",
     normal: "feltNormal",
     rough: "feltRough",
-    strength: 0.26,
+    strength: 0.6,
     metalness: 0,
     coat: 0,
     environment: 0.4,
   },
   "Player tray suede": {
+    felt: true,
     color: "feltColor",
     normal: "feltNormal",
     rough: "feltRough",
-    strength: 0.32,
+    strength: 0.45,
     metalness: 0,
     coat: 0,
     environment: 0.3,
@@ -128,13 +138,16 @@ export async function createTableMaterials(
           ? "albedo"
           : key.endsWith("Normal")
             ? "normal"
-            : "roughness",
+            : key.endsWith("AO")
+              ? "occlusion"
+              : "roughness",
       };
       // Matched scanned wood: a 4-unit tile on board-local physical Detail UV.
       // Identical isotropic scale keeps pores proportional on tops/aprons/legs.
       if (key.startsWith("wood")) texture.repeat.set(0.8 / 4, 0.8 / 4);
       // Existing felt fibres were designed as a .46-world-unit tile.
-      if (key.startsWith("felt")) texture.repeat.set(0.8 / 0.46, 0.8 / 0.46);
+      if (key.startsWith("felt"))
+        texture.repeat.set(0.8 / FELT_TILE_SIZE, 0.8 / FELT_TILE_SIZE);
       maps[key] = texture;
       textures.add(texture);
     }),
@@ -150,12 +163,13 @@ export async function createTableMaterials(
     const spec = MATERIALS[original.name];
     if (!spec) return original;
     if (materials.has(original.name)) return materials.get(original.name);
-    const material =
-      original.name === "Hand-polished dark walnut"
-        ? new THREE.MeshPhysicalMaterial()
-        : original.clone();
-    if (original.name === "Hand-polished dark walnut")
+    const physical = original.name === "Hand-polished dark walnut" || spec.felt;
+    const material = physical
+      ? new THREE.MeshPhysicalMaterial()
+      : original.clone();
+    if (physical)
       THREE.MeshStandardMaterial.prototype.copy.call(material, original);
+    if (spec.felt) material.setValues(createFeltSurfaceSettings());
     material.name = original.name;
     material.color.set(spec.tint ?? 0xffffff);
     material.map = maps[spec.color];
@@ -163,6 +177,10 @@ export async function createTableMaterials(
     material.normalMapType = THREE.TangentSpaceNormalMap;
     material.normalScale.set(spec.strength, spec.strength);
     material.roughnessMap = maps[spec.rough];
+    // AO is only the shallow pores, not baked scene lighting. It shares the
+    // surface detail UV and remains deliberately weak under the real HDRI.
+    material.aoMap = maps[spec.occlusion] ?? null;
+    material.aoMapIntensity = spec.occlusionStrength ?? 1;
     // Map texels already encode the desired roughness. Multiplying by another
     // .5 scalar would turn satin wood into an unintended glossy surface.
     material.roughness = 1;
@@ -174,6 +192,15 @@ export async function createTableMaterials(
       material.clearcoatRoughness = spec.coatRoughness ?? 0.75;
       material.clearcoatMap = null;
       material.clearcoatRoughnessMap = null;
+      // Varnish follows the photographed pores instead of reflecting as a
+      // perfectly flat second shell. Reuse the shared scan, no extra texture.
+      material.clearcoatNormalMap = spec.coatNormalStrength
+        ? maps[spec.normal]
+        : null;
+      material.clearcoatNormalScale.set(
+        spec.coatNormalStrength ?? 0,
+        spec.coatNormalStrength ?? 0,
+      );
     }
     material.userData = {
       ...material.userData,

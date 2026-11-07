@@ -19,6 +19,8 @@ export function createTableCompositor(renderer) {
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
   quad.frustumCulled = false;
   scene.add(quad);
+  const depthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false });
+  let nativeSurface = null;
   let target = null,
     plan = null;
   function resize(options) {
@@ -71,7 +73,56 @@ export function createTableCompositor(renderer) {
     } finally {
       renderer.setRenderTarget(null);
     }
-    return Promise.resolve(worldCompile);
+    return Promise.resolve(worldCompile).then(() => {
+      // Tone mapping/output colour differs between HDR-target and screen
+      // programs. Warm both the native physical material and depth variant
+      // before startup's black gate opens, after async polling has settled.
+      if (target) renderNativeSurface(world, worldCamera, true);
+    });
+  }
+  function renderNativeSurface(world, worldCamera, compileOnly = false) {
+    if (!nativeSurface?.visible) return;
+    const background = world.background;
+    const override = world.overrideMaterial;
+    const matrixAutoUpdate = world.matrixWorldAutoUpdate;
+    const shadowUpdate = renderer.shadowMap.needsUpdate;
+    const hidden = [];
+    const others = [];
+    world.traverse((object) => {
+      if (!object.visible || !object.isMesh || object === nativeSurface) return;
+      others.push(object);
+      // Preserve already-composited translucent dice and ghost chips too:
+      // native felt must not paint over their visible silhouettes.
+      if (object.userData.environment) {
+        hidden.push(object);
+        object.visible = false;
+      }
+    });
+    world.background = null;
+    world.matrixWorldAutoUpdate = false;
+    renderer.shadowMap.needsUpdate = false;
+    try {
+      if (!compileOnly) renderer.clearDepth();
+      nativeSurface.visible = false;
+      world.overrideMaterial = depthMaterial;
+      if (compileOnly) renderer.compile(world, worldCamera);
+      else renderer.render(world, worldCamera);
+      world.overrideMaterial = override;
+      nativeSurface.visible = true;
+      for (const object of others) object.visible = false;
+      // Same material, lighting, shadow map and camera; only its framebuffer
+      // changes. Ink therefore stays on the felt and behind solid pieces.
+      if (compileOnly) renderer.compile(world, worldCamera);
+      else renderer.render(world, worldCamera);
+    } finally {
+      nativeSurface.visible = true;
+      for (const object of others) object.visible = true;
+      for (const object of hidden) object.visible = true;
+      world.background = background;
+      world.overrideMaterial = override;
+      world.matrixWorldAutoUpdate = matrixAutoUpdate;
+      renderer.shadowMap.needsUpdate = shadowUpdate;
+    }
   }
   function render(world, worldCamera) {
     renderer.setRenderTarget(target);
@@ -81,10 +132,14 @@ export function createTableCompositor(renderer) {
       renderer.setRenderTarget(null);
       renderer.clear();
       renderer.render(scene, camera);
+      if (world) renderNativeSurface(world, worldCamera);
     }
   }
   return {
     resize,
+    setNativeSurface(surface) {
+      nativeSurface = surface;
+    },
     compile,
     render,
     get plan() {
@@ -95,6 +150,7 @@ export function createTableCompositor(renderer) {
     },
     dispose() {
       target?.dispose();
+      depthMaterial.dispose();
       quad.geometry.dispose();
       material.dispose();
     },

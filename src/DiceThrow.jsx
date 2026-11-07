@@ -122,9 +122,13 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       textures.add(t);
       return t;
     });
-    const roughness = tl.load(asset("dice-roughness.png"));
-    roughness.flipY = false;
-    textures.add(roughness);
+    const roughness = [1, 2, 3].map((i) => {
+      const t = tl.load(asset(`dice-roughness-${i}.png`));
+      t.flipY = false;
+      t.colorSpace = THREE.NoColorSpace;
+      textures.add(t);
+      return t;
+    });
     new GLTFLoader().load(
       asset("dice.glb"),
       (g) => {
@@ -198,7 +202,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
               const m = createDiceMaterial(
                 appearance,
                 normals[diceWearIndex(shooterId, i)],
-                roughness,
+                roughness[diceWearIndex(shooterId, i)],
                 software,
               );
               cache.set(k, m);

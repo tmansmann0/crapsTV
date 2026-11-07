@@ -1,6 +1,6 @@
 {
   "name": "crapstv",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "description": "A living-room craps table. TV is the table. Phones are the chips.",
@@ -16,6 +16,7 @@
     "test:odds": "node tests/phone-odds.browser.mjs",
     "benchmark": "node scripts/benchmark-render.mjs",
     "test:graphics": "node tests/graphics.browser.mjs",
+    "test:board": "node tests/board-artwork.browser.mjs",
     "test:payout": "node tests/phone-payout.browser.mjs",
     "test:layout": "node tests/phone-layout.browser.mjs",
     "test:learn": "node tests/learn-center.browser.mjs",

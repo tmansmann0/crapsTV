@@ -1,0 +1,83 @@
+{
+  "generator": "scripts/build-surface-maps.py",
+  "seeded": true,
+  "maps": {
+    "dice-wear-1": {
+      "width": 512,
+      "height": 512,
+      "min": 0.40493099166273683,
+      "max": 0.9999999999675204,
+      "standardDeviation": 0.00910550971997928,
+      "sha256": "2e5773df2575e28e3c27fd7782d4c943a4599af4e81aba4f0eaf01bf42d257b3"
+    },
+    "dice-roughness-1": {
+      "width": 512,
+      "height": 512,
+      "min": 0.205,
+      "max": 0.44681459769389326,
+      "standardDeviation": 0.01944448543552803,
+      "sha256": "03ccf413e8bcdf3d8151fc24e64000455d76ba22eed63506a26da88c05240eac"
+    },
+    "dice-roughness": {
+      "width": 512,
+      "height": 512,
+      "min": 0.205,
+      "max": 0.44681459769389326,
+      "standardDeviation": 0.01944448543552803,
+      "sha256": "03ccf413e8bcdf3d8151fc24e64000455d76ba22eed63506a26da88c05240eac"
+    },
+    "dice-wear-2": {
+      "width": 512,
+      "height": 512,
+      "min": 0.4093518519189795,
+      "max": 0.9999999999944522,
+      "standardDeviation": 0.00881999575410819,
+      "sha256": "4f22b7db7b30411bf0eff3a23f19c33b8f3f626910811672ed41ce82ca13e4d1"
+    },
+    "dice-roughness-2": {
+      "width": 512,
+      "height": 512,
+      "min": 0.205,
+      "max": 0.44635960689731197,
+      "standardDeviation": 0.018869511472187357,
+      "sha256": "37eb861a703d1403e617ba26c47cec13ccea1b8feac9508d72063905dc3c2f0b"
+    },
+    "dice-wear-3": {
+      "width": 512,
+      "height": 512,
+      "min": 0.4022848887831059,
+      "max": 0.9999999999035478,
+      "standardDeviation": 0.008826121117453732,
+      "sha256": "73e2c6d7068dde48850014ca529e5ae051a5f42874dc7925335d1a0bc1f73964"
+    },
+    "dice-roughness-3": {
+      "width": 512,
+      "height": 512,
+      "min": 0.205,
+      "max": 0.4540870902371322,
+      "standardDeviation": 0.01895154286904024,
+      "sha256": "14163742da213357c7a5c33c9f9b14832cf2b91aa581a04cf576a0819dbafb6c"
+    },
+    "felt-normal": {
+      "width": 1024,
+      "height": 1024,
+      "min": 0.18093489920678985,
+      "max": 0.9999999922059963,
+      "standardDeviation": 0.046033381738778176,
+      "sha256": "bc7c06ba8ecb0450dd612d3b06e6093b9354acaebb9178e6d422cc379b391d7d"
+    },
+    "felt-roughness": {
+      "width": 1024,
+      "height": 1024,
+      "min": 0.91,
+      "max": 0.99,
+      "standardDeviation": 0.010999701887503053,
+      "sha256": "2cea51128f10459c201ca66edbd602668ac1fa8e2327450c492e1407ed2923c2"
+    }
+  },
+  "feltTileWorldUnits": 0.46,
+  "preservedSha256": {
+    "public/assets/dice.glb": "60817c01b409120a1247dc82f1dd7c554f9c4ce261d29da7484bcab20f54f8ae",
+    "assets/source/dice.blend": "8d7ce445c6e10f21fea1876fd5287b37f5c7820499667985e14f353eaca82762"
+  }
+}

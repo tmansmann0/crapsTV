@@ -10,6 +10,8 @@ import { createSceneUI } from "./scene-ui.js";
 import { createTablePieces } from "./table-pieces.js";
 import { createTableMaterials } from "./table-materials.js";
 import { createTableCompositor } from "./table-compositor.js";
+import { createBoardArtwork } from "./board-artwork.js";
+import { createFeltSurfaceSettings } from "./felt-surface.js";
 import { puckHome } from "./puck-layout.js";
 import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
@@ -330,8 +332,7 @@ export default function Table3D(props) {
         el.dataset.environment = "unavailable";
         stageError = "Casino environment could not load. Refresh to retry.";
       });
-    const loader = new GLTFLoader(),
-      textures = {};
+    const loader = new GLTFLoader();
     function addObject(object) {
       object.traverse((o) => {
         if (o.isMesh) {
@@ -399,39 +400,41 @@ export default function Table3D(props) {
     }
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(10.84, 5.4),
-      new THREE.MeshStandardMaterial({
+      new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        roughness: 0.98,
+        ...createFeltSurfaceSettings(),
         roughnessMap: roughness,
         normalMap: normal,
-        normalScale: new THREE.Vector2(0.26, 0.26),
-        metalness: 0,
       }),
     );
     board.rotation.x = -Math.PI / 2;
     board.position.y = 0.012;
     board.receiveShadow = true;
     scene.add(board);
-    const textureLoader = new THREE.TextureLoader();
-    for (const mode of ["classic", "crapless"])
-      textureLoader.load(
-        asset(`board-${mode}-4k.png`),
-        (t) => {
-          if (!alive) {
-            t.dispose();
-            return;
-          }
-          t.colorSpace = THREE.SRGBColorSpace;
-          t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-          textures[mode] = t;
-          textureQuality.register(t);
-          boardsLoaded++;
-        },
-        undefined,
-        () => {
-          stageError = "Table layout could not load. Refresh to retry.";
-        },
-      );
+    compositor.setNativeSurface(board);
+    const boardArtwork = createBoardArtwork(renderer, {
+      resolveAsset: asset,
+      initialMode:
+        latest.current.state?.config.mode === "crapless"
+          ? "crapless"
+          : "classic",
+      software,
+      onError: () => {
+        stageError = "Table layout could not load. Refresh to retry.";
+      },
+    });
+    boardArtwork.ready
+      .then(() => {
+        if (!alive) return;
+        board.material.map = boardArtwork.texture;
+        board.material.needsUpdate = true;
+        boardsLoaded = 2;
+        el.dataset.boardPrintResolution = String(boardArtwork.width);
+        el.dataset.boardPrintSource = "svg";
+      })
+      .catch(() => {
+        stageError = "Table layout could not load. Refresh to retry.";
+      });
     const pieces = createTablePieces(scene, renderer, { software });
     pieces.ready
       .then(() => {
@@ -770,8 +773,9 @@ export default function Table3D(props) {
         userUntil = 0;
         el.dataset.camera = cameraMode;
       }
-      if (textures[mode] && board.material.map !== textures[mode]) {
-        board.material.map = textures[mode];
+      boardArtwork.select(mode);
+      if (boardArtwork.texture && board.material.map !== boardArtwork.texture) {
+        board.material.map = boardArtwork.texture;
         board.material.needsUpdate = true;
       }
       if (s?.lastRoll?.id !== previousRoll) {
@@ -851,8 +855,7 @@ export default function Table3D(props) {
           autoView?.fov ??
           (cameraMode === "room" ? 60 : 43));
       camera.fov +=
-        (targetFov - camera.fov) *
-        (directedShot ? 1 : Math.min(1, dt * 5));
+        (targetFov - camera.fov) * (directedShot ? 1 : Math.min(1, dt * 5));
       camera.updateProjectionMatrix();
       if (automaticCamera) {
         const elapsed = (time - startTime) / 1000;
@@ -915,7 +918,9 @@ export default function Table3D(props) {
       el.dataset.cameraVariant = directedShot?.shotVariant || "";
       el.dataset.cameraArrivalAt = String(directedShot?.arrivalAt ?? "");
       el.dataset.cameraTransferAt = String(directedShot?.transferAt ?? "");
-      el.dataset.cameraSubjectHeight = String(directedShot?.subjectHeight ?? "");
+      el.dataset.cameraSubjectHeight = String(
+        directedShot?.subjectHeight ?? "",
+      );
       const connected = !!introSample || current.status === "connected";
       const piecesChanged =
         s !== lastPiecesState ||
@@ -1241,7 +1246,7 @@ export default function Table3D(props) {
             }
         });
         sceneTextures.forEach((t) => t.dispose());
-        Object.values(textures).forEach((t) => t.dispose());
+        boardArtwork.dispose();
         normal.dispose();
         roughness.dispose();
         readyEnvironment?.dispose();

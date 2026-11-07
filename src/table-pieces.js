@@ -155,7 +155,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     return texture;
   }
   const diceNormals = [1, 2, 3].map((n) => linearTexture(`dice-wear-${n}.png`));
-  const diceRoughness = linearTexture("dice-roughness.png");
+  const diceRoughness = [1, 2, 3].map((n) =>
+    linearTexture(`dice-roughness-${n}.png`),
+  );
   const diceReady = new Promise((resolve, reject) => {
     new GLTFLoader().load(
       asset("dice.glb"),
@@ -370,7 +372,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
           const material = createDiceMaterial(
             appearance,
             diceNormals[wear],
-            diceRoughness,
+            diceRoughness[wear],
             software,
           );
           materials.add(material);

@@ -40,6 +40,7 @@ jobs:
       - run: npm run test:layout
       - run: npm run test:learn
       - run: npm run test:graphics
+      - run: npm run test:board
       - run: npm run test:tv
       - run: npm run test:tour
       - run: npm run test:startup

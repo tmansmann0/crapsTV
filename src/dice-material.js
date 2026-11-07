@@ -33,7 +33,14 @@ export function createDiceMaterial(
         : 0.26,
     metalness: 0,
     normalMap,
-    normalScale: new THREE.Vector2(0.2, 0.2),
+    normalScale: new THREE.Vector2(
+      translucent ? 0.3 : 0.42,
+      translucent ? 0.3 : 0.42,
+    ),
+    // Handling scratches break the coating as well as the underlying resin.
+    // A pristine coat over worn resin otherwise hides them in close-up reflections.
+    clearcoatNormalMap: software ? null : normalMap,
+    clearcoatNormalScale: new THREE.Vector2(0.26, 0.26),
     roughnessMap,
     clearcoat: software ? 0 : translucent ? 0.7 : 0.35,
     clearcoatRoughness: translucent ? 0.14 : 0.2,

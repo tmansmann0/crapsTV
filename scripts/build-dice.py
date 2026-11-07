@@ -36,37 +36,18 @@ def image_from_rgb(name, rgb):
     return image
 
 
-# Low-amplitude directional scuffs and a few hairline scratches. These are
-# original procedural tangent-space maps, not a color-overlay imitation.
+# Shared deterministic baker also supports a maps-only refresh without changing geometry.
+import sys
+sys.path.insert(0, str(ROOT / 'scripts'))
+from surface_maps import dice_maps
 normal_images = []
 roughness_image = None
 for version in range(1, 4):
-    rng = np.random.default_rng(1107 + version)
-    size = 512
-    heightmap = rng.normal(0, 0.0012, (size, size)).astype(np.float32)
-    for stroke in range(100):
-        x0, y0 = rng.uniform(0, size, 2)
-        length = rng.uniform(4, 55)
-        angle = rng.uniform(0, math.tau)
-        dx, dy = math.cos(angle)*length, math.sin(angle)*length
-        # Tiny gaussian brush; low height means marks stay subtle in reflections.
-        steps = max(2, int(length*2))
-        depth = rng.uniform(.006, .017)
-        for t in np.linspace(0, 1, steps):
-            x, y = x0+dx*t, y0+dy*t
-            ix, iy = int(x), int(y)
-            for oy in (-1, 0, 1):
-                for ox in (-1, 0, 1):
-                    xx, yy = (ix+ox) % size, (iy+oy) % size
-                    distance = (xx-x)**2+(yy-y)**2
-                    heightmap[yy,xx] -= depth*math.exp(-distance/1.1)/steps*8
-    gy, gx = np.gradient(heightmap)
-    normals = np.stack((-gx*3, -gy*3, np.ones_like(gx)), axis=-1)
-    normals /= np.linalg.norm(normals, axis=-1, keepdims=True)
-    normal_images.append(image_from_rgb(f'dice-wear-{version}', normals*.5+.5))
+    normals, roughness = dice_maps(version)
+    normal_images.append(image_from_rgb(f'dice-wear-{version}', normals))
+    image = image_from_rgb(f'dice-roughness-{version}', roughness)
     if version == 1:
-        roughness = np.clip(.235 + rng.normal(0,.005,(size,size)) - heightmap*1.8, .20, .34)
-        roughness_image = image_from_rgb('dice-roughness', np.repeat(roughness[:,:,None],3,axis=2))
+        roughness_image = image_from_rgb('dice-roughness', roughness)
 
 body_mat = bpy.data.materials.new('DiceBody')
 body_mat.use_nodes = True
