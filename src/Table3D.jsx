@@ -1,3 +1,4 @@
+import { configureRenderer } from "./render-quality.js";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -44,9 +45,9 @@ export default function Table3D(props) {
       environmentShell = null,
       environmentTarget = null,
       displayRevision = -1;
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    const { software } = configureRenderer(renderer);
+    el.dataset.renderQuality = software ? "software" : "full";
     renderer.setSize(el.clientWidth, el.clientHeight);
-    renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
@@ -118,7 +119,37 @@ export default function Table3D(props) {
       environmentShell.userData.environment = true;
       scene.add(environmentShell);
       scene.environmentRotation.y = Math.PI / 2;
-      environmentTarget = pmrem.fromEquirectangular(texture);
+      let lightingTexture = texture;
+      if (software && texture.image.width > 512) {
+        // Keep the real HDR backdrop, but prefilter a smaller lighting map on
+        // CPU renderers instead of asking them to convolve the full 4K image.
+        const source = texture.image;
+        const width = 512,
+          height = Math.round((source.height * width) / source.width);
+        const channels = source.data.length / (source.width * source.height);
+        const pixels = new source.data.constructor(width * height * channels);
+        for (let y = 0; y < height; y++)
+          for (let x = 0; x < width; x++) {
+            const from =
+              (Math.floor((y * source.height) / height) * source.width +
+                Math.floor((x * source.width) / width)) *
+              channels;
+            for (let c = 0; c < channels; c++)
+              pixels[(y * width + x) * channels + c] = source.data[from + c];
+          }
+        lightingTexture = new THREE.DataTexture(
+          pixels,
+          width,
+          height,
+          texture.format,
+          texture.type,
+        );
+        lightingTexture.colorSpace = texture.colorSpace;
+        lightingTexture.mapping = THREE.EquirectangularReflectionMapping;
+        lightingTexture.needsUpdate = true;
+      }
+      environmentTarget = pmrem.fromEquirectangular(lightingTexture);
+      if (lightingTexture !== texture) lightingTexture.dispose();
       scene.environment = environmentTarget.texture;
       scene.environmentIntensity = 1.2;
       readyEnvironment = texture;
@@ -210,7 +241,7 @@ export default function Table3D(props) {
         t.anisotropy = renderer.capabilities.getMaxAnisotropy();
         textures[mode] = t;
       });
-    const pieces = createTablePieces(scene, renderer);
+    const pieces = createTablePieces(scene, renderer, { software });
     const dice = pieces.dice;
     const aimArrow = new THREE.ArrowHelper(
       new THREE.Vector3(0, 0, -1),
@@ -293,8 +324,12 @@ export default function Table3D(props) {
       const dt = Math.min(frameDelta, 0.06);
       const interval =
         latest.current.state?.rolling || dragStart || time < settlingUntil
-          ? 33
-          : 66;
+          ? software
+            ? 80
+            : 33
+          : software
+            ? 200
+            : 66;
       if (time - lastTime < interval) return;
       lastTime = time;
       const current = latest.current,
@@ -440,10 +475,13 @@ export default function Table3D(props) {
           10.84
         : -4.5;
       ui.update({ ...current, cameraMode });
-      renderer.clear();
-      renderer.render(scene, camera);
-      renderer.clearDepth();
-      renderer.render(ui.scene, ui.camera);
+      // Hidden TV tabs still advance shared state, but need no GPU readback.
+      if (!document.hidden) {
+        renderer.clear();
+        renderer.render(scene, camera);
+        renderer.clearDepth();
+        renderer.render(ui.scene, ui.camera);
+      }
     }
     frame = requestAnimationFrame(animate);
     return () => {

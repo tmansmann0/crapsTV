@@ -11,3 +11,5 @@ The room authority generates a throw once, using a fixed-step Cannon simulation 
 The TV follows the flight, then frames the landing, before returning to the selected camera mode. Reduced-motion mode keeps the selected camera instead of using cinematic camera travel. Actual bets and payouts resolve at the end of the authoritative timeline; the phone's visual result summary shows the settled dice and the player's net result.
 
 The table now uses continuous macro UVs for walnut and leather, plus a separate surface-detail UV channel for subtle wear normal and roughness maps. Wager chips sit entirely above the felt and use the same modeled chip as the dealer rack.
+
+Phone chip thumbnails are pre-rendered from the GLB. Software GPU renderers use a lower internal pixel ratio, fewer frames, and no real-time shadow map; the mesh geometry and synchronized trajectory stay the same. Hardware GPUs keep full-resolution rendering and soft shadows.

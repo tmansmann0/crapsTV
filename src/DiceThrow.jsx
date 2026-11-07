@@ -1,3 +1,4 @@
+import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -44,21 +45,24 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       setFailed(true);
       return;
     }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    const { software } = configureRenderer(renderer, 1.5);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.95;
-    renderer.shadowMap.enabled = true;
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#0d332b");
     const camera = new THREE.PerspectiveCamera(37, 1, 0.05, 50);
     camera.position.set(0, 2.1, 4.3);
     camera.lookAt(0, 0, 1.8);
-    const pmrem = new THREE.PMREMGenerator(renderer),
-      room = new RoomEnvironment();
-    const environment = pmrem.fromScene(room, 0.04);
-    scene.environment = environment.texture;
-    room.dispose();
+    let pmrem = null,
+      environment = null;
+    if (!software) {
+      pmrem = new THREE.PMREMGenerator(renderer);
+      const room = new RoomEnvironment();
+      environment = pmrem.fromScene(room, 0.04);
+      scene.environment = environment.texture;
+      room.dispose();
+    }
     scene.add(new THREE.HemisphereLight(0xffffff, 0x284c3e, 0.8));
     const light = new THREE.DirectionalLight(0xffedce, 2.4);
     light.position.set(-2, 6, 4);
@@ -129,7 +133,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     observer.observe(el);
     function render(time) {
       frame = requestAnimationFrame(render);
-      if (time - lastTime < (document.hidden ? 500 : 32)) return;
+      if (time - lastTime < (document.hidden ? 500 : software ? 80 : 32))
+        return;
       lastTime = time;
       const { state: s, aim: localAim, appearance, shooterId } = latest.current;
       const key = JSON.stringify([appearance, shooterId]);
@@ -144,6 +149,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
                 appearance,
                 normals[diceWearIndex(shooterId, i)],
                 roughness,
+                software,
               );
               cache.set(k, m);
               materials.add(m);
@@ -189,7 +195,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       el.dataset.throwId = s.throw?.id || "";
       el.dataset.pose = JSON.stringify(pose.dice);
       el.dataset.loaded = String(loaded);
-      renderer.render(scene, camera);
+      if (!document.hidden) renderer.render(scene, camera);
     }
     frame = requestAnimationFrame(render);
     return () => {
@@ -203,8 +209,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       floor.material.dispose();
       rail.geometry.dispose();
       rail.material.dispose();
-      environment.dispose();
-      pmrem.dispose();
+      environment?.dispose();
+      pmrem?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };

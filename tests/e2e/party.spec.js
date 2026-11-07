@@ -8,229 +8,268 @@ async function capture(page, options) {
 }
 test("TV and phones complete a session, reconnect and export a recap", async ({
   browser,
-}) => {
-  await mkdir("artifacts", { recursive: true });
-  const errors = [];
-  const tv = await browser.newPage({ viewport: { width: 1280, height: 800 } });
-  tv.on("pageerror", (e) => errors.push(e.message));
-  let rejectedOnce = false;
-  await tv.context().routeWebSocket("**/socket", (ws) => {
-    const server = ws.connectToServer();
-    let name = "";
-    ws.onMessage((raw) => {
-      const message = JSON.parse(raw);
-      if (message.type === "join") name = message.name || name;
-      if (name === "Tyler" && message.type === "bet" && !rejectedOnce) {
-        rejectedOnce = true;
-        ws.send(
-          JSON.stringify({
-            type: "error",
-            message: "That bet changed. Please retry.",
-          }),
-        );
-      } else server.send(raw);
+}, testInfo) => {
+  // Independent browser GPU processes mirror the physical TV and phones.
+  const controllers = await browser
+    .browserType()
+    .launch({ ...testInfo.project.use.launchOptions, headless: true });
+  try {
+    await mkdir("artifacts", { recursive: true });
+    const errors = [];
+    const tv = await browser.newPage({
+      // CI uses software rasterization; keep every UI element while limiting pixels.
+      viewport: process.env.CI
+        ? { width: 960, height: 640 }
+        : { width: 1280, height: 800 },
     });
-  });
+    tv.on("pageerror", (e) => errors.push(e.message));
+    let rejectedOnce = false;
+    const interceptWagers = (ws) => {
+      const server = ws.connectToServer();
+      let name = "";
+      ws.onMessage((raw) => {
+        const message = JSON.parse(raw);
+        if (message.type === "join") name = message.name || name;
+        if (name === "Tyler" && message.type === "bet" && !rejectedOnce) {
+          rejectedOnce = true;
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              message: "That bet changed. Please retry.",
+            }),
+          );
+        } else server.send(raw);
+      });
+    };
 
-  await tv.goto("http://127.0.0.1:4321");
-  const scene = tv.getByTestId("casino-scene");
-  await expect(scene).toHaveAttribute("data-room-code", /^[A-Z2-9]{6}$/);
-  await expect(tv.locator("header, footer")).toHaveCount(0);
-  await expect(tv.locator(".table-canvas canvas")).toHaveCount(1);
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-environment",
-    "casino-room.exr",
-    { timeout: 30000 },
-  );
-  await tv.waitForTimeout(2300);
-  await tv.locator("canvas").click({
-    position: { x: 48, y: 48 },
-  });
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-settings-open",
-    "true",
-  );
-  await tv.locator("canvas").click({ position: { x: 130, y: 210 } });
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-camera",
-    "table",
-  );
-  await capture(tv, { path: "artifacts/tv-lobby.png", fullPage: true });
-  const cfg = await (
-    await tv.request.get("http://127.0.0.1:4321/api/config")
-  ).json();
-  // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
-  const popup = tv.waitForEvent("popup");
-  await tv.locator("canvas").click({
-    position: { x: 130, y: 305 },
-  });
-  const phone = await popup;
-  await tv.locator("canvas").click({ position: { x: 48, y: 48 } });
-  await phone.setViewportSize({ width: 390, height: 844 });
-  phone.on("pageerror", (e) => errors.push(e.message));
-  await phone.getByRole("heading", { name: "Join table" }).waitFor();
-  await phone.getByLabel("Your name").fill("Tyler");
-  await phone.getByRole("button", { name: "Join", exact: true }).click();
-  await phone.getByText("Table setup").waitFor();
-  await expect(
-    phone.locator('.setup input[type="checkbox"]'),
-  ).not.toBeChecked();
-  await capture(phone, { path: "artifacts/phone-setup.png", fullPage: true });
-  const bob = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-  });
-  bob.on("pageerror", (e) => errors.push(e.message));
-  await bob.goto(`http://127.0.0.1:4321/?join=${cfg.code}`);
-  await expect(bob).toHaveURL(`http://127.0.0.1:4321/join?code=${cfg.code}`);
-  await bob.getByRole("heading", { name: "Join table" }).waitFor();
-  await bob.getByLabel("Your name").fill("Jordan");
-  await bob.getByRole("button", { name: "Join", exact: true }).click();
-  await bob.getByText("Your chips are waiting.").waitFor();
-  await phone.getByRole("button", { name: "Open the table" }).click();
-  await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
-  await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
-  await phone.locator('[data-bet-id="pass"]').click();
-  await phone.getByRole("button", { name: /Place \$5/ }).click();
-  await expect(phone.locator(".pg-notice")).toContainText("That bet changed");
-  await expect(
-    phone.getByRole("button", { name: /Bundle of \$5/ }),
-  ).toBeVisible();
-  await phone.getByRole("button", { name: /Place \$5/ }).click();
-  await expect(phone.locator(".pg-wallet")).toContainText("$5");
-  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
-  await phone.getByRole("button", { name: "Add $1 chip", exact: true }).click();
-  const bundle = await phone
-    .getByRole("button", { name: /Bundle of \$6/ })
-    .boundingBox();
-  const field = await phone.locator('[data-bet-id="field"]').boundingBox();
-  await phone.mouse.move(
-    bundle.x + bundle.width / 2,
-    bundle.y + bundle.height / 2,
-  );
-  await phone.mouse.down();
-  await phone.mouse.move(
-    field.x + field.width / 2,
-    field.y + field.height / 2,
-    { steps: 10 },
-  );
-  await phone.mouse.up();
-  await expect(phone.locator(".pg-wallet")).toContainText("$11");
-  await expect
-    .poll(async () =>
-      Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
-    )
-    .toBeGreaterThan(0);
-  await bob.locator('[data-bet-id="field"]').click();
-  await bob.getByRole("button", { name: /Place \$5/ }).click();
-  await capture(phone, { path: "artifacts/phone-playing.png", fullPage: true });
-  const bankBefore = await phone.locator(".pg-wallet dd").allTextContents();
-  await phone.getByRole("tab", { name: "Learn", exact: true }).click();
-  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
-  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
-  await phone.locator('[data-bet-id="practice-pass"]').click();
-  await phone.getByRole("button", { name: /Place \$10/ }).click();
-  await phone.getByRole("button", { name: "Throw practice dice" }).click();
-  await expect(phone.locator(".pg-practice-result")).toBeVisible();
-  expect(await phone.locator(".pg-wallet dd").allTextContents()).toEqual(
-    bankBefore,
-  );
-  await capture(phone, {
-    path: "artifacts/phone-tutorial.png",
-    fullPage: true,
-  });
-  await phone.getByRole("tab", { name: "Roll", exact: true }).click();
-  await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
-    "data-loaded",
-    "true",
-  );
-  await phone.getByRole("button", { name: "blue dice", exact: true }).click();
-  await phone
-    .getByRole("button", { name: "Translucent dice", exact: true })
-    .click();
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-dice-color",
-    "blue",
-  );
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-dice-finish",
-    "translucent",
-  );
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-player-labels",
-    "2",
-  );
-  await phone.getByRole("button", { name: "Open settings" }).click();
-  await phone.locator("summary").click();
-  await phone.getByLabel("TV camera").selectOption("room");
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-camera",
-    "room",
-  );
-  await phone.getByRole("button", { name: "Close settings" }).click();
-  const diceBox = await phone.getByTestId("phone-dice").boundingBox();
-  await phone.mouse.move(
-    diceBox.x + diceBox.width * 0.5,
-    diceBox.y + diceBox.height * 0.85,
-  );
-  await phone.mouse.down();
-  await phone.mouse.move(
-    diceBox.x + diceBox.width * 0.65,
-    diceBox.y + diceBox.height * 0.25,
-    { steps: 12 },
-  );
-  await phone.mouse.up();
-  await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-cinematic",
-    "true",
-  );
-  await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
-  const throwId = await phone
-    .getByTestId("phone-dice")
-    .getAttribute("data-throw-id");
-  expect(throwId).toBeTruthy();
-  await expect(tv.locator(".table-canvas")).toHaveAttribute(
-    "data-throw-id",
-    throwId,
-  );
-  await expect
-    .poll(async () => {
-      const a = await tv.locator(".table-canvas").getAttribute("data-pose");
-      const b = await phone.getByTestId("phone-dice").getAttribute("data-pose");
-      return a && a === b;
-    })
-    .toBeTruthy();
-  await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);
-  await capture(phone, {
-    path: "artifacts/phone-dice-result.png",
-    fullPage: true,
-  });
-  await capture(tv, { path: "artifacts/tv-playing.png", fullPage: true });
-  // Reload must preserve identity and chips, rather than creating another seat.
-  await phone.reload();
-  await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
-  await phone.getByRole("button", { name: "Open settings" }).click();
-  await phone.locator("summary").click();
-  await phone.getByRole("button", { name: "Close table for everyone" }).click();
-  await phone
-    .getByRole("button", { name: "Close for everyone", exact: true })
-    .click();
-  await bob.getByText("YOUR NIGHT, RECAPPED").waitFor();
-  const downloadP = phone.waitForEvent("download");
-  await phone.getByRole("button", { name: "Save your recap card" }).click();
-  const download = await downloadP;
-  await download.saveAs("artifacts/recap.png");
-  await capture(phone, { path: "artifacts/phone-recap.png", fullPage: true });
-  await capture(tv, { path: "artifacts/tv-recaps.png", fullPage: true });
-  assert.deepEqual(errors, []);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      code: cfg.code,
-      errors,
-      screenshots: "artifacts/",
-      download: download.suggestedFilename(),
-    }),
-  );
+    await tv.goto("http://127.0.0.1:4321");
+    const scene = tv.getByTestId("casino-scene");
+    await expect(scene).toHaveAttribute("data-room-code", /^[A-Z2-9]{6}$/);
+    await expect(tv.locator("header, footer")).toHaveCount(0);
+    await expect(tv.locator(".table-canvas canvas")).toHaveCount(1);
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-environment",
+      "casino-room.exr",
+      { timeout: 30000 },
+    );
+    await tv.waitForTimeout(2300);
+    await tv.locator("canvas").click({
+      position: { x: 48, y: 48 },
+    });
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-settings-open",
+      "true",
+    );
+    await tv.locator("canvas").click({ position: { x: 130, y: 210 } });
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-camera",
+      "table",
+    );
+    await capture(tv, { path: "artifacts/tv-lobby.png", fullPage: true });
+    const cfg = await (
+      await tv.request.get("http://127.0.0.1:4321/api/config")
+    ).json();
+    // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
+    const popup = tv.waitForEvent("popup");
+    await tv.locator("canvas").click({
+      position: { x: 130, y: 305 },
+    });
+    const controllerPopup = await popup;
+    await controllerPopup.waitForURL(/\/join\?code=/);
+    const controllerURL = controllerPopup.url();
+    await controllerPopup.close();
+    await tv.locator("canvas").click({ position: { x: 48, y: 48 } });
+    const phone = await controllers.newPage({
+      viewport: { width: 390, height: 844 },
+    });
+    await phone.context().routeWebSocket("**/socket", interceptWagers);
+    await phone.goto(controllerURL);
+    await phone.bringToFront();
+    phone.on("pageerror", (e) => errors.push(e.message));
+    await phone.getByRole("heading", { name: "Join table" }).waitFor();
+    await phone.getByLabel("Your name").fill("Tyler");
+    await phone.getByRole("button", { name: "Join", exact: true }).click();
+    await phone.getByText("Table setup").waitFor();
+    await expect(
+      phone.locator('.setup input[type="checkbox"]'),
+    ).not.toBeChecked();
+    await capture(phone, { path: "artifacts/phone-setup.png", fullPage: true });
+    const bob = await controllers.newPage({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+    });
+    bob.on("pageerror", (e) => errors.push(e.message));
+    await bob.goto(`http://127.0.0.1:4321/?join=${cfg.code}`);
+    await expect(bob).toHaveURL(`http://127.0.0.1:4321/join?code=${cfg.code}`);
+    await bob.getByRole("heading", { name: "Join table" }).waitFor();
+    await bob.getByLabel("Your name").fill("Jordan");
+    await bob.getByRole("button", { name: "Join", exact: true }).click();
+    await bob.getByText("Your chips are waiting.").waitFor();
+    await phone.bringToFront();
+    await phone.getByRole("button", { name: "Open the table" }).click();
+    await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
+    await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
+    await phone.locator('[data-bet-id="pass"]').click();
+    await phone.getByRole("button", { name: /Place \$5/ }).click();
+    await expect(phone.locator(".pg-notice")).toContainText("That bet changed");
+    await expect(
+      phone.getByRole("button", { name: /Bundle of \$5/ }),
+    ).toBeVisible();
+    await phone.getByRole("button", { name: /Place \$5/ }).click();
+    await expect(phone.locator(".pg-wallet")).toContainText("$5");
+    await phone
+      .getByRole("button", { name: "Add $5 chip", exact: true })
+      .click();
+    await phone
+      .getByRole("button", { name: "Add $1 chip", exact: true })
+      .click();
+    const bundle = await phone
+      .getByRole("button", { name: /Bundle of \$6/ })
+      .boundingBox();
+    const field = await phone.locator('[data-bet-id="field"]').boundingBox();
+    await phone.mouse.move(
+      bundle.x + bundle.width / 2,
+      bundle.y + bundle.height / 2,
+    );
+    await phone.mouse.down();
+    await phone.mouse.move(
+      field.x + field.width / 2,
+      field.y + field.height / 2,
+      { steps: 10 },
+    );
+    await phone.mouse.up();
+    await expect(phone.locator(".pg-wallet")).toContainText("$11");
+    await expect
+      .poll(async () =>
+        Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
+      )
+      .toBeGreaterThan(0);
+    await bob.bringToFront();
+    await bob.locator('[data-bet-id="field"]').click();
+    await bob.getByRole("button", { name: /Place \$5/ }).click();
+    await phone.bringToFront();
+    await capture(phone, {
+      path: "artifacts/phone-playing.png",
+      fullPage: true,
+    });
+    const bankBefore = await phone.locator(".pg-wallet dd").allTextContents();
+    await phone.getByRole("tab", { name: "Learn", exact: true }).click();
+    await phone
+      .getByRole("button", { name: "Add $5 chip", exact: true })
+      .click();
+    await phone
+      .getByRole("button", { name: "Add $5 chip", exact: true })
+      .click();
+    await phone.locator('[data-bet-id="practice-pass"]').click();
+    await phone.getByRole("button", { name: /Place \$10/ }).click();
+    await phone.getByRole("button", { name: "Throw practice dice" }).click();
+    await expect(phone.locator(".pg-practice-result")).toBeVisible();
+    expect(await phone.locator(".pg-wallet dd").allTextContents()).toEqual(
+      bankBefore,
+    );
+    await capture(phone, {
+      path: "artifacts/phone-tutorial.png",
+      fullPage: true,
+    });
+    await phone.getByRole("tab", { name: "Roll", exact: true }).click();
+    await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
+      "data-loaded",
+      "true",
+    );
+    await phone.getByRole("button", { name: "blue dice", exact: true }).click();
+    await phone
+      .getByRole("button", { name: "Translucent dice", exact: true })
+      .click();
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-dice-color",
+      "blue",
+    );
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-dice-finish",
+      "translucent",
+    );
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-player-labels",
+      "2",
+    );
+    await phone.getByRole("button", { name: "Open settings" }).click();
+    await phone.locator("summary").click();
+    await phone.getByLabel("TV camera").selectOption("room");
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-camera",
+      "room",
+    );
+    await phone.getByRole("button", { name: "Close settings" }).click();
+    const diceBox = await phone.getByTestId("phone-dice").boundingBox();
+    await phone.mouse.move(
+      diceBox.x + diceBox.width * 0.5,
+      diceBox.y + diceBox.height * 0.85,
+    );
+    await phone.mouse.down();
+    await phone.mouse.move(
+      diceBox.x + diceBox.width * 0.65,
+      diceBox.y + diceBox.height * 0.25,
+      { steps: 12 },
+    );
+    await phone.mouse.up();
+    await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-cinematic",
+      "true",
+    );
+    await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
+    const throwId = await phone
+      .getByTestId("phone-dice")
+      .getAttribute("data-throw-id");
+    expect(throwId).toBeTruthy();
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-throw-id",
+      throwId,
+    );
+    await expect
+      .poll(async () => {
+        const a = await tv.locator(".table-canvas").getAttribute("data-pose");
+        const b = await phone
+          .getByTestId("phone-dice")
+          .getAttribute("data-pose");
+        return a && a === b;
+      })
+      .toBeTruthy();
+    await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);
+    await capture(phone, {
+      path: "artifacts/phone-dice-result.png",
+      fullPage: true,
+    });
+    await capture(tv, { path: "artifacts/tv-playing.png", fullPage: true });
+    // Reload must preserve identity and chips, rather than creating another seat.
+    await phone.reload();
+    await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
+    await phone.getByRole("button", { name: "Open settings" }).click();
+    await phone.locator("summary").click();
+    await phone
+      .getByRole("button", { name: "Close table for everyone" })
+      .click();
+    await phone
+      .getByRole("button", { name: "Close for everyone", exact: true })
+      .click();
+    await bob.getByText("YOUR NIGHT, RECAPPED").waitFor();
+    const downloadP = phone.waitForEvent("download");
+    await phone.getByRole("button", { name: "Save your recap card" }).click();
+    const download = await downloadP;
+    await download.saveAs("artifacts/recap.png");
+    await capture(phone, { path: "artifacts/phone-recap.png", fullPage: true });
+    await capture(tv, { path: "artifacts/tv-recaps.png", fullPage: true });
+    assert.deepEqual(errors, []);
+    console.log(
+      JSON.stringify({
+        ok: true,
+        code: cfg.code,
+        errors,
+        screenshots: "artifacts/",
+        download: download.suggestedFilename(),
+      }),
+    );
+  } finally {
+    await controllers.close();
+  }
 });

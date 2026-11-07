@@ -47,3 +47,13 @@ blender --background --python scripts/build-chips.py
 Built and previewed with Blender 4.5 LTS. All geometry, map generation, and textures were authored for crapsTV and follow the repository's asset license. No image generation, stock assets, or external references were used for this model.
 
 Validation: the final Cycles preview was visually inspected; front-cap smoothing was corrected so the engraved cuts remain planar. The GLB structure confirms one mesh, four primitives, embedded PNG material textures, and Y-up bounds of ±0.5 across X/Z and ±0.065 across Y. The three height-map files have distinct hashes and preserve the same UV atlas dimensions.
+
+## Phone tray thumbnails
+
+The five `chip-100.png` through `chip-50000.png` files are transparent, pre-rendered views of this same GLB. They avoid allocating an extra WebGL context on each phone just to draw the 2D tray. Rebuild them after changing the chip model with:
+
+```sh
+node scripts/render-chip-thumbnails.mjs
+```
+
+The generator uses the shared runtime chip material factory and a temporary local Vite server. It requires the development dependencies and Playwright Chromium.

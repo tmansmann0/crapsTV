@@ -59,7 +59,7 @@ export const SEATS = [
 ];
 const hash = (s) =>
   [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
-export function createTablePieces(scene, renderer) {
+export function createTablePieces(scene, renderer, { software = false } = {}) {
   let alive = true,
     chipFactory = null,
     dealerRoot = null,
@@ -228,6 +228,7 @@ export function createTablePieces(scene, renderer) {
               appearance,
               diceNormals[variant],
               diceRoughness,
+              software,
             );
             materials.add(m);
             diceMaterialCache.set(key, m);

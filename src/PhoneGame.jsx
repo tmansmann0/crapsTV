@@ -1,3 +1,4 @@
+import { assetURL } from "./asset-url.js";
 import {
   createContext,
   useCallback,
@@ -69,21 +70,13 @@ function chipsForAmount(amount) {
 }
 
 function useChipThumbnails() {
-  const [images, setImages] = useState(null);
-  useEffect(() => {
-    let live = true;
-    // Three.js stays out of the first paint; piles show CSS chips until this lands.
-    import("./chip-rendering.js")
-      .then(({ renderChipThumbnails }) =>
-        renderChipThumbnails(THUMBNAILS, { size: 160 }),
-      )
-      .then((result) => live && setImages(result))
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
-  return images;
+  return useMemo(
+    () =>
+      Object.fromEntries(
+        THUMBNAILS.map((value) => [value, assetURL(`chip-${value}.png`)]),
+      ),
+    [],
+  );
 }
 
 function Chip({ value, label }) {
