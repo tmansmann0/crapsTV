@@ -73,6 +73,8 @@ crossing bracket and reports its measured terminal frame overshoot separately,
 instead of assuming a fixed frame-interval tolerance. Every active sample must
 agree with actual RAF time minus accounted waits. A slow frame does not permit
 early completion, an unaccounted clock jump, or a missing calibration probe.
+Set `STARTUP_SPARSE_RAF=1` for deliberate short/long frame stalls in the browser
+proof. This reproduces late recovery gaps without changing product timing.
 
 Live Retest keeps the current quality during aiming, throws and payout
 animations. It advances one probe at a time after a safe hold and sufficient

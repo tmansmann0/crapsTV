@@ -165,53 +165,66 @@ try {
     )
       glErrors.push(message.text());
   });
-  await page.addInitScript(() => {
-    window.startupSamples = [];
-    const requestFrame = window.requestAnimationFrame.bind(window);
-    let lastSample;
-    // Read immediately after the app's RAF callback and retain the SAME RAF
-    // timestamp it received. A separate timer can read a previous frame's DOM
-    // after a slow software draw, producing a false shortened-opening result.
-    window.requestAnimationFrame = (callback) =>
-      requestFrame((at) => {
-        callback(at);
-        const d = document.querySelector(".table-canvas")?.dataset;
-        if (!d?.startupPhase) return;
-        const key = [d.startupPhase, d.startupElapsed, d.graphicsIntro].join(
-          ":",
-        );
-        if (key === lastSample) return;
-        lastSample = key;
-        window.startupSamples.push({
-          at,
-          observedAt: performance.now(),
-          phase: d.startupPhase,
-          elapsed: Number(d.startupElapsed),
-          fade: Number(d.startupFade),
-          ui: Number(d.startupUiOpacity),
-          ready: d.sceneReady,
-          demo: d.demoActive,
-          intro: d.graphicsIntro,
-          throwId: d.throwId,
-          transfers: JSON.parse(d.activeTransfers || "[]"),
-          probe: Number(d.startupProbe),
-          fps: Number(d.graphicsFps),
-          textureLimit: Number(d.graphicsTextures),
-          modelDetail: d.graphicsModel,
-          sceneResolution: d.sceneResolution,
-          hold: d.startupCalibrationHold,
-          rolling: d.startupRolling,
-          diceDone: d.startupDiceDone,
-          dicePose: JSON.parse(d.startupDicePose || "[]"),
-          effectiveFps: Number(d.startupEffectiveFps),
-          uploadPausedMs: Number(d.startupUploadPausedMs || 0),
-          qualityChanges: JSON.parse(d.startupQualityChanges || "[]"),
-          cameraPosition: JSON.parse(d.cameraPosition || "[]"),
-          cameraTarget: JSON.parse(d.cameraTarget || "[]"),
-          cameraFov: Number(d.cameraFov),
+  await page.addInitScript(
+    ({ sparse }) => {
+      window.startupSamples = [];
+      const requestFrame = window.requestAnimationFrame.bind(window);
+      let lastSample;
+      let sparseFrame = 0;
+      // Read immediately after the app's RAF callback and retain the SAME RAF
+      // timestamp it received. A separate timer can read a previous frame's DOM
+      // after a slow software draw, producing a false shortened-opening result.
+      window.requestAnimationFrame = (callback) =>
+        requestFrame((at) => {
+          callback(at);
+          const d = document.querySelector(".table-canvas")?.dataset;
+          if (!d?.startupPhase) return;
+          const key = [d.startupPhase, d.startupElapsed, d.graphicsIntro].join(
+            ":",
+          );
+          if (key === lastSample) return;
+          lastSample = key;
+          window.startupSamples.push({
+            at,
+            observedAt: performance.now(),
+            phase: d.startupPhase,
+            elapsed: Number(d.startupElapsed),
+            fade: Number(d.startupFade),
+            ui: Number(d.startupUiOpacity),
+            ready: d.sceneReady,
+            demo: d.demoActive,
+            intro: d.graphicsIntro,
+            throwId: d.throwId,
+            transfers: JSON.parse(d.activeTransfers || "[]"),
+            probe: Number(d.startupProbe),
+            fps: Number(d.graphicsFps),
+            textureLimit: Number(d.graphicsTextures),
+            modelDetail: d.graphicsModel,
+            sceneResolution: d.sceneResolution,
+            hold: d.startupCalibrationHold,
+            rolling: d.startupRolling,
+            diceDone: d.startupDiceDone,
+            dicePose: JSON.parse(d.startupDicePose || "[]"),
+            effectiveFps: Number(d.startupEffectiveFps),
+            uploadPausedMs: Number(d.startupUploadPausedMs || 0),
+            qualityChanges: JSON.parse(d.startupQualityChanges || "[]"),
+            cameraPosition: JSON.parse(d.cameraPosition || "[]"),
+            cameraTarget: JSON.parse(d.cameraTarget || "[]"),
+            cameraFov: Number(d.cameraFov),
+          });
+          // Reproduce a fast frame followed by long software-render/scheduler
+          // stalls. Keep native RAF handles/cancellation and real wall time.
+          if (sparse && d.demoActive === "true") {
+            const delay = [0, 33, 1800, 900][sparseFrame++ % 4];
+            const until = performance.now() + delay;
+            while (performance.now() < until) {
+              /* deliberate test-only stall */
+            }
+          }
         });
-      });
-  });
+    },
+    { sparse: process.env.STARTUP_SPARSE_RAF === "1" },
+  );
   let sawAsset;
   const assetHeld = new Promise((resolve) => {
     releaseAsset = resolve;

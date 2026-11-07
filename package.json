@@ -1,6 +1,6 @@
 {
   "name": "crapstv",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "private": true,
   "type": "module",
   "description": "A living-room craps table. TV is the table. Phones are the chips.",

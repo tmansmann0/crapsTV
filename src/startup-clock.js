@@ -10,9 +10,19 @@ export function createStartupClock(holds) {
     startAt,
     switchAt,
   }));
-  let entered = null;
+  let entered = null,
+    recovery = null;
   return {
     advance({ elapsed, now, completedProbe }) {
+      if (recovery && completedProbe >= recovery.probe) {
+        // A quick first post-upload RAF must not release the result: a later
+        // RAF can still stall past the entire static window. Present at least
+        // one recovery frame 150ms after the switch before releasing it on
+        // the following frame. Only discarded content time becomes a pause.
+        const adjusted = Math.min(elapsed, recovery.switchAt + 150);
+        if (now - recovery.at >= 150) recovery = null;
+        return { elapsed: adjusted, pausedMs: Math.max(0, elapsed - adjusted) };
+      }
       const next = checkpoints.find(({ probe }) => probe > completedProbe);
       if (!next || elapsed < next.startAt) return { elapsed, pausedMs: 0 };
       if (entered?.probe !== next.probe) {
@@ -30,6 +40,8 @@ export function createStartupClock(holds) {
         next.startAt + Math.max(0, now - entered.at),
       );
       const adjusted = Math.min(elapsed, limit);
+      if (adjusted >= next.switchAt && !recovery)
+        recovery = { probe: next.probe, switchAt: next.switchAt, at: now };
       return { elapsed: adjusted, pausedMs: Math.max(0, elapsed - adjusted) };
     },
   };

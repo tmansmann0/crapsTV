@@ -105,3 +105,47 @@ test("independent openings have fresh checkpoints and ordinary frames keep their
     "after all checkpoints the existing duration/completion clock applies",
   );
 });
+
+test("a late second RAF cannot skip the post-switch static recovery frame", () => {
+  for (const hold of holds) {
+    const clock = createStartupClock([hold]),
+      completedProbe = hold.probe - 1;
+    clock.advance({ elapsed: hold.startAt, now: hold.startAt, completedProbe });
+    assert.equal(
+      clock.advance({
+        elapsed: hold.switchAt,
+        now: hold.switchAt,
+        completedProbe,
+      }).elapsed,
+      hold.switchAt,
+    );
+    const quick = clock.advance({
+      elapsed: hold.switchAt + 33,
+      now: hold.switchAt + 33,
+      completedProbe: hold.probe,
+    });
+    assert.deepEqual(quick, { elapsed: hold.switchAt + 33, pausedMs: 0 });
+    const stalled = clock.advance({
+      elapsed: hold.switchAt + 2033,
+      now: hold.switchAt + 2033,
+      completedProbe: hold.probe,
+    });
+    assert.deepEqual(
+      stalled,
+      {
+        elapsed: hold.switchAt + 150,
+        pausedMs: 1883,
+      },
+      "first frame beyond150ms stays on the same static camera/result",
+    );
+    assert.deepEqual(
+      clock.advance({
+        elapsed: hold.switchAt + 183,
+        now: hold.switchAt + 2066,
+        completedProbe: hold.probe,
+      }),
+      { elapsed: hold.switchAt + 183, pausedMs: 0 },
+      "the following frame resumes content with the stall exactly accounted",
+    );
+  }
+});
