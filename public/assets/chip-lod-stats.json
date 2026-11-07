@@ -1,0 +1,19 @@
+{
+  "beforeTriangles": 10098,
+  "afterTriangles": 1984,
+  "reductionPercent": 80.35254505842741,
+  "materials": [
+    "ChipBase",
+    "ChipInlay",
+    "ChipEngraving",
+    "ChipMetal"
+  ],
+  "diameter": 1,
+  "height": 0.13,
+  "atlas": "same front/back/edge atlas as chip.glb",
+  "sourceHashes": {
+    "public/assets/chip.glb": "04c4a96926e074d3f1e3596ae6c53dc9842d76a5f70302464dd82728bb1b7dee",
+    "assets/source/chip.blend": "04903dd2e718f3aacabf43bdb9e27aec0e535c95b0376a9dd81e461e61c51f96"
+  },
+  "file": "chip-lod.glb"
+}
