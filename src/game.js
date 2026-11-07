@@ -451,15 +451,21 @@ export function setDiceAppearance(s, id, appearance) {
     appearance && typeof appearance === "object" && !Array.isArray(appearance),
     "Invalid dice appearance.",
   );
+  // Merge independent choices against the authoritative state. A second tap
+  // can arrive before the phone receives the first choice's state broadcast.
+  const color =
+    appearance.color === undefined ? p.dice.color : appearance.color;
+  const finish =
+    appearance.finish === undefined ? p.dice.finish : appearance.finish;
   assert(
-    ["red", "green", "blue"].includes(appearance.color),
+    ["red", "green", "blue"].includes(color),
     "Choose red, green or blue dice.",
   );
   assert(
-    ["solid", "translucent"].includes(appearance.finish),
+    ["solid", "translucent"].includes(finish),
     "Choose solid or translucent dice.",
   );
-  p.dice = { color: appearance.color, finish: appearance.finish };
+  p.dice = { color, finish };
 }
 export function setDisplaySettings(s, id, options) {
   admin(s, id);

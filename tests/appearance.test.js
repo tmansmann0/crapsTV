@@ -28,6 +28,18 @@ test("only the current shooter may change validated dice, and never during a rol
   game.setDiceAppearance(s, b.id, { color: "green", finish: "solid" });
   assert.equal(b.dice.color, "green");
 });
+test("quick color and finish choices preserve each other before a state echo", () => {
+  const s = game.createState(),
+    a = game.join(s, "A");
+  game.start(s, a.id);
+  game.setDiceAppearance(s, a.id, { color: "blue" });
+  game.setDiceAppearance(s, a.id, { finish: "translucent" });
+  assert.deepEqual(a.dice, { color: "blue", finish: "translucent" });
+  game.setDiceAppearance(s, a.id, { finish: "solid" });
+  game.setDiceAppearance(s, a.id, { color: "green" });
+  assert.deepEqual(a.dice, { color: "green", finish: "solid" });
+  assert.throws(() => game.setDiceAppearance(s, a.id, { color: null }));
+});
 test("TV settings are admin-only and validate camera/sound values", () => {
   const s = game.createState(),
     a = game.join(s, "A"),

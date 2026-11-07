@@ -572,6 +572,29 @@ function Phone({
     isShooter = state.shooterId === player.id,
     disabled = state.rolling || !connected;
   const canReup = equity(player) < state.config.minBet && !player.bets.length;
+  const diceChoice = useRef(player.dice || { color: "red", finish: "solid" });
+  const pendingDice = useRef(null);
+  useEffect(() => {
+    const incoming = player.dice || { color: "red", finish: "solid" };
+    const pending = pendingDice.current;
+    if (
+      !pending ||
+      disabled ||
+      !isShooter ||
+      (incoming.color === pending.color && incoming.finish === pending.finish)
+    ) {
+      diceChoice.current = incoming;
+      pendingDice.current = null;
+    }
+  }, [player.dice, disabled, isShooter]);
+  function chooseDice(patch) {
+    // Preserve taps immediately, even before the server echoes the first choice.
+    // Send both fields to remain compatible with already-running local rooms.
+    const appearance = { ...diceChoice.current, ...patch };
+    diceChoice.current = appearance;
+    pendingDice.current = appearance;
+    send({ type: "dice", appearance });
+  }
   return (
     <main className="phone-page">
       <div className="phone-head">
@@ -828,15 +851,7 @@ function Phone({
                     aria-pressed={(player.dice?.color || "red") === color}
                     disabled={disabled}
                     className={`dice-color ${color}`}
-                    onClick={() =>
-                      send({
-                        type: "dice",
-                        appearance: {
-                          color,
-                          finish: player.dice?.finish || "solid",
-                        },
-                      })
-                    }
+                    onClick={() => chooseDice({ color })}
                   >
                     {color}
                   </button>
@@ -848,15 +863,7 @@ function Phone({
                     key={finish}
                     aria-pressed={(player.dice?.finish || "solid") === finish}
                     disabled={disabled}
-                    onClick={() =>
-                      send({
-                        type: "dice",
-                        appearance: {
-                          color: player.dice?.color || "red",
-                          finish,
-                        },
-                      })
-                    }
+                    onClick={() => chooseDice({ finish })}
                   >
                     {finish}
                   </button>

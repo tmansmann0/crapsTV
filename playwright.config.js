@@ -2,7 +2,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests/e2e",
   // CI renders the real 3D scene with software WebGL. Allow for shared-runner latency.
-  timeout: 120000,
+  timeout: 180000,
+  expect: { timeout: process.env.CI ? 20000 : 5000 },
   fullyParallel: false,
   // A retry would inherit this session's in-memory table; fail the original case instead.
   retries: 0,

@@ -11,7 +11,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
 }) => {
   await mkdir("artifacts", { recursive: true });
   const errors = [];
-  const tv = await browser.newPage({ viewport: { width: 1440, height: 1040 } });
+  const tv = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   tv.on("pageerror", (e) => errors.push(e.message));
   await tv.goto("http://127.0.0.1:4321");
   const scene = tv.getByTestId("casino-scene");
@@ -24,7 +24,6 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     { timeout: 30000 },
   );
   await tv.waitForTimeout(2300);
-  const viewport = tv.viewportSize();
   await tv.locator("canvas").click({
     position: { x: 48, y: 48 },
   });
