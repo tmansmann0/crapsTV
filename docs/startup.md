@@ -83,6 +83,10 @@ never delays a player's next roll or changes the ledger. A cold update extends
 only its camera recovery hold for at least 700 ms after work completes; a new
 aim or throw immediately returns camera ownership to current gameplay. Run
 `npm run test:startup-retest` for an isolated real-authority airborne test.
+The camera cannot leave recovery before an actual world draw at least 150 ms
+after the switch; a throttled RAF callback alone does not count. Its browser
+proof requires distinct real dice poses spanning airborne time, rather than a
+minimum rendering FPS, and verifies unchanged camera/dice across the hold.
 
 The [recorded hold proof](benchmarks/startup-quality-holds.json) checks actual
 framebuffer/texture/FPS changes against camera position, target, FOV and dice

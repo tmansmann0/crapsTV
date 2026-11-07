@@ -33,6 +33,10 @@ import {
 } from "./startup-sequence.js";
 import { createStartupClock } from "./startup-clock.js";
 import {
+  retainLiveCalibrationCamera,
+  markLiveCalibrationPresented,
+} from "./live-calibration-camera.js";
+import {
   startupCandidates,
   selectStartupProfile,
   STARTUP_PROBE_AT,
@@ -789,12 +793,11 @@ export default function Table3D(props) {
               const throwId = liveState?.throw?.id || null;
               if (
                 liveCalibrationHold &&
-                (((!liveCalibrationHold.recoveryUntil ||
-                  time >= liveCalibrationHold.recoveryUntil) &&
-                  !calibrationCanHold(liveState, liveNow, 0)) ||
-                  liveState?.rolling ||
-                  liveState?.aim?.active ||
-                  liveCalibrationHold.throwId !== throwId)
+                !retainLiveCalibrationCamera(liveCalibrationHold, {
+                  now: time,
+                  roomNow: liveNow,
+                  state: liveState,
+                })
               )
                 liveCalibrationHold = null;
               if (
@@ -829,8 +832,6 @@ export default function Table3D(props) {
                   });
                 }
               }
-              if (liveCalibrationHold && time >= liveCalibrationHold.endAt)
-                liveCalibrationHold = null;
               hold = liveCalibrationHold;
             } else
               hold = sampleStartup(introShowcase, elapsed, {
@@ -841,6 +842,10 @@ export default function Table3D(props) {
             const probe =
               hold && holdNow >= hold.switchAt ? hold.probe : introCandidate;
             if (probe !== introCandidate) {
+              if (introLiveProbe && hold) {
+                hold.switchedAt = time;
+                hold.recoveryPresented = false;
+              }
               introCandidate = probe;
               introPreviousFrame = null;
               probeWarmUntil = time + 900;
@@ -1349,6 +1354,8 @@ export default function Table3D(props) {
           el.dataset.boardInkSamples = String(boardArtwork.metrics.samples);
         }
         compositor.render(stageReady ? scene : null, camera);
+        if (stageReady && introLiveProbe)
+          markLiveCalibrationPresented(liveCalibrationHold, time);
         renderer.clearDepth();
         if (stageReady) {
           // Seat, wager, and transfer labels stay native-resolution even when

@@ -20,7 +20,7 @@ const server = spawn(process.execPath, ["server/index.js"], {
   },
   stdio: "ignore",
 });
-let browser, ws, state;
+let browser, ws, state, page;
 const errors = [];
 const send = (message) => ws.send(JSON.stringify(message));
 async function waitState(predicate) {
@@ -67,7 +67,7 @@ try {
       "--ignore-gpu-blocklist",
     ],
   });
-  const page = await browser.newPage({
+  page = await browser.newPage({
     viewport: process.env.CI
       ? { width: 800, height: 500 }
       : { width: 1280, height: 800 },
@@ -138,21 +138,44 @@ try {
       { timeout: 15000 },
     )
     .toBeGreaterThan(0);
-  await pause(250);
+  await page.waitForFunction(
+    () => {
+      const first = window.retestFrames.find((f) => f.changes.length === 1);
+      return first && window.retestFrames.some((f) => f.at >= first.at + 150);
+    },
+    null,
+    { timeout: 15000 },
+  );
   const frames = await page.evaluate(() => window.retestFrames);
   const airborne = frames.filter(
-    (f) => f.intro === "true" && f.rolling === "true",
+    (f) => f.intro === "true" && f.rolling === "true" && f.dice.length === 2,
   );
-  assert(airborne.length > 4);
+  assert(
+    airborne.length >= 2,
+    "actual flight is observed on multiple rendered frames",
+  );
+  const airborneSpanMs = airborne.at(-1).at - airborne[0].at;
+  const airbornePoses = new Set(airborne.map((f) => JSON.stringify(f.dice)))
+    .size;
+  assert(airborneSpanMs >= 450, "observations span actual airborne time");
+  assert(
+    airbornePoses >= 2,
+    "the real dice move between the flight observations",
+  );
   assert(airborne.every((f) => f.probe === -1 && f.changes.length === 0));
   const changed = frames.find((f) => f.changes.length === 1);
   assert.equal(changed.probe, 0, "live candidates advance sequentially");
   assert.equal(changed.rolling, "false");
   assert.equal(changed.done, "true");
   assert.equal(changed.hold, "true");
-  const before = frames
-    .filter((f) => f.at >= changed.at - 250 && f.at < changed.at)
-    .at(0);
+  const before = frames.find(
+    (f) =>
+      f.hold === "true" &&
+      f.rolling === "false" &&
+      f.done === "true" &&
+      f.changes.length === 0 &&
+      f.at <= changed.at - 300,
+  );
   const after = frames.find((f) => f.at >= changed.at + 150);
   assert(before && after);
   for (const key of ["dice", "camera", "target", "fov"]) {
@@ -171,6 +194,8 @@ try {
         ok: true,
         port,
         airborneFrames: airborne.length,
+        airborneSpanMs,
+        airbornePoses,
         changed,
         before,
         after,
@@ -183,6 +208,21 @@ try {
   console.log(
     "Retest proof passed: aim and real physics flight defer allocations; camera and dice rest 300ms before the sequential first probe.",
   );
+} catch (error) {
+  await mkdir("artifacts", { recursive: true });
+  await writeFile(
+    "artifacts/startup-retest-failure.json",
+    JSON.stringify(
+      {
+        message: error.stack || error.message,
+        frames: await page?.evaluate(() => window.retestFrames).catch(() => []),
+        errors,
+      },
+      null,
+      2,
+    ),
+  );
+  throw error;
 } finally {
   ws?.terminate();
   await browser?.close();
