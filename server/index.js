@@ -16,7 +16,16 @@ const code = Array.from(
   (b) => alphabet[b % alphabet.length],
 ).join("");
 const hub = new RoomHub(code);
-app.get("/api/config", (_req, res) => res.json({ local: true, code }));
+app.get("/api/config", (_req, res) => {
+  const address = Object.values(networkInterfaces())
+    .flat()
+    .find((info) => info && info.family === "IPv4" && !info.internal)?.address;
+  res.json({
+    local: true,
+    code,
+    joinOrigin: address ? `http://${address}:${port}` : null,
+  });
+});
 if (process.argv.includes("--dev")) {
   const { createServer } = await import("vite");
   const vite = await createServer({
@@ -77,7 +86,9 @@ server.listen(port, "0.0.0.0", () => {
   for (const infos of Object.values(networkInterfaces()))
     for (const info of infos || [])
       if (info.family === "IPv4" && !info.internal)
-        console.log(`  Phones: http://${info.address}:${port}/?join=${code}`);
+        console.log(
+          `  Phones: http://${info.address}:${port}/join?code=${code}`,
+        );
   console.log(
     "\n  Keep this process running during your session. Ctrl+C to close.\n",
   );

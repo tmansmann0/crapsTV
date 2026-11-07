@@ -10,3 +10,5 @@ playwright-report/
 
 artifacts/
 .venv*/
+
+*.blend1

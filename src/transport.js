@@ -8,7 +8,7 @@ export const newCode = () =>
   ).join("");
 export async function detectLocal() {
   try {
-    const r = await fetch("./api/config", {
+    const r = await fetch(new URL("api/config", document.baseURI), {
       signal: AbortSignal.timeout(5000),
     });
     if (!r.ok) return null;

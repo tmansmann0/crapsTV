@@ -1,6 +1,6 @@
 # crapsTV ✦
 
-**Your TV is the table. Your phone holds the chips.**
+**Full-screen 3D craps with phone controllers.**
 
 A personal, open-source living-room casino for 1–12 players. Built with React, Three.js, an original Blender table and dice, and a shared authoritative craps engine. Play with pretend chips on macOS, Windows, and Linux.
 
@@ -20,7 +20,7 @@ npm run build
 npm start
 ```
 
-Open `http://localhost:3000` on the TV computer. The terminal also prints a **LAN address**, such as `http://192.168.1.50:3000`. Open that address on the TV to show a scannable QR code; phones must be on the same Wi-Fi. Guest Wi-Fi or client isolation may prevent phones reaching the computer. Allow Node through the OS firewall if asked.
+Open `http://localhost:3000` on the TV computer. The root page is the full-screen 3D table; join code, QR, controls, and player balances are drawn inside the canvas. The terminal also prints a **LAN address**, such as `http://192.168.1.50:3000`. Open that address on the TV to show a scannable QR code; phones must be on the same Wi-Fi. Guest Wi-Fi or client isolation may prevent phones reaching the computer. Allow Node through the OS firewall if asked.
 
 These commands are the same in macOS/Linux terminals, Windows PowerShell, and Windows Terminal. No Blender, Python, model downloads, account, or cloud service is needed at runtime. Fonts, models, artwork, and audio are bundled. After installation, local sessions work offline.
 
@@ -28,9 +28,9 @@ These commands are the same in macOS/Linux terminals, Windows PowerShell, and Wi
 
 ## Play online with GitHub Pages
 
-1. Open the [online game](https://tmansmann0.github.io/crapsTV/) on your TV/laptop and choose **Host an online table**.
-2. Keep that tab open. Friends scan its QR or open the site, enter their name and six-character room code, and join.
-3. The **first player to join** becomes the game admin. The TV itself is a spectator until someone selects **Join here**.
+1. Open the [online game](https://tmansmann0.github.io/crapsTV/) on your TV/laptop. It opens the 3D scene and automatically hosts an online room.
+2. Keep that tab open. Friends scan its QR or open [/join](https://tmansmann0.github.io/crapsTV/join), enter their name and six-character room code, and join.
+3. The **first player to join** becomes the game admin. The TV itself is a spectator until someone opens **Controller** in a separate tab.
 
 GitHub Pages serves the static app. PeerJS’s free public signaling service introduces the browsers; game messages then travel over WebRTC. The host browser owns the session. **Some corporate networks, symmetric NATs, or restrictive firewalls require a TURN relay; this free build does not bundle a paid relay.** If a connection cannot be made, use local play or another network. Closing/reloading the hosting tab ends the online room; it is not a persistent game server. Phone reloads can rejoin the same seat while the host remains open.
 
@@ -71,7 +71,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `server/index.js` | Local HTTP/WebSocket host with same-origin check and heartbeat |
 | `src/transport.js` | Local sockets or online PeerJS room transport |
 | `src/Table3D.jsx` | Blender models, equirectangular artwork, real HDR lighting, dice animation |
-| `public/assets/` | Original generated branding, vector boards, GLBs, HDR and previews |
+| `public/assets/` | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
 | `assets/source/` | Editable Blender sources |
 | `public/audio/` | 51 MP3 announcements with manifests, hashes, and license notice |
 | `scripts/` | Optional reproducible board/model/audio generation |
@@ -80,8 +80,16 @@ No money changes hands. This is a casual game for friends; a human hosting a pee
 
 ## Art and voice
 
-The table/dice were built and exported with Blender; the boards are original editable SVGs. The image-generated casino panorama is **LDR**; the separate procedural RGBE lighting file contains genuine HDR radiance. They are not interchangeable. [Model details](docs/models.md) · [Image prompts and provenance](docs/visual-assets.md).
+The table/dice were built and exported with Blender; the boards are original editable SVGs with an open area behind the pass line for odds. The active casino environment is a real Blender-rendered **scene-linear EXR**, used for both the background and PMREM lighting/reflections. The older image-generated LDR panorama is retained as a source asset and is not used for lighting. [Model details](docs/models.md) · [Image prompts and provenance](docs/visual-assets.md).
 
 The male voice is **Kokoro `am_michael`**. NeuTTS-2E was investigated but required gated model access, so it is not used. All 51 playable clips are bundled; see [audio.md](docs/audio.md) for the pinned model, license, and regeneration instructions.
 
 MIT licensed original code and assets; included third-party dependencies and font/model notices retain their respective licenses. This is an independent project, unaffiliated with Jackbox or Spotify.
+
+## Camera and TV controls
+
+The TV page has no outer navigation, sidebar, headings, or footer. Every visible label and control is a mesh rendered within its WebGL canvas. The clipped DOM controls exist only for keyboard/screen-reader access. The in-scene camera control cycles **auto → table → room**. Drag to orbit and scroll/pinch to zoom. Auto view makes a slow sweep, moves in for a roll, and pauses automatic movement after manual interaction. Reduced-motion settings disable the drift and dice tumble. Dice are 0.27 table units, versus the original 0.7.
+
+`/join?code=ABCDEF` is the dedicated phone route. The static build includes a GitHub Pages `404.html` entry and sets its base path before loading modules, so direct controller links and refreshes resolve under `/crapsTV/`. Legacy `?join=` invitations still enter the controller.
+
+[HDR environment details](docs/environment.md).

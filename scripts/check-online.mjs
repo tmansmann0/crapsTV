@@ -17,26 +17,29 @@ try {
   for (const p of [host, phone])
     p.on("pageerror", (e) => errors.push(e.message));
   await host.goto(url);
-  await host.getByRole("button", { name: "Host an online table" }).waitFor();
+  const scene = host.getByTestId("casino-scene");
+  await scene.waitFor();
+  await host.waitForFunction(
+    () =>
+      document.querySelector('[data-testid="casino-scene"]')?.dataset.roomCode
+        ?.length === 6,
+  );
+  await host.getByRole("status").filter({ hasText: "connected" }).waitFor();
+  const code = await scene.getAttribute("data-room-code");
   await host.waitForTimeout(1500);
   await host.screenshot({
     path: "artifacts/online-landing.png",
     fullPage: true,
   });
-  await host.getByRole("button", { name: "Host an online table" }).click();
-  await host
-    .getByText("Table connected", { exact: true })
-    .waitFor({ timeout: 30000 });
-  const code = await host.locator(".join-card h2").innerText();
   console.log("Online room opened:", code);
-  const joinURL = new URL(url);
-  joinURL.searchParams.set("join", code);
+  const joinURL = new URL("join", url);
+  joinURL.searchParams.set("code", code);
   await phone.goto(joinURL.href);
   await phone
-    .getByRole("heading", { name: "Take a seat." })
+    .getByRole("heading", { name: "Join table" })
     .waitFor({ timeout: 30000 });
   await phone.getByLabel("Your name").fill("Online Tester");
-  await phone.getByRole("button", { name: "I’m feeling lucky" }).click();
+  await phone.getByRole("button", { name: "Join", exact: true }).click();
   await phone.getByText("Set the night in motion.").waitFor();
   await phone.getByRole("button", { name: "Crapless craps" }).click();
   await phone.getByRole("button", { name: "Open the table" }).click();
@@ -58,7 +61,10 @@ try {
   await phone
     .getByRole("button", { name: "Close for everyone", exact: true })
     .click();
-  await host.getByRole("heading", { name: "What a night." }).waitFor();
+  await host
+    .getByRole("status")
+    .filter({ hasText: "Session closed" })
+    .waitFor();
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

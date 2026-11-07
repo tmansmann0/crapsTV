@@ -6,7 +6,7 @@
   "description": "A living-room craps table. TV is the table. Phones are the chips.",
   "scripts": {
     "dev": "node server/index.js --dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/finalize-build.mjs",
     "start": "node server/index.js",
     "test": "node --test tests/*.test.js",
     "check": "npm test && npm run build",

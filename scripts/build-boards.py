@@ -6,7 +6,7 @@ import svgwrite
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'public/assets'
 OUT.mkdir(parents=True, exist_ok=True)
-GOLD, IVORY, GREEN = '#ccab67', '#f9ecd0', '#075247'
+GOLD, IVORY, GREEN = '#b5a375', '#efe8d3', '#073a31'
 
 def make(mode):
     d = svgwrite.Drawing(str(OUT / f'board-{mode}.svg'), size=('2048px', '1024px'), viewBox='0 0 2048 1024')
@@ -14,16 +14,18 @@ def make(mode):
     d.add(d.rect((0,0),(2048,1024),fill=GREEN,rx=160))
     # A restrained woven pattern remains crisp at table-texture scale.
     pattern = d.pattern(id='weave', insert=(0,0), size=(12,12), patternUnits='userSpaceOnUse')
-    pattern.add(d.path(d='M0,0 L12,12 M-6,6 L6,18 M6,-6 L18,6', stroke='#a2d7bd', stroke_width=.45, opacity=.055))
+    pattern.add(d.path(d='M0,0 L12,12 M-6,6 L6,18 M6,-6 L18,6', stroke='#a2d7bd', stroke_width=.4, opacity=.035))
     d.defs.add(pattern)
     d.add(d.rect((0,0),(2048,1024),fill='url(#weave)',rx=160))
     def txt(value,x,y,size=28,fill=IVORY,weight=500,tracking=1):
-        d.add(d.text(value,insert=(x,y),text_anchor='middle',font_family='Arial, Helvetica, sans-serif',font_size=size,font_weight=weight,fill=fill,letter_spacing=tracking))
-    def box(x,y,w,h,r=12,stroke=GOLD,fill='none',sw=3):
-        d.add(d.rect((x,y),(w,h),rx=r,fill=fill,stroke=stroke,stroke_width=sw))
-    box(44,42,1960,940,140,sw=3)
-    box(60,58,1928,908,128,sw=1)
-    txt('crapsTV',1024,124,46,GOLD,800,-1)
+        # The lower 22% is deliberately reserved for odds chips. Typography is
+        # separately sized instead of vertically distorting a complete SVG.
+        family='Georgia, Times New Roman, serif' if size>=30 else 'Arial, Helvetica, sans-serif'
+        d.add(d.text(value,insert=(x,y*.82),text_anchor='middle',font_family=family,font_size=size*.86,font_weight=min(weight,600),fill=fill,letter_spacing=tracking*.82))
+    def box(x,y,w,h,r=10,stroke=GOLD,fill='none',sw=1.65):
+        d.add(d.rect((x,y*.82),(w,h*.82),rx=r,fill=fill,stroke=stroke,stroke_width=sw))
+    d.add(d.rect((36,30),(1976,964),rx=138,fill='none',stroke=GOLD,stroke_width=1.4,opacity=.65))
+    txt('crapsTV',1024,112,46,GOLD,600,-1)
     txt('CRAPLESS CRAPS' if mode=='crapless' else 'CLASSIC CRAPS',1024,164,16,IVORY,600,6)
     nums=[2,3,4,5,6,8,9,10,11,12] if mode=='crapless' else [4,5,6,8,9,10]
     ratios={2:'11:2',3:'11:4',4:'9:5',5:'7:5',6:'7:6',8:'7:6',9:'7:5',10:'9:5',11:'11:4',12:'11:2'}
@@ -67,7 +69,7 @@ def make(mode):
     for i,n in enumerate(fieldnums):
         x=center_x+center_w*(i+.5)/len(fieldnums)
         if n in (2,12):
-            d.add(d.circle((x,677),33,fill='none',stroke=GOLD,stroke_width=2))
+            d.add(d.circle((x,677*.82),27,fill='none',stroke=GOLD,stroke_width=1.65))
         txt(str(n),x,690,34,IVORY,800,0)
     txt('2 PAYS DOUBLE  ·  12 PAYS TRIPLE',cx,753,17,GOLD,600,2)
     if mode=='classic':

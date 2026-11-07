@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      const routeBase = document.createElement("base");
+      routeBase.href = location.pathname.replace(/\/join\/?$/, "/");
+      document.head.append(routeBase);
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <meta name="theme-color" content="#231111" />
@@ -8,7 +13,7 @@
       name="description"
       content="Your living room. Las Vegas rules. A 3D craps table for your TV, controlled from your phones."
     />
-    <title>crapsTV — A little Vegas. A lot of you.</title>
+    <title>crapsTV</title>
   </head>
   <body>
     <div id="root"></div>

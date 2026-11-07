@@ -59,3 +59,9 @@ A phone disconnect preserves its seat for reconnection. Explicit cash-out marks 
 [PeerJS](https://peerjs.com/server/getting-started) uses its free public signaling server by default. Room IDs have a crapsTV namespace and six random, readable characters. The TV tab accepts WebRTC data connections and runs the same validated game engine. Signaling is not persistent storage and is not a substitute for a TURN relay. Network traversal and service availability can prevent online play; local WebSocket mode avoids this dependency entirely.
 
 The web host is trusted to operate its own game. A person who edits their hosting code could bias their room; there is no third-party fairness certification, anti-cheat attestation, or real money.
+
+## Full-screen scene and controller route
+
+The root page always shows the 3D casino. It auto-connects to the local room when `/api/config` is available, otherwise starts a browser-hosted room. The room code, QR, balances, camera controls, and game status are rendered as raycastable WebGL meshes. `/join?code=…` is the dedicated phone-controller entry point, including direct static-host navigation via `404.html`.
+
+The rendered EXR environment provides real HDR background radiance and PMREM lighting. Background and environment use the same orientation. Room view reveals the panorama through camera rotation; an HDR panorama is infinitely distant and does not provide translational parallax or room collision.

@@ -2,14 +2,11 @@ import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowRight,
-  ArrowUpRight,
   BookOpen,
   Check,
   ChevronDown,
-  Copy,
   Crown,
   Dices,
-  Expand,
   Info,
   LogOut,
   Minus,
@@ -20,10 +17,9 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
-  Wifi,
   X,
 } from "lucide-react";
-import QRCode from "qrcode";
+import { routeInfo, controllerURL } from "./routes.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
 function Table3D(props) {
   return (
@@ -170,12 +166,12 @@ function useAnnouncer(state, enabled) {
   }, [state, enabled]);
 }
 function App() {
-  const query = new URLSearchParams(location.search),
-    initialCode = query.get("join") || "";
+  const route = useRef(routeInfo()).current;
+  const initialCode = route.code;
   const [session, setSession] = useState(null),
     [checking, setChecking] = useState(true),
     [state, setState] = useState(null),
-    [view, setView] = useState(initialCode ? "phone" : "tv"),
+    [view, setView] = useState(route.controller ? "phone" : "tv"),
     [playerId, setPlayerId] = useState(null),
     [status, setStatus] = useState("connecting"),
     [error, setError] = useState(""),
@@ -195,10 +191,16 @@ function App() {
     detectLocal().then((local) => {
       if (!mounted) return;
       if (local) {
-        setSession({ kind: "local", code: local.code });
+        setSession({
+          kind: "local",
+          code: local.code,
+          joinOrigin: local.joinOrigin,
+        });
         setJoinCode(local.code);
-      } else if (initialCode) {
-        setSession({ kind: "online-join", code: initialCode.toUpperCase() });
+      } else if (route.controller && initialCode) {
+        setSession({ kind: "online-join", code: initialCode });
+      } else if (!route.controller) {
+        setSession({ kind: "online-host", code: newCode() });
       }
       setChecking(false);
     });
@@ -302,21 +304,70 @@ function App() {
       }
     }
   }, [status, state?.code]);
-  const onlineHost = () => {
-    const code = newCode();
-    setSession({ kind: "online-host", code });
-    setJoinCode(code);
-    setView("tv");
+  const roomCode = state?.code || session?.code || "";
+  const joinLink = controllerURL(roomCode, session?.joinOrigin);
+  const sceneAction = async (action) => {
+    if (action === "join") window.open(joinLink, "_blank", "noopener");
+    if (action === "sound") setSound((value) => !value);
+    if (action === "fullscreen") {
+      if (document.fullscreenElement)
+        await document.exitFullscreen?.().catch(() => {});
+      else await document.documentElement.requestFullscreen?.().catch(() => {});
+    }
+    if (action === "reconnect") location.reload();
+    if (action === "copy") {
+      try {
+        await navigator.clipboard.writeText(joinLink);
+        toast("Join link copied");
+      } catch {
+        toast(joinLink);
+      }
+    }
   };
-  const roomCode = state?.code || session?.code;
+  if (view === "tv")
+    return (
+      <main
+        className="immersive-screen"
+        data-testid="casino-scene"
+        data-room-code={roomCode}
+      >
+        <Table3D
+          state={state}
+          code={roomCode}
+          status={checking ? "connecting" : status}
+          error={error}
+          sound={sound}
+          joinURL={joinLink}
+          onAction={sceneAction}
+        />
+        <div className="scene-accessibility" aria-label="Table controls">
+          <p role="status">
+            {status}. Room {roomCode}.{" "}
+            {state?.status === "ended"
+              ? "Session closed"
+              : state?.point
+                ? `Point ${state.point}`
+                : "Come out"}
+            .
+          </p>
+          <button onClick={() => sceneAction("join")}>
+            Open phone controller
+          </button>
+          <button onClick={() => sceneAction("sound")}>
+            {sound ? "Mute announcer" : "Enable announcer"}
+          </button>
+          <button onClick={() => sceneAction("fullscreen")}>
+            Fullscreen table
+          </button>
+        </div>
+      </main>
+    );
   return (
     <>
       <header className="header">
         <Brand />
         <nav>
-          <span className="desktop-only tagline">
-            A LITTLE VEGAS. A LOT OF YOU.
-          </span>
+          <span className="desktop-only tagline">PHONE CONTROLLER</span>
           {session && (
             <button
               className={`connection ${status === "connected" ? "online" : ""}`}
@@ -357,40 +408,12 @@ function App() {
           </button>
         </div>
       )}
-      {!session && checking ? (
+      {checking || (session && !state) ? (
         <main className="connecting">
-          <Dices size={42} />
-          <h1>Finding your table.</h1>
+          <Dices size={32} />
+          <h1>Connecting</h1>
+          <p>{error || "Connecting to the table…"}</p>
         </main>
-      ) : !session ? (
-        <Landing
-          checking={checking}
-          onlineHost={onlineHost}
-          name={joinName}
-          setName={setJoinName}
-          code={joinCode}
-          setCode={setJoinCode}
-          join={join}
-        />
-      ) : !state ? (
-        <main className="connecting">
-          <Dices size={42} />
-          <h1>Pulling up your table.</h1>
-          <p>
-            Room {roomCode} ·{" "}
-            {status === "disconnected"
-              ? "The host could not be reached."
-              : "Making room for a good night."}
-          </p>
-          <button
-            className="button dark"
-            onClick={() => (location.href = location.pathname)}
-          >
-            Back to lobby
-          </button>
-        </main>
-      ) : view === "tv" ? (
-        <TV state={state} session={session} setView={setView} />
       ) : !player ? (
         <Join
           state={state}
@@ -409,7 +432,10 @@ function App() {
               : "YOU’VE CASHED OUT"}
           </div>
           <Recap player={player} state={state} />
-          <button className="text-button" onClick={() => setView("tv")}>
+          <button
+            className="text-button"
+            onClick={() => (location.href = document.baseURI)}
+          >
             Back to the table <ArrowRight size={16} />
           </button>
           {isAdmin && state.status === "ended" && (
@@ -470,128 +496,19 @@ function App() {
           </section>
         </div>
       )}
-      <footer>
-        <span>
-          crapsTV <span>✦</span> MADE FOR A FULL HOUSE.
-        </span>
-        <span>Play chips. No real-money wagering.</span>
-      </footer>
     </>
   );
 }
-function Landing({ checking, onlineHost, name, setName, code, setCode, join }) {
-  return (
-    <main className="landing">
-      <section className="landing-copy">
-        <div className="eyebrow">
-          <span className="tiny-star">✦</span> THE LIVING ROOM CASINO
-        </div>
-        <h1>
-          Good company.
-          <br />
-          <em>
-            Questionable
-            <br />
-            odds.
-          </em>
-        </h1>
-        <p>
-          Your TV is the table. Your phone holds the chips.
-          <br />
-          Bring your friends. We’ll bring a little Vegas.
-        </p>
-        <button
-          className="button dark jumbo"
-          disabled={checking}
-          onClick={onlineHost}
-        >
-          <Monitor size={19} />
-          {checking ? "Finding your table…" : "Host an online table"}
-          <ArrowUpRight size={20} />
-        </button>
-        <div className="fine-print">
-          <Check size={14} /> No download for your friends <span>·</span> Up to
-          12 players
-        </div>
-        <form className="landing-join" onSubmit={join}>
-          <div className="eyebrow">ALREADY GOT A SEAT?</div>
-          <div>
-            <input
-              aria-label="Your name"
-              placeholder="Your name"
-              value={name}
-              maxLength={20}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              aria-label="Room code"
-              className="code-input"
-              placeholder="CODE"
-              value={code}
-              maxLength={6}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-            />
-            <button aria-label="Join table" type="submit">
-              <ArrowRight />
-            </button>
-          </div>
-        </form>
-      </section>
-      <section className="landing-visual">
-        <div className="visual-top">
-          <span>
-            <i /> THE BEST TABLE IN THE HOUSE
-          </span>
-          <span>OPEN ALL NIGHT</span>
-        </div>
-        <Table3D preview />
-        <div className="visual-caption">
-          <span className="script">Your place. Your people.</span>
-          <span>EST. TONIGHT ↗</span>
-        </div>
-        <img className="hero-chip" src={`${base}assets/ui-chip.png`} alt="" />
-      </section>
-      <div className="feature-strip">
-        <div>
-          <Dices />
-          <h3>Two ways to roll.</h3>
-          <p>Classic craps or crapless. Same friends, different odds.</p>
-        </div>
-        <div>
-          <BookOpen />
-          <h3>First timer? Perfect.</h3>
-          <p>Teach mode puts payouts and probabilities in your pocket.</p>
-        </div>
-        <div>
-          <Sparkles />
-          <h3>Make a night of it.</h3>
-          <p>Re-up, rally, and save your own end-of-night recap.</p>
-        </div>
-      </div>
-      <div className="online-note">
-        <Wifi size={15} />
-        <span>
-          Online rooms use a free peer connection. Keep the TV tab open. For
-          local play, run the included server and join on the same Wi-Fi.
-        </span>
-      </div>
-    </main>
-  );
-}
-function Join({ state, name, setName, code, setCode, join, setView }) {
+function Join({ state, name, setName, code, setCode, join }) {
   return (
     <main className="join-page">
       <div className="join-art">
         <Dices size={50} />
-        <span>ONE MORE AT THE TABLE.</span>
+        <span>CONTROLLER</span>
       </div>
-      <h1>Take a seat.</h1>
-      <p>
-        The first player to join runs the table.
-        <br />
-        Everyone else brings the luck.
-      </p>
-      {state.status === "ended" ? (
+      <h1>Join table</h1>
+      <p>Enter the code shown on the main screen.</p>
+      {state?.status === "ended" ? (
         <div className="notice">
           This table has closed. Ask the host to open a new one.
         </div>
@@ -615,312 +532,21 @@ function Join({ state, name, setName, code, setCode, join, setView }) {
               value={code}
               maxLength={6}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder={state.code}
+              placeholder={state?.code || "ABCDEF"}
               required
             />
           </label>
           <button className="button dark jumbo" type="submit">
-            I’m feeling lucky <ArrowRight size={18} />
+            Join <ArrowRight size={18} />
           </button>
         </form>
       )}
-      <button className="text-button" onClick={() => setView("tv")}>
-        Just watching? Show the TV <Monitor size={16} />
+      <button
+        className="text-button"
+        onClick={() => (location.href = document.baseURI)}
+      >
+        Show main screen <Monitor size={16} />
       </button>
-    </main>
-  );
-}
-function JoinCard({ state, session, setView }) {
-  const [qr, setQr] = useState(""),
-    [copied, setCopied] = useState(false);
-  const url = new URL(location.pathname, location.origin);
-  url.searchParams.set("join", state.code);
-  const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(
-      location.hostname,
-    ),
-    usable = !(session.kind === "local" && isLocalhost);
-  useEffect(() => {
-    QRCode.toDataURL(url.href, {
-      margin: 1,
-      width: 160,
-      color: { dark: "#411c24", light: "#f4eee3" },
-    }).then(setQr);
-  }, [url.href]);
-  return (
-    <section className="join-card">
-      <div className="eyebrow">YOUR PHONE IS YOUR CONTROLLER</div>
-      <div className="join-card-body">
-        {usable && qr ? (
-          <img className="qr" src={qr} alt="Scan to join this room" />
-        ) : (
-          <div className="qr-placeholder">
-            <Wifi size={32} />
-          </div>
-        )}
-        <div>
-          <p>Pull up a chair.</p>
-          <h2>{state.code}</h2>
-          <span>
-            {session.kind === "local"
-              ? "SAME WI-FI, SAME GOOD NIGHT."
-              : "SIX LETTERS. ENDLESS POSSIBILITIES."}
-          </span>
-        </div>
-      </div>
-      <p className="join-help">
-        {usable
-          ? "Scan the code or open this link on your phone."
-          : "Open the LAN address printed in your terminal on this TV to get a phone-ready QR code."}
-      </p>
-      <div className="button-row">
-        <button
-          className="button outline small"
-          disabled={!usable}
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(url.href);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1800);
-            } catch {
-              window.prompt("Copy this join link", url.href);
-            }
-          }}
-        >
-          {copied ? <Check size={14} /> : <Copy size={14} />}{" "}
-          {copied ? "Copied" : "Copy invite"}
-        </button>
-        <button className="button small dark" onClick={() => setView("phone")}>
-          Join here <ArrowRight size={14} />
-        </button>
-      </div>
-    </section>
-  );
-}
-function TV({ state, session, setView }) {
-  const players = state.players.filter((p) => !p.left),
-    shooter = players.find((p) => p.id === state.shooterId),
-    ended = state.status === "ended";
-  return (
-    <main className="tv-page">
-      <div className="tv-heading">
-        <div>
-          <div className="eyebrow">
-            {ended
-              ? "ONE FOR THE MEMORY BOOKS"
-              : state.status === "lobby"
-                ? "A GOOD NIGHT STARTS HERE"
-                : "THE LIVING ROOM CASINO"}
-          </div>
-          <h1>
-            {ended ? (
-              "What a night."
-            ) : state.status === "lobby" ? (
-              <>
-                The table is <em>yours.</em>
-              </>
-            ) : (
-              <>
-                Let the good times <em>roll.</em>
-              </>
-            )}
-          </h1>
-        </div>
-        <div className="table-tags">
-          <span>
-            <Dices size={15} />
-            {state.config.mode === "crapless"
-              ? "Crapless craps"
-              : "Classic craps"}
-          </span>
-          <span>{money(state.config.minBet)} minimum</span>
-          {state.config.teach && (
-            <span>
-              <BookOpen size={15} />
-              Teach mode
-            </span>
-          )}
-        </div>
-      </div>
-      {ended ? (
-        <>
-          <div className="end-summary">
-            <Sparkles size={26} />
-            <h2>
-              {state.rolls.length} rolls. {state.players.length} legends.
-            </h2>
-            <p>
-              Open your phone for your personal recap. Same table next time?
-            </p>
-          </div>
-          <div className="recap-grid">
-            {state.players.map((p) => (
-              <Recap key={p.id} player={p} state={state} compact />
-            ))}
-          </div>
-        </>
-      ) : (
-        <div className="tv-grid">
-          <section className="table-stage">
-            <div className="stage-top">
-              <span>
-                <i className={state.rolling ? "live rolling" : "live"} />
-                {state.rolling
-                  ? "DICE ARE OUT"
-                  : state.status === "lobby"
-                    ? "WAITING FOR YOUR PEOPLE"
-                    : "BETS ARE OPEN"}
-              </span>
-              <button
-                aria-label="Fullscreen table"
-                onClick={() => {
-                  if (document.fullscreenElement)
-                    document.exitFullscreen?.().catch(() => {});
-                  else
-                    document.documentElement
-                      .requestFullscreen?.()
-                      .catch(() => {});
-                }}
-              >
-                <Expand size={17} />
-              </button>
-            </div>
-            <Table3D state={state} />
-            <img
-              className="stage-logo"
-              src={`${base}assets/brand-logo.png`}
-              alt="crapsTV"
-            />
-            <div className="table-overlay">
-              <div className={`point-puck ${state.point ? "on" : ""}`}>
-                <span>{state.point ? "POINT" : "COME OUT"}</span>
-                <b>{state.point || "OFF"}</b>
-              </div>
-              {state.status === "playing" && (
-                <div className="result-banner" aria-live="polite">
-                  {state.rolling ? (
-                    <>
-                      <Dices className="dice-spin" />
-                      <h2>A little suspense…</h2>
-                    </>
-                  ) : (
-                    <>
-                      <span className="roll-total">
-                        {state.lastRoll?.total || "✦"}
-                      </span>
-                      <div>
-                        <h2>
-                          {state.lastRoll?.message || "It’s your lucky night."}
-                        </h2>
-                        <p>
-                          {shooter?.name || "Next player"} has the dice · roll{" "}
-                          {state.rolls.length + 1}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="stage-bottom">
-              <span className="script">Your place. Your people.</span>
-              <div className="recent-rolls">
-                {state.rolls.length ? (
-                  state.rolls.slice(-10).map((r) => (
-                    <span
-                      key={r.id}
-                      className={r.total === 7 ? "seven" : ""}
-                      title={r.message}
-                    >
-                      {r.total}
-                    </span>
-                  ))
-                ) : (
-                  <span className="empty-rolls">
-                    THE FIRST ROLL IS A PHONE AWAY.
-                  </span>
-                )}
-              </div>
-            </div>
-          </section>
-          <aside className="tv-sidebar">
-            <JoinCard state={state} session={session} setView={setView} />
-            <section className="rail">
-              <div className="section-label">
-                AT THE RAIL <span>{players.length}/12</span>
-              </div>
-              {players.length ? (
-                players
-                  .slice()
-                  .sort((a, b) => net(b) - net(a))
-                  .map((p) => (
-                    <div className="rail-player" key={p.id}>
-                      <div className="avatar" style={{ "--player": p.color }}>
-                        {p.name[0].toUpperCase()}
-                      </div>
-                      <div className="player-name">
-                        <b>
-                          {p.name}{" "}
-                          {p.id === state.adminId && <Crown size={12} />}
-                        </b>
-                        <span>
-                          {p.id === state.shooterId
-                            ? "✦ Has the dice"
-                            : !p.connected
-                              ? "Reconnecting…"
-                              : money(
-                                  p.bets.reduce((n, b) => n + b.amount, 0),
-                                ) + " on the felt"}
-                        </span>
-                      </div>
-                      <div className="player-bank">
-                        <b>{money(equity(p))}</b>
-                        <span className={net(p) >= 0 ? "positive" : "negative"}>
-                          {net(p) >= 0 ? "+" : "−"}
-                          {money(Math.abs(net(p)))}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-              ) : (
-                <div className="empty-rail">
-                  <span>✦</span>
-                  <p>
-                    The seats are empty.
-                    <br />
-                    The possibilities aren’t.
-                  </p>
-                </div>
-              )}
-            </section>
-            {state.status === "lobby" ? (
-              <div className="host-note">
-                <Crown size={17} />
-                <p>
-                  {players.length
-                    ? `${players[0].name} is setting the house rules on their phone.`
-                    : "First to join sets the house rules. Starting chips, game mode, and how much help you want."}
-                </p>
-              </div>
-            ) : (
-              <section className="table-feed">
-                <div className="section-label">TABLE TALK</div>
-                {state.log.slice(0, 3).map((l) => (
-                  <p key={l.id}>
-                    <span>✦</span>
-                    {l.text}
-                  </p>
-                ))}
-              </section>
-            )}
-          </aside>
-        </div>
-      )}
-      <div className="tv-bottom-note">
-        <span>
-          <Smartphone size={16} /> Bets and host controls live on your phone.
-        </span>
-        <span>NO CASH. NO PRESSURE. JUST ONE MORE ROLL.</span>
-      </div>
     </main>
   );
 }

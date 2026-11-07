@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
-const asset = (name) => `${import.meta.env.BASE_URL}assets/${name}`;
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { createSceneUI } from "./scene-ui.js";
+const asset = (name) => new URL(`assets/${name}`, document.baseURI).href;
 const rotations = {
   1: [0, 0, 0],
   6: [Math.PI, 0, 0],
@@ -11,7 +14,6 @@ const rotations = {
   3: [0, 0, Math.PI / 2],
   4: [0, 0, -Math.PI / 2],
 };
-// Coordinates are matched to the editable 2048 × 1024 SVG felt layouts.
 function chipLocation(bet, mode) {
   const points =
     mode === "crapless"
@@ -20,28 +22,26 @@ function chipLocation(bet, mode) {
   const [kind, number] = bet.type.split("-");
   let x = 1024,
     y = 900;
-  if (kind === "place" || bet.point) {
-    const point = bet.point || Number(number);
-    x = 136 + ((points.indexOf(point) + 0.5) * 1776) / points.length;
-    y = kind === "place" ? 290 : bet.type === "odds" ? 382 : 345;
-  } else if (bet.type === "dont") {
-    y = 840;
-  } else if (bet.type === "come") {
-    y = 470;
-  } else if (bet.type === "dontcome") {
+  // Pass odds sit in the generous unprinted area behind the pass line.
+  if (bet.type === "pass") {
+    y = 920;
+  } else if (bet.type === "odds" && bet.parentType === "pass") {
+    x = 1024;
+    y = 1085;
+  } else if (kind === "place" || bet.point) {
+    const n = bet.point || Number(number);
+    x = 136 + ((points.indexOf(n) + 0.5) * 1776) / points.length;
+    y = kind === "place" ? 290 : bet.type === "odds" ? 380 : 345;
+  } else if (bet.type === "dont") y = 840;
+  else if (bet.type === "come") y = 470;
+  else if (bet.type === "dontcome") {
     x = 285;
     y = 465;
-  } else if (bet.type === "field") {
-    y = 720;
-  } else if (kind === "hard") {
-    const idx = [4, 6, 8, 10].indexOf(Number(number));
-    if (mode === "classic") {
-      x = idx % 2 ? 370 : 210;
-      y = idx < 2 ? 640 : 735;
-    } else {
-      x = 1740;
-      y = 520 + idx * 67;
-    }
+  } else if (bet.type === "field") y = 710;
+  else if (kind === "hard") {
+    const i = [4, 6, 8, 10].indexOf(Number(number));
+    x = mode === "classic" ? (i % 2 ? 370 : 210) : 1740;
+    y = mode === "classic" ? (i < 2 ? 640 : 735) : 520 + i * 67;
   } else if (kind === "prop" || bet.type === "craps") {
     const row =
       bet.type === "craps"
@@ -57,110 +57,175 @@ function chipLocation(bet, mode) {
     x = Number(number) === 6 ? 720 : 1320;
     y = 785;
   }
-  return [(x / 2048 - 0.5) * 10.84, (y / 1024 - 0.5) * 5.4];
+  return [(x / 2048 - 0.5) * 10.84, ((y * 0.82) / 1024 - 0.5) * 5.4];
 }
-export default function Table3D({ state, preview = false }) {
+export default function Table3D(props) {
   const host = useRef(),
-    data = useRef({}),
-    props = useRef({ state, preview });
-  props.current = { state, preview };
+    latest = useRef(props);
+  latest.current = props;
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let renderer;
     try {
       renderer = new THREE.WebGLRenderer({
         antialias: true,
-        alpha: false,
         powerPreference: "high-performance",
       });
     } catch {
       setFailed(true);
       return;
     }
-    const el = host.current,
-      scene = new THREE.Scene();
-    scene.background = new THREE.Color("#1c1814");
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
+    const el = host.current;
+    let alive = true,
+      frame,
+      readyEnvironment = null,
+      cameraMode = "auto",
+      userUntil = 0,
+      dragStart = null;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
+    renderer.autoClear = false;
     el.appendChild(renderer.domElement);
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 120);
-    camera.position.set(0, 10.8, 11.5);
-    camera.lookAt(0, 0, 0);
-    scene.add(new THREE.HemisphereLight(0xffecd7, 0x17342e, 1.3));
-    const light = new THREE.DirectionalLight(0xffe1af, 2.5);
-    light.position.set(-4, 9, 3);
-    light.castShadow = true;
-    light.shadow.mapSize.set(2048, 2048);
-    Object.assign(light.shadow.camera, {
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#09100e");
+    const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 160);
+    camera.position.set(9, 5.3, 15);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0.3, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.065;
+    controls.enablePan = false;
+    controls.minDistance = 8;
+    controls.maxDistance = 26;
+    controls.minPolarAngle = 0.15;
+    controls.maxPolarAngle = 1.43;
+    controls.rotateSpeed = 0.42;
+    controls.addEventListener("start", () => {
+      userUntil = performance.now() + 15000;
+    });
+    scene.add(new THREE.HemisphereLight(0xc6d9ce, 0x18251e, 0.38));
+    const key = new THREE.DirectionalLight(0xffe5c6, 2.5);
+    key.position.set(-4, 10, 4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(2048, 2048);
+    Object.assign(key.shadow.camera, {
       left: -9,
       right: 9,
-      top: 9,
-      bottom: -9,
+      top: 7,
+      bottom: -7,
       near: 1,
       far: 30,
     });
-    light.shadow.bias = -0.0003;
-    scene.add(light);
-    const fill = new THREE.PointLight(0xa4f8d4, 25);
-    fill.position.set(4, 3, -3);
-    scene.add(fill);
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(17, 11),
-      new THREE.ShadowMaterial({ opacity: 0.28 }),
+    key.shadow.bias = -0.0002;
+    scene.add(key);
+    const rim = new THREE.DirectionalLight(0xf3d4a3, 1.1);
+    rim.position.set(7, 4, -7);
+    scene.add(rim);
+    const shadow = new THREE.Mesh(
+      new THREE.PlaneGeometry(28, 28),
+      new THREE.ShadowMaterial({ opacity: 0.32 }),
     );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -2.1;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    const loader = new GLTFLoader();
-    let alive = true;
-    const tracked = [];
-    const track = (object) => {
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = -2.15;
+    shadow.receiveShadow = true;
+    scene.add(shadow);
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    pmrem.compileEquirectangularShader();
+    function setEnvironment(texture, name) {
+      if (!alive) {
+        texture.dispose();
+        return;
+      }
+      texture.mapping = THREE.EquirectangularReflectionMapping;
+      scene.background = texture;
+      scene.backgroundIntensity = 0.75;
+      scene.backgroundBlurriness = 0.018;
+      scene.backgroundRotation.y = Math.PI / 2;
+      scene.environmentRotation.y = Math.PI / 2;
+      scene.environment = pmrem.fromEquirectangular(texture).texture;
+      scene.environmentIntensity = 1.2;
+      readyEnvironment = texture;
+      el.dataset.environment = name;
+    }
+    async function loadEnvironment(name, sourceLoader) {
+      const response = await fetch(asset(name));
+      if (
+        !response.ok ||
+        response.headers.get("content-type")?.includes("text/html")
+      )
+        throw new Error("Environment unavailable");
+      const parsed = sourceLoader.parse(await response.arrayBuffer());
+      if (!parsed?.data) throw new Error("Invalid HDR data");
+      if (!alive) return;
+      const texture = new THREE.DataTexture(
+        parsed.data,
+        parsed.width,
+        parsed.height,
+        parsed.format,
+        parsed.type,
+      );
+      texture.colorSpace = parsed.colorSpace || THREE.LinearSRGBColorSpace;
+      texture.minFilter = texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      texture.flipY = false;
+      texture.needsUpdate = true;
+      setEnvironment(texture, name);
+    }
+    loadEnvironment("casino-room.exr", new EXRLoader())
+      .catch(() => loadEnvironment("casino-studio.hdr", new HDRLoader()))
+      .catch(() => {
+        el.dataset.environment = "unavailable";
+      });
+    const loader = new GLTFLoader(),
+      textures = {};
+    function addObject(object) {
       object.traverse((o) => {
         if (o.isMesh) {
           o.castShadow = true;
           o.receiveShadow = true;
         }
       });
-      tracked.push(object);
       return object;
-    };
+    }
     loader.load(asset("table.glb"), (g) => {
-      if (alive) scene.add(track(g.scene));
+      if (alive) scene.add(addObject(g.scene));
     });
+    const weaveSize = 128,
+      weave = new Uint8Array(weaveSize * weaveSize * 4);
+    for (let i = 0; i < weaveSize * weaveSize; i++) {
+      const x = i % weaveSize,
+        y = Math.floor(i / weaveSize),
+        j = i * 4;
+      weave[j] = 128 + (x % 2 ? 5 : -5);
+      weave[j + 1] = 128 + (y % 2 ? 5 : -5);
+      weave[j + 2] = 255;
+      weave[j + 3] = 255;
+    }
+    const normal = new THREE.DataTexture(weave, weaveSize, weaveSize);
+    normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
+    normal.repeat.set(35, 18);
+    normal.needsUpdate = true;
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(10.84, 5.4),
       new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        roughness: 1,
-        transparent: false,
+        roughness: 0.94,
+        normalMap: normal,
+        normalScale: new THREE.Vector2(0.18, 0.18),
+        metalness: 0,
       }),
     );
     board.rotation.x = -Math.PI / 2;
     board.position.y = 0.012;
     board.receiveShadow = true;
     scene.add(board);
-    data.current.board = board;
-    const texLoader = new THREE.TextureLoader(),
-      textures = {};
-    texLoader.load(asset("casino-panorama.png"), (t) => {
-      if (!alive) {
-        t.dispose();
-        return;
-      }
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.mapping = THREE.EquirectangularReflectionMapping;
-      scene.background = t;
-      scene.backgroundBlurriness = 0.03;
-      scene.backgroundIntensity = 0.65;
-      scene.backgroundRotation.set(-Math.PI / 4, 0.5, 0);
-      data.current.panorama = t;
-    });
+    const textureLoader = new THREE.TextureLoader();
     for (const mode of ["classic", "crapless"])
-      texLoader.load(asset(`board-${mode}.png`), (t) => {
+      textureLoader.load(asset(`board-${mode}.png`), (t) => {
         if (!alive) {
           t.dispose();
           return;
@@ -169,132 +234,177 @@ export default function Table3D({ state, preview = false }) {
         t.anisotropy = renderer.capabilities.getMaxAnisotropy();
         textures[mode] = t;
       });
-    new HDRLoader().load(asset("casino-studio.hdr"), (t) => {
-      if (!alive) {
-        t.dispose();
-        return;
-      }
-      t.mapping = THREE.EquirectangularReflectionMapping;
-      scene.environment = t;
-      scene.environmentIntensity = 0.4;
-      data.current.env = t;
-    });
     const dice = [new THREE.Group(), new THREE.Group()];
     dice.forEach((d, i) => {
-      d.position.set(i ? 1.05 : -0.25, 0.47, 0.5);
-      d.scale.setScalar(0.7);
+      d.position.set(i ? 0.4 : -0.35, 0.15, -0.05);
+      d.scale.setScalar(0.27);
       scene.add(d);
     });
     loader.load(asset("dice.glb"), (g) => {
-      if (!alive) return;
-      dice.forEach((d) => d.add(track(g.scene.clone(true))));
+      if (alive) dice.forEach((d) => d.add(addObject(g.scene.clone(true))));
     });
-    // Chip stacks make each seat's action visible on the shared table.
     const chips = new THREE.Group();
     scene.add(chips);
-    let chipKey = "";
-    let prevRoll = null;
-    let settlingUntil = 0;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let clock = 0;
+    let chipKey = "",
+      previousRoll = null,
+      settlingUntil = 0;
     const puck = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.28, 0.12, 40),
-      new THREE.MeshStandardMaterial({
-        color: 0xf5e5c5,
-        metalness: 0.1,
-        roughness: 0.35,
-      }),
+      new THREE.CylinderGeometry(0.2, 0.2, 0.085, 48),
+      new THREE.MeshStandardMaterial({ color: 0xf5ead0, roughness: 0.5 }),
     );
-    puck.position.set(-4, 0.1, -2);
+    puck.position.set(-4.5, 0.07, -2.1);
     scene.add(puck);
+    const ui = createSceneUI(renderer, (action) => {
+      if (action === "camera") {
+        cameraMode =
+          cameraMode === "auto"
+            ? "table"
+            : cameraMode === "table"
+              ? "room"
+              : "auto";
+        userUntil = 0;
+        el.dataset.camera = cameraMode;
+      } else latest.current.onAction?.(action);
+    });
+    function pointerDown(e) {
+      dragStart = { x: e.clientX, y: e.clientY };
+      if (ui.pick(e.clientX, e.clientY)) controls.enabled = false;
+    }
+    function pointerUp(e) {
+      const click =
+        dragStart &&
+        Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) < 7;
+      controls.enabled = true;
+      if (click) {
+        const action = ui.pick(e.clientX, e.clientY);
+        if (action) ui.activate(action);
+      }
+      dragStart = null;
+    }
+    function pointerMove(e) {
+      renderer.domElement.style.cursor = ui.pick(e.clientX, e.clientY)
+        ? "pointer"
+        : dragStart
+          ? "grabbing"
+          : "grab";
+    }
+    el.addEventListener("pointerdown", pointerDown);
+    el.addEventListener("pointerup", pointerUp);
+    el.addEventListener("pointermove", pointerMove);
+    el.addEventListener("pointercancel", () => {
+      controls.enabled = true;
+      dragStart = null;
+    });
     function resize() {
       const w = el.clientWidth,
         h = el.clientHeight;
       renderer.setSize(w, h, false);
       camera.aspect = w / h;
-      camera.position.set(0, preview ? 8.6 : 8.8, preview ? 9.4 : 9.2);
-      if (w / h < 1.2) camera.position.multiplyScalar(1.25);
-      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
+      ui.resize(w, h);
     }
     const observer = new ResizeObserver(resize);
     observer.observe(el);
     resize();
-    let frame,
-      lastTime = 0;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    let lastTime = 0,
+      startTime = performance.now();
+    const targetPosition = new THREE.Vector3();
     function animate(time) {
-      const s = props.current.state;
-      if (s?.lastRoll?.id !== prevRoll) {
-        prevRoll = s?.lastRoll?.id;
-        settlingUntil = time + 1000;
-      }
-      // An idle felt is static: save GPU work between updates and honor reduced motion.
-      const moving =
-        !reducedMotion.matches && (s?.rolling || time < settlingUntil);
-      const frameInterval = document.hidden ? 1000 : moving ? 33 : 250;
-      if (time - lastTime < frameInterval) {
-        frame = requestAnimationFrame(animate);
-        return;
-      }
-      const dt = Math.min((time - lastTime) / 1000, 0.05);
+      frame = requestAnimationFrame(animate);
+      if (document.hidden && time - lastTime < 500) return;
+      const dt = Math.min((time - lastTime) / 1000, 0.06);
+      const interval =
+        latest.current.state?.rolling || dragStart || time < settlingUntil
+          ? 33
+          : 66;
+      if (time - lastTime < interval) return;
       lastTime = time;
-      clock += dt;
-      const mode = s?.config.mode === "crapless" ? "crapless" : "classic";
+      const targetFov = cameraMode === "room" ? 60 : 43;
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 3);
+      camera.updateProjectionMatrix();
+      const current = latest.current,
+        s = current.state,
+        mode = s?.config.mode === "crapless" ? "crapless" : "classic";
       if (textures[mode] && board.material.map !== textures[mode]) {
         board.material.map = textures[mode];
         board.material.needsUpdate = true;
       }
-      const key = (s?.players || [])
-        .map(
-          (p) =>
-            `${mode}:${p.id}:${p.bets.map((b) => `${b.id}/${b.type}/${b.point}/${b.amount}`).join(",")}`,
-        )
-        .join("|");
-      if (key !== chipKey) {
-        chipKey = key;
+      if (time > userUntil && !dragStart) {
+        const elapsed = (time - startTime) / 1000;
+        if (cameraMode === "table") targetPosition.set(0.01, 14, 6.5);
+        else if (cameraMode === "room") targetPosition.set(9, 3.0, 16);
+        else if (s?.rolling) targetPosition.set(2.2, 5.7, 9.2);
+        else {
+          const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
+          targetPosition.set(drift, 4.2, 13.2);
+        }
+        if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
+        camera.position.lerp(
+          targetPosition,
+          reduced.matches ? 1 : 1 - Math.exp(-dt * 1.6),
+        );
+      }
+      controls.update();
+      const nextChipKey = JSON.stringify([
+        mode,
+        s?.players.map((p) => [p.id, p.left, p.bets]),
+      ]);
+      if (nextChipKey !== chipKey) {
+        chipKey = nextChipKey;
         while (chips.children.length) {
-          const o = chips.children[0];
-          o.geometry.dispose();
-          o.material.dispose();
-          chips.remove(o);
+          const chip = chips.children[0];
+          chip.geometry.dispose();
+          chip.material.dispose();
+          chips.remove(chip);
         }
         s?.players
           .filter((p) => !p.left)
-          .forEach((p, i) => {
-            for (const bet of p.bets) {
-              const [x, z] = chipLocation(bet, mode);
-              const count = Math.min(
-                4,
-                Math.max(1, Math.ceil(bet.amount / 2500)),
+          .forEach((p, i) =>
+            p.bets.forEach((b) => {
+              const parent = p.bets.find((x) => x.id === b.parent);
+              const [x, z] = chipLocation(
+                { ...b, parentType: parent?.type },
+                mode,
               );
-              for (let j = 0; j < count; j++) {
+              for (
+                let n = 0;
+                n < Math.min(5, Math.ceil(b.amount / 2500));
+                n++
+              ) {
                 const chip = new THREE.Mesh(
-                  new THREE.CylinderGeometry(0.115, 0.115, 0.045, 24),
+                  new THREE.CylinderGeometry(0.1, 0.1, 0.036, 32),
                   new THREE.MeshStandardMaterial({
                     color: p.color,
-                    roughness: 0.6,
+                    roughness: 0.45,
                   }),
                 );
                 chip.position.set(
-                  x + ((i % 4) - 1.5) * 0.19,
-                  0.04 + j * 0.047,
-                  z + Math.floor(i / 4) * 0.17,
+                  x + ((i % 4) - 1.5) * 0.17,
+                  0.034 + n * 0.038,
+                  z + Math.floor(i / 4) * 0.13,
                 );
                 chip.castShadow = true;
                 chips.add(chip);
               }
-            }
-          });
+            }),
+          );
+      }
+      if (s?.lastRoll?.id !== previousRoll) {
+        previousRoll = s?.lastRoll?.id;
+        settlingUntil = time + 1100;
       }
       const values = s?.lastRoll?.dice || [3, 4];
-      dice.forEach((d, i) => {
-        if (s?.rolling && !reducedMotion.matches) {
-          d.position.y = 0.8 + Math.abs(Math.sin(clock * 9 + i)) * 1.2;
-          d.position.x = (i ? 1.1 : -0.5) + Math.sin(clock * 5 + i) * 0.6;
-          d.position.z = 0.3 + Math.cos(clock * 7 + i) * 0.5;
-          d.rotation.x += dt * (7 + i);
-          d.rotation.z += dt * (9 - i);
-          d.rotation.y += dt * 4;
+      dice.forEach((die, i) => {
+        if (s?.rolling && !reduced.matches) {
+          die.position.set(
+            (i ? 0.55 : -0.55) + Math.sin(time * 0.009 + i) * 0.45,
+            0.25 + Math.abs(Math.sin(time * 0.013 + i)) * 0.65,
+            Math.cos(time * 0.007 + i) * 0.3,
+          );
+          die.rotation.x += dt * (7 + i);
+          die.rotation.y += dt * 6;
+          die.rotation.z += dt * 8;
         } else {
           const q = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(...rotations[values[i]]),
@@ -305,61 +415,65 @@ export default function Table3D({ state, preview = false }) {
               i ? 0.45 : -0.25,
             ),
           );
-          d.quaternion.slerp(
-            q,
-            reducedMotion.matches ? 1 : Math.min(1, dt * 12),
-          );
-          d.position.lerp(
-            new THREE.Vector3(i ? 0.85 : -0.35, 0.37, 0.4),
-            Math.min(1, dt * 9),
+          die.quaternion.slerp(q, reduced.matches ? 1 : Math.min(1, dt * 11));
+          die.position.lerp(
+            new THREE.Vector3(i ? 0.42 : -0.34, 0.15, -0.06),
+            Math.min(1, dt * 10),
           );
         }
       });
-      puck.material.color.set(s?.point ? 0xf5e5c5 : 0x242424);
+      const pts =
+        mode === "crapless"
+          ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
+          : [4, 5, 6, 8, 9, 10];
+      puck.material.color.set(s?.point ? 0xf4ecd8 : 0x141b17);
       puck.position.x = s?.point
-        ? Math.max(-4.4, Math.min(4.3, (s.point - 7) * 0.75))
-        : -4.4;
+        ? ((136 + ((pts.indexOf(s.point) + 0.5) * 1776) / pts.length) / 2048 -
+            0.5) *
+          10.84
+        : -4.5;
+      ui.update({ ...current, cameraMode });
+      renderer.clear();
       renderer.render(scene, camera);
-      frame = requestAnimationFrame(animate);
+      renderer.clearDepth();
+      renderer.render(ui.scene, ui.camera);
     }
     frame = requestAnimationFrame(animate);
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      controls.dispose();
+      ui.dispose();
+      el.removeEventListener("pointerdown", pointerDown);
+      el.removeEventListener("pointerup", pointerUp);
+      el.removeEventListener("pointermove", pointerMove);
       scene.traverse((o) => {
         o.geometry?.dispose();
-        if (o.material) {
+        if (o.material)
           for (const m of Array.isArray(o.material) ? o.material : [o.material])
             m.dispose();
-        }
       });
       Object.values(textures).forEach((t) => t.dispose());
-      data.current.env?.dispose();
-      data.current.panorama?.dispose();
+      normal.dispose();
+      readyEnvironment?.dispose();
+      scene.environment?.dispose();
+      pmrem.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
   }, []);
   return (
     <div
-      className="table-canvas"
+      className="table-canvas immersive-canvas"
       ref={host}
       role="img"
-      aria-label="Three dimensional craps table with dice, felt layout and player chips"
+      aria-label="3D craps table with in-scene room code and controls"
     >
       {failed && (
         <div className="webgl-fallback">
-          <img
-            src={asset(
-              `board-${state?.config.mode === "crapless" ? "crapless" : "classic"}.svg`,
-            )}
-            alt="Craps table layout"
-          />
-          <p>
-            3D unavailable on this device. Your phone controls and game still
-            work.
-          </p>
+          This screen needs WebGL to display the table.{" "}
+          <a href={props.joinURL}>Open the phone controller</a>
         </div>
       )}
     </div>

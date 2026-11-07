@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 test("TV and phones complete a session, reconnect and export a recap", async ({
   browser,
@@ -9,22 +9,41 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   const tv = await browser.newPage({ viewport: { width: 1440, height: 1040 } });
   tv.on("pageerror", (e) => errors.push(e.message));
   await tv.goto("http://127.0.0.1:4321");
-  await tv.getByText("The table is yours.").waitFor();
+  const scene = tv.getByTestId("casino-scene");
+  await expect(scene).toHaveAttribute("data-room-code", /^[A-Z2-9]{6}$/);
+  await expect(tv.locator("header, footer")).toHaveCount(0);
+  await expect(tv.locator(".table-canvas canvas")).toHaveCount(1);
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-environment",
+    "casino-room.exr",
+    { timeout: 30000 },
+  );
   await tv.waitForTimeout(2300);
+  const viewport = tv.viewportSize();
+  await tv.locator("canvas").click({
+    position: { x: viewport.width / 2 - 120, y: viewport.height - 40 },
+  });
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-camera",
+    "table",
+  );
   await tv.screenshot({ path: "artifacts/tv-lobby.png", fullPage: true });
   const cfg = await (
     await tv.request.get("http://127.0.0.1:4321/api/config")
   ).json();
-  const phone = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-    isMobile: true,
-    deviceScaleFactor: 2,
-  });
+  // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
+  const popup = tv.waitForEvent("popup");
+  await tv
+    .locator("canvas")
+    .click({
+      position: { x: viewport.width / 2 + 120, y: viewport.height - 40 },
+    });
+  const phone = await popup;
+  await phone.setViewportSize({ width: 390, height: 844 });
   phone.on("pageerror", (e) => errors.push(e.message));
-  await phone.goto(`http://127.0.0.1:4321/?join=${cfg.code}`);
-  await phone.getByRole("heading", { name: "Take a seat." }).waitFor();
+  await phone.getByRole("heading", { name: "Join table" }).waitFor();
   await phone.getByLabel("Your name").fill("Tyler");
-  await phone.getByRole("button", { name: "I’m feeling lucky" }).click();
+  await phone.getByRole("button", { name: "Join", exact: true }).click();
   await phone.getByText("Set the night in motion.").waitFor();
   await phone.screenshot({ path: "artifacts/phone-setup.png", fullPage: true });
   const bob = await browser.newPage({
@@ -33,9 +52,10 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   });
   bob.on("pageerror", (e) => errors.push(e.message));
   await bob.goto(`http://127.0.0.1:4321/?join=${cfg.code}`);
-  await bob.getByRole("heading", { name: "Take a seat." }).waitFor();
+  await expect(bob).toHaveURL(`http://127.0.0.1:4321/join?code=${cfg.code}`);
+  await bob.getByRole("heading", { name: "Join table" }).waitFor();
   await bob.getByLabel("Your name").fill("Jordan");
-  await bob.getByRole("button", { name: "I’m feeling lucky" }).click();
+  await bob.getByRole("button", { name: "Join", exact: true }).click();
   await bob.getByText("Your chips are waiting.").waitFor();
   await phone.getByRole("button", { name: "Open the table" }).click();
   await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
