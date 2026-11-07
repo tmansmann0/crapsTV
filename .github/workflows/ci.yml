@@ -41,6 +41,7 @@ jobs:
       - run: npm run test:learn
       - run: npm run test:graphics
       - run: npm run test:tv
+      - run: npm run test:tour
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,5 +1,11 @@
+import {
+  planOutcomeTour,
+  remainingPresentationTransfers,
+  SETTLEMENT_FLIGHT_MS,
+} from "./round-presentation.js";
+export const presentationFlows = remainingPresentationTransfers;
 // Pure presentation planning. Money remains authoritative in game.js.
-export const CHIP_FLIGHT_MS = 1150;
+export const CHIP_FLIGHT_MS = SETTLEMENT_FLIGHT_MS;
 export const SEAT_LAYOUT = [
   ...[-4.5, -2.7, -0.9, 0.9, 2.7, 4.5].map((x) => ({
     center: [x, 0.675, 3.91],
@@ -55,6 +61,35 @@ export function routeKey(route) {
     : `${route.kind}:${route.playerId || ""}`;
 }
 
+/** Render-only legacy upgrade; never mutates either authoritative snapshot. */
+export function resolveOutcomePresentation(previous, next) {
+  const roll = next?.lastRoll;
+  if (!roll) return null;
+  if (roll.presentation?.version === 1) return roll.presentation;
+  const sources = {};
+  const compatible =
+    previous &&
+    previous.code === next.code &&
+    previous.createdAt === next.createdAt;
+  for (const event of roll.events || []) {
+    const before = compatible
+      ? previous.players?.find((player) => player.id === event.playerId)
+          ?.bets || []
+      : [];
+    for (const outcome of event.bets || []) {
+      const bet = before.find((bet) => bet.id === outcome.betId);
+      if (!bet) continue;
+      const parent = before.find((candidate) => candidate.id === bet.parent);
+      sources[`${event.playerId}:${outcome.betId}`] = {
+        sourceBet: { ...bet, parentType: parent?.type || bet.parentType },
+        standing:
+          outcome.result === "win" && /^(place|hard|big)-/.test(bet.type),
+      };
+    }
+  }
+  return planOutcomeTour(next, { sources });
+}
+
 /** First snapshots, room resets, and reconnect baselines intentionally have no flights. */
 export function planChipFlows(previous, next, { now = Date.now() } = {}) {
   if (
@@ -67,9 +102,26 @@ export function planChipFlows(previous, next, { now = Date.now() } = {}) {
     return [];
   const flows = [];
   const newRoll = next.lastRoll && next.lastRoll.id !== previous.lastRoll?.id;
-  // Do not replay old settlement animations after a sleeping/reconnecting display.
-  const roll = newRoll && now - next.lastRoll.at <= 5000 ? next.lastRoll : null;
+  const stored =
+    newRoll && next.lastRoll.presentation?.version === 1
+      ? next.lastRoll.presentation
+      : null;
+  // Legacy hosts retain the short freshness cutoff; immutable schedules may
+  // still have future actors after five seconds and remain seekable.
+  const roll =
+    newRoll && (stored || now - next.lastRoll.at <= 5000)
+      ? next.lastRoll
+      : null;
   if (newRoll && !roll) return [];
+  const presentation = roll ? resolveOutcomePresentation(previous, next) : null;
+  const settlementFlows = presentation?.transfers || [];
+  if (presentation)
+    flows.push(
+      ...presentationFlows(
+        { ...next, lastRoll: { ...roll, presentation } },
+        now,
+      ),
+    );
   const transitionAt = Number.isFinite(next.snapshotAt) ? next.snapshotAt : now;
   for (const [index, player] of (next.players || []).entries()) {
     const old = previous.players?.find((p) => p.id === player.id);
@@ -119,6 +171,7 @@ export function planChipFlows(previous, next, { now = Date.now() } = {}) {
         outcome.result === "win" && /^(place|hard|big)-/.test(before.type);
       settled.set(outcome.betId, standingWin ? outcome.amount : 0);
       const from = betRoute(player.id, before, oldBets);
+      if (presentation) continue;
       if (outcome.result === "lose")
         add(
           "loss",
@@ -210,7 +263,11 @@ export function planChipFlows(previous, next, { now = Date.now() } = {}) {
           bet.id,
         );
       }
-    const mine = flows.filter((f) => f.playerId === player.id);
+    const settlementIds = new Set(settlementFlows.map((flow) => flow.id));
+    const mine = [
+      ...flows.filter((flow) => !settlementIds.has(flow.id)),
+      ...settlementFlows,
+    ].filter((f) => f.playerId === player.id);
     const explained = mine.reduce(
       (sum, f) =>
         sum +
@@ -241,8 +298,10 @@ export function sampleChipFlow(flow, now) {
   );
   return {
     progress,
-    active: now >= flow.startAt && progress < 1,
-    done: progress >= 1,
+    active:
+      now >= flow.startAt &&
+      now < Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity),
+    done: now >= Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity),
   };
 }
 export function arcPosition(from, to, progress, height = 1.45) {
@@ -259,9 +318,15 @@ export function visualChipAmount(amount, route, flows, now) {
   const key = routeKey(route);
   let visible = amount;
   for (const flow of flows) {
-    if (now < flow.startAt + flow.duration && routeKey(flow.to) === key)
+    if (
+      now < Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity) &&
+      routeKey(flow.to) === key
+    )
       visible -= flow.amount;
-    if (now < flow.startAt && routeKey(flow.from) === key)
+    if (
+      now < Math.min(flow.startAt, flow.cutAt ?? Infinity) &&
+      routeKey(flow.from) === key
+    )
       visible += flow.sourceAmount;
   }
   return Math.max(0, visible);

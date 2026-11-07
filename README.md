@@ -64,6 +64,7 @@ npm run test:learn      # animated lesson rules, controls and phone fit
 npm run test:payout     # board-to-bank payout presentation
 npm run test:layout     # stable Play layout across interaction states
 npm run test:tv         # Compact/Large layout and actual 1080p/4K glyph checks
+npm run test:tour       # shared payout/camera sequence and finite idle views
 npm run test:online     # optional live PeerJS test against the published site
 npm run benchmark       # isolated twelve-player WebGL frame/draw benchmark
 npm run format          # format source, tests, and workflows
@@ -128,7 +129,9 @@ The display now uses a [retopologized table and distance-based chip detail](docs
 
 The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/4K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger. **UI size** is a separate local Compact/Large choice for each TV or display.
 
-Auto uses a wide lobby view and a near-top-down betting view once play starts. Throws keep one of four corner positions, then cut overhead to show the settled faces. A short breather between rolls gives way to the betting view. Manual orbit, fixed Table/Room views, and reduced motion take priority. Strong direct hits can nudge or topple a few wager chips. The modeled ON/OFF puck and solid wager stacks participate in the authoritative dice simulation; the puck has a white ON face and black OFF face. See [camera and contact details](docs/roll-presentation.md), [puck model](docs/puck.md), and [betting-window rules](docs/betting-window.md).
+Auto uses a wide lobby view and a close, near-top-down betting view. Throws keep one of four felt-level corner positions, then cut overhead to show the settled faces. A shared camera/chip schedule can highlight a standout result, group matching wins, or frame only the active part of the table. It fits the fixed betting window and finishes on a held overview; idle player views do not loop endlessly. Left-drag orbits, Shift + left-drag pans, and the wheel zooms. Manual views and reduced motion take priority.
+
+Strong direct hits can nudge or topple a few wager chips. The modeled ON/OFF puck and solid wager stacks participate in the authoritative dice simulation; the puck has a white ON face and black OFF face. See [camera and contact details](docs/roll-presentation.md), [puck model](docs/puck.md), and [betting-window rules](docs/betting-window.md).
 
 The TV interface defaults to Compact, with an optional Large size in TV Settings for longer viewing distances. Cards sit beside their chip piles, with chip footprints reserved against overlap. The renderer supports native 1080p/4K output, independently sharp UI at reduced 3D resolution, and a 4K raster of the vector felt. See [TV display QA](docs/tv-display-qa.md).
 

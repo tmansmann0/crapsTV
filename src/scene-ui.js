@@ -3,6 +3,7 @@ import * as THREE from "three";
 import QRCode from "qrcode";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import { bettingSecondsRemaining } from "./betting-window.js";
+import { money } from "./game.js";
 import {
   createTVLayout,
   TV_TYPE,
@@ -464,7 +465,8 @@ export function createSceneUI(renderer, onAction) {
         status !== "connected" ||
         sceneLoading);
     let heading = "Connecting",
-      detail = "";
+      detail = "",
+      headingColor = C.ink;
     if (state?.status === "playing") {
       const roll = state.lastRoll;
       const kind = {
@@ -486,6 +488,44 @@ export function createSceneUI(renderer, onAction) {
         : bettingSeconds > 0
           ? `Betting open · ${bettingSeconds}s${layout.compact ? "" : ` · ${shooter} next`}`
           : `${shooter} to roll · Betting open`;
+      const focus = current.cameraFocus;
+      if (!state.rolling && focus?.phase === "outcome-player") {
+        const delta = focus.delta || 0;
+        heading = `${focus.name} · ${delta > 0 ? "+" : delta < 0 ? "−" : ""}${money(Math.abs(delta))}`;
+        headingColor = delta > 0 ? "#c4e1b5" : delta < 0 ? "#edb6a5" : C.ink;
+        const outcomes = (focus.bets || []).map(
+          (bet) =>
+            `${bet.label || "Bet"} ${bet.result === "win" ? "won" : bet.result === "lose" ? "lost" : "returned"}`,
+        );
+        detail = outcomes.slice(0, 2).join(" · ") || "Resolving wagers";
+        if (outcomes.length > 2) detail += ` · +${outcomes.length - 2} more`;
+      } else if (!state.rolling && focus?.phase === "outcome-group") {
+        const events = (state.lastRoll?.events || []).filter((event) =>
+          focus.playerIds?.includes(event.playerId),
+        );
+        const total = events.reduce((sum, event) => sum + event.delta, 0);
+        const names = events.map((event) => event.name);
+        const group =
+          names.length === 2
+            ? names.join(" + ")
+            : `${focus.playerCount} players`;
+        heading = `${group} · ${total > 0 ? "+" : total < 0 ? "−" : ""}${money(Math.abs(total))}`;
+        headingColor = total > 0 ? "#c4e1b5" : total < 0 ? "#edb6a5" : C.ink;
+        const outcomes = events.flatMap((event) => event.bets || []);
+        const labels = [...new Set(outcomes.map((bet) => bet.label))];
+        const results = new Set(outcomes.map((bet) => bet.result));
+        detail =
+          labels.length === 1 && results.size === 1
+            ? `${labels[0]} ${outcomes[0].result === "win" ? "wins" : outcomes[0].result === "lose" ? "lost" : "returned"}`
+            : "Wagers resolved";
+        if (bettingSeconds > 0) detail += ` · ${bettingSeconds}s to roll`;
+      } else if (!state.rolling && focus?.phase === "idle-player") {
+        const player = state.players.find((p) => p.id === focus.playerId);
+        if (player) {
+          heading = player.name;
+          detail = `Bank ${money(player.bank)} · ${bettingSeconds > 0 ? `Betting open · ${bettingSeconds}s` : `${shooter} to roll`}`;
+        }
+      }
     }
     if (state?.status === "ended") {
       heading = "SESSION CLOSED";
@@ -498,9 +538,19 @@ export function createSceneUI(renderer, onAction) {
     if (error) {
       heading = "NOTICE";
       detail = error;
+      headingColor = C.ink;
     }
     c.textAlign = "center";
-    fittedText(c, heading, p.w / 2, 70, TV_TYPE.result, p.w - 56, C.ink, 700);
+    fittedText(
+      c,
+      heading,
+      p.w / 2,
+      70,
+      TV_TYPE.result,
+      p.w - 56,
+      headingColor,
+      700,
+    );
     fittedText(
       c,
       detail,
@@ -628,6 +678,10 @@ export function createSceneUI(renderer, onAction) {
       current.bettingSeconds,
       next.state?.lastRoll?.id,
       next.state?.shooterId,
+      next.cameraFocus?.shotKey,
+      next.cameraFocus &&
+        next.state?.players.find((p) => p.id === next.cameraFocus.playerId)
+          ?.bank,
       next.state?.players.map((p) => [p.id, p.name]),
     ]);
     if (next.joinURL && next.joinURL !== qrURL && next.code) {

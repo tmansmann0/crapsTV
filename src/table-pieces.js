@@ -15,6 +15,7 @@ import {
   betRoute,
   routeKey,
   planChipFlows,
+  presentationFlows,
   sampleChipFlow,
   arcPosition,
   visualChipAmount,
@@ -65,6 +66,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     connectedBefore = true,
     reconnectBaseline = null;
   let flows = [],
+    restoredPresentation = null,
     seatLayout = SEAT_LAYOUT,
     layoutRevision = 0;
   let impactStacks = [],
@@ -1001,6 +1003,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       if (previousState) {
         previousState = snapshotRef = null;
         flows = [];
+        restoredPresentation = null;
         impacts = [];
         impactThrowId = null;
         impactBindings.clear();
@@ -1025,6 +1028,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       reconnectBaseline = state.snapshotAt ?? state;
       previousState = null;
       flows = [];
+      restoredPresentation = null;
       snapshotRef = null;
       connectedBefore = false;
       impacts = [];
@@ -1035,6 +1039,8 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       connected &&
       (state.snapshotAt ?? state) === reconnectBaseline;
     if (connected && !waitingForFresh && snapshotRef !== state) {
+      if (state.rolling && state.throw?.id !== previousState?.throw?.id)
+        flows = [];
       if (chipFactory && connectedBefore && previousState) {
         const planned = planChipFlows(previousState, state, { now });
         const ids = new Set(flows.map((f) => f.id));
@@ -1046,6 +1052,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         previousState.createdAt !== state.createdAt
       ) {
         flows = [];
+        restoredPresentation = null;
         impacts = [];
         impactThrowId = null;
         lastStatic = "";
@@ -1054,7 +1061,28 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       snapshotRef = state;
       connectedBefore = true;
     }
-    flows = flows.filter((f) => now < f.startAt + f.duration);
+    const presentationKey = state.lastRoll?.presentation
+      ? `${state.code}:${state.createdAt}:${state.lastRoll.id}`
+      : null;
+    if (
+      chipFactory &&
+      connected &&
+      !waitingForFresh &&
+      presentationKey &&
+      restoredPresentation !== presentationKey
+    ) {
+      const ids = new Set(flows.map((flow) => flow.id));
+      flows.push(
+        ...presentationFlows(state, now).filter((flow) => !ids.has(flow.id)),
+      );
+      restoredPresentation = presentationKey;
+    }
+    for (const flow of flows)
+      if (flow.presentationMode === "fit-window")
+        flow.cutAt = Math.min(flow.presentationDeadline, state.nextRollAt);
+    flows = flows.filter(
+      (f) => now < Math.min(f.startAt + f.duration, f.cutAt ?? Infinity),
+    );
     if (chipFactory) {
       buildStatic(state, players, now);
       updatePreviews(state, players);

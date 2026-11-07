@@ -326,6 +326,13 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     );
     await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
     await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);
+    // The phone can publish the result before a slow software-rendered TV
+    // samples its final frame. Compare the actual settled TV pose, not a
+    // still-moving frame from that authoritative throw.
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-throw-settled",
+      "true",
+    );
     const landedPose = await tv
       .locator(".table-canvas")
       .getAttribute("data-pose");

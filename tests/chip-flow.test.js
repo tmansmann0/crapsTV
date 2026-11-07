@@ -21,6 +21,7 @@ function state(bank = 10000, bets = []) {
     createdAt: 1,
     status: "playing",
     snapshotAt: 1000,
+    nextRollAt: 0, // These legacy fixtures intentionally use immediate payouts.
     config: { mode: "craps" },
     lastRoll: null,
     players: [{ id: "p1", name: "A", seat: 0, bank, bets, left: false }],

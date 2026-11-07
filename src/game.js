@@ -1,3 +1,4 @@
+import { planOutcomeTour } from "./round-presentation.js";
 import { puckHome } from "./puck-layout.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import {
@@ -714,6 +715,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
     oldPoint = s.point,
     crapless = s.config.mode === "crapless";
   const events = [];
+  const presentationSources = {};
   for (const p of s.players.filter((p) => !p.left)) {
     const before = equity(p),
       pending = [...p.bets];
@@ -726,6 +728,12 @@ export function finishRoll(s, dice = s.throw?.dice) {
     const settleBet = (bet, result, multiplier = 1, stay = false) => {
       const beforeBet = equity(p);
       const amount = bet.amount;
+      const parent = pending.find((candidate) => candidate.id === bet.parent);
+      const sourceBet = { ...bet, parentType: parent?.type || bet.parentType };
+      presentationSources[`${p.id}:${bet.id}`] = {
+        sourceBet,
+        standing: result === "win" && stay,
+      };
       settle(p, bet, result, multiplier, stay);
       settlements.push({
         betId: bet.id,
@@ -873,7 +881,11 @@ export function finishRoll(s, dice = s.throw?.dice) {
     throwId: s.throw?.id || null,
     at: Date.now(),
   };
-  s.rolls.push(s.lastRoll);
+  s.lastRoll.presentation = planOutcomeTour(s, {
+    sources: presentationSources,
+  });
+  const { presentation, ...historicalRoll } = s.lastRoll;
+  s.rolls.push(historicalRoll);
   log(s, message, kind);
   return s.lastRoll;
 }

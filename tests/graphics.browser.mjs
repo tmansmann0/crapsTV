@@ -61,6 +61,49 @@ try {
   await expect(table).toHaveAttribute("data-graphics-intro", "false", {
     timeout: 20000,
   });
+  const cameraPose = () =>
+    table.evaluate((el) => ({
+      eye: JSON.parse(el.dataset.cameraPosition),
+      target: JSON.parse(el.dataset.cameraTarget),
+    }));
+  // A modifier pan translates eye and target together; ordinary drag orbits.
+  await page.mouse.move(640, 350);
+  await page.keyboard.down("Shift");
+  await page.mouse.down();
+  await expect(table).toHaveAttribute("data-camera-manual", "true");
+  const beforePan = await cameraPose();
+  await page.mouse.move(740, 350, { steps: 12 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect
+    .poll(async () => {
+      const p = await cameraPose();
+      return Math.hypot(...p.target.map((n, i) => n - beforePan.target[i]));
+    })
+    .toBeGreaterThan(0.1);
+  const afterPan = await cameraPose();
+  assert(
+    Math.hypot(
+      ...afterPan.eye.map(
+        (n, i) =>
+          n - afterPan.target[i] - (beforePan.eye[i] - beforePan.target[i]),
+      ),
+    ) < 0.02,
+    "Shift drag keeps the viewing angle while translating",
+  );
+  await page.waitForTimeout(500);
+  const beforeOrbit = await cameraPose();
+  await page.mouse.move(640, 350);
+  await page.mouse.down();
+  await page.mouse.move(740, 350, { steps: 12 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const p = await cameraPose();
+      return Math.hypot(...p.eye.map((n, i) => n - beforeOrbit.eye[i]));
+    })
+    .toBeGreaterThan(0.1);
+  await expect(table).toHaveAttribute("data-camera-manual", "true");
   const click = (action) => clickTV(page, action);
   // Auto can already resolve to the requested effective value (e.g. 1K on
   // SwiftShader). Wait for the rendered requested setting before clicking
@@ -211,6 +254,7 @@ try {
       ok: true,
       checks: [
         "intro calibration",
+        "Shift-left-drag pans and normal drag orbits",
         "24/30/60 FPS",
         "real antialias context recreation",
         "menu retained after recreation",

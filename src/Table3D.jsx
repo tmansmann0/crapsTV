@@ -11,6 +11,7 @@ import { createTablePieces } from "./table-pieces.js";
 import { createTableMaterials } from "./table-materials.js";
 import { createTableCompositor } from "./table-compositor.js";
 import { puckHome } from "./puck-layout.js";
+import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
@@ -162,7 +163,8 @@ export default function Table3D(props) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.065;
     controls.enablePan = false;
-    controls.minDistance = 8;
+    controls.screenSpacePanning = true;
+    controls.minDistance = 0.35;
     controls.maxDistance = 26;
     controls.minPolarAngle = 0.15;
     controls.maxPolarAngle = 1.43;
@@ -491,14 +493,23 @@ export default function Table3D(props) {
     });
     ui.setSettingsPage(graphicsPage.current);
     function pointerDown(e) {
-      dragStart = { x: e.clientX, y: e.clientY };
-      if (ui.pick(e.clientX, e.clientY)) controls.enabled = false;
+      const overUI = !!ui.pick(e.clientX, e.clientY);
+      const pan = !overUI && e.button === 0 && e.shiftKey;
+      dragStart = { x: e.clientX, y: e.clientY, pan };
+      // OrbitControls already maps Shift + left-drag to screen-space pan.
+      // Enable it only for that gesture so ordinary left-drag keeps orbiting.
+      controls.enablePan = pan;
+      if (overUI) controls.enabled = false;
     }
     function pointerUp(e) {
       const click =
         dragStart &&
+        !dragStart.pan &&
         Math.hypot(e.clientX - dragStart.x, e.clientY - dragStart.y) < 7;
+      if (dragStart && !click && controls.enabled)
+        userUntil = performance.now() + 15000;
       controls.enabled = true;
+      controls.enablePan = false;
       if (click) {
         const action = ui.pick(e.clientX, e.clientY);
         if (action) ui.activate(action);
@@ -517,9 +528,11 @@ export default function Table3D(props) {
     el.addEventListener("pointermove", pointerMove);
     function pointerCancel() {
       controls.enabled = true;
+      controls.enablePan = false;
       dragStart = null;
     }
     el.addEventListener("pointercancel", pointerCancel);
+    window.addEventListener("blur", pointerCancel);
     function resize() {
       const w = el.clientWidth,
         h = el.clientHeight;
@@ -569,6 +582,33 @@ export default function Table3D(props) {
     let previousCameraShot = null;
     let launchState = null,
       launchProps = {};
+    let incomingState = null,
+      displayState = null,
+      localPresentation = null;
+    function stateForDisplay(next) {
+      if (next === incomingState) return displayState;
+      if (
+        !next ||
+        next.code !== incomingState?.code ||
+        next.createdAt !== incomingState?.createdAt
+      )
+        localPresentation = null;
+      if (
+        next?.lastRoll &&
+        !next.lastRoll.presentation &&
+        next.lastRoll.id !== localPresentation?.rollId
+      )
+        localPresentation = resolveOutcomePresentation(incomingState, next);
+      displayState =
+        next?.lastRoll && !next.lastRoll.presentation && localPresentation
+          ? {
+              ...next,
+              lastRoll: { ...next.lastRoll, presentation: localPresentation },
+            }
+          : next;
+      incomingState = next;
+      return displayState;
+    }
     let nextFrameAt = 0;
     function animate(time) {
       frame = requestAnimationFrame(animate);
@@ -609,7 +649,7 @@ export default function Table3D(props) {
       nextFrameAt += interval;
       lastTime = time;
       const current = latest.current,
-        s = current.state,
+        s = stateForDisplay(current.state),
         mode = s?.config.mode === "crapless" ? "crapless" : "classic";
       const graphicsRevision = s?.display?.graphicsRevision ?? 0;
       if (
@@ -674,27 +714,31 @@ export default function Table3D(props) {
               reducedMotion: reduced.matches,
             })
           : null;
-      const cinematic = !!cameraShot;
-      controls.minDistance = cinematic
-        ? 0.18
-        : Math.min(8, camera.position.distanceTo(controls.target));
+      const playerShot = !cameraShot && autoView?.shotKey ? autoView : null;
+      const directedShot = cameraShot || playerShot;
+      const cinematic = !!directedShot;
+      controls.minDistance = cinematic ? 0.18 : 0.35;
       controls.minPolarAngle = cameraShot?.phase === "result" ? 0.0001 : 0.15;
-      controls.maxPolarAngle =
-        cameraShot?.phase === "throw" ? Math.PI - 0.01 : 1.43;
+      controls.maxPolarAngle = directedShot ? Math.PI - 0.01 : 1.43;
       controls.enableDamping = !cinematic;
-      const shotKey = cameraShot ? `${s.throw.id}:${cameraShot.phase}` : null;
+      const shotKey = cameraShot
+        ? `${s.throw.id}:${cameraShot.phase}`
+        : playerShot?.shotKey || null;
       const cut = shotKey !== null && shotKey !== previousCameraShot;
-      const targetFov =
-        cameraShot?.fov ?? autoView?.fov ?? (cameraMode === "room" ? 60 : 43);
+      const targetFov = !automaticCamera
+        ? camera.fov
+        : (directedShot?.fov ??
+          autoView?.fov ??
+          (cameraMode === "room" ? 60 : 43));
       camera.fov += (targetFov - camera.fov) * (cut ? 1 : Math.min(1, dt * 5));
       camera.updateProjectionMatrix();
       if (automaticCamera) {
         const elapsed = (time - startTime) / 1000;
-        if (cameraShot) {
+        if (directedShot) {
           // Flush any leftover manual orbit damping before the selected shot.
           if (cut) controls.update();
-          targetPosition.fromArray(cameraShot.position);
-          shotTarget.fromArray(cameraShot.target);
+          targetPosition.fromArray(directedShot.position);
+          shotTarget.fromArray(directedShot.target);
           controls.target.lerp(shotTarget, cut ? 1 : 1 - Math.exp(-dt * 7));
           camera.position.copy(targetPosition);
         } else {
@@ -711,7 +755,7 @@ export default function Table3D(props) {
                 Math.sin(((time - introStart) / introDuration) * Math.PI) * 2,
               15.5,
             );
-          else if (cameraMode === "table") targetPosition.set(0.01, 17, 8);
+          else if (cameraMode === "table") targetPosition.set(0.01, 8.1, 1.2);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
           else if (autoView) targetPosition.fromArray(autoView.position);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
@@ -733,6 +777,7 @@ export default function Table3D(props) {
       el.dataset.cameraPosition = JSON.stringify(camera.position.toArray());
       el.dataset.cameraTarget = JSON.stringify(controls.target.toArray());
       el.dataset.cameraFov = String(camera.fov);
+      el.dataset.cameraManual = String(!automaticCamera);
       if (
         camera.position.distanceToSquared(labelCameraPosition) > 0.000001 ||
         camera.quaternion.angleTo(labelCameraRotation) > 0.0001 ||
@@ -746,6 +791,8 @@ export default function Table3D(props) {
       el.dataset.cameraShot =
         cameraShot?.phase || autoView?.phase || "overview";
       el.dataset.cameraRig = cameraShot ? String(cameraShot.rig) : "";
+      el.dataset.cameraPlayer = playerShot?.playerId || "";
+      el.dataset.cameraShotKey = shotKey || "";
       const connected = current.status === "connected";
       const piecesChanged =
         s !== lastPiecesState ||
@@ -766,6 +813,17 @@ export default function Table3D(props) {
       el.dataset.banks = String(pieces.banks.children.length);
       el.dataset.previews = String(pieces.previews.children.length);
       el.dataset.transfers = String(pieces.transfers.children.length);
+      el.dataset.activeTransfers = JSON.stringify(
+        pieces.transfers.children
+          .filter((group) => group.visible)
+          .map((group) => ({
+            id: group.userData.flow?.id,
+            playerId: group.userData.flow?.playerId,
+            kind: group.userData.flow?.kind,
+            amount: group.userData.flow?.amount,
+            position: group.position.toArray(),
+          })),
+      );
       el.dataset.sceneReady = String(stageReady);
       el.dataset.chips = String(pieces.chips.children.length);
       const chipImpacts = pieces.impactStatus;
@@ -798,6 +856,9 @@ export default function Table3D(props) {
       }
       el.dataset.throwId = s?.throw?.id || "";
       el.dataset.pose = pose ? JSON.stringify(pose.dice) : "";
+      el.dataset.throwSettled = String(
+        !!(shared?.done && !aiming && !s?.rolling),
+      );
       el.dataset.cinematic = String(cinematic);
       el.dataset.wallHits = String(shared?.wallHits || 0);
       const puckPlacement = s?.puck || puckHome(s?.point, mode);
@@ -853,6 +914,16 @@ export default function Table3D(props) {
       ui.update({
         ...current,
         cameraMode,
+        cameraFocus: playerShot && {
+          phase: playerShot.phase,
+          shotKey: playerShot.shotKey,
+          playerId: playerShot.playerId,
+          playerIds: playerShot.playerIds,
+          playerCount: playerShot.playerCount,
+          name: playerShot.name,
+          delta: playerShot.delta,
+          bets: playerShot.bets,
+        },
         sceneLoading: !stageReady,
         error: current.error || stageError,
         graphics,
@@ -963,6 +1034,7 @@ export default function Table3D(props) {
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);
       el.removeEventListener("pointercancel", pointerCancel);
+      window.removeEventListener("blur", pointerCancel);
       renderer.domElement.remove();
       const disposeResources = () => {
         textureQuality.dispose();
