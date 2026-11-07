@@ -1,0 +1,12 @@
+{
+  "frames": 361,
+  "fps": 60.002000066668884,
+  "p50Ms": 16.699999999999818,
+  "p95Ms": 16.700000000000728,
+  "meanDraws": 97,
+  "meanTriangles": 485338,
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+  "width": 1600,
+  "height": 1000,
+  "rollingFps": null
+}

@@ -1,3 +1,8 @@
+import {
+  DEFAULT_GRAPHICS,
+  mergeGraphics,
+  normalizeGraphics,
+} from "./graphics-settings.js";
 import { validBetChoices } from "./bet-options.js";
 import {
   createThrowTimeline,
@@ -53,7 +58,13 @@ export function createState(code = "LOCAL") {
     code,
     status: "lobby",
     config: { mode: "craps", startingBank: 100000, minBet: 500, teach: false },
-    display: { sound: false, camera: "auto", revision: 0 },
+    display: {
+      sound: false,
+      camera: "auto",
+      graphics: { ...DEFAULT_GRAPHICS },
+      graphicsRevision: 0,
+      revision: 0,
+    },
     players: [],
     adminId: null,
     shooterId: null,
@@ -512,18 +523,42 @@ export function setDiceAppearance(s, id, appearance) {
 export function setDisplaySettings(s, id, options) {
   admin(s, id);
   assert(
-    options && typeof options === "object" && !Array.isArray(options),
+    options &&
+      typeof options === "object" &&
+      !Array.isArray(options) &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(options)),
     "Invalid display settings.",
   );
+  assert(
+    Reflect.ownKeys(options).every(
+      (key) =>
+        typeof key === "string" &&
+        ["sound", "camera", "graphics"].includes(key),
+    ),
+    "Unknown display setting.",
+  );
   const current = s.display || { sound: false, camera: "auto", revision: 0 };
-  const sound = options.sound ?? current.sound,
-    camera = options.camera ?? current.camera;
+  const sound = Object.hasOwn(options, "sound") ? options.sound : current.sound;
+  const camera = Object.hasOwn(options, "camera")
+    ? options.camera
+    : current.camera;
   assert(typeof sound === "boolean", "Sound must be on or off.");
   assert(
     ["auto", "table", "room"].includes(camera),
     "Choose auto, table or room view.",
   );
-  s.display = { sound, camera, revision: current.revision + 1 };
+  const graphics = Object.hasOwn(options, "graphics")
+    ? mergeGraphics(current.graphics, options.graphics)
+    : normalizeGraphics(current.graphics);
+  s.display = {
+    sound,
+    camera,
+    graphics,
+    graphicsRevision:
+      (current.graphicsRevision || 0) +
+      (Object.hasOwn(options, "graphics") ? 1 : 0),
+    revision: current.revision + 1,
+  };
 }
 
 function throwController(s, id) {
@@ -560,17 +595,29 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
     gesture,
     s.aim?.playerId === id ? s.aim : undefined,
   );
-  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-  const timeline = createThrowTimeline({
-    id: uid(),
-    playerId: id,
-    shooterId: s.shooterId,
-    seed,
-    dice: [randomDie(), randomDie()],
-    gesture: controls,
-    startAt: Date.now(),
-    duration,
-  });
+  let timeline;
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    try {
+      timeline = createThrowTimeline({
+        id: uid(),
+        playerId: id,
+        shooterId: s.shooterId,
+        seed,
+        gesture: controls,
+        startAt: 0,
+        duration,
+      });
+      break;
+    } catch (error) {
+      // Only retry a physically cocked/off-table throw. No face value is ever
+      // selected or used to accept/reject a valid landed throw.
+      if (error.code !== "DICE_UNSETTLED") throw error;
+    }
+  }
+  assert(timeline, "The dice did not settle. Please throw again.");
+  timeline.startAt = Date.now();
+  timeline.settledAt += timeline.startAt;
   s.throw = timeline;
   s.aim = null;
   s.rolling = true;
@@ -596,10 +643,7 @@ function settle(p, b, result, multiplier = 1, stay = false) {
   }
   if (!stay || result !== "win") p.bets = p.bets.filter((x) => x.id !== b.id);
 }
-export function finishRoll(
-  s,
-  dice = s.throw?.dice || [randomDie(), randomDie()],
-) {
+export function finishRoll(s, dice = s.throw?.dice) {
   assert(s.rolling, "No roll in progress.");
   assert(
     Array.isArray(dice) &&
@@ -608,9 +652,9 @@ export function finishRoll(
     "Invalid dice.",
   );
   if (s.throw && dice.some((n, i) => n !== s.throw.dice[i])) {
-    // Trusted deterministic rule tests may override the outcome directly.
-    // Keep their visible final orientation consistent as well.
-    s.throw = createThrowTimeline({ ...s.throw, dice });
+    // Explicit dice are a trusted rules-test fixture, never accepted from the
+    // wire. Drop the unrelated visual throw instead of manufacturing its faces.
+    s.throw = null;
   }
   const total = dice[0] + dice[1],
     oldPoint = s.point,

@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { routeInfo, controllerURL } from "./routes.js";
+import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
 function Table3D(props) {
   return (
@@ -664,6 +665,68 @@ function Phone({
                 <option value="room">Room</option>
               </select>
             </label>
+            <div
+              className="admin-graphics-settings"
+              style={{
+                borderTop: "1px solid var(--line)",
+                paddingTop: 14,
+                marginTop: 16,
+              }}
+            >
+              <h3>Graphics</h3>
+              <p style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 15 }}>
+                Auto checks the TV and chooses settings for that display. Manual
+                choices override its recommendation.
+              </p>
+              {Object.entries({
+                fps: "Frame rate",
+                antialias: "Antialiasing",
+                resolution: "Resolution",
+                modelDetail: "Model detail",
+                textures: "Textures",
+              }).map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <select
+                    aria-label={`TV graphics ${label.toLowerCase()}`}
+                    value={state.display?.graphics?.[key] ?? "auto"}
+                    disabled={!connected}
+                    onChange={(event) =>
+                      send({
+                        type: "display",
+                        settings: {
+                          graphics: {
+                            [key]:
+                              key === "fps" && event.target.value !== "auto"
+                                ? Number(event.target.value)
+                                : event.target.value,
+                          },
+                        },
+                      })
+                    }
+                  >
+                    {GRAPHICS_OPTIONS[key].map((option) => (
+                      <option key={String(option.value)} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <button
+                type="button"
+                className="button outline small"
+                disabled={!connected}
+                onClick={() =>
+                  send({
+                    type: "display",
+                    settings: { graphics: { ...DEFAULT_GRAPHICS } },
+                  })
+                }
+              >
+                Use automatic graphics
+              </button>
+            </div>
             <div className="button-row">
               <button
                 className="button outline small"

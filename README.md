@@ -42,8 +42,8 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Starting stack and table minimum.** The first player chooses both.
 - **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
 - **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The visual practice tutorial and rules/payout guide are always available.
-- **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
-- **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw, and random results come from the authority’s cryptographic random generator.
+- **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Taking odds lives directly below Pass Line on the main board, with current stake, legal increments, remaining capacity, and quick amounts. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
+- **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw. The authority securely randomizes the launch, simulates the dice until they settle, and reads the upper faces. Those exact physical poses remain unchanged after landing.
 - **Re-up without losing your story.** With no open bets and total chips below the minimum, refill to the starting stack. Added chips count as new buy-in, never as winnings.
 - **Cash out or close the table.** Unresolved wagers are returned. Each player gets a personal recap, net-result chart, biggest win, comeback count, and downloadable **1080×1440 PNG** or editable SVG.
 - **Bundled announcer.** Open Settings on the TV to enable the original male Kokoro voice pack. It announces rolls, points, seven-outs, join/leave, re-ups, and other major events. Browsers require that user gesture before sound.
@@ -57,7 +57,10 @@ npm test                # deterministic rules and authority tests
 npm run build           # portable static bundle in dist/
 npx playwright install chromium
 npm run test:e2e        # starts an isolated local server; TV + two phones
+npm run test:odds       # isolated real-rules phone odds/layout checks
+npm run test:graphics   # actual WebGL settings, calibration and persistence checks
 npm run test:online     # optional live PeerJS test against the published site
+npm run benchmark       # isolated twelve-player WebGL frame/draw benchmark
 npm run format          # format source, tests, and workflows
 ```
 
@@ -107,10 +110,14 @@ The generated logo is used on the TV and the felt. Hardways show pairs of dice, 
 
 Chips load a real modeled GLB with edge inserts, engraved medallions, and three independently seeded wear/roughness variants. Preparing a phone bundle shows held chips beside that player’s bank and a ghost pile over the selected bet. Accepted stakes travel onto the felt; returned stakes and winnings travel back to the bank. Standing bets stay on the felt when only their profit is paid. Reconnecting uses the current ledger without replaying old payouts. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
 
-Dice animation uses Cannon rigid bodies against the felt and the table’s raised rubber walls. The visual throw does not choose or change the cryptographically generated game result. The dice settle to the authoritative faces after the bounce. The rubber contact boundary is X=±5.42/Z=±2.71 with a .92-unit top rail.
+Cannon rigid bodies roll against the felt and the table’s raised rubber walls. The server generates unpredictable initial orientations and spin, then reads the resulting settled faces. No result is preselected and no post-landing rotation is applied. Every phone and TV samples the same recorded physical trajectory. The rubber contact boundary is X=±5.42/Z=±2.71 with a .92-unit top rail.
 
 For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit sphere inside the scene. Dolly/zoom therefore changes the room perspective along with the table. The same HDR still supplies PMREM reflections, but the sphere is an approximate backdrop, not a fully collision-modeled room.
 
 [Chip sources and maps](docs/chips.md) · [Dice sources and customization](docs/dice.md)
 
 [Phone interface and throw synchronization](docs/phone-and-throws.md).
+
+The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the display refresh rate. Close camera views retain the original detailed chips.
+
+The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger.

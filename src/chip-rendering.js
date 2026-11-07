@@ -49,8 +49,9 @@ export async function createChipFactory(renderer) {
     textures.add(texture);
     return texture;
   };
-  const [gltf, normalMaps, roughnessMaps] = await Promise.all([
+  const [gltf, lowDetail, normalMaps, roughnessMaps] = await Promise.all([
     loader.loadAsync(asset("chip.glb")),
+    loader.loadAsync(asset("chip-lod.glb")).catch(() => null),
     Promise.all([1, 2, 3].map((i) => loadData(`chip-normal-${i}.png`))),
     Promise.all([1, 2, 3].map((i) => loadData(`chip-roughness-${i}.png`))),
   ]);
@@ -68,9 +69,22 @@ export async function createChipFactory(renderer) {
         }
     }
   });
+  const lowGeometry = new Map();
+  lowDetail?.scene.traverse((object) => {
+    if (!object.isMesh) return;
+    geometries.add(object.geometry);
+    lowGeometry.set(object.material.name, object.geometry);
+    materials.add(object.material);
+    for (const value of Object.values(object.material))
+      if (value?.isTexture) textures.add(value);
+  });
   const cache = new Map();
   function styled(original, denomination, wear, opacity = 1) {
-    const key = `${original.uuid}/${denomination}/${wear}/${opacity}`;
+    // Only the clay changes denomination; inlays share wear and metal/engraving
+    // share one material across every chip. Avoid splitting identical GPU batches.
+    const colored = original.name.startsWith("ChipBase");
+    const worn = /^Chip(Base|Inlay)/.test(original.name);
+    const key = `${original.uuid}/${colored ? denomination : 0}/${worn ? wear : 0}/${opacity}`;
     if (!cache.has(key)) {
       const material = original.clone();
       if (original.name.startsWith("ChipBase"))
@@ -145,16 +159,17 @@ export async function createChipFactory(renderer) {
           scale,
         );
         for (const mesh of sourceMeshes) {
-          const key = `${mesh.uuid}/${denomination}/${wear}/${spec.opacity ?? 1}`;
+          const material = styled(
+            mesh.material,
+            denomination,
+            wear,
+            spec.opacity ?? 1,
+          );
+          const key = `${mesh.geometry.uuid}/${material.uuid}`;
           if (!buckets.has(key))
             buckets.set(key, {
               mesh,
-              material: styled(
-                mesh.material,
-                denomination,
-                wear,
-                spec.opacity ?? 1,
-              ),
+              material,
               matrices: [],
             });
           buckets
@@ -172,10 +187,49 @@ export async function createChipFactory(renderer) {
         batch.castShadow = batch.receiveShadow = !material.transparent;
         batch.instanceMatrix.needsUpdate = true;
         batch.computeBoundingSphere();
+        const low = lowGeometry.get(mesh.material.name);
+        if (low)
+          batch.userData.chipLOD = {
+            high: mesh.geometry,
+            low,
+            diameter: Math.max(...specs.map((s) => s.diameter ?? 0.23)),
+            detailed: true,
+          };
         group.add(batch);
       }
       group.userData.chipCount = specs.length;
       return group;
+    },
+    updateLOD(root, camera, height, detail = "auto") {
+      let changed = false;
+      root.updateWorldMatrix(true, true);
+      const center = new THREE.Vector3();
+      const projectionScale =
+        height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      root.traverse((object) => {
+        const lod = object.userData.chipLOD;
+        if (!lod) return;
+        center
+          .copy(object.boundingSphere.center)
+          .applyMatrix4(object.matrixWorld);
+        const pixels =
+          (lod.diameter * projectionScale) /
+          Math.max(0.1, center.distanceTo(camera.position));
+        const detailed =
+          detail === "full"
+            ? true
+            : detail === "optimized"
+              ? false
+              : lod.detailed
+                ? pixels >= 28
+                : pixels > 36;
+        if (detailed !== lod.detailed) {
+          lod.detailed = detailed;
+          object.geometry = detailed ? lod.high : lod.low;
+          changed = true;
+        }
+      });
+      return changed;
     },
     dispose() {
       for (const geometry of geometries) geometry.dispose();

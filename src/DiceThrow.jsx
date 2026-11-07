@@ -18,18 +18,22 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
   const host = useRef(null),
     latest = useRef(null),
     drag = useRef(null),
-    lastAim = useRef(0);
+    lastAim = useRef(0),
+    observedThrow = useRef(state.rolling ? state.throw?.id : null);
   const [aim, setAim] = useState(null),
     [failed, setFailed] = useState(false);
   const shooter = state.players.find((p) => p.id === state.shooterId);
+  if (state.rolling && state.throw?.id) observedThrow.current = state.throw.id;
+  const justLanded =
+    !!observedThrow.current &&
+    !state.rolling &&
+    state.lastRoll?.throwId === observedThrow.current;
   const canThrow =
-    connected && !state.rolling && (player.id === state.shooterId || isAdmin);
-  latest.current = {
-    state,
-    shooterId: shooter?.id,
-    aim,
-    appearance: shooter?.dice || { color: "red", finish: "solid" },
-  };
+    connected &&
+    !state.rolling &&
+    !justLanded &&
+    (player.id === state.shooterId || isAdmin);
+  latest.current = { state, aim, activeThrowId: observedThrow.current };
   useEffect(() => {
     if (state.rolling || !connected) {
       drag.current = null;
@@ -50,8 +54,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     renderer.toneMappingExposure = 0.95;
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#0d332b");
-    const camera = new THREE.PerspectiveCamera(37, 1, 0.05, 50);
+    scene.background = new THREE.Color("#0b1113");
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
     camera.position.set(0, 2.1, 4.3);
     camera.lookAt(0, 0, 1.8);
     let pmrem = null,
@@ -63,24 +67,13 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       scene.environment = environment.texture;
       room.dispose();
     }
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x284c3e, 0.8));
+    scene.add(new THREE.HemisphereLight(0xfff7e8, 0x243543, 1.2));
     const light = new THREE.DirectionalLight(0xffedce, 2.4);
     light.position.set(-2, 6, 4);
-    light.castShadow = true;
     scene.add(light);
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(12, 6),
-      new THREE.MeshStandardMaterial({ color: "#123d2e", roughness: 0.96 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    scene.add(floor);
-    const rail = new THREE.Mesh(
-      new THREE.BoxGeometry(11, 0.74, 0.13),
-      new THREE.MeshStandardMaterial({ color: "#142b21", roughness: 0.9 }),
-    );
-    rail.position.set(0, 0.37, -2.71);
-    scene.add(rail);
+    const rim = new THREE.DirectionalLight(0x8fdaca, 1.5);
+    rim.position.set(3, 2, -4);
+    scene.add(rim);
     const dice = [new THREE.Group(), new THREE.Group()];
     dice.forEach((d) => {
       d.scale.setScalar(DICE_SIZE);
@@ -93,7 +86,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       frame,
       loaded = false,
       appearanceKey = "",
-      lastTime = 0;
+      lastTime = 0,
+      viewDistance = 0;
     const tl = new THREE.TextureLoader();
     const normals = [1, 2, 3].map((i) => {
       const t = tl.load(asset(`dice-wear-${i}.png`));
@@ -104,39 +98,63 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     const roughness = tl.load(asset("dice-roughness.png"));
     roughness.flipY = false;
     textures.add(roughness);
-    new GLTFLoader().load(asset("dice.glb"), (g) => {
-      if (!alive) {
-        disposeModel(g.scene);
-        return;
-      }
-      g.scene.traverse((o) => {
-        if (o.isMesh) {
-          geometries.add(o.geometry);
-          materials.add(o.material);
-          for (const value of Object.values(o.material))
-            if (value?.isTexture) textures.add(value);
-          o.castShadow = true;
-          o.receiveShadow = true;
+    new GLTFLoader().load(
+      asset("dice.glb"),
+      (g) => {
+        if (!alive) {
+          disposeModel(g.scene);
+          return;
         }
-      });
-      dice.forEach((d) => d.add(g.scene.clone(true)));
-      loaded = true;
-    });
+        g.scene.traverse((o) => {
+          if (o.isMesh) {
+            geometries.add(o.geometry);
+            materials.add(o.material);
+            for (const value of Object.values(o.material))
+              if (value?.isTexture) textures.add(value);
+            o.castShadow = true;
+            o.receiveShadow = true;
+          }
+        });
+        dice.forEach((d) => d.add(g.scene.clone(true)));
+        loaded = true;
+      },
+      undefined,
+      () => {
+        if (alive) setFailed(true);
+      },
+    );
     const cache = new Map(),
       focus = new THREE.Vector3(),
-      target = new THREE.Vector3();
+      viewDirection = new THREE.Vector3(0.08, 0.85, 1).normalize(),
+      corner = new THREE.Vector3();
     const observer = new ResizeObserver(() => {
-      renderer.setSize(el.clientWidth, el.clientHeight);
-      camera.aspect = el.clientWidth / el.clientHeight;
+      renderer.setSize(
+        Math.max(1, el.clientWidth),
+        Math.max(1, el.clientHeight),
+      );
+      camera.aspect =
+        Math.max(1, el.clientWidth) / Math.max(1, el.clientHeight);
       camera.updateProjectionMatrix();
     });
     observer.observe(el);
     function render(time) {
       frame = requestAnimationFrame(render);
-      if (time - lastTime < (document.hidden ? 500 : software ? 80 : 32))
-        return;
+      if (time - lastTime < (document.hidden ? 500 : software ? 80 : 0)) return;
+      const dt = lastTime ? Math.min(0.1, (time - lastTime) / 1000) : 1 / 60;
       lastTime = time;
-      const { state: s, aim: localAim, appearance, shooterId } = latest.current;
+      const { state: s, aim: localAim, activeThrowId } = latest.current;
+      // A freshly opened Roll tab is a ready close-up, not a replay of the
+      // previous roll. Once observed, a throw keeps its final pose until unmount.
+      const showingShared =
+        !!s.throw &&
+        (s.rolling || s.throw.id === activeThrowId) &&
+        !localAim &&
+        !s.aim?.active;
+      const shooterId = showingShared ? s.throw.shooterId : s.shooterId;
+      const appearance = s.players.find((p) => p.id === shooterId)?.dice || {
+        color: "red",
+        finish: "solid",
+      };
       const key = JSON.stringify([appearance, shooterId]);
       if (loaded && key !== appearanceKey) {
         appearanceKey = key;
@@ -158,10 +176,9 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
           }),
         );
       }
-      const shared =
-        s.throw && !localAim && !s.aim?.active
-          ? sampleThrow(s.throw, Date.now() + (s.clockOffsetMs || 0))
-          : null;
+      const shared = showingShared
+        ? sampleThrow(s.throw, Date.now() + (s.clockOffsetMs || 0))
+        : null;
       const pose = localAim
         ? aimDicePose(localAim)
         : s.aim?.active
@@ -172,26 +189,55 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         dice[i].quaternion.fromArray(p.quaternion);
       });
       focus.copy(dice[0].position).add(dice[1].position).multiplyScalar(0.5);
-      if (localAim || s.aim?.active) focus.set(0, 0.2, 1.85);
-      // Follow the exact shared positions, framed closely enough for a phone.
+      // Frame the true positions together. The full cube diagonal bounds every
+      // orientation; no fake table, snapping, or independent animation is used.
       const radius =
-        Math.max(...dice.map((d) => d.position.distanceTo(focus))) + 0.25;
+        Math.max(...dice.map((d) => d.position.distanceTo(focus))) +
+        (DICE_SIZE * Math.sqrt(3)) / 2;
       const halfFov = Math.min(
         THREE.MathUtils.degToRad(camera.fov / 2),
         Math.atan(
           Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect,
         ),
       );
-      const distance = Math.max(2.2, (radius / Math.sin(halfFov)) * 1.12);
-      target
-        .set(0.08, 0.57, 0.82)
-        .normalize()
-        .multiplyScalar(distance)
-        .add(focus);
-      camera.position.lerp(target, 0.18);
-      if (camera.position.distanceTo(focus) < distance)
-        camera.position.sub(focus).setLength(distance).add(focus);
+      const requiredDistance = Math.max(
+        0.6,
+        (radius / Math.sin(halfFov)) * 1.17,
+      );
+      // Widen immediately to prevent clipping; ease only the move back inward.
+      viewDistance = Math.max(
+        requiredDistance,
+        viewDistance +
+          (requiredDistance - viewDistance) * (1 - Math.exp(-dt * 7)),
+      );
+      camera.position.copy(focus).addScaledVector(viewDirection, viewDistance);
       camera.lookAt(focus);
+      camera.updateMatrixWorld();
+      let framed = true;
+      for (const die of dice)
+        for (const x of [-0.5, 0.5])
+          for (const y of [-0.5, 0.5])
+            for (const z of [-0.5, 0.5]) {
+              corner
+                .set(x, y, z)
+                .multiplyScalar(DICE_SIZE)
+                .applyQuaternion(die.quaternion)
+                .add(die.position)
+                .project(camera);
+              if (
+                Math.abs(corner.x) > 0.98 ||
+                Math.abs(corner.y) > 0.98 ||
+                corner.z < -1 ||
+                corner.z > 1
+              )
+                framed = false;
+            }
+      el.dataset.framed = String(framed);
+      el.dataset.view = showingShared
+        ? s.rolling
+          ? "rolling"
+          : "landed"
+        : "ready";
       el.dataset.throwId = s.throw?.id || "";
       el.dataset.pose = JSON.stringify(pose.dice);
       el.dataset.loaded = String(loaded);
@@ -205,10 +251,6 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       geometries.forEach((g) => g.dispose());
       materials.forEach((m) => m.dispose());
       textures.forEach((t) => t.dispose());
-      floor.geometry.dispose();
-      floor.material.dispose();
-      rail.geometry.dispose();
-      rail.material.dispose();
       environment?.dispose();
       pmrem?.dispose();
       renderer.dispose();
@@ -269,11 +311,21 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         <strong>
           {state.rolling
             ? "Dice are out"
-            : canThrow
-              ? "Your throw"
-              : `${shooter?.name || "Shooter"} has the dice`}
+            : justLanded
+              ? "Dice landed"
+              : canThrow
+                ? "Your throw"
+                : `${shooter?.name || "Shooter"} has the dice`}
         </strong>
-        <span>{aim ? `${Math.round(aim.power * 100)}%` : "LIVE WITH TV"}</span>
+        <span>
+          {aim
+            ? `${Math.round(aim.power * 100)}% POWER`
+            : state.rolling
+              ? "LIVE WITH TV"
+              : justLanded
+                ? "RETURNING TO PLAY"
+                : "DICE CLOSE-UP"}
+        </span>
       </div>
       <div
         ref={host}

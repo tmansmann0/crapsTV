@@ -4,7 +4,7 @@
 
 Money is represented as integer cents. Placing a bet transfers its stake from cash to the felt; it does not create a loss yet. Equity is cash plus all live stakes. Winning a closing bet returns stake plus profit; winning a persistent bet pays profit while its stake stays on the felt. Net result is equity minus all buy-ins. A re-up contributes only the amount needed to restore the starting stack. The recap chart records net after every roll and at join, re-up, and cash-out.
 
-The minimum is at least $1. Starting chips are $10–$1,000,000. Bets must be integers, fit the cash balance, and respect a proper denomination. For example, place 6/8 uses $6 increments, place 3/11 uses $4 increments, and a pass-odds bet at point 6 uses $5 increments. Selecting a $5 chip automatically shows the proper $6 wager for place 6; the amount is visible before the click. Odds may be added up to five times the parent stake. Bets never borrow chips.
+The minimum is at least $1. Starting chips are $10–$1,000,000. Bets must be integers, fit the cash balance, and respect a proper denomination. For example, place 6/8 uses $6 increments, place 3/11 uses $4 increments, and a pass-odds bet at point 6 uses $5 increments. A $5 bundle on place 6 offers an explicit $6 option; irregular bundles show legal lower/higher choices before placing anything. Odds may be added up to five times the parent stake. Bets never borrow chips.
 
 The base pass/come contract cannot be removed after it travels to a point. Its odds can be removed. Don’t bets and their odds can be taken down. Cashing out intentionally closes the player's entire session and returns all unresolved stakes; closing the table does this for everyone.
 
@@ -14,7 +14,7 @@ Classic come-out: pass/come wins on 7 or 11; loses on 2, 3, 12; other totals est
 
 Crapless come-out: only 7 wins immediately, every other total establishes a point. There is no don’t side. Individual come bets retain their own points, independent of the table point.
 
-The shooter continues after a point hit or come-out craps. A seven-out passes the dice to the next connected active player. The admin may roll for the table. The authority locks betting for 1.7 seconds before producing two independent, unbiased cryptographic die values; the meshes animate to match those values.
+The shooter continues after a point hit or come-out craps. A seven-out passes the dice to the next connected active player. The admin may roll for the table. The authority locks betting, obtains a cryptographic launch seed, and simulates both dice until they sleep flat on the felt. Their upper faces determine the outcome; no face is selected in advance. The shared timeline preserves those settled positions and orientations, including a brief unchanged hold before the ledger resolves. Cocked or off-table simulations are retried with fresh launch conditions, never rotated into a desired result. The UI probabilities describe ideal fair dice rather than a statistical certification of the physics model.
 
 | Wager | Profit payout | Resolution |
 | --- | --- | --- |

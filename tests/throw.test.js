@@ -8,15 +8,15 @@ import {
   diceQuaternion,
   aimDicePose,
   sanitizeGesture,
+  upperDieFace,
 } from "../src/throw-motion.js";
-import { DICE_SIZE, BOUNDS } from "../src/dice-physics.js";
+import { DICE_SIZE, BOUNDS, createDicePhysics } from "../src/dice-physics.js";
 
 const options = {
   id: "test-throw",
   playerId: "shooter",
   shooterId: "shooter",
   seed: 8214,
-  dice: [2, 5],
   startAt: 10000,
   duration: 2500,
   gesture: { x: 0.3, power: 0.7 },
@@ -28,6 +28,14 @@ function table() {
   game.start(state, a.id);
   return { state, a, b };
 }
+
+test("settlement cannot invent dice when its physical throw is missing", () => {
+  const { state } = table();
+  state.rolling = true;
+  state.throw = null;
+  assert.throws(() => game.finishRoll(state), /Invalid dice/);
+  assert.equal(state.lastRoll, null);
+});
 
 test("teach mode starts off and only a valid host can enable it", () => {
   const { state, a, b } = table();
@@ -94,7 +102,7 @@ test("a precomputed timeline is deterministic and clients can seek at independen
   assert.deepEqual(sampleThrow(first, 11220), sampleThrow(wireCopy, 11220));
   assert.equal(sampleThrow(first, 9999).progress, 0);
   assert.equal(sampleThrow(first, 12500).done, true);
-  assert.equal(first.frames.length, 151);
+  assert.equal(first.frames.length, first.physicsSteps / 2 + 2);
   assert(first.wallHits > 0);
 });
 
@@ -118,25 +126,75 @@ const faces = {
   5: [0, 0, -1],
   6: [0, -1, 0],
 };
-test("the conditioned final orientation always shows the authoritative face", () => {
-  for (let value = 1; value <= 6; value++) {
-    const up = rotate(faces[value], diceQuaternion(value, 1.1));
-    assert(
-      Math.abs(up[0]) < 1e-9 &&
-        Math.abs(up[1] - 1) < 1e-9 &&
-        Math.abs(up[2]) < 1e-9,
-    );
-    const flight = createThrowTimeline({
-      ...options,
-      dice: [value, 7 - value],
-    });
-    const end = sampleThrow(flight, 12500);
-    for (let i = 0; i < 2; i++) {
-      const renderedUp = rotate(faces[flight.dice[i]], end.dice[i].quaternion);
-      assert(Math.abs(renderedUp[1] - 1) < 0.0001);
-      assert.equal(end.dice[i].position[1], DICE_SIZE / 2 + 0.002);
+test("physical upper faces determine the outcome and the resting pose is never corrected", () => {
+  for (let seed = 0; seed < 12; seed++) {
+    const flight = createThrowTimeline({ ...options, seed });
+    const physics = createDicePhysics();
+    physics.throwDice(seed, options.gesture);
+    // Compare every shared sample to the unmodified fixed-step simulation.
+    for (let i = 0; i < flight.frames.length - 1; i++) {
+      if (i) {
+        physics.step(1 / 120);
+        physics.step(1 / 120);
+      }
+      const expected = physics.bodies.flatMap((body) =>
+        [
+          body.position.x,
+          body.position.y,
+          body.position.z,
+          body.quaternion.x,
+          body.quaternion.y,
+          body.quaternion.z,
+          body.quaternion.w,
+        ].map((value) => Math.round(value * 100000) / 100000),
+      );
+      assert.deepEqual(flight.frames[i].slice(1), expected);
     }
+    assert(physics.sleeping);
+    const end = sampleThrow(flight, flight.startAt + flight.duration);
+    for (let i = 0; i < 2; i++) {
+      const visible = upperDieFace(end.dice[i].quaternion);
+      assert.equal(visible.value, flight.dice[i]);
+      assert(visible.alignment >= 0.995);
+    }
+    // Settlement timing holds the raw terminal frame, with no later spin.
+    assert.deepEqual(
+      flight.frames.at(-1).slice(1),
+      flight.frames.at(-2).slice(1),
+    );
+    const after = sampleThrow(flight, flight.startAt + flight.duration + 10000);
+    assert.deepEqual(after.dice, end.dice);
   }
+});
+
+test("the GLB face mapping reads every physical top face correctly", () => {
+  for (let value = 1; value <= 6; value++) {
+    const q = diceQuaternion(value, 1.1);
+    const up = rotate(faces[value], q);
+    assert(Math.abs(up[1] - 1) < 1e-9);
+    assert.equal(upperDieFace(q).value, value);
+  }
+});
+
+test("launch randomness uses the full seed and ignores a requested face result", () => {
+  const first = createThrowTimeline({ ...options, seed: 0 });
+  const different = createThrowTimeline({ ...options, seed: 997 });
+  assert.notDeepEqual(first.frames, different.frames);
+  const forged = createThrowTimeline({ ...options, seed: 0, dice: [6, 6] });
+  assert.deepEqual(forged, first);
+});
+
+test("explicit rules-test fixtures never rewrite a recorded physical landing", () => {
+  const { state, a } = table();
+  game.place(state, a.id, "pass", 500);
+  const flight = game.beginRoll(state, a.id);
+  const before = structuredClone(flight.frames);
+  const fixture =
+    flight.dice[0] === 6 && flight.dice[1] === 5 ? [1, 1] : [6, 5];
+  game.finishRoll(state, fixture);
+  assert.equal(state.throw, null);
+  assert.deepEqual(state.lastRoll.dice, fixture);
+  assert.deepEqual(flight.frames, before);
 });
 
 test("extreme allowed gestures keep dice within the cushion and above the felt", () => {

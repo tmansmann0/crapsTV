@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
+import { upperDieFace } from "../../src/throw-motion.js";
 // Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
 // captured locally; CI retains every interaction/assertion and DOM trace.
 async function capture(page, options) {
@@ -160,9 +161,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(
       phone.getByRole("button", { name: /Bundle of \$5/ }),
     ).toBeVisible();
-    await phone
-      .getByRole("button", { name: "Bet $5 on Pass line", exact: true })
-      .press("Enter");
+    await phone.getByRole("button", { name: /Place \$5/ }).press("Enter");
     await expect(phone.locator(".pg-wallet")).toContainText("$23");
     await phone
       .getByRole("button", { name: "Add $5 chip", exact: true })
@@ -260,11 +259,10 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     );
     await phone.mouse.up();
     await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
-    await expect(tv.locator(".table-canvas")).toHaveAttribute(
-      "data-cinematic",
-      "true",
+    await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
+      "data-throw-id",
+      /.+/,
     );
-    await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
     const throwId = await phone
       .getByTestId("phone-dice")
       .getAttribute("data-throw-id");
@@ -273,16 +271,35 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "data-throw-id",
       throwId,
     );
-    await expect
-      .poll(async () => {
-        const a = await tv.locator(".table-canvas").getAttribute("data-pose");
-        const b = await phone
-          .getByTestId("phone-dice")
-          .getAttribute("data-pose");
-        return a && a === b;
-      })
-      .toBeTruthy();
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-cinematic",
+      "true",
+    );
+    await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
     await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);
+    const landedPose = await tv
+      .locator(".table-canvas")
+      .getAttribute("data-pose");
+    const shownFaces = await phone
+      .locator(".pg-outcome .pg-die")
+      .evaluateAll((nodes) =>
+        nodes.map((node) =>
+          Number(node.getAttribute("aria-label").match(/\d+/)[0]),
+        ),
+      );
+    expect(
+      JSON.parse(landedPose).map((die) => upperDieFace(die.quaternion).value),
+    ).toEqual(shownFaces);
+    // Regression: the resting orientation must not turn into a different result later.
+    await phone.waitForTimeout(400);
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-pose",
+      landedPose,
+    );
+    await expect(
+      phone.getByRole("tab", { name: "Play", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(phone.getByTestId("phone-dice")).toHaveCount(0);
     await capture(phone, {
       path: "artifacts/phone-dice-result.png",
       fullPage: true,

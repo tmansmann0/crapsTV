@@ -1,6 +1,7 @@
 import { assetURL } from "./asset-url.js";
 import * as THREE from "three";
 import QRCode from "qrcode";
+import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 
 // The TV overlay is rendered entirely as raycastable WebGL meshes.
 export function createSceneUI(renderer, onAction) {
@@ -15,6 +16,8 @@ export function createSceneUI(renderer, onAction) {
     qrURL = "",
     qr = null,
     logo = null,
+    settingsPage = "main",
+    viewWidth = 960,
     alive = true;
   const C = {
     ink: "#eee8db",
@@ -48,9 +51,11 @@ export function createSceneUI(renderer, onAction) {
   }
   panel("brand", 205, 86);
   panel("settingsButton", 48, 48);
-  panel("settings", 288, 316);
+  panel("settings", 304, 368);
+  panel("graphics", 320, 414);
   panel("join", 286, 126);
   panel("status", 410, 62);
+  panel("intro", 430, 174);
   const img = new Image();
   img.onload = () => {
     if (alive) {
@@ -113,6 +118,9 @@ export function createSceneUI(renderer, onAction) {
       cameraMode,
       settingsOpen,
       sceneLoading,
+      graphics = DEFAULT_GRAPHICS,
+      graphicsInfo = {},
+      introActive,
     } = current;
     let p = panels.brand,
       c = begin(p, false);
@@ -131,7 +139,7 @@ export function createSceneUI(renderer, onAction) {
     ];
     finish(p);
     p = panels.settings;
-    p.mesh.visible = !!settingsOpen;
+    p.mesh.visible = !!settingsOpen && settingsPage === "main";
     c = begin(p);
     text(c, "TABLE SETTINGS", 19, 31, 11, C.gold, 700);
     text(c, "×", p.w - 33, 32, 24, C.muted);
@@ -144,6 +152,7 @@ export function createSceneUI(renderer, onAction) {
       ["copy", "Copy invite", "↗"],
       ["join", "Phone controller", "↗"],
       ["fullscreen", "Fullscreen", "⛶"],
+      ["graphics", "Graphics", "›"],
     ];
     rows.forEach(([action, label, value], i) => {
       const y = 55 + i * 48;
@@ -159,7 +168,116 @@ export function createSceneUI(renderer, onAction) {
       p.mesh.userData.buttons.push({ x: 0, y: y - 5, w: p.w, h: 48, action });
     });
     finish(p);
+    p = panels.graphics;
+    p.mesh.visible = !!settingsOpen && settingsPage === "graphics";
+    c = begin(p);
+    text(c, "‹ Back", 17, 31, 12, C.gold, 600);
+    text(c, "GRAPHICS", 96, 31, 11, C.gold, 700);
+    text(c, "×", p.w - 33, 32, 24, C.muted);
+    p.mesh.userData.buttons = [
+      { x: 0, y: 0, w: 86, h: 46, action: "graphics:back" },
+      { x: p.w - 52, y: 0, w: 52, h: 46, action: "settings" },
+    ];
+    const graphicsLabels = {
+      fps: "Frame rate",
+      antialias: "Antialiasing",
+      resolution: "Resolution",
+      modelDetail: "Model detail",
+      textures: "Textures",
+    };
+    Object.entries(graphicsLabels).forEach(([key, label], i) => {
+      const y = 55 + i * 42;
+      c.strokeStyle = C.line;
+      c.beginPath();
+      c.moveTo(17, y - 7);
+      c.lineTo(p.w - 17, y - 7);
+      c.stroke();
+      const value = graphics[key] ?? "auto";
+      const option = GRAPHICS_OPTIONS[key].find((o) => o.value === value);
+      text(c, label, 18, y + 18, 13);
+      c.textAlign = "right";
+      text(
+        c,
+        `${option?.label || "Auto"}  ›`,
+        p.w - 18,
+        y + 18,
+        11,
+        C.gold,
+        600,
+      );
+      c.textAlign = "left";
+      p.mesh.userData.buttons.push({
+        x: 0,
+        y: y - 6,
+        w: p.w,
+        h: 42,
+        action: `graphics:${key}`,
+      });
+    });
+    const measured = Number.isFinite(graphicsInfo.fps)
+      ? `${Math.round(graphicsInfo.fps)} FPS`
+      : "FPS pending";
+    const device = String(graphicsInfo.device || "This display");
+    text(
+      c,
+      device.length > 40 ? `${device.slice(0, 37)}…` : device,
+      18,
+      282,
+      10,
+      C.muted,
+    );
+    text(
+      c,
+      graphicsInfo.status === "testing"
+        ? "Measuring this display…"
+        : `${measured} · ${graphicsInfo.resolution || "Auto resolution"}`,
+      18,
+      301,
+      11,
+      C.ink,
+      600,
+    );
+    text(
+      c,
+      `Textures: ${graphicsInfo.textureLabel || "Auto"}`,
+      18,
+      320,
+      10,
+      C.muted,
+    );
+    c.fillStyle = "rgba(199,171,115,.12)";
+    c.beginPath();
+    c.roundRect(16, 340, p.w - 32, 43, 7);
+    c.fill();
+    text(
+      c,
+      graphicsInfo.status === "testing"
+        ? "Restart graphics check"
+        : "Retest automatic settings",
+      29,
+      367,
+      12,
+      C.gold,
+      600,
+    );
+    p.mesh.userData.buttons.push({
+      x: 16,
+      y: 340,
+      w: p.w - 32,
+      h: 43,
+      action: "graphics:retest",
+    });
+    text(
+      c,
+      "Auto adapts to this display. Tap a row to change.",
+      18,
+      401,
+      9,
+      C.muted,
+    );
+    finish(p);
     p = panels.join;
+    p.mesh.visible = !settingsOpen || viewWidth >= 700;
     c = begin(p);
     text(c, "JOIN TABLE", 17, 24, 9, C.gold, 700);
     text(c, code || "······", 16, 64, 30, C.ink, 600);
@@ -200,11 +318,13 @@ export function createSceneUI(renderer, onAction) {
     p = panels.status;
     c = begin(p);
     p.mesh.visible =
-      state?.status === "playing" ||
-      state?.status === "ended" ||
-      !!error ||
-      status !== "connected" ||
-      sceneLoading;
+      !settingsOpen &&
+      !introActive &&
+      (state?.status === "playing" ||
+        state?.status === "ended" ||
+        !!error ||
+        status !== "connected" ||
+        sceneLoading);
     let heading = "Connecting",
       detail = "";
     if (state?.status === "playing") {
@@ -242,8 +362,64 @@ export function createSceneUI(renderer, onAction) {
     );
     c.textAlign = "left";
     finish(p);
+    p = panels.intro;
+    p.mesh.visible = !!introActive && !settingsOpen;
+    c = begin(p);
+    const testing = graphicsInfo.status !== "ready";
+    text(
+      c,
+      testing ? "GETTING YOUR TABLE READY" : "CRAPSTV",
+      20,
+      27,
+      10,
+      C.gold,
+      700,
+    );
+    text(
+      c,
+      testing ? "Checking graphics performance" : "Your table is ready",
+      20,
+      58,
+      20,
+      C.ink,
+      600,
+    );
+    text(
+      c,
+      testing
+        ? "A short check tunes graphics for this display."
+        : `${measured} · ${graphicsInfo.resolution || "Automatic resolution"}`,
+      20,
+      82,
+      11,
+      C.muted,
+    );
+    const progress = Math.max(
+      0,
+      Math.min(1, graphicsInfo.progress ?? (testing ? 0 : 1)),
+    );
+    c.fillStyle = "rgba(199,171,115,.18)";
+    c.fillRect(20, 99, p.w - 40, 4);
+    c.fillStyle = C.gold;
+    c.fillRect(20, 99, (p.w - 40) * progress, 4);
+    text(
+      c,
+      testing
+        ? "You can change these choices in Graphics."
+        : "Automatic choices can be changed at any time.",
+      20,
+      126,
+      10,
+      C.muted,
+    );
+    text(c, "Graphics settings  ›", 20, 153, 11, C.gold, 600);
+    p.mesh.userData.buttons = [
+      { x: 15, y: 135, w: 180, h: 32, action: "graphics:open" },
+    ];
+    finish(p);
   }
   function resize(w, h) {
+    viewWidth = w;
     camera.aspect = w / h;
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(h / 2000));
     camera.updateProjectionMatrix();
@@ -263,14 +439,29 @@ export function createSceneUI(renderer, onAction) {
       "settings",
       small ? 12 : 24,
       small ? 70 : 84,
-      Math.min(1, (w - 24) / 288),
+      Math.min(1, (w - 24) / 304, (h - 100) / 368),
+    );
+    place(
+      "graphics",
+      small ? 12 : 24,
+      small ? 70 : 84,
+      Math.min(1, (w - 24) / 320, (h - 100) / 414),
     );
     const js = small ? 0.8 : 1;
     place("join", w - 286 * js - (small ? 12 : 24), small ? 78 : 24, js);
     const ss = Math.min(1, (w - 28) / 410);
     place("status", (w - 410 * ss) / 2, h - 62 * ss - 20, ss);
+    const introScale = Math.min(1, (w - 32) / 430);
+    place(
+      "intro",
+      (w - 430 * introScale) / 2,
+      Math.max(150, (h - 174 * introScale) / 2),
+      introScale,
+    );
+    redraw();
   }
   function update(next) {
+    if (!next.settingsOpen && current.settingsOpen) settingsPage = "main";
     current = next;
     const key = JSON.stringify([
       next.code,
@@ -280,6 +471,15 @@ export function createSceneUI(renderer, onAction) {
       next.cameraMode,
       next.settingsOpen,
       next.sceneLoading,
+      next.graphics,
+      Math.round(next.graphicsInfo?.fps || 0),
+      next.graphicsInfo?.resolution,
+      next.graphicsInfo?.device,
+      next.graphicsInfo?.status,
+      next.graphicsInfo?.textureLabel,
+      Math.round((next.graphicsInfo?.progress || 0) * 100),
+      next.introActive,
+      next.introReducedMotion,
       next.fallbackJoinURL,
       next.state?.status,
       next.state?.point,
@@ -339,7 +539,21 @@ export function createSceneUI(renderer, onAction) {
     resize,
     update,
     pick,
-    activate: onAction,
+    get settingsPage() { return settingsPage; },
+    setSettingsPage(page) {
+      settingsPage = page === "graphics" ? "graphics" : "main";
+      redraw();
+    },
+    activate(action) {
+      if (action === "graphics" || action === "graphics:open") {
+        settingsPage = "graphics";
+        if (!current.settingsOpen) onAction("settings");
+        redraw();
+      } else if (action === "graphics:back") {
+        settingsPage = "main";
+        redraw();
+      } else onAction(action);
+    },
     dispose() {
       alive = false;
       for (const p of Object.values(panels)) {

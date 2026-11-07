@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -28,6 +29,13 @@ import {
 } from "lucide-react";
 import { validBetChoices } from "./bet-options.js";
 import { catalogue, describeBet, equity, money, net } from "./game.js";
+import {
+  freshMobileSettlement,
+  MOBILE_DICE_HOLD_MS,
+  MOBILE_PAYOUT_HOLD_MS,
+  MOBILE_PAYOUT_FLIGHT_MS,
+  MOBILE_PAYOUT_STAGGER_MS,
+} from "./mobile-settlement.js";
 import "./phone-game.css";
 
 const TRAY = [100, 500, 2500, 10000];
@@ -308,6 +316,8 @@ function BetTile({
   teach,
   className = "",
   cue,
+  disabled,
+  note,
   onSelect,
   children,
 }) {
@@ -327,9 +337,10 @@ function BetTile({
       data-bet-id={row.id}
       className={`pg-tile ${className} ${state}`}
       aria-pressed={!!selected}
+      disabled={disabled}
       aria-label={`${row.name}${
         row.available ? "" : `, ${unavailableLabel(row)}`
-      }${stake ? `, your stake ${money(stake)}` : ""}`}
+      }${stake ? `, your stake ${money(stake)}` : ""}${note ? `, ${note}` : ""}`}
       onClick={() => onSelect(row)}
     >
       {children}
@@ -493,7 +504,7 @@ function Notice({ notice, fallback, onBet, locked }) {
   );
 }
 
-function QuickBets({ row, player, onBet }) {
+function QuickBets({ row, player, onBet, detail }) {
   const { quick } = validBetChoices(row, 0, player);
   if (!quick.length) return null;
   return (
@@ -502,7 +513,10 @@ function QuickBets({ row, player, onBet }) {
       role="group"
       aria-label={`Quick bets on ${row.name}`}
     >
-      <span>{row.name}</span>
+      <span>
+        {row.name}
+        {detail && <small>{detail}</small>}
+      </span>
       {quick.map((value) => (
         <button
           type="button"
@@ -517,7 +531,28 @@ function QuickBets({ row, player, onBet }) {
   );
 }
 
-function Board({ state, rows, travelled, tile }) {
+// What a line bet's odds row can still accept, read from the authoritative row.
+function oddsCapacity(row, stake, player) {
+  const { minimum, maximum } = validBetChoices(row, 0, player);
+  if (maximum >= minimum)
+    return { open: true, note: `Up to ${money(maximum)} more` };
+  return {
+    open: false,
+    note: row.max - stake < row.minimum ? "At odds limit" : "Bank too low",
+  };
+}
+
+function OddsCue({ side, label, text }) {
+  return (
+    <div className="pg-odds-row pg-odds-cue" role="note" data-odds-cue={side}>
+      <Lock size={13} aria-hidden="true" />
+      <b>{label}</b>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function Board({ state, rows, travelled, tile, passBet, dontBet, oddsTile }) {
   const by = (id) => rows.find((row) => row.id === id);
   const places = rows.filter(isPlaceRow),
     crapless = state.config.mode === "crapless";
@@ -581,16 +616,35 @@ function Board({ state, rows, travelled, tile }) {
         </span>,
         "pg-tile-field",
       )}
-      {dont &&
-        tile(
-          dont,
-          <span className="pg-tile-name is-small">Don’t Pass Bar</span>,
-          "pg-tile-dont",
-        )}
+      {dont && (
+        <div className="pg-board-dont">
+          {tile(
+            dont,
+            <span className="pg-tile-name is-small">Don’t Pass Bar</span>,
+            "pg-tile-dont",
+          )}
+          {dontBet?.point && oddsTile(dontBet, "Don’t Odds")}
+        </div>
+      )}
       {tile(
         pass,
         <span className="pg-tile-name is-pass">Pass Line</span>,
         "pg-tile-pass",
+      )}
+      {passBet?.point ? (
+        oddsTile(passBet, "Pass Odds")
+      ) : (
+        <OddsCue
+          side="pass"
+          label="Pass Odds"
+          text={
+            passBet
+              ? "Open once the point is set"
+              : state.point
+                ? "Need a Pass Line bet from the come-out"
+                : "Bet Pass Line first"
+          }
+        />
       )}
       {!state.point && (
         <span className="pg-puck is-off pg-board-off" aria-label="No point set">
@@ -601,8 +655,7 @@ function Board({ state, rows, travelled, tile }) {
   );
 }
 
-function MoreBets({ rows, tile }) {
-  const extra = rows.filter((row) => !isBoardRow(row));
+function MoreBets({ extra, tile }) {
   const groups = ["True odds", "Hardways", "One roll", "Big numbers"];
   return (
     <div className="pg-more">
@@ -634,7 +687,7 @@ function MoreBets({ rows, tile }) {
                 })}
               </div>
             ) : (
-              <p>Available once a line bet has a point.</p>
+              <p>Come odds appear here once a come bet has a point.</p>
             )}
           </section>
         );
@@ -682,7 +735,16 @@ function PlayPanel({
     onDragTarget(dragTarget);
     return () => onDragTarget(undefined);
   }, [dragTarget, onDragTarget]);
-  const { stakes, counts, travelled, moreStake, oddsCount } = useMemo(() => {
+  const {
+    stakes,
+    counts,
+    travelled,
+    extras,
+    passBet,
+    dontBet,
+    moreStake,
+    oddsCount,
+  } = useMemo(() => {
     const stakes = stakeTotals(player.bets),
       counts = {},
       travelled = {};
@@ -693,11 +755,21 @@ function PlayPanel({
         travelled[b.point] =
           `${b.type === "come" ? "C" : "DC"} ${compact(b.amount)}`;
     }
-    const extras = rows.filter((row) => !isBoardRow(row));
+    const passBet = player.bets.find((b) => b.type === "pass"),
+      dontBet = player.bets.find((b) => b.type === "dont");
+    const onBoard = new Set(
+      [passBet, dontBet].filter((b) => b?.point).map((b) => `odds:${b.id}`),
+    );
+    const extras = rows.filter(
+      (row) => !isBoardRow(row) && !onBoard.has(row.id),
+    );
     return {
       stakes,
       counts,
       travelled,
+      extras,
+      passBet,
+      dontBet,
       moreStake: sum(extras.map((row) => stakes[row.id] || 0)),
       oddsCount: extras.filter((row) => row.parent).length,
     };
@@ -706,8 +778,9 @@ function PlayPanel({
     setSelectedId((current) => (current === row.id ? null : row.id));
     setNotice(null);
   };
-  const tile = (row, children, className) => (
+  const tile = (row, children, className, extra) => (
     <BetTile
+      {...extra}
       key={row.id}
       row={row}
       className={className}
@@ -723,12 +796,35 @@ function PlayPanel({
       {children}
     </BetTile>
   );
+  const oddsTile = (parent, label) => {
+    const row = rows.find((r) => r.id === `odds:${parent.id}`);
+    if (!row) return null;
+    const { open, note } = oddsCapacity(row, stakes[row.id] || 0, player);
+    const detail =
+      parent.type === "pass" && open
+        ? `Min ${money(row.minimum)} · ${money(row.quantum)} steps · ${note}`
+        : note;
+    return tile(
+      row,
+      <span className="pg-odds-text">
+        <b>
+          {label} · {parent.point}
+        </b>
+        <small>{detail}</small>
+      </span>,
+      "pg-odds-row pg-tile-odds",
+      {
+        note: `${detail}. Pays ${row.payout}. Total odds limit ${money(row.max)}`,
+        disabled: !open || state.rolling || !connected,
+      },
+    );
+  };
   const liveNotice = !connected
     ? { tone: "error", text: "Reconnecting. Bets are paused." }
     : state.rolling
       ? { tone: "lock", text: "Dice are out. Bets are locked." }
       : notice;
-  const showQuick = !locked && !!selectedRow?.available && !liveNotice?.row;
+  const showQuick = !locked && !!selectedRow?.available && !liveNotice;
   const fallback = selectedRow
     ? `${selectedRow.name} · min ${money(selectedRow.minimum)}${
         selectedRow.quantum > 100
@@ -805,16 +901,28 @@ function PlayPanel({
             />
           </>
         )}
-        {!canReup && (liveNotice || !showQuick || teach) && (
-          <Notice
-            notice={liveNotice}
-            fallback={fallback}
-            onBet={wager}
-            locked={locked}
-          />
-        )}
-        {!canReup && showQuick && (
-          <QuickBets row={selectedRow} player={player} onBet={wager} />
+        {!canReup && (
+          <div className="pg-feedback">
+            {showQuick ? (
+              <QuickBets
+                row={selectedRow}
+                player={player}
+                onBet={wager}
+                detail={
+                  teach
+                    ? `Min ${money(selectedRow.minimum)} · pays ${selectedRow.payout.split(" · ")[0]} · ${(selectedRow.prob * 100).toFixed(1)}% win · ${selectedRow.edge.toFixed(2)}% edge`
+                    : undefined
+                }
+              />
+            ) : (
+              <Notice
+                notice={liveNotice}
+                fallback={fallback}
+                onBet={wager}
+                locked={locked}
+              />
+            )}
+          </div>
         )}
       </div>
       <div className="pg-board-switch" role="group" aria-label="Betting layout">
@@ -837,9 +945,17 @@ function PlayPanel({
       </div>
       <div className={`pg-felt ${locked ? "is-locked" : ""}`}>
         {view === "board" ? (
-          <Board state={state} rows={rows} travelled={travelled} tile={tile} />
+          <Board
+            state={state}
+            rows={rows}
+            travelled={travelled}
+            tile={tile}
+            passBet={passBet}
+            dontBet={dontBet}
+            oddsTile={oddsTile}
+          />
         ) : (
-          <MoreBets rows={rows} tile={tile} />
+          <MoreBets extra={extras} tile={tile} />
         )}
       </div>
       {drag.ghostNode}
@@ -1618,6 +1734,158 @@ function SettingsSheet({ open, onClose, children }) {
   );
 }
 
+// The chips start on the actual DOM betting targets, then move into the bank.
+// RAF changes only the overlay transforms; it never drives the game ledger.
+function MobilePayout({ presentation, onLand }) {
+  const nodes = useRef(new Map());
+  const layer = useRef(null);
+  useLayoutEffect(() => {
+    const shell = layer.current?.closest(".pg-shell");
+    if (!shell) return;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let frame,
+      started,
+      disposed = false;
+    const landed = new Set();
+    const items = presentation.entries.map((entry, index) => ({
+      entry,
+      index,
+      element: nodes.current.get(entry.id),
+    }));
+    const measure = () => {
+      const targets = [
+        ...shell.querySelectorAll("[data-bet-id], [data-odds-cue]"),
+      ];
+      const targetId = (element) =>
+        element.dataset.betId || `odds-cue:${element.dataset.oddsCue}`;
+      const bank = shell
+        .querySelector("[data-bank-target]")
+        ?.getBoundingClientRect();
+      const felt = shell.querySelector(".pg-felt")?.getBoundingClientRect();
+      const nav = shell.querySelector(".pg-nav")?.getBoundingClientRect();
+      const header = shell.querySelector(".pg-header")?.getBoundingClientRect();
+      const groups = new Map();
+      for (const item of items) {
+        const { entry, element } = item;
+        const target = entry.anchors
+          .map((id) =>
+            targets.find(
+              (el) =>
+                targetId(el) === id && el.getBoundingClientRect().height > 0,
+            ),
+          )
+          .find(Boolean);
+        const rect = target?.getBoundingClientRect() || felt;
+        if (!rect || !bank || !element) continue;
+        const key = target ? targetId(target) : "other";
+        const sibling = groups.get(key) || 0;
+        groups.set(key, sibling + 1);
+        // Keep complete labels inside even the narrowest supported phone.
+        item.x = Math.max(
+          88,
+          Math.min(
+            innerWidth - 88,
+            rect.x + rect.width / 2 + (sibling % 2 ? 34 : -14),
+          ),
+        );
+        item.y = Math.max(
+          (header?.bottom || 54) + 50,
+          Math.min(
+            (nav?.top || innerHeight - 70) - 34,
+            rect.y + rect.height / 2 + sibling * 48,
+          ),
+        );
+        item.toX = bank.x + bank.width / 2;
+        item.toY = bank.y + bank.height / 2;
+        element.dataset.anchor = target ? targetId(target) : "other-bets";
+        element.dataset.phase = "on-board";
+        element.style.opacity = "1";
+      }
+    };
+    measure();
+    const tick = (now) => {
+      if (disposed) return;
+      started ??= now;
+      const elapsed = now - started;
+      for (const item of items) {
+        const { entry, index, element, x, y, toX, toY } = item;
+        if (!element || landed.has(entry.id)) continue;
+        const delay = MOBILE_PAYOUT_HOLD_MS + index * MOBILE_PAYOUT_STAGGER_MS;
+        const progress = reduced
+          ? elapsed >= delay
+            ? 1
+            : 0
+          : Math.max(
+              0,
+              Math.min(1, (elapsed - delay) / MOBILE_PAYOUT_FLIGHT_MS),
+            );
+        const ease = progress * progress * (3 - 2 * progress);
+        const dx = Number.isFinite(x) ? x + (toX - x) * ease : innerWidth / 2;
+        const dy = Number.isFinite(y)
+          ? y + (toY - y) * ease - Math.sin(progress * Math.PI) * 42
+          : innerHeight / 2;
+        element.style.transform = `translate3d(${dx}px,${dy}px,0) translate(-50%,-50%) scale(${1 - ease * 0.67})`;
+        element.dataset.phase = progress ? "flying" : "on-board";
+        if (progress >= 1) {
+          element.dataset.phase = "landed";
+          element.style.opacity = "0";
+          landed.add(entry.id);
+          onLand(entry.id);
+        }
+      }
+      if (landed.size < items.length) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    window.addEventListener("resize", measure);
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", measure);
+    };
+  }, [presentation.id, onLand]);
+  return (
+    <div
+      ref={layer}
+      className="pg-payout-layer"
+      data-payout-roll={presentation.id}
+    >
+      <span className="pg-sr-only" role="status">
+        {presentation.entries
+          .map(
+            (entry) =>
+              `${entry.label}: ${entry.profit ? `${money(entry.profit)} won` : "Push"}${entry.returnedStake ? `, ${money(entry.returnedStake)} stake returned` : ", stake stays on the table"}.`,
+          )
+          .join(" ")}
+      </span>
+      {presentation.entries.map((entry) => (
+        <div
+          key={entry.id}
+          ref={(el) => {
+            if (el) nodes.current.set(entry.id, el);
+            else nodes.current.delete(entry.id);
+          }}
+          className="pg-payout"
+          data-payout-bet={entry.betId}
+        >
+          <div className="pg-payout-chip">
+            <Chip value={chipFor(entry.total)} />
+            <b>{money(entry.total)}</b>
+          </div>
+          <div className="pg-payout-label">
+            <strong>{entry.label}</strong>
+            <span>{entry.profit ? `+${money(entry.profit)} won` : "Push"}</span>
+            <small>
+              {entry.returnedStake
+                ? `${money(entry.returnedStake)} stake returned`
+                : "Stake stays on table"}
+            </small>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function PhoneGame({
   state,
   player,
@@ -1642,6 +1910,9 @@ export default function PhoneGame({
         ? chipsForAmount(state.config.minBet)
         : [],
     );
+  const [presentation, setPresentation] = useState(null);
+  const previousSnapshot = useRef(null);
+  const reconnectBaseline = useRef(null);
   const amount = sum(bundle);
   const rows = useMemo(() => catalogue(state, player), [state, player]);
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
@@ -1651,6 +1922,73 @@ export default function PhoneGame({
     shooterName =
       state.players.find((p) => p.id === state.shooterId)?.name || "The host",
     canReup = equity(player) < state.config.minBet && !player.bets.length;
+
+  // A continuous connection and a new, recent server result are required.
+  // First snapshots and reconnects establish a baseline without replaying money.
+  useLayoutEffect(() => {
+    if (!connected) {
+      previousSnapshot.current = null;
+      reconnectBaseline.current = { state, snapshotAt: state.snapshotAt };
+      setPresentation(null);
+      return;
+    }
+    if (reconnectBaseline.current) {
+      const baseline = reconnectBaseline.current;
+      // Transport can reconnect before its first room snapshot arrives.
+      if (
+        state === baseline.state ||
+        (Number.isFinite(baseline.snapshotAt) &&
+          state.snapshotAt === baseline.snapshotAt)
+      )
+        return;
+      reconnectBaseline.current = null;
+      previousSnapshot.current = state;
+      return;
+    }
+    const previous = previousSnapshot.current;
+    previousSnapshot.current = state;
+    if (
+      state.rolling &&
+      (!previous?.rolling || state.throw?.id !== previous.throw?.id)
+    ) {
+      setPresentation(null);
+      if (rollArea) setTab("dice");
+    }
+    const fresh = freshMobileSettlement(previous, state, player.id);
+    if (fresh) setPresentation({ ...fresh, active: false, landed: [] });
+  }, [state, connected, player.id, !!rollArea]);
+  useEffect(() => {
+    if (!presentation || presentation.active) return;
+    const id = presentation.id;
+    const timer = setTimeout(() => {
+      setTab("play");
+      setDetailOpen(false);
+      setPresentation((current) =>
+        current?.id === id && current.entries.length
+          ? { ...current, active: true }
+          : null,
+      );
+    }, MOBILE_DICE_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [presentation?.id, presentation?.active]);
+  const landPayout = useCallback(
+    (id) =>
+      setPresentation((current) => {
+        if (!current || current.landed.includes(id)) return current;
+        const landed = [...current.landed, id];
+        return landed.length === current.entries.length
+          ? null
+          : { ...current, landed };
+      }),
+    [],
+  );
+  const pendingCredit =
+    presentation?.entries.reduce(
+      (total, entry) =>
+        total + (presentation.landed.includes(entry.id) ? 0 : entry.total),
+      0,
+    ) || 0;
+  const displayedBank = Math.max(0, player.bank - pendingCredit);
 
   // Bets are frozen while dice fly, so this is exactly what the roll acted on.
   const thrown = useRef(null);
@@ -1691,7 +2029,9 @@ export default function PhoneGame({
   // Lives here, not in PlayPanel, so leaving the Play tab clears the TV while a
   // cash-out or session end (which the server clears itself) sends nothing.
   const staged =
-    tab === "play" && !canReup && amount <= player.bank ? amount : 0;
+    tab === "play" && !canReup && !pendingCredit && amount <= player.bank
+      ? amount
+      : 0;
   useBetPreview({
     send,
     echo: player.betPreview,
@@ -1856,9 +2196,12 @@ export default function PhoneGame({
             </small>
           </div>
           <dl className="pg-wallet">
-            <div>
+            <div
+              data-bank-target
+              className={pendingCredit ? "is-awaiting-payout" : ""}
+            >
               <dt>Bank</dt>
-              <dd>{compact(player.bank)}</dd>
+              <dd data-bank-value={displayedBank}>{compact(displayedBank)}</dd>
             </div>
             <div>
               <dt>Stake</dt>
@@ -1926,7 +2269,7 @@ export default function PhoneGame({
               rows={rows}
               connected={connected}
               teach={state.config.teach}
-              busy={!!pendingWager}
+              busy={!!pendingWager || pendingCredit > 0}
               bundle={bundle}
               amount={amount}
               selectedRow={selectedRow}
@@ -1985,6 +2328,9 @@ export default function PhoneGame({
             </button>
           ))}
         </nav>
+        {presentation?.active && (
+          <MobilePayout presentation={presentation} onLand={landPayout} />
+        )}
         {settingsArea && (
           <SettingsSheet
             open={settingsOpen}

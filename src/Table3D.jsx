@@ -11,6 +11,27 @@ import { createTablePieces } from "./table-pieces.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
 import { assetURL as asset } from "./asset-url.js";
+import {
+  DEFAULT_GRAPHICS,
+  GRAPHICS_OPTIONS,
+  normalizeGraphics,
+} from "./graphics-settings.js";
+import {
+  recommendGraphics,
+  calibrateGraphics,
+  resolveGraphics,
+} from "./graphics-profile.js";
+import { createTextureQuality } from "./texture-quality.js";
+const GRAPHICS_STORAGE = "crapstv-graphics-v1";
+function savedGraphics() {
+  try {
+    return normalizeGraphics(
+      JSON.parse(localStorage.getItem(GRAPHICS_STORAGE) || "{}"),
+    );
+  } catch {
+    return { ...DEFAULT_GRAPHICS };
+  }
+}
 const rotations = {
   1: [0, 0, 0],
   6: [Math.PI, 0, 0],
@@ -21,14 +42,36 @@ const rotations = {
 };
 export default function Table3D(props) {
   const host = useRef(),
-    latest = useRef(props);
+    latest = useRef(props),
+    graphicsRef = useRef(null),
+    profileRef = useRef(null),
+    remoteGraphicsRevision = useRef(-1),
+    graphicsPage = useRef("main"),
+    retainedView = useRef(null),
+    introDone = useRef(false);
+  if (!graphicsRef.current) graphicsRef.current = savedGraphics();
   latest.current = props;
   const [failed, setFailed] = useState(false);
+  const [rendererEpoch, setRendererEpoch] = useState(0);
   useEffect(() => {
     let renderer;
+    let graphics = graphicsRef.current;
+    const capabilities = {
+      devicePixelRatio: window.devicePixelRatio || 1,
+      deviceMemory: navigator.deviceMemory,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+    };
+    const initialProfile =
+      profileRef.current || recommendGraphics(capabilities);
+    const initialQuality = resolveGraphics(
+      graphics,
+      initialProfile,
+      capabilities,
+    );
+    let contextAntialias = initialQuality.antialias;
     try {
       renderer = new THREE.WebGLRenderer({
-        antialias: true,
+        antialias: initialQuality.antialias,
         powerPreference: "high-performance",
       });
     } catch {
@@ -39,12 +82,12 @@ export default function Table3D(props) {
     let alive = true,
       frame,
       readyEnvironment = null,
-      cameraMode = "auto",
-      userUntil = 0,
+      cameraMode = retainedView.current?.cameraMode || "auto",
+      userUntil = retainedView.current?.userUntil || 0,
       dragStart = null,
       environmentShell = null,
       environmentTarget = null,
-      displayRevision = -1,
+      displayRevision = retainedView.current?.displayRevision ?? -1,
       tableLoaded = false,
       piecesLoaded = false,
       detailLoaded = 0,
@@ -53,9 +96,44 @@ export default function Table3D(props) {
       warming = false,
       stageError = "";
     const { software } = configureRenderer(renderer);
+    capabilities.software = software;
+    capabilities.maxTextureSize = renderer.capabilities.maxTextureSize;
+    if (!profileRef.current)
+      profileRef.current = recommendGraphics(capabilities);
+    let quality = resolveGraphics(graphics, profileRef.current, capabilities);
+    if (
+      quality.antialias !==
+      renderer.getContext().getContextAttributes().antialias
+    ) {
+      renderer.dispose();
+      renderer.forceContextLoss();
+      renderer = new THREE.WebGLRenderer({
+        antialias: quality.antialias,
+        powerPreference: "high-performance",
+      });
+      configureRenderer(renderer);
+      contextAntialias = quality.antialias;
+    }
+    renderer.setPixelRatio(quality.pixelRatio);
+    const textureQuality = createTextureQuality(quality.textureLimit);
+    let restarting = false;
+    let introStart = null;
+    let introPaused = null;
+    let introIntervals = [];
+    let introPreviousFrame = null;
+    const introDuration = software ? 900 : 2400;
+    const glInfo = renderer
+      .getContext()
+      .getExtension("WEBGL_debug_renderer_info");
+    const deviceName = glInfo
+      ? renderer.getContext().getParameter(glInfo.UNMASKED_RENDERER_WEBGL)
+      : "WebGL device";
     el.dataset.renderQuality = software ? "software" : "full";
     renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // The room light is fixed: camera movement does not invalidate its shadows.
+    renderer.shadowMap.autoUpdate = false;
+    renderer.info.autoReset = false;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     renderer.autoClear = false;
@@ -66,6 +144,10 @@ export default function Table3D(props) {
     camera.position.set(10, 6.5, 18);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.4, 0.5);
+    if (retainedView.current) {
+      camera.position.fromArray(retainedView.current.position);
+      controls.target.fromArray(retainedView.current.target);
+    }
     controls.enableDamping = true;
     controls.dampingFactor = 0.065;
     controls.enablePan = false;
@@ -110,6 +192,7 @@ export default function Table3D(props) {
         texture.dispose();
         return;
       }
+      textureQuality.register(texture);
       texture.mapping = THREE.EquirectangularReflectionMapping;
       // A finite inward-facing shell lets dolly/zoom change the room's scale.
       environmentShell = new THREE.Mesh(
@@ -126,6 +209,13 @@ export default function Table3D(props) {
       environmentShell.userData.environment = true;
       scene.add(environmentShell);
       scene.environmentRotation.y = Math.PI / 2;
+      readyEnvironment = texture;
+      rebuildEnvironment();
+      el.dataset.environment = name;
+    }
+    function rebuildEnvironment() {
+      if (!readyEnvironment) return;
+      const texture = readyEnvironment;
       let lightingTexture = texture;
       if (software && texture.image.width > 512) {
         // Keep the real HDR backdrop, but prefilter a smaller lighting map on
@@ -155,12 +245,12 @@ export default function Table3D(props) {
         lightingTexture.mapping = THREE.EquirectangularReflectionMapping;
         lightingTexture.needsUpdate = true;
       }
+      const previous = environmentTarget;
       environmentTarget = pmrem.fromEquirectangular(lightingTexture);
       if (lightingTexture !== texture) lightingTexture.dispose();
       scene.environment = environmentTarget.texture;
       scene.environmentIntensity = 1.2;
-      readyEnvironment = texture;
-      el.dataset.environment = name;
+      previous?.dispose();
     }
     async function loadEnvironment(name, sourceLoader) {
       const response = await fetch(asset(name));
@@ -199,12 +289,19 @@ export default function Table3D(props) {
         if (o.isMesh) {
           o.castShadow = true;
           o.receiveShadow = true;
+          registerMaterialTextures(o.material);
         }
       });
       return object;
     }
+    function registerMaterialTextures(material) {
+      for (const m of Array.isArray(material) ? material : [material])
+        for (const value of Object.values(m || {}))
+          if (value?.isTexture && value !== environmentTarget?.texture)
+            textureQuality.register(value);
+    }
     loader.load(
-      asset("table-player-rails.glb"),
+      asset("table-player-rails-optimized.glb"),
       (g) => {
         if (alive) {
           scene.add(addObject(g.scene));
@@ -227,6 +324,7 @@ export default function Table3D(props) {
             return;
           }
           detailLoaded++;
+          textureQuality.register(texture);
         },
         undefined,
         () => {
@@ -271,6 +369,7 @@ export default function Table3D(props) {
           t.colorSpace = THREE.SRGBColorSpace;
           t.anisotropy = renderer.capabilities.getMaxAnisotropy();
           textures[mode] = t;
+          textureQuality.register(t);
           boardsLoaded++;
         },
         undefined,
@@ -305,8 +404,58 @@ export default function Table3D(props) {
     );
     puck.position.set(-4.5, 0.07, -2.1);
     scene.add(puck);
+    function applyRuntimeQuality() {
+      quality = resolveGraphics(graphics, profileRef.current, capabilities);
+      if (quality.antialias !== contextAntialias && !restarting) {
+        graphicsPage.current = ui.settingsPage;
+        retainedView.current = {
+          cameraMode,
+          userUntil,
+          displayRevision,
+          position: camera.position.toArray(),
+          target: controls.target.toArray(),
+        };
+        restarting = true;
+        setRendererEpoch((value) => value + 1);
+        return;
+      }
+      if (renderer.getPixelRatio() !== quality.pixelRatio) {
+        renderer.setPixelRatio(quality.pixelRatio);
+        resize();
+      }
+      if (textureQuality.setLimit(quality.textureLimit)) rebuildEnvironment();
+      renderer.shadowMap.needsUpdate = true;
+    }
+    function setGraphics(next) {
+      graphics = normalizeGraphics(next);
+      graphicsRef.current = graphics;
+      try {
+        localStorage.setItem(GRAPHICS_STORAGE, JSON.stringify(graphics));
+      } catch {}
+      applyRuntimeQuality();
+    }
+    function handleGraphics(action) {
+      const key = action.slice("graphics:".length);
+      if (key === "retest") {
+        introDone.current = false;
+        introStart = null;
+        introPreviousFrame = null;
+        introIntervals = [];
+        return;
+      }
+      const options = GRAPHICS_OPTIONS[key];
+      if (!options) return;
+      const index = options.findIndex(
+        (option) => option.value === graphics[key],
+      );
+      setGraphics({
+        ...graphics,
+        [key]: options[(index + 1) % options.length].value,
+      });
+    }
     const ui = createSceneUI(renderer, (action) => {
-      if (action === "camera") {
+      if (action.startsWith("graphics:")) handleGraphics(action);
+      else if (action === "camera") {
         cameraMode =
           cameraMode === "auto"
             ? "table"
@@ -317,6 +466,7 @@ export default function Table3D(props) {
         el.dataset.camera = cameraMode;
       } else latest.current.onAction?.(action);
     });
+    ui.setSettingsPage(graphicsPage.current);
     function pointerDown(e) {
       dragStart = { x: e.clientX, y: e.clientY };
       if (ui.pick(e.clientX, e.clientY)) controls.enabled = false;
@@ -342,10 +492,11 @@ export default function Table3D(props) {
     el.addEventListener("pointerdown", pointerDown, true);
     el.addEventListener("pointerup", pointerUp);
     el.addEventListener("pointermove", pointerMove);
-    el.addEventListener("pointercancel", () => {
+    function pointerCancel() {
       controls.enabled = true;
       dragStart = null;
-    });
+    }
+    el.addEventListener("pointercancel", pointerCancel);
     function resize() {
       const w = el.clientWidth,
         h = el.clientHeight;
@@ -360,25 +511,69 @@ export default function Table3D(props) {
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
     let lastTime = 0,
       startTime = performance.now();
-    const targetPosition = new THREE.Vector3();
+    let lastPiecesState = null,
+      lastPiecesConnection = null,
+      lastPiecesReady = false,
+      renderedOnce = false,
+      metricStart = 0,
+      metricFrames = 0;
+    const targetPosition = new THREE.Vector3(),
+      tableTarget = new THREE.Vector3(0, 0.4, 0.5),
+      diceMidpoint = new THREE.Vector3(),
+      scratchPosition = new THREE.Vector3(),
+      aimOffset = new THREE.Vector3(0.17, -0.07, 0),
+      aimDirection = new THREE.Vector3();
+    let nextFrameAt = 0;
     function animate(time) {
       frame = requestAnimationFrame(animate);
+      if (restarting) return;
+      if (document.hidden) {
+        if (introPaused === null) introPaused = time;
+        introPreviousFrame = null;
+      } else {
+        if (introPaused !== null && introStart !== null)
+          introStart += time - introPaused;
+        introPaused = null;
+        if (stageReady && !introDone.current) {
+          if (introStart === null) introStart = time;
+          if (introPreviousFrame !== null && time - introStart > 300)
+            introIntervals.push(time - introPreviousFrame);
+          introPreviousFrame = time;
+          if (time - introStart >= introDuration) {
+            if (!software)
+              profileRef.current = calibrateGraphics(
+                profileRef.current,
+                introIntervals,
+              );
+            introDone.current = true;
+            applyRuntimeQuality();
+            nextFrameAt = 0;
+          }
+        }
+      }
       if (document.hidden && time - lastTime < 500) return;
       const frameDelta = (time - lastTime) / 1000;
       const dt = Math.min(frameDelta, 0.06);
-      const interval =
-        latest.current.state?.rolling || dragStart || time < settlingUntil
-          ? software
-            ? 80
-            : 33
-          : software
-            ? 200
-            : 66;
-      if (time - lastTime < interval) return;
+      const testing = stageReady && !introDone.current;
+      const interval = 1000 / (testing && !software ? 60 : quality.fps);
+      // Carry fractional deadlines: 24 FPS on a 60 Hz display needs alternating
+      // two/three-refresh gaps, rather than accidentally becoming 20 FPS.
+      if (!document.hidden && time + 0.75 < nextFrameAt) return;
+      if (!nextFrameAt || time - nextFrameAt > interval) nextFrameAt = time;
+      nextFrameAt += interval;
       lastTime = time;
       const current = latest.current,
         s = current.state,
         mode = s?.config.mode === "crapless" ? "crapless" : "classic";
+      const graphicsRevision = s?.display?.graphicsRevision ?? 0;
+      if (
+        s?.display?.graphics &&
+        graphicsRevision !== remoteGraphicsRevision.current
+      ) {
+        remoteGraphicsRevision.current = graphicsRevision;
+        if (graphicsRevision > 0) setGraphics(s.display.graphics);
+      }
+      if (restarting) return;
       if (s?.display && s.display.revision !== displayRevision) {
         displayRevision = s.display.revision;
         cameraMode = s.display.camera;
@@ -410,15 +605,15 @@ export default function Table3D(props) {
       if ((time > userUntil && !dragStart) || cinematic) {
         const elapsed = (time - startTime) / 1000;
         if (cinematic && shared) {
-          const mid = new THREE.Vector3()
+          const mid = diceMidpoint
             .fromArray(shared.dice[0].position)
-            .add(new THREE.Vector3().fromArray(shared.dice[1].position))
+            .add(scratchPosition.fromArray(shared.dice[1].position))
             .multiplyScalar(0.5);
           const ending = shared.progress > 0.72;
           const radius =
             Math.max(
               ...shared.dice.map((p) =>
-                new THREE.Vector3().fromArray(p.position).distanceTo(mid),
+                scratchPosition.fromArray(p.position).distanceTo(mid),
               ),
             ) + 0.35;
           const halfFov = Math.min(
@@ -446,11 +641,16 @@ export default function Table3D(props) {
           if (camera.position.distanceTo(mid) < distance)
             camera.position.sub(mid).setLength(distance).add(mid);
         } else {
-          controls.target.lerp(
-            new THREE.Vector3(0, 0.4, 0.5),
-            Math.min(1, dt * 3),
-          );
-          if (cameraMode === "table") targetPosition.set(0.01, 17, 8);
+          controls.target.lerp(tableTarget, Math.min(1, dt * 3));
+          if (testing && !reduced.matches && time > userUntil)
+            targetPosition.set(
+              Math.sin(((time - introStart) / introDuration) * Math.PI * 2) *
+                3.5,
+              7.5 +
+                Math.sin(((time - introStart) / introDuration) * Math.PI) * 2,
+              15.5,
+            );
+          else if (cameraMode === "table") targetPosition.set(0.01, 17, 8);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
           else {
@@ -473,7 +673,21 @@ export default function Table3D(props) {
           .sub(controls.target)
           .setLength(cinematicDistance)
           .add(controls.target);
-      pieces.update(s, { connected: current.status === "connected" });
+      const connected = current.status === "connected";
+      const piecesChanged =
+        s !== lastPiecesState ||
+        connected !== lastPiecesConnection ||
+        pieces.isReady !== lastPiecesReady ||
+        pieces.animating;
+      if (piecesChanged) {
+        pieces.update(s, { connected });
+        scene.traverse((object) => {
+          if (object.isMesh) registerMaterialTextures(object.material);
+        });
+        lastPiecesState = s;
+        lastPiecesConnection = connected;
+        lastPiecesReady = pieces.isReady;
+      }
       el.dataset.settingsOpen = String(!!current.settingsOpen);
       el.dataset.playerLabels = String(pieces.labels.children.length);
       el.dataset.banks = String(pieces.banks.children.length);
@@ -502,10 +716,8 @@ export default function Table3D(props) {
       }
       aimArrow.visible = !!aiming;
       if (aiming) {
-        aimArrow.position
-          .fromArray(aiming.dice[0].position)
-          .add(new THREE.Vector3(0.17, -0.07, 0));
-        aimArrow.setDirection(new THREE.Vector3().fromArray(aiming.direction));
+        aimArrow.position.fromArray(aiming.dice[0].position).add(aimOffset);
+        aimArrow.setDirection(aimDirection.fromArray(aiming.direction));
         aimArrow.setLength(0.8 + aiming.power * 2.2, 0.22, 0.12);
       }
       el.dataset.throwId = s?.throw?.id || "";
@@ -546,19 +758,67 @@ export default function Table3D(props) {
         cameraMode,
         sceneLoading: !stageReady,
         error: current.error || stageError,
+        graphics,
+        introActive: testing,
+        introReducedMotion: reduced.matches,
+        graphicsInfo: {
+          fps: Number(el.dataset.renderFps) || null,
+          resolution: `${renderer.domElement.width} × ${renderer.domElement.height}`,
+          device: String(deviceName),
+          status: testing ? "testing" : "ready",
+          progress: testing
+            ? Math.min(1, (time - introStart) / introDuration)
+            : 1,
+          textureLabel: `${Math.min(quality.textureLimit, textureQuality.maxNativeDimension || quality.textureLimit)}px maximum`,
+        },
       });
       // Hidden TV tabs still advance shared state, but need no GPU readback.
       if (!document.hidden) {
+        const lodChanged = pieces.updateLOD(
+          camera,
+          el.clientHeight,
+          quality.modelDetail,
+        );
+        el.dataset.graphics = JSON.stringify(graphics);
+        el.dataset.graphicsFps = String(quality.fps);
+        el.dataset.graphicsModel = quality.modelDetail;
+        el.dataset.graphicsTextures = String(quality.textureLimit);
+        el.dataset.graphicsIntro = String(testing);
+        el.dataset.graphicsPage = ui.settingsPage;
+        renderer.info.reset();
+        renderer.shadowMap.needsUpdate =
+          !renderedOnce ||
+          lodChanged ||
+          piecesChanged ||
+          !!aiming ||
+          !!s?.rolling ||
+          time < settlingUntil;
         renderer.clear();
         if (stageReady) renderer.render(scene, camera);
         renderer.clearDepth();
         renderer.render(ui.scene, ui.camera);
+        if (stageReady) {
+          renderedOnce = true;
+          if (!metricStart) metricStart = time;
+          else metricFrames++;
+          if (time - metricStart >= 1000) {
+            el.dataset.renderFps = (
+              (metricFrames * 1000) /
+              (time - metricStart)
+            ).toFixed(1);
+            el.dataset.drawCalls = String(renderer.info.render.calls);
+            el.dataset.triangles = String(renderer.info.render.triangles);
+            metricStart = time;
+            metricFrames = 0;
+          }
+        }
       }
     }
     frame = requestAnimationFrame(animate);
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
+      textureQuality.dispose();
       observer.disconnect();
       controls.dispose();
       ui.dispose();
@@ -566,6 +826,7 @@ export default function Table3D(props) {
       el.removeEventListener("pointerdown", pointerDown, true);
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);
+      el.removeEventListener("pointercancel", pointerCancel);
       const sceneTextures = new Set();
       scene.traverse((o) => {
         o.geometry?.dispose();
@@ -586,9 +847,10 @@ export default function Table3D(props) {
       environmentTarget?.dispose();
       pmrem.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, []);
+  }, [rendererEpoch]);
   return (
     <div
       className="table-canvas immersive-canvas"

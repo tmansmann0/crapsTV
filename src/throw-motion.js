@@ -88,118 +88,118 @@ export function aimDicePose(aim = DEFAULT_GESTURE) {
   };
 }
 
-function insideRail(position) {
-  const x = clamp(position[0], -BOUNDS.x + 0.22, BOUNDS.x - 0.22);
-  const z = clamp(position[2], -BOUNDS.z + 0.22, BOUNDS.z - 0.22);
-  const cx = BOUNDS.x - BOUNDS.cornerRadius,
-    cz = BOUNDS.z - BOUNDS.cornerRadius;
-  if (Math.abs(x) > cx && Math.abs(z) > cz) {
-    const dx = Math.abs(x) - cx,
-      dz = Math.abs(z) - cz;
-    const ratio = Math.min(
-      1,
-      (BOUNDS.cornerRadius - 0.22) / Math.hypot(dx, dz),
-    );
-    return [
-      Math.sign(x) * (cx + dx * ratio),
-      DICE_SIZE / 2 + 0.002,
-      Math.sign(z) * (cz + dz * ratio),
-    ];
-  }
-  return [x, DICE_SIZE / 2 + 0.002, z];
+/** The visible upper face of the GLB, derived from its physical orientation. */
+export function upperDieFace(quaternion) {
+  const length = Math.hypot(...quaternion);
+  if (!length || !Number.isFinite(length))
+    throw new Error("Invalid die orientation.");
+  const [x, y, z, w] = quaternion.map((value) => value / length);
+  // World-Y component of each local axis after quaternion rotation.
+  const axes = [
+    2 * (x * y + w * z),
+    1 - 2 * (x * x + z * z),
+    2 * (y * z - w * x),
+  ];
+  const candidates = [
+    { value: 1, alignment: axes[1] },
+    { value: 6, alignment: -axes[1] },
+    { value: 2, alignment: axes[2] },
+    { value: 5, alignment: -axes[2] },
+    { value: 3, alignment: axes[0] },
+    { value: 4, alignment: -axes[0] },
+  ];
+  return candidates.reduce((best, face) =>
+    face.alignment > best.alignment ? face : best,
+  );
 }
 
+const physicalPose = (body) => ({
+  position: [body.position.x, body.position.y, body.position.z],
+  quaternion: [
+    body.quaternion.x,
+    body.quaternion.y,
+    body.quaternion.z,
+    body.quaternion.w,
+  ],
+});
+
 /**
- * Run the rigid bodies ONCE on the authority, at a fixed 120Hz. The serialized
- * 60Hz frames, including the conditioned final face orientation, are the source
- * of truth for all renderers. Clients never independently re-simulate a throw.
+ * Simulate ONCE on the authority, until both bodies physically sleep on the
+ * felt. Every serialized pose comes directly from Cannon: no target faces,
+ * positional correction or post-landing rotation. The upper faces determine
+ * the result, rather than a separately chosen result determining the pose.
  */
 export function createThrowTimeline({
   id,
   playerId,
   shooterId = playerId,
   seed,
-  dice,
   gesture,
   startAt = Date.now(),
   duration = THROW_DURATION,
 }) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
     throw new Error("Invalid throw seed.");
-  if (
-    !Array.isArray(dice) ||
-    dice.length !== 2 ||
-    dice.some((n) => !Number.isInteger(n) || n < 1 || n > 6)
-  )
-    throw new Error("Invalid dice.");
   if (!Number.isFinite(startAt) || !Number.isFinite(duration) || duration < 0)
     throw new Error("Invalid throw timing.");
   const controls = sanitizeGesture(gesture);
   const physics = createDicePhysics();
   physics.throwDice(seed, controls);
-  const raw = [];
-  const samples = 150;
-  for (let frame = 0; frame <= samples; frame++) {
-    if (frame) {
-      physics.step(1 / 120);
-      physics.step(1 / 120);
+  const raw = [physics.bodies.map(physicalPose)];
+  let steps = 0;
+  while (steps < 1440) {
+    physics.step(1 / 120);
+    steps++;
+    if (steps % 2 === 0) {
+      raw.push(physics.bodies.map(physicalPose));
+      if (steps >= 120 && physics.sleeping) break;
     }
-    raw.push(
-      physics.bodies.map((body) => ({
-        position: [body.position.x, body.position.y, body.position.z],
-        quaternion: [
-          body.quaternion.x,
-          body.quaternion.y,
-          body.quaternion.z,
-          body.quaternion.w,
-        ],
-      })),
-    );
   }
-  // Leave enough room between the final footprint of both cubes as they square
-  // up. The physical path is preserved through 80% of the visible flight.
-  const target = raw[samples].map((pose, i) => ({
-    position: insideRail(pose.position),
-    quaternion: diceQuaternion(dice[i], ((seed >>> (i * 8)) % 6283) / 1000),
-  }));
+  const last = raw.at(-1);
+  const faces = last.map((pose) => upperDieFace(pose.quaternion));
+  // A die against a wall/another die, outside the bed, or not at rest is a
+  // cocked/off-table throw. The authority may rethrow with a fresh launch seed;
+  // it must never rotate an invalid result into a selected value.
   if (
-    Math.hypot(
-      target[0].position[0] - target[1].position[0],
-      target[0].position[2] - target[1].position[2],
-    ) <
-    DICE_SIZE * 1.5
+    !physics.sleeping ||
+    last.some(
+      (pose, i) =>
+        faces[i].alignment < 0.995 ||
+        pose.position[1] > DICE_SIZE * 0.75 ||
+        pose.position[1] < DICE_SIZE * 0.4 ||
+        Math.abs(pose.position[0]) > BOUNDS.x - DICE_SIZE * 0.45 ||
+        Math.abs(pose.position[2]) > BOUNDS.z - DICE_SIZE * 0.45,
+    )
   ) {
-    target[0].position[0] -= DICE_SIZE * 0.8;
-    target[1].position[0] += DICE_SIZE * 0.8;
-    target.forEach((pose) => {
-      pose.position = insideRail(pose.position);
-    });
+    const error = new Error(
+      "Dice did not settle flat on the table. Throw again.",
+    );
+    error.code = "DICE_UNSETTLED";
+    throw error;
   }
-  const settleStart = Math.floor(samples * 0.8);
-  const frames = raw.map((poses, index) => {
-    const t = clamp((index - settleStart) / (samples - settleStart), 0, 1);
-    const ease = t * t * t * (t * (t * 6 - 15) + 10);
-    const row = [rounded((index / samples) * duration)];
-    poses.forEach((pose, i) => {
-      const position = pose.position.map(
-        (v, j) => v + (target[i].position[j] - v) * ease,
-      );
-      const quaternion = slerp(pose.quaternion, target[i].quaternion, ease);
-      row.push(...position.map(rounded), ...quaternion.map(rounded));
-    });
-    return row;
-  });
+  const settleOffset = duration * 0.88;
+  const frames = raw.map((poses, index) => [
+    rounded((index / (raw.length - 1)) * settleOffset),
+    ...poses.flatMap((pose) =>
+      [...pose.position, ...pose.quaternion].map(rounded),
+    ),
+  ]);
+  // Hold the unmodified, already sleeping bodies briefly before results show.
+  frames.push([duration, ...frames.at(-1).slice(1)]);
   return {
-    version: 1,
+    version: 2,
     id,
     playerId,
     shooterId,
     seed,
     startAt,
     duration,
-    dice: [...dice],
+    dice: faces.map((face) => face.value),
     gesture: controls,
     frames,
+    settledAt: startAt + settleOffset,
+    physicsSteps: steps,
+    simulationDuration: steps / 120,
     wallHits: physics.wallHits,
   };
 }

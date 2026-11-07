@@ -1,7 +1,7 @@
 .dice-throw {
   border-radius: 18px;
   overflow: hidden;
-  background: #0d332b;
+  background: #0b1113;
   color: #f6eddb;
   box-shadow: 0 8px 30px #09251d22;
   margin: 8px 0;
@@ -18,10 +18,10 @@
 .dice-throw-top span {
   font-size: 9px;
   letter-spacing: 0.12em;
-  color: #bdd7bf;
+  color: #aac9c2;
 }
 .dice-throw-view {
-  height: clamp(220px, 40dvh, 340px);
+  height: clamp(260px, 44dvh, 390px);
   position: relative;
   touch-action: none;
   cursor: grab;
@@ -34,13 +34,19 @@
 }
 .dice-swipe-hint {
   position: absolute;
-  bottom: 16px;
-  width: 100%;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  padding: 9px 15px;
+  border: 1px solid #ffffff1b;
+  border-radius: 999px;
+  background: #0b1113bb;
   text-align: center;
   font-size: 12px;
   font-weight: 600;
   pointer-events: none;
-  color: #d7e5cf;
+  color: #d6e5df;
 }
 .dice-power {
   position: absolute;

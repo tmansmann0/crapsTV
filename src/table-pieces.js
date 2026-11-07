@@ -407,6 +407,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       });
     });
     if (specs.length) banks.add(chipFactory.createBatch(specs));
+    const wagerSpecs = [];
     wagers.forEach(({ route, player, visible }) => {
       if (visible <= 0) return;
       const pile = new THREE.Group();
@@ -415,10 +416,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         !isLineWager(route.bet) &&
         (route.bet.point || route.bet.type.startsWith("place-"));
       const diameter = compact ? 0.22 : 0.31;
-      const batch = chipFactory.createBatch(
-        pileSpecs(visible, { seed: route.bet.id, diameter }),
-      );
-      pile.add(batch);
+      const pileChips = pileSpecs(visible, { seed: route.bet.id, diameter });
+      for (const spec of pileChips) {
+        wagerSpecs.push({
+          ...spec,
+          position: spec.position.map(
+            (v, i) => v + pile.position.getComponent(i),
+          ),
+        });
+      }
       const marker = ring(player.color, diameter / 0.33);
       marker.position.y = 0.016;
       pile.add(marker);
@@ -438,7 +444,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         compact || isLineWager(route.bet) ? 2.6 : 5,
       );
       label.position.y =
-        0.13 * diameter * 1.3 * Math.min(8, batch.userData.chipCount) + 0.08;
+        0.13 * diameter * 1.3 * Math.min(8, pileChips.length) + 0.08;
       pile.add(label);
       pile.userData = {
         playerId: player.id,
@@ -447,6 +453,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       };
       chips.add(pile);
     });
+    if (wagerSpecs.length) {
+      const batch = chipFactory.createBatch(wagerSpecs);
+      batch.name = "Shared wager chip instances";
+      chips.add(batch);
+    }
   }
   function updatePreviews(state, players) {
     const key = JSON.stringify([
@@ -667,6 +678,18 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     ready,
     get isReady() {
       return !!chipFactory && dice[0].children.length > 0;
+    },
+    get animating() {
+      return flows.length > 0;
+    },
+    updateLOD(camera, height, detail = "auto") {
+      if (!chipFactory) return false;
+      let changed = false;
+      for (const root of [banks, chips, previews, transfers, dealerRack])
+        if (root)
+          changed =
+            chipFactory.updateLOD(root, camera, height, detail) || changed;
+      return changed;
     },
     installDealerRack(tableRoot) {
       dealerRoot = tableRoot;

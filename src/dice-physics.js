@@ -11,15 +11,25 @@ import {
 // Retained stepping API also supports isolated physics/asset checks.
 export const DICE_SIZE = 0.22;
 export const BOUNDS = { x: 5.42, z: 2.71, height: 0.92, cornerRadius: 0.86 };
+/** Full 32-bit seeded launch randomness. No face outcome is selected here. */
+export function seededRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value = (value + 0x6d2b79f5) >>> 0;
+    let mixed = Math.imul(value ^ (value >>> 15), value | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  };
+}
 export function createDicePhysics() {
   const world = new World({ gravity: new Vec3(0, -9.81, 0) });
   world.allowSleep = true;
-  world.solver.iterations = 12;
+  world.solver.iterations = 20;
   const resin = new Material("resin"),
     felt = new Material("felt"),
     rubber = new Material("rubber");
   world.addContactMaterial(
-    new ContactMaterial(resin, felt, { friction: 0.27, restitution: 0.36 }),
+    new ContactMaterial(resin, felt, { friction: 0.33, restitution: 0.36 }),
   );
   world.addContactMaterial(
     new ContactMaterial(resin, rubber, { friction: 0.16, restitution: 0.58 }),
@@ -60,10 +70,10 @@ export function createDicePhysics() {
       mass: 0.019,
       material: resin,
       shape: new Box(new Vec3(DICE_SIZE / 2, DICE_SIZE / 2, DICE_SIZE / 2)),
-      linearDamping: 0.2,
-      angularDamping: 0.24,
-      sleepSpeedLimit: 0.12,
-      sleepTimeLimit: 0.2,
+      linearDamping: 0.25,
+      angularDamping: 0.32,
+      sleepSpeedLimit: 0.045,
+      sleepTimeLimit: 0.22,
     });
     world.addBody(b);
     return b;
@@ -80,23 +90,36 @@ export function createDicePhysics() {
     elapsed = 0;
     wallHits = 0;
     running = true;
-    const q = ((seed >>> 0) % 997) / 997;
+    const random = seededRandom(seed);
     const aim = Math.max(-1, Math.min(1, gesture.x || 0));
     const power = Math.max(0, Math.min(1, gesture.power ?? 0.65));
     bodies.forEach((b, i) => {
       b.wakeUp();
       b.position.set(
         aim * 0.55 + (i ? 0.19 : -0.19),
-        0.15 + power * 0.18 + i * 0.03,
+        0.23 + power * 0.16 + i * 0.03,
         1.9 - power * 0.15,
       );
-      b.quaternion.setFromEuler(q * 2 + i * 0.7, 0.4 + i * 0.8, 0.6 + q);
-      b.velocity.set(
-        aim * 3.4 + (i ? 1 : -1) * (0.35 + q * 0.35),
-        1.9 + power * 1.2 + i * 0.15,
-        -7.4 - power * 3.1 - q * 0.3,
+      // Uniform random orientation on the unit quaternion sphere.
+      const u = random(),
+        a = random() * Math.PI * 2,
+        c = random() * Math.PI * 2;
+      b.quaternion.set(
+        Math.sqrt(1 - u) * Math.sin(a),
+        Math.sqrt(1 - u) * Math.cos(a),
+        Math.sqrt(u) * Math.sin(c),
+        Math.sqrt(u) * Math.cos(c),
       );
-      b.angularVelocity.set(11 + i * 3, 8 - q * 3, 13 - i * 5);
+      b.velocity.set(
+        aim * 3.4 + (random() - 0.5) * 0.9,
+        1.7 + power * 1.1 + random() * 0.3,
+        -7.8 - power * 2.5 + (random() - 0.5) * 0.8,
+      );
+      b.angularVelocity.set(
+        (random() - 0.5) * 32,
+        (random() - 0.5) * 32,
+        (random() - 0.5) * 32,
+      );
       b.force.setZero();
       b.torque.setZero();
     });
@@ -105,7 +128,7 @@ export function createDicePhysics() {
     if (!running) return;
     world.step(1 / 120, Math.min(dt, 0.5), 60);
     elapsed += dt;
-    if (elapsed > 5) running = false;
+    if (elapsed > 12) running = false;
   }
   function stop() {
     running = false;
@@ -120,6 +143,9 @@ export function createDicePhysics() {
     throwDice,
     step,
     stop,
+    get sleeping() {
+      return bodies.every((body) => body.sleepState === Body.SLEEPING);
+    },
     get elapsed() {
       return elapsed;
     },

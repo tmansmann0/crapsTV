@@ -37,7 +37,7 @@ The die is one unit across, with origin at its center. Face values are:
 | +X | 3 |
 | -X | 4 |
 
-Choose a final quaternion that rotates the chosen face's normal to world +Y. Animation should settle at that orientation; the dice mesh does not decide game outcomes.
+Read the final physical quaternion against these face normals to identify the upper face. The authoritative simulation now determines the result from the actual landing; never rotate a die after it settles to match a separately selected value.
 
 The current scene uses `EXRLoader` with `casino-room.exr` for both background and PMREM environment (see [environment.md](environment.md)). The earlier `casino-studio.hdr` is retained as a fallback and can be loaded with `HDRLoader` and `EquirectangularReflectionMapping`. This file contains actual scene-linear values from approximately 0.0398 to 17.875, with warm wall-light lobes and overhead softboxes. It is procedural casino-inspired *lighting*, not an AI-generated photograph. It is separate from `casino-panorama.png`, which is the image-generation agent's LDR visual background. Converting that PNG to `.hdr` would not recover real dynamic range and has not been done.
 
