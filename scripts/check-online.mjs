@@ -5,7 +5,12 @@ import assert from "node:assert/strict";
 const url = process.env.ONLINE_URL || "https://tmansmann0.github.io/crapsTV/";
 const browser = await chromium.launch({
   headless: true,
-  args: ["--use-angle=swiftshader", "--enable-webgl"],
+  args: [
+    process.platform === "darwin"
+      ? "--use-angle=metal"
+      : "--use-angle=swiftshader",
+    "--enable-webgl",
+  ],
 });
 try {
   await mkdir("artifacts", { recursive: true });
