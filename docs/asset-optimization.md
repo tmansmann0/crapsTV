@@ -2,11 +2,11 @@
 
 The optimized files are separate variants. The previous table/variant sources and the original detailed chip are preserved byte for byte.
 
-| Asset | Before | Optimized | Reduction |
-| --- | --- | --- | --- |
-| Player table triangles | 217,448 | 34,926 | 83.9% |
-| Player table mesh/material draws per pass | 102 | 7 | 93.1% |
-| Chip triangles | 10,098 | 1,984 | 80.4% |
+| Asset                                     | Before  | Optimized | Reduction |
+| ----------------------------------------- | ------- | --------- | --------- |
+| Player table triangles                    | 217,448 | 34,926    | 83.9%     |
+| Player table mesh/material draws per pass | 102     | 7         | 93.1%     |
+| Chip triangles                            | 10,098  | 1,984     | 80.4%     |
 
 These are asset counts, not an FPS guarantee. A shadow pass draws the applicable meshes again, and the scene's dynamic chips, text, environment and resolution also affect frame rate. Full scene performance is measured separately by the runtime.
 
@@ -39,7 +39,11 @@ Validation includes exact crown-vertex comparison, all 120 tray-floor positions,
 
 An isolated twelve-player game at 1600×1000 on Chrome/ANGLE Metal, Apple M5 Pro, measured 15.00 FPS before changes and 60.00 FPS after. Idle draw calls fell from 544 to 97; triangles drawn per frame, including shadow work, fell from 4,637,532 to about 490,000. A separate cinematic throw run also measured 60.00 FPS. These measurements describe this machine and scene, not a guarantee for every GPU.
 
-The original renderer deliberately capped hardware frames at 15 FPS idle and 30 FPS during throws. Hardware now renders on every animation frame. Fixed lighting reuses its shadow map until objects move, change, or switch detail. Compatible chip materials share instances, wagers share one set of batches, and stationary banks are rebuilt only when state or visible chip transfers change. Chips switch between detailed/low-detail geometry using projected size with a 28–36 pixel hysteresis band; close views keep full geometry, textures and wear maps.
+The original renderer deliberately capped hardware frames at 15 FPS idle and 30 FPS during throws. Hardware now renders on every animation frame. Fixed lighting reuses its shadow map until objects move, change, or switch detail. Compatible chip materials share instances, wagers share one set of batches, and stationary banks are rebuilt only when state or visible chip transfers change.
+
+Chip detail is selected per chip, rather than from a whole batch's center. Separate high/low instance buffers share the source geometry and materials; they retain stable identities for contact animation and upload transforms only when needed. Auto uses a 128–160 rendered-pixel hysteresis band; the low mesh's 32-sided rim is within about 0.4 pixels of the circle at that threshold. Close views and the Full setting retain the original geometry. The LOD calculation uses actual 3D-buffer pixels, including HiDPI scaling.
+
+At native 3840×2160, the measured Auto scene dropped from 2,145,010 drawn triangles to roughly 490,000 without increasing the original 97 draw calls. The exact final UI/label pass adds its own small draw budget. See [TV display QA](tv-display-qa.md) for explicit 1080p/4K measurements and the tested GPU; resolution verification is required before calling a result 4K.
 
 Run `npm run benchmark` for the idle scene. Set `BENCH_ROLL=1` for a throw and `BENCH_LABEL=custom-name` for separate JSON/screenshot output in `artifacts/`. Each run uses its own temporary server, twelve test players, and a real WebGL browser; it does not join existing rooms.
 

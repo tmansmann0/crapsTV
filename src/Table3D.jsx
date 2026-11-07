@@ -9,9 +9,12 @@ import { disposeModel } from "./three-resources.js";
 import { createSceneUI } from "./scene-ui.js";
 import { createTablePieces } from "./table-pieces.js";
 import { createTableMaterials } from "./table-materials.js";
+import { createTableCompositor } from "./table-compositor.js";
+import { puckHome } from "./puck-layout.js";
+import { wagerStackLayout } from "./wager-layout.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
-import { sampleThrowCamera } from "./throw-camera.js";
+import { sampleThrowCamera, sampleTableCamera } from "./throw-camera.js";
 import { assetURL as asset } from "./asset-url.js";
 import {
   DEFAULT_GRAPHICS,
@@ -62,6 +65,8 @@ export default function Table3D(props) {
       devicePixelRatio: window.devicePixelRatio || 1,
       deviceMemory: navigator.deviceMemory,
       hardwareConcurrency: navigator.hardwareConcurrency,
+      viewportWidth: host.current.clientWidth,
+      viewportHeight: host.current.clientHeight,
     };
     const initialProfile =
       profileRef.current || recommendGraphics(capabilities);
@@ -91,6 +96,7 @@ export default function Table3D(props) {
       environmentTarget = null,
       displayRevision = retainedView.current?.displayRevision ?? -1,
       tableLoaded = false,
+      puckLoaded = false,
       piecesLoaded = false,
       detailLoaded = 0,
       boardsLoaded = 0,
@@ -141,10 +147,11 @@ export default function Table3D(props) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     renderer.autoClear = false;
+    const compositor = createTableCompositor(renderer);
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#09100e");
-    const camera = new THREE.PerspectiveCamera(43, 1, 0.1, 160);
+    const camera = new THREE.PerspectiveCamera(43, 1, 0.035, 160);
     camera.position.set(10, 6.5, 18);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.4, 0.5);
@@ -372,7 +379,7 @@ export default function Table3D(props) {
     const textureLoader = new THREE.TextureLoader();
     for (const mode of ["classic", "crapless"])
       textureLoader.load(
-        asset(`board-${mode}.png`),
+        asset(`board-${mode}-4k.png`),
         (t) => {
           if (!alive) {
             t.dispose();
@@ -410,12 +417,19 @@ export default function Table3D(props) {
     scene.add(aimArrow);
     let previousRoll = null,
       settlingUntil = 0;
-    const puck = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.2, 0.2, 0.085, 48),
-      new THREE.MeshStandardMaterial({ color: 0xf5ead0, roughness: 0.5 }),
-    );
-    puck.position.set(-4.5, 0.07, -2.1);
+    const puck = new THREE.Group();
+    puck.name = "Physical ON/OFF puck";
     scene.add(puck);
+    loader
+      .loadAsync(asset("puck.glb"))
+      .then((gltf) => {
+        if (!alive) return disposeModel(gltf.scene);
+        puck.add(addObject(gltf.scene));
+        puckLoaded = true;
+      })
+      .catch(() => {
+        stageError = "Puck model could not load. Refresh to retry.";
+      });
     function applyRuntimeQuality() {
       quality = resolveGraphics(graphics, profileRef.current, capabilities);
       if (quality.antialias !== contextAntialias && !restarting) {
@@ -431,10 +445,7 @@ export default function Table3D(props) {
         setRendererEpoch((value) => value + 1);
         return;
       }
-      if (renderer.getPixelRatio() !== quality.pixelRatio) {
-        renderer.setPixelRatio(quality.pixelRatio);
-        resize();
-      }
+      resize();
       if (textureQuality.setLimit(quality.textureLimit)) rebuildEnvironment();
       renderer.shadowMap.needsUpdate = true;
     }
@@ -512,7 +523,20 @@ export default function Table3D(props) {
     function resize() {
       const w = el.clientWidth,
         h = el.clientHeight;
-      renderer.setSize(w, h, false);
+      capabilities.viewportWidth = w;
+      capabilities.viewportHeight = h;
+      capabilities.devicePixelRatio = window.devicePixelRatio || 1;
+      quality = resolveGraphics(graphics, profileRef.current, capabilities);
+      const buffers = compositor.resize({
+        width: w,
+        height: h,
+        devicePixelRatio: capabilities.devicePixelRatio,
+        scenePixelRatio: quality.pixelRatio,
+        antialias: quality.antialias,
+      });
+      el.dataset.sceneResolution = `${buffers.sceneWidth}x${buffers.sceneHeight}`;
+      el.dataset.uiResolution = `${buffers.uiWidth}x${buffers.uiHeight}`;
+      el.dataset.splitResolution = String(buffers.split);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       ui.resize(w, h);
@@ -528,13 +552,23 @@ export default function Table3D(props) {
       lastPiecesReady = false,
       renderedOnce = false,
       metricStart = 0,
-      metricFrames = 0;
+      metricFrames = 0,
+      uiRevision = -1,
+      uiExclusions = [],
+      labelCameraMotionAt = performance.now(),
+      labelCameraFov = camera.fov;
+    const labelCameraPosition = camera.position.clone();
+    const labelCameraRotation = camera.quaternion.clone();
     const targetPosition = new THREE.Vector3(),
       tableTarget = new THREE.Vector3(0, 0.4, 0.5),
       shotTarget = new THREE.Vector3(),
+      puckTarget = new THREE.Vector3(),
+      puckRotation = new THREE.Quaternion(),
       aimOffset = new THREE.Vector3(0.17, -0.07, 0),
       aimDirection = new THREE.Vector3();
     let previousCameraShot = null;
+    let launchState = null,
+      launchProps = {};
     let nextFrameAt = 0;
     function animate(time) {
       frame = requestAnimationFrame(animate);
@@ -602,7 +636,17 @@ export default function Table3D(props) {
       }
       const throwTime = Date.now() + (s?.clockOffsetMs || 0);
       const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
-      const aiming = s?.aim?.active ? aimDicePose(s.aim) : null;
+      if (s !== launchState) {
+        launchState = s;
+        launchProps = {
+          puck:
+            s?.puck && s.puck.point === s.point
+              ? s.puck
+              : puckHome(s?.point, s?.config.mode),
+          stacks: wagerStackLayout(s),
+        };
+      }
+      const aiming = s?.aim?.active ? aimDicePose(s.aim, launchProps) : null;
       const pose = aiming || shared;
       const automaticCamera = time > userUntil && !dragStart;
       const cameraShot =
@@ -612,18 +656,36 @@ export default function Table3D(props) {
               pose: shared,
               now: throwTime,
               aspect: camera.aspect,
+              viewportWidth: el.clientWidth,
+              viewportHeight: el.clientHeight,
+              hudRects: uiExclusions,
+              reducedMotion: reduced.matches,
+            })
+          : null;
+      const autoView =
+        automaticCamera && cameraMode === "auto" && !testing
+          ? sampleTableCamera({
+              state: s,
+              now: throwTime,
+              aspect: camera.aspect,
+              viewportWidth: el.clientWidth,
+              viewportHeight: el.clientHeight,
+              hudRects: uiExclusions,
               reducedMotion: reduced.matches,
             })
           : null;
       const cinematic = !!cameraShot;
       controls.minDistance = cinematic
-        ? 1.2
+        ? 0.18
         : Math.min(8, camera.position.distanceTo(controls.target));
       controls.minPolarAngle = cameraShot?.phase === "result" ? 0.0001 : 0.15;
+      controls.maxPolarAngle =
+        cameraShot?.phase === "throw" ? Math.PI - 0.01 : 1.43;
       controls.enableDamping = !cinematic;
       const shotKey = cameraShot ? `${s.throw.id}:${cameraShot.phase}` : null;
       const cut = shotKey !== null && shotKey !== previousCameraShot;
-      const targetFov = cameraShot?.fov ?? (cameraMode === "room" ? 60 : 43);
+      const targetFov =
+        cameraShot?.fov ?? autoView?.fov ?? (cameraMode === "room" ? 60 : 43);
       camera.fov += (targetFov - camera.fov) * (cut ? 1 : Math.min(1, dt * 5));
       camera.updateProjectionMatrix();
       if (automaticCamera) {
@@ -636,7 +698,11 @@ export default function Table3D(props) {
           controls.target.lerp(shotTarget, cut ? 1 : 1 - Math.exp(-dt * 7));
           camera.position.copy(targetPosition);
         } else {
-          controls.target.lerp(tableTarget, Math.min(1, dt * 3));
+          if (autoView) shotTarget.fromArray(autoView.target);
+          controls.target.lerp(
+            autoView ? shotTarget : tableTarget,
+            Math.min(1, dt * 3),
+          );
           if (testing && !reduced.matches && time > userUntil)
             targetPosition.set(
               Math.sin(((time - introStart) / introDuration) * Math.PI * 2) *
@@ -647,21 +713,38 @@ export default function Table3D(props) {
             );
           else if (cameraMode === "table") targetPosition.set(0.01, 17, 8);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
+          else if (autoView) targetPosition.fromArray(autoView.position);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
           else {
             const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
             targetPosition.set(drift, 6.0, 16.2);
           }
-          if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
+          if (camera.aspect < 1 && !autoView)
+            targetPosition.multiplyScalar(1.45);
           camera.position.lerp(
             targetPosition,
-            reduced.matches ? 1 : 1 - Math.exp(-dt * 1.6),
+            reduced.matches
+              ? 1
+              : 1 - Math.exp(-dt * (autoView?.phase === "betting" ? 3 : 1.6)),
           );
         }
       }
       controls.update();
+      el.dataset.cameraPosition = JSON.stringify(camera.position.toArray());
+      el.dataset.cameraTarget = JSON.stringify(controls.target.toArray());
+      el.dataset.cameraFov = String(camera.fov);
+      if (
+        camera.position.distanceToSquared(labelCameraPosition) > 0.000001 ||
+        camera.quaternion.angleTo(labelCameraRotation) > 0.0001 ||
+        Math.abs(camera.fov - labelCameraFov) > 0.02
+      )
+        labelCameraMotionAt = time;
+      labelCameraPosition.copy(camera.position);
+      labelCameraRotation.copy(camera.quaternion);
+      labelCameraFov = camera.fov;
       previousCameraShot = shotKey;
-      el.dataset.cameraShot = cameraShot?.phase || "overview";
+      el.dataset.cameraShot =
+        cameraShot?.phase || autoView?.phase || "overview";
       el.dataset.cameraRig = cameraShot ? String(cameraShot.rig) : "";
       const connected = current.status === "connected";
       const piecesChanged =
@@ -717,28 +800,49 @@ export default function Table3D(props) {
       el.dataset.pose = pose ? JSON.stringify(pose.dice) : "";
       el.dataset.cinematic = String(cinematic);
       el.dataset.wallHits = String(shared?.wallHits || 0);
-      const pts =
-        mode === "crapless"
-          ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
-          : [4, 5, 6, 8, 9, 10];
-      puck.material.color.set(s?.point ? 0xf4ecd8 : 0x141b17);
-      puck.position.x = s?.point
-        ? ((136 + ((pts.indexOf(s.point) + 0.5) * 1776) / pts.length) / 2048 -
-            0.5) *
-          10.84 *
-          (1588 / 1776)
-        : -4.0;
+      const puckPlacement = s?.puck || puckHome(s?.point, mode);
+      const physicalPuck = shared?.puck;
+      puck.position.fromArray(physicalPuck?.position || puckPlacement.position);
+      puck.quaternion.fromArray(
+        physicalPuck?.quaternion || puckPlacement.quaternion,
+      );
+      if (physicalPuck && shared.done && !s?.rolling) {
+        // Only the dealer's marker placement is animated after a point change.
+        // Dice always retain the exact authoritative physical poses above.
+        puckTarget.fromArray(puckPlacement.position);
+        puckRotation.fromArray(puckPlacement.quaternion);
+        const moved =
+          puck.position.distanceToSquared(puckTarget) > 1e-8 ||
+          Math.abs(puck.quaternion.dot(puckRotation)) < 0.99999;
+        if (moved) {
+          const progress = THREE.MathUtils.clamp(
+            (throwTime - s.throw.startAt - s.throw.duration) / 650,
+            0,
+            1,
+          );
+          const eased = progress * progress * (3 - 2 * progress);
+          puck.position.lerp(puckTarget, eased);
+          puck.position.y += Math.sin(progress * Math.PI) * 0.13;
+          puck.quaternion.slerp(puckRotation, eased);
+        }
+      }
+      el.dataset.puckPose = JSON.stringify({
+        position: puck.position.toArray(),
+        quaternion: puck.quaternion.toArray(),
+      });
+      el.dataset.propHits = String(shared?.propHits || 0);
       if (
         !stageReady &&
         !warming &&
         tableLoaded &&
+        puckLoaded &&
         detailLoaded === 2 &&
         boardsLoaded === 2 &&
         piecesLoaded &&
         readyEnvironment
       ) {
         warming = true;
-        startupCompile = Promise.resolve(renderer.compileAsync?.(scene, camera))
+        startupCompile = Promise.resolve(compositor.compile(scene, camera))
           .then(() => {
             if (alive) stageReady = true;
           })
@@ -756,21 +860,47 @@ export default function Table3D(props) {
         introReducedMotion: reduced.matches,
         graphicsInfo: {
           fps: Number(el.dataset.renderFps) || null,
-          resolution: `${renderer.domElement.width} × ${renderer.domElement.height}`,
+          resolution: `${compositor.plan.sceneWidth} × ${compositor.plan.sceneHeight}`,
+          uiResolution: `${compositor.plan.uiWidth} × ${compositor.plan.uiHeight}`,
           device: String(deviceName),
           status: testing ? "testing" : "ready",
           progress: testing
             ? Math.min(1, (time - introStart) / introDuration)
             : 1,
-          textureLabel: `${Math.min(quality.textureLimit, textureQuality.maxNativeDimension || quality.textureLimit)}px maximum`,
+          textureLabel: `${Math.min(quality.textureLimit, textureQuality.maxNativeDimension || quality.textureLimit)}px`,
         },
       });
+      if (uiRevision !== ui.revision) {
+        uiRevision = ui.revision;
+        uiExclusions = ui.getVisibleRects();
+        el.dataset.uiActions = JSON.stringify(ui.getActionPoints());
+        el.dataset.uiTextMetrics = JSON.stringify(ui.textMetrics);
+        el.dataset.uiLayout = JSON.stringify(ui.getLayout());
+      }
       // Hidden TV tabs still advance shared state, but need no GPU readback.
       if (!document.hidden) {
         const lodChanged = pieces.updateLOD(
           camera,
           el.clientHeight,
           quality.modelDetail,
+          {
+            width: el.clientWidth,
+            renderHeight: compositor.plan.sceneHeight,
+            exclusions: uiExclusions,
+            labelScale: ui.getLayout().labelScale,
+            labelMotion: ui.labelMotion,
+            puckPose: puck,
+            labelsAllowed:
+              !s?.rolling &&
+              !cameraShot &&
+              autoView?.phase !== "breather" &&
+              !testing &&
+              !current.settingsOpen &&
+              time - labelCameraMotionAt >= 300,
+          },
+        );
+        el.dataset.amountLabelsVisible = String(
+          !!pieces.financialLabelsVisible,
         );
         el.dataset.graphics = JSON.stringify(graphics);
         el.dataset.graphicsFps = String(quality.fps);
@@ -786,9 +916,25 @@ export default function Table3D(props) {
           !!aiming ||
           !!s?.rolling ||
           time < settlingUntil;
-        renderer.clear();
-        if (stageReady) renderer.render(scene, camera);
+        compositor.render(stageReady ? scene : null, camera);
         renderer.clearDepth();
+        if (stageReady) {
+          // Seat, wager, and transfer labels stay native-resolution even when
+          // the modeled table is rendered at a lower resolution.
+          const background = scene.background;
+          const autoUpdate = scene.matrixWorldAutoUpdate;
+          scene.background = null;
+          scene.matrixWorldAutoUpdate = false;
+          camera.layers.set(1);
+          try {
+            renderer.render(scene, camera);
+          } finally {
+            camera.layers.set(0);
+            scene.background = background;
+            scene.matrixWorldAutoUpdate = autoUpdate;
+          }
+          renderer.clearDepth();
+        }
         renderer.render(ui.scene, ui.camera);
         if (stageReady) {
           renderedOnce = true;
@@ -821,6 +967,7 @@ export default function Table3D(props) {
       const disposeResources = () => {
         textureQuality.dispose();
         ui.dispose();
+        compositor.dispose();
         pieces.dispose();
         tableMaterials?.dispose();
         const sceneTextures = new Set();

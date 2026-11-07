@@ -128,8 +128,18 @@ const faces = {
   6: [0, -1, 0],
 };
 test("physical upper faces determine the outcome and the resting pose is never corrected", () => {
-  for (let seed = 0; seed < 12; seed++) {
-    const flight = createThrowTimeline({ ...options, seed });
+  let accepted = 0;
+  for (let seed = 0; seed < 60 && accepted < 12; seed++) {
+    let flight;
+    try {
+      flight = createThrowTimeline({ ...options, seed });
+    } catch (error) {
+      // Physical launches may finish cocked after contact. Only that explicit
+      // rejection can be skipped while collecting twelve valid raw replays.
+      assert.equal(error.code, "DICE_UNSETTLED");
+      continue;
+    }
+    accepted++;
     const physics = createDicePhysics();
     physics.throwDice(seed, options.gesture);
     // Compare every shared sample to the unmodified fixed-step simulation.
@@ -166,6 +176,7 @@ test("physical upper faces determine the outcome and the resting pose is never c
     const after = sampleThrow(flight, flight.startAt + flight.duration + 10000);
     assert.deepEqual(after.dice, end.dice);
   }
+  assert.equal(accepted, 12);
 });
 
 test("the GLB face mapping reads every physical top face correctly", () => {

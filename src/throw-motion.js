@@ -1,4 +1,5 @@
 import { createDicePhysics, DICE_SIZE, BOUNDS } from "./dice-physics.js";
+import { diceLaunchPositions } from "./dice-launch.js";
 
 export const THROW_DURATION = 2500;
 export const DEFAULT_GESTURE = Object.freeze({ x: 0, power: 0.65 });
@@ -70,17 +71,14 @@ function slerp(a, b, t) {
   return a.map((v, i) => wa * v + wb * target[i]);
 }
 
-export function aimDicePose(aim = DEFAULT_GESTURE) {
+export function aimDicePose(aim = DEFAULT_GESTURE, props) {
   const gesture = sanitizeGesture(aim);
+  const positions = diceLaunchPositions(gesture, props);
   const direction = new Float64Array([gesture.x * 0.38, 0, -1]);
   const len = Math.hypot(...direction);
   return {
     dice: [0, 1].map((i) => ({
-      position: [
-        gesture.x * 0.55 + (i ? 0.17 : -0.17),
-        DICE_SIZE / 2 + 0.04 + gesture.power * 0.18,
-        1.9 - gesture.power * 0.15,
-      ],
+      position: positions[i],
       quaternion: diceQuaternion(i + 1, gesture.x * 0.2),
     })),
     direction: Array.from(direction, (v) => v / len),
@@ -137,35 +135,71 @@ export function createThrowTimeline({
   gesture,
   startAt = Date.now(),
   duration = THROW_DURATION,
+  puck = null,
+  stacks = [],
 }) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
     throw new Error("Invalid throw seed.");
   if (!Number.isFinite(startAt) || !Number.isFinite(duration) || duration < 0)
     throw new Error("Invalid throw timing.");
   const controls = sanitizeGesture(gesture);
-  const physics = createDicePhysics();
+  const physics = createDicePhysics({ puck, stacks });
   physics.throwDice(seed, controls);
   const raw = [physics.bodies.map(physicalPose)];
+  const rawPuck = physics.puckBody ? [physicalPose(physics.puckBody)] : null;
   let steps = 0;
   while (steps < 1440) {
     physics.step(1 / 120);
     steps++;
     if (steps % 2 === 0) {
       raw.push(physics.bodies.map(physicalPose));
+      if (rawPuck) rawPuck.push(physicalPose(physics.puckBody));
       if (steps >= 120 && physics.sleeping) break;
     }
   }
   const last = raw.at(-1);
   const faces = last.map((pose) => upperDieFace(pose.quaternion));
-  // A die against a wall/another die, outside the bed, or not at rest is a
-  // cocked/off-table throw. The authority may rethrow with a fresh launch seed;
-  // it must never rotate an invalid result into a selected value.
+  // Only a nearby physical support can authorize a die above floor height.
+  // A tall wager elsewhere cannot make a floating/stacked die valid.
+  function supportedHeight(pose) {
+    let top = DICE_SIZE * 0.15;
+    for (const stack of stacks) {
+      if (
+        Math.hypot(
+          pose.position[0] - stack.position[0],
+          pose.position[2] - stack.position[2],
+        ) <=
+        stack.radius + DICE_SIZE * 0.72
+      )
+        top = Math.max(top, stack.position[1] + stack.height / 2);
+    }
+    if (physics.puckBody) {
+      const marker = physicalPose(physics.puckBody),
+        [x, , z] = marker.quaternion;
+      const vertical = Math.min(1, Math.abs(1 - 2 * (x * x + z * z)));
+      if (
+        Math.hypot(
+          pose.position[0] - marker.position[0],
+          pose.position[2] - marker.position[2],
+        ) <=
+        puck.radius + DICE_SIZE * 0.72
+      )
+        top = Math.max(
+          top,
+          marker.position[1] +
+            (puck.height / 2) * vertical +
+            puck.radius * Math.sqrt(1 - vertical * vertical),
+        );
+    }
+    return top + DICE_SIZE * 0.6;
+  }
+  // Tilted, off-table or moving dice are invalid; never force a target face.
   if (
     !physics.sleeping ||
     last.some(
       (pose, i) =>
         faces[i].alignment < 0.995 ||
-        pose.position[1] > DICE_SIZE * 0.75 ||
+        pose.position[1] > supportedHeight(pose) ||
         pose.position[1] < DICE_SIZE * 0.4 ||
         Math.abs(pose.position[0]) > BOUNDS.x - DICE_SIZE * 0.45 ||
         Math.abs(pose.position[2]) > BOUNDS.z - DICE_SIZE * 0.45,
@@ -184,10 +218,25 @@ export function createThrowTimeline({
       [...pose.position, ...pose.quaternion].map(rounded),
     ),
   ]);
+  const puckFrames = rawPuck
+    ? rawPuck.map((pose, index) => [
+        frames[index][0],
+        ...[...pose.position, ...pose.quaternion].map(rounded),
+      ])
+    : null;
+  if (puckFrames) puckFrames.push([duration, ...puckFrames.at(-1).slice(1)]);
+  const propContacts = physics.propContacts.map((contact) => ({
+    ...contact,
+    time: rounded((contact.simulationTime / (steps / 120)) * settleOffset),
+    speed: rounded(contact.speed),
+    normal: contact.normal.map(rounded),
+    position: contact.position.map(rounded),
+    velocity: contact.velocity.map(rounded),
+  }));
   // Hold the unmodified, already sleeping bodies briefly before results show.
   frames.push([duration, ...frames.at(-1).slice(1)]);
   return {
-    version: 2,
+    version: 3,
     id,
     playerId,
     shooterId,
@@ -197,6 +246,16 @@ export function createThrowTimeline({
     dice: faces.map((face) => face.value),
     gesture: controls,
     frames,
+    puckFrames,
+    props: {
+      puck: puck ? structuredClone(puck) : null,
+      stacks: structuredClone(stacks),
+    },
+    propContacts,
+    stackContacts: propContacts
+      .filter((contact) => contact.kind === "stack")
+      .map((contact) => ({ ...contact, stackId: contact.id })),
+    propHits: physics.propHits,
     settledAt: startAt + settleOffset,
     physicsSteps: steps,
     simulationDuration: steps / 120,
@@ -238,10 +297,21 @@ export function sampleThrow(throwState, now = Date.now()) {
     );
     return { position, quaternion };
   });
+  let puck = null;
+  if (throwState.puckFrames?.length === frames.length) {
+    const a = throwState.puckFrames[low],
+      b = throwState.puckFrames[high];
+    puck = {
+      position: a.slice(1, 4).map((v, index) => v + (b[index + 1] - v) * t),
+      quaternion: slerp(a.slice(4, 8), b.slice(4, 8), t),
+    };
+  }
   return {
     dice,
+    puck,
     progress: duration ? elapsed / duration : 1,
     done: now >= startAt + duration,
     wallHits: throwState.wallHits,
+    propHits: throwState.propHits || 0,
   };
 }

@@ -1,35 +1,17 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { createChipBatch } from "./chip-batch.js";
 
-export const CHIP_DENOMINATIONS = [
-  { value: 100, color: "#eee8dc", label: "$1" },
-  { value: 500, color: "#a9112e", label: "$5" },
-  { value: 2500, color: "#087342", label: "$25" },
-  { value: 10000, color: "#111722", label: "$100" },
-  { value: 50000, color: "#6d36a5", label: "$500" },
-  { value: 100000, color: "#c28b0c", label: "$1,000" },
-];
-
-export function chipDenomination(value) {
-  return (
-    [...CHIP_DENOMINATIONS].reverse().find((d) => value >= d.value) ||
-    CHIP_DENOMINATIONS[0]
-  );
-}
-
-// A finite display stack, with its exact total shown separately by the caller.
-export function chipStackForAmount(amount, limit = 8) {
-  let remainder = Math.max(0, amount);
-  const chips = [];
-  for (const { value } of [...CHIP_DENOMINATIONS].reverse()) {
-    while (remainder >= value && chips.length < limit) {
-      chips.push(value);
-      remainder -= value;
-    }
-  }
-  if (!chips.length && amount > 0) chips.push(100);
-  return { chips, truncated: remainder > 0, total: amount };
-}
+import {
+  CHIP_DENOMINATIONS,
+  chipDenomination,
+  chipStackForAmount,
+} from "./chip-stack.js";
+export {
+  CHIP_DENOMINATIONS,
+  chipDenomination,
+  chipStackForAmount,
+} from "./chip-stack.js";
 
 import { assetURL as asset } from "./asset-url.js";
 
@@ -136,111 +118,18 @@ export async function createChipFactory(renderer) {
       return group;
     },
     createBatch(specs) {
-      const group = new THREE.Group(),
-        buckets = new Map();
       gltf.scene.updateMatrixWorld(true);
-      const sourceMeshes = [];
+      const sources = [];
       gltf.scene.traverse((object) => {
-        if (object.isMesh) sourceMeshes.push(object);
+        if (object.isMesh) sources.push(object);
       });
-      const position = new THREE.Vector3(),
-        quaternion = new THREE.Quaternion(),
-        scale = new THREE.Vector3();
-      for (const [specIndex, spec] of specs.entries()) {
-        const denomination = spec.denomination ?? 500,
-          wear = (((spec.wear || 0) % 3) + 3) % 3;
-        const diameter = spec.diameter ?? 0.23,
-          thickness = spec.thicknessScale ?? 1.15;
-        position.fromArray(spec.position || [0, 0, 0]);
-        quaternion.setFromEuler(
-          new THREE.Euler(...(spec.rotation || [0, 0, 0])),
-        );
-        scale.set(diameter, diameter * thickness, diameter);
-        const transform = new THREE.Matrix4().compose(
-          position,
-          quaternion,
-          scale,
-        );
-        for (const mesh of sourceMeshes) {
-          const material = styled(
-            mesh.material,
-            denomination,
-            wear,
-            spec.opacity ?? 1,
-          );
-          const key = `${mesh.geometry.uuid}/${material.uuid}`;
-          if (!buckets.has(key))
-            buckets.set(key, {
-              mesh,
-              material,
-              matrices: [],
-              specIndices: [],
-            });
-          buckets
-            .get(key)
-            .matrices.push(transform.clone().multiply(mesh.matrixWorld));
-          buckets.get(key).specIndices.push(specIndex);
-        }
-      }
-      for (const {
-        mesh,
-        material,
-        matrices,
-        specIndices,
-      } of buckets.values()) {
-        const batch = new THREE.InstancedMesh(
-          mesh.geometry,
-          material,
-          matrices.length,
-        );
-        matrices.forEach((matrix, index) => batch.setMatrixAt(index, matrix));
-        batch.castShadow = batch.receiveShadow = !material.transparent;
-        // Stable source indices let presentation physics move selected real chips
-        // without replacing shared geometry, materials, or LOD batches.
-        batch.userData.chipSpecIndices = specIndices;
-        batch.instanceMatrix.needsUpdate = true;
-        batch.computeBoundingSphere();
-        const low = lowGeometry.get(mesh.material.name);
-        if (low)
-          batch.userData.chipLOD = {
-            high: mesh.geometry,
-            low,
-            diameter: Math.max(...specs.map((s) => s.diameter ?? 0.23)),
-            detailed: true,
-          };
-        group.add(batch);
-      }
-      group.userData.chipCount = specs.length;
-      return group;
+      return createChipBatch(specs, sources, styled, lowGeometry);
     },
     updateLOD(root, camera, height, detail = "auto") {
       let changed = false;
-      root.updateWorldMatrix(true, true);
-      const center = new THREE.Vector3();
-      const projectionScale =
-        height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
       root.traverse((object) => {
-        const lod = object.userData.chipLOD;
-        if (!lod) return;
-        center
-          .copy(object.boundingSphere.center)
-          .applyMatrix4(object.matrixWorld);
-        const pixels =
-          (lod.diameter * projectionScale) /
-          Math.max(0.1, center.distanceTo(camera.position));
-        const detailed =
-          detail === "full"
-            ? true
-            : detail === "optimized"
-              ? false
-              : lod.detailed
-                ? pixels >= 28
-                : pixels > 36;
-        if (detailed !== lod.detailed) {
-          lod.detailed = detailed;
-          object.geometry = detailed ? lod.high : lod.low;
-          changed = true;
-        }
+        const batch = object.userData.chipBatch;
+        if (batch) changed = batch.update(camera, height, detail) || changed;
       });
       return changed;
     },

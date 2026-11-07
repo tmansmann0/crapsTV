@@ -1,0 +1,33 @@
+{
+  "triangles": 1340,
+  "vertices": 672,
+  "materials": 1,
+  "expectedGLTFBounds": {
+    "size": [
+      0.4,
+      0.085,
+      0.4
+    ],
+    "min": [
+      -0.2,
+      -0.0425,
+      -0.2
+    ],
+    "max": [
+      0.2,
+      0.0425,
+      0.2
+    ]
+  },
+  "orientation": {
+    "positiveY": "white ON",
+    "negativeY": "black OFF",
+    "showOFF": "rotate around X by pi"
+  },
+  "atlas": [
+    1024,
+    1024
+  ],
+  "glbBytes": 98980,
+  "provenance": "Original geometry, original geometric vector glyphs, original procedural atlas; no external assets"
+}

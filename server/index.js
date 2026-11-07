@@ -114,9 +114,13 @@ try {
     const { createServer } = await import("vite");
     const vite = await createServer({
       root,
+      // Isolated visual tests use Vite too. Never let their dependency optimizer
+      // replace the live preview's cached bundles while a browser is using them.
+      cacheDir: path.join(root, "node_modules", ".vite-crapstv", String(port)),
       server: {
         middlewareMode: true,
         allowedHosts: devAllowedHosts,
+        hmr: { port: 20000 + (port % 30000) },
       },
       appType: "spa",
     });

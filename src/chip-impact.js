@@ -46,6 +46,58 @@ export function findChipImpactCandidates(timeline, stacks) {
     timeline.duration -
     CHIP_IMPACT_LIMITS.physicsMs -
     CHIP_IMPACT_LIMITS.recoveryMs;
+  if (Array.isArray(timeline.stackContacts)) {
+    const byId = new Map(stacks.map((stack) => [stack.id, stack]));
+    const seen = new Set(),
+      candidates = [];
+    for (const contact of [...timeline.stackContacts].sort(
+      (a, b) => a.time - b.time,
+    )) {
+      const id = contact.stackId ?? contact.id,
+        stack = byId.get(id);
+      if (
+        !stack?.chips.length ||
+        seen.has(id) ||
+        !Number.isFinite(contact.time) ||
+        contact.time < 0 ||
+        contact.time > end ||
+        !Number.isFinite(contact.speed) ||
+        contact.speed < CHIP_IMPACT_LIMITS.minimumSpeed ||
+        ![0, 1].includes(contact.die)
+      )
+        continue;
+      if (
+        !Array.isArray(contact.normal) ||
+        contact.normal.length !== 3 ||
+        !contact.normal.every(Number.isFinite)
+      )
+        continue;
+      const velocity = contact.velocity;
+      if (
+        Array.isArray(velocity) &&
+        velocity.length === 3 &&
+        velocity.every(Number.isFinite)
+      ) {
+        const totalSpeed = Math.hypot(...velocity);
+        if (
+          totalSpeed &&
+          contact.speed / totalSpeed < CHIP_IMPACT_LIMITS.minimumHeadOn
+        )
+          continue;
+      }
+      seen.add(id);
+      candidates.push({
+        stack,
+        selected: stack.chips.slice(-CHIP_IMPACT_LIMITS.chips),
+        time: contact.time,
+        die: contact.die,
+        speed: contact.speed,
+        contact,
+      });
+      if (candidates.length === CHIP_IMPACT_LIMITS.stacks) break;
+    }
+    return candidates;
+  }
   const candidates = [];
   for (const stack of stacks) {
     if (!stack.chips?.length) continue;
@@ -224,6 +276,7 @@ function simulateContact(timeline, candidate) {
     start + CHIP_IMPACT_LIMITS.physicsMs + 50,
     timeline.duration - CHIP_IMPACT_LIMITS.recoveryMs,
   );
+  let transmitted = false;
   for (let time = start; time <= until; time += dt * 1000) {
     currentTime = time;
     const current = sampleThrow(timeline, timeline.startAt + time),
@@ -248,6 +301,28 @@ function simulateContact(timeline, candidate) {
         .scale(Math.min(angle, Math.PI) / dt, body.angularVelocity);
       body.aabbNeedsUpdate = true;
     });
+    if (candidate.contact && !transmitted && time >= candidate.time) {
+      transmitted = true;
+      // The authority's solid cylinder can stop a die before the selected top
+      // chips touch its replayed body. Transmit that real contact through the
+      // stack, instead of requiring an impossible second geometric intrusion.
+      {
+        contactAt ??= candidate.time;
+        const normal = new Vec3(...candidate.contact.normal);
+        if (normal.lengthSquared() > 0) normal.normalize();
+        const kick = clamp(candidate.speed * 0.16, 0.2, 0.8);
+        bodies.forEach((body, index) => {
+          const radius = selected[index].diameter / 2;
+          const impulse = normal.scale(-body.mass * kick);
+          const point = new Vec3(
+            normal.x * radius * 0.7,
+            -chipHeight(selected[index]) * 0.5,
+            normal.z * radius * 0.7,
+          );
+          body.applyImpulse(impulse, point);
+        });
+      }
+    }
     world.step(dt);
     bodies.forEach((body, i) => {
       // Keep this cosmetic collision local: no chips can leave their betting area.

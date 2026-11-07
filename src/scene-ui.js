@@ -3,9 +3,34 @@ import * as THREE from "three";
 import QRCode from "qrcode";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import { bettingSecondsRemaining } from "./betting-window.js";
+import {
+  createTVLayout,
+  TV_TYPE,
+  TV_UI_STORAGE_KEY,
+  TV_LABEL_STORAGE_KEY,
+  TV_LABEL_MOTIONS,
+  normalizeLabelMotion,
+  fitJoinAddress,
+  JOIN_CARD,
+} from "./tv-layout.js";
 
 // The TV overlay is rendered entirely as raycastable WebGL meshes.
 export function createSceneUI(renderer, onAction) {
+  let uiSize = "compact",
+    labelMotion = "smooth";
+  try {
+    uiSize =
+      localStorage.getItem(TV_UI_STORAGE_KEY) === "large" ? "large" : "compact";
+  } catch {
+    /* Storage may be unavailable in private contexts. */
+  }
+  try {
+    labelMotion = normalizeLabelMotion(
+      localStorage.getItem(TV_LABEL_STORAGE_KEY),
+    );
+  } catch {
+    /* Retain the default when storage is unavailable. */
+  }
   const scene = new THREE.Scene(),
     camera = new THREE.PerspectiveCamera(45, 1, 1, 3000);
   camera.position.z = 1000;
@@ -16,9 +41,11 @@ export function createSceneUI(renderer, onAction) {
     lastKey = "",
     qrURL = "",
     qr = null,
+    qrVersion = 0,
     logo = null,
     settingsPage = "main",
-    viewWidth = 960,
+    layout = createTVLayout(1920, 1080, { uiSize, labelMotion }),
+    revision = 0,
     alive = true;
   const C = {
     ink: "#eee8db",
@@ -48,15 +75,21 @@ export function createSceneUI(renderer, onAction) {
     mesh.userData = { id, buttons: [] };
     scene.add(mesh);
     interactive.push(mesh);
-    panels[id] = { mesh, canvas, ctx: canvas.getContext("2d"), texture, w, h };
+    panels[id] = {
+      mesh,
+      canvas,
+      ctx: canvas.getContext("2d"),
+      texture,
+      w,
+      h,
+      backingScale: 2,
+    };
   }
-  panel("brand", 205, 86);
-  panel("settingsButton", 48, 48);
-  panel("settings", 304, 368);
-  panel("graphics", 320, 414);
-  panel("join", 286, 126);
-  panel("status", 410, 62);
-  panel("intro", 430, 174);
+  for (const [id, box] of Object.entries(layout.panels))
+    panel(id, box.logicalWidth, box.logicalHeight);
+  document.fonts?.ready.then(() => {
+    if (alive) redraw();
+  });
   const img = new Image();
   img.onload = () => {
     if (alive) {
@@ -67,16 +100,17 @@ export function createSceneUI(renderer, onAction) {
   img.src = assetURL("brand-logo.png");
   function begin(p, glass = true) {
     const c = p.ctx;
-    c.setTransform(2, 0, 0, 2, 0, 0);
+    c.setTransform(p.backingScale, 0, 0, p.backingScale, 0, 0);
     c.clearRect(0, 0, p.w, p.h);
     p.mesh.userData.buttons = [];
+    p.mesh.userData.textMetrics = [];
     if (glass) {
       const g = c.createLinearGradient(0, 0, p.w, p.h);
       g.addColorStop(0, "rgba(12,28,24,.97)");
       g.addColorStop(1, "rgba(5,13,11,.91)");
       c.fillStyle = g;
       c.beginPath();
-      c.roundRect(0.5, 0.5, p.w - 1, p.h - 1, 12);
+      c.roundRect(0.5, 0.5, p.w - 1, p.h - 1, 18);
       c.fill();
       c.strokeStyle = C.line;
       c.lineWidth = 1;
@@ -84,13 +118,59 @@ export function createSceneUI(renderer, onAction) {
     }
     return c;
   }
-  function text(c, str, x, y, size = 13, color = C.ink, weight = 500) {
+  function text(
+    c,
+    str,
+    x,
+    y,
+    size = 36,
+    color = C.ink,
+    weight = 500,
+    importance = "primary",
+  ) {
     c.fillStyle = color;
     c.font = `${weight} ${size}px Manrope,Arial,sans-serif`;
-    c.fillText(String(str), x, y);
+    const value = String(str),
+      metrics = c.measureText(value);
+    const panel = Object.values(panels).find((panel) => panel.ctx === c);
+    panel?.mesh.userData.textMetrics.push({
+      text: value,
+      importance,
+      fontSize: size,
+      x,
+      y,
+      align: c.textAlign,
+      ascent: metrics.actualBoundingBoxAscent,
+      descent: metrics.actualBoundingBoxDescent,
+      left: metrics.actualBoundingBoxLeft,
+      right: metrics.actualBoundingBoxRight,
+      glyphHeight:
+        metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent,
+      glyphWidth:
+        metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight,
+      cssGlyphHeight:
+        (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) *
+        panel.mesh.scale.y,
+      backingGlyphHeight:
+        (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) *
+        panel.backingScale,
+    });
+    c.fillText(value, x, y);
   }
   function finish(p) {
-    p.texture.needsUpdate = true;
+    // Countdown/FPS updates redraw all canvases, but static corners should not
+    // upload multi-megapixel textures again when only the status text changed.
+    const key = JSON.stringify([
+      p.canvas.width,
+      p.canvas.height,
+      p.mesh.userData.textMetrics,
+      p.mesh.userData.id === "brand" && !!logo,
+      p.mesh.userData.id === "join" && qrVersion,
+    ]);
+    if (key !== p.drawKey) {
+      p.drawKey = key;
+      p.texture.needsUpdate = true;
+    }
   }
   function gear(c, x, y, r) {
     c.strokeStyle = C.gold;
@@ -109,7 +189,30 @@ export function createSceneUI(renderer, onAction) {
     c.arc(x, y, r * 0.3, 0, Math.PI * 2);
     c.stroke();
   }
+  function fittedText(
+    c,
+    str,
+    x,
+    y,
+    size,
+    maxWidth,
+    color = C.ink,
+    weight = 500,
+  ) {
+    const minimumSize = Math.min(36, size);
+    c.font = `${weight} ${size}px Manrope,Arial,sans-serif`;
+    while (c.measureText(String(str)).width > maxWidth && size > minimumSize) {
+      size -= 1;
+      c.font = `${weight} ${size}px Manrope,Arial,sans-serif`;
+    }
+    const value = String(str);
+    let shown = value;
+    while (c.measureText(shown).width > maxWidth && shown.length > 2)
+      shown = shown.slice(0, -2) + "…";
+    text(c, shown, x, y, size, color, weight);
+  }
   function redraw() {
+    revision++;
     const {
       state,
       code,
@@ -127,26 +230,26 @@ export function createSceneUI(renderer, onAction) {
     let p = panels.brand,
       c = begin(p, false);
     if (logo) {
-      const ratio = logo.width / logo.height,
-        w = 194,
-        h = w / ratio;
-      c.drawImage(logo, 5, (p.h - h) / 2, w, h);
+      const w = 250,
+        h = w / (logo.width / logo.height);
+      c.drawImage(logo, 3, (p.h - h) / 2, w, h);
     }
     finish(p);
     p = panels.settingsButton;
     c = begin(p);
-    gear(c, 24, 24, 12);
+    gear(c, 44, 44, 25);
     p.mesh.userData.buttons = [
-      { x: 0, y: 0, w: 48, h: 48, action: "settings" },
+      { x: 0, y: 0, w: 88, h: 88, action: "settings" },
     ];
     finish(p);
+
     p = panels.settings;
     p.mesh.visible = !!settingsOpen && settingsPage === "main";
     c = begin(p);
-    text(c, "TABLE SETTINGS", 19, 31, 11, C.gold, 700);
-    text(c, "×", p.w - 33, 32, 24, C.muted);
+    text(c, "TABLE SETTINGS", 28, 49, 36, C.gold, 700);
+    text(c, "×", p.w - 54, 51, 42, C.muted);
     p.mesh.userData.buttons = [
-      { x: p.w - 52, y: 0, w: 52, h: 48, action: "settings" },
+      { x: p.w - 88, y: 0, w: 88, h: 76, action: "settings" },
     ];
     const rows = [
       ["sound", "Announcer", sound ? "ON" : "OFF"],
@@ -155,158 +258,190 @@ export function createSceneUI(renderer, onAction) {
       ["join", "Phone controller", "↗"],
       ["fullscreen", "Fullscreen", "⛶"],
       ["graphics", "Graphics", "›"],
+      ["ui-size", "UI size", uiSize === "large" ? "LARGE" : "COMPACT"],
+      ["labels", "Labels", labelMotion.toUpperCase()],
     ];
     rows.forEach(([action, label, value], i) => {
-      const y = 55 + i * 48;
+      const y = 92 + i * 76;
       c.strokeStyle = C.line;
       c.beginPath();
-      c.moveTo(17, y - 6);
-      c.lineTo(p.w - 17, y - 6);
+      c.moveTo(26, y - 10);
+      c.lineTo(p.w - 26, y - 10);
       c.stroke();
-      text(c, label, 19, y + 22, 13);
+      text(c, label, 28, y + 32, TV_TYPE.setting);
       c.textAlign = "right";
-      text(c, value, p.w - 22, y + 22, 11, C.gold, 600);
+      text(c, value, p.w - 30, y + 32, 38, C.gold, 600);
       c.textAlign = "left";
-      p.mesh.userData.buttons.push({ x: 0, y: y - 5, w: p.w, h: 48, action });
+      p.mesh.userData.buttons.push({ x: 0, y: y - 10, w: p.w, h: 76, action });
     });
     finish(p);
+
     p = panels.graphics;
     p.mesh.visible = !!settingsOpen && settingsPage === "graphics";
     c = begin(p);
-    text(c, "‹ Back", 17, 31, 12, C.gold, 600);
-    text(c, "GRAPHICS", 96, 31, 11, C.gold, 700);
-    text(c, "×", p.w - 33, 32, 24, C.muted);
+    text(c, "‹ Back", 26, 49, 36, C.gold, 600);
+    text(c, "GRAPHICS", 218, 49, 36, C.gold, 700);
+    text(c, "×", p.w - 54, 51, 42, C.muted);
     p.mesh.userData.buttons = [
-      { x: 0, y: 0, w: 86, h: 46, action: "graphics:back" },
-      { x: p.w - 52, y: 0, w: 52, h: 46, action: "settings" },
+      { x: 0, y: 0, w: 166, h: 76, action: "graphics:back" },
+      { x: p.w - 88, y: 0, w: 88, h: 76, action: "settings" },
     ];
-    const graphicsLabels = {
+    const labels = {
       fps: "Frame rate",
       antialias: "Antialiasing",
       resolution: "Resolution",
       modelDetail: "Model detail",
       textures: "Textures",
     };
-    Object.entries(graphicsLabels).forEach(([key, label], i) => {
-      const y = 55 + i * 42;
+    Object.entries(labels).forEach(([key, label], i) => {
+      const y = 91 + i * 72;
       c.strokeStyle = C.line;
       c.beginPath();
-      c.moveTo(17, y - 7);
-      c.lineTo(p.w - 17, y - 7);
+      c.moveTo(26, y - 10);
+      c.lineTo(p.w - 26, y - 10);
       c.stroke();
-      const value = graphics[key] ?? "auto";
-      const option = GRAPHICS_OPTIONS[key].find((o) => o.value === value);
-      text(c, label, 18, y + 18, 13);
+      const option = GRAPHICS_OPTIONS[key].find(
+        (o) => o.value === (graphics[key] ?? "auto"),
+      );
+      text(c, label, 28, y + 31, TV_TYPE.setting);
       c.textAlign = "right";
-      text(
+      fittedText(
         c,
         `${option?.label || "Auto"}  ›`,
-        p.w - 18,
-        y + 18,
-        11,
+        p.w - 28,
+        y + 31,
+        38,
+        300,
         C.gold,
         600,
       );
       c.textAlign = "left";
       p.mesh.userData.buttons.push({
         x: 0,
-        y: y - 6,
+        y: y - 10,
         w: p.w,
-        h: 42,
+        h: 72,
         action: `graphics:${key}`,
       });
     });
     const measured = Number.isFinite(graphicsInfo.fps)
       ? `${Math.round(graphicsInfo.fps)} FPS`
       : "FPS pending";
-    const device = String(graphicsInfo.device || "This display");
-    text(
+    fittedText(
       c,
-      device.length > 40 ? `${device.slice(0, 37)}…` : device,
-      18,
-      282,
-      10,
+      graphicsInfo.device || "This display",
+      28,
+      493,
+      36,
+      p.w - 56,
       C.muted,
     );
-    text(
+    fittedText(
       c,
       graphicsInfo.status === "testing"
         ? "Measuring this display…"
-        : `${measured} · ${graphicsInfo.resolution || "Auto resolution"}`,
-      18,
-      301,
-      11,
-      C.ink,
-      600,
+        : `${measured} · 3D ${graphicsInfo.resolution || "Auto"}`,
+      28,
+      532,
+      36,
+      p.w - 56,
     );
-    text(
+    fittedText(
       c,
-      `Textures: ${graphicsInfo.textureLabel || "Auto"}`,
-      18,
-      320,
-      10,
+      `UI ${graphicsInfo.uiResolution || "Native"} · Maps ${graphicsInfo.textureLabel || "Auto"}`,
+      28,
+      570,
+      36,
+      p.w - 56,
       C.muted,
     );
     c.fillStyle = "rgba(199,171,115,.12)";
     c.beginPath();
-    c.roundRect(16, 340, p.w - 32, 43, 7);
+    c.roundRect(24, 596, p.w - 48, 68, 10);
     c.fill();
     text(
       c,
       graphicsInfo.status === "testing"
         ? "Restart graphics check"
         : "Retest automatic settings",
-      29,
-      367,
-      12,
+      42,
+      640,
+      36,
       C.gold,
       600,
     );
     p.mesh.userData.buttons.push({
-      x: 16,
-      y: 340,
-      w: p.w - 32,
-      h: 43,
+      x: 24,
+      y: 596,
+      w: p.w - 48,
+      h: 68,
       action: "graphics:retest",
     });
-    text(
-      c,
-      "Auto adapts to this display. Tap a row to change.",
-      18,
-      401,
-      9,
-      C.muted,
-    );
     finish(p);
+
     p = panels.join;
-    p.mesh.visible = !settingsOpen || viewWidth >= 700;
+    p.mesh.visible = !settingsOpen || !layout.compact;
     c = begin(p);
-    text(c, "JOIN TABLE", 17, 24, 9, C.gold, 700);
-    text(c, code || "······", 16, 64, 30, C.ink, 600);
-    const url = current.joinURL ? new URL(current.joinURL) : null;
+    // A compact invitation: the room code leads, with the QR isolated in a
+    // warm paper inset so the two ways to join have distinct visual groups.
+    c.fillStyle = C.gold;
+    c.beginPath();
+    c.moveTo(29, 25);
+    c.lineTo(35, 31);
+    c.lineTo(29, 37);
+    c.lineTo(23, 31);
+    c.closePath();
+    c.fill();
+    text(c, "JOIN TABLE", 46, 38, 22, C.gold, 700, "secondary");
+    fittedText(c, code || "······", 22, 105, 72, 378, C.ink, 700);
+    c.strokeStyle = "rgba(199,171,115,.22)";
+    c.beginPath();
+    c.moveTo(409, 25);
+    c.lineTo(409, 185);
+    c.stroke();
+    c.fillStyle = "#f0e7d6";
+    c.beginPath();
+    c.roundRect(422, 15, 160, 180, 12);
+    c.fill();
+    const address = fitJoinAddress(current.joinURL, (value, size) => {
+      c.font = `600 ${size}px Manrope,Arial,sans-serif`;
+      return c.measureText(value).width;
+    });
+    address.lines.forEach((line, index) =>
+      text(
+        c,
+        line,
+        JOIN_CARD.addressX,
+        JOIN_CARD.addressBaselines[index],
+        address.size,
+        index ? C.muted : C.ink,
+        600,
+      ),
+    );
+    p.mesh.userData.joinAddress = address;
+    if (qr) {
+      c.imageSmoothingEnabled = false;
+      c.drawImage(
+        qr,
+        JOIN_CARD.qr.x,
+        JOIN_CARD.qr.y,
+        JOIN_CARD.qr.size,
+        JOIN_CARD.qr.size,
+      );
+      c.imageSmoothingEnabled = true;
+    }
+    c.textAlign = "center";
     text(
       c,
-      url ? `${url.host}${url.pathname}` : "Connecting…",
-      17,
-      89,
-      9,
-      C.muted,
+      status === "disconnected" ? "TAP TO RECONNECT" : "SCAN TO JOIN",
+      502,
+      183,
+      16,
+      "#233c31",
+      700,
+      "secondary",
     );
-    text(
-      c,
-      status === "connected"
-        ? current.fallbackJoinURL
-          ? `IP ${new URL(current.fallbackJoinURL).host}/join`
-          : "Scan with your phone"
-        : status === "disconnected"
-          ? "Connection lost"
-          : "Connecting…",
-      17,
-      109,
-      10,
-      C.muted,
-    );
-    if (qr) c.drawImage(qr, 199, 20, 72, 72);
+    c.textAlign = "start";
     p.mesh.userData.buttons = [
       {
         x: 0,
@@ -317,6 +452,7 @@ export function createSceneUI(renderer, onAction) {
       },
     ];
     finish(p);
+
     p = panels.status;
     c = begin(p);
     p.mesh.visible =
@@ -330,21 +466,30 @@ export function createSceneUI(renderer, onAction) {
     let heading = "Connecting",
       detail = "";
     if (state?.status === "playing") {
+      const roll = state.lastRoll;
+      const kind = {
+        natural: "WINNER",
+        craps: "CRAPS",
+        "point-hit": "POINT MADE",
+        "seven-out": "SEVEN OUT",
+      }[roll?.kind];
+      const point = state.point ? `POINT ${state.point}` : "COME OUT";
       heading = state.rolling
-        ? "Dice rolling"
-        : state.point
-          ? `POINT ${state.point}`
-          : "COME OUT";
-      const shooter = state.players.find((p) => p.id === state.shooterId);
+        ? "DICE ROLLING"
+        : roll
+          ? `${roll.total} · ${kind || point}`
+          : point;
+      const shooter =
+        state.players.find((p) => p.id === state.shooterId)?.name || "Host";
       detail = state.rolling
         ? "Bets closed"
         : bettingSeconds > 0
-          ? `Betting open · ${bettingSeconds}s before the next roll`
-          : `${shooter?.name || "Host"} to roll${state.lastRoll ? ` · ${state.lastRoll.dice.join(" + ")} = ${state.lastRoll.total}` : ""}`;
+          ? `Betting open · ${bettingSeconds}s${layout.compact ? "" : ` · ${shooter} next`}`
+          : `${shooter} to roll · Betting open`;
     }
     if (state?.status === "ended") {
       heading = "SESSION CLOSED";
-      detail = "Recaps are ready on your phones";
+      detail = "Your recaps are on your phones";
     }
     if (sceneLoading && !error) {
       heading = "Loading table…";
@@ -355,17 +500,20 @@ export function createSceneUI(renderer, onAction) {
       detail = error;
     }
     c.textAlign = "center";
-    text(c, heading, p.w / 2, 27, 16, C.ink, 700);
-    text(
+    fittedText(c, heading, p.w / 2, 70, TV_TYPE.result, p.w - 56, C.ink, 700);
+    fittedText(
       c,
-      detail.length > 65 ? detail.slice(0, 62) + "…" : detail,
+      detail,
       p.w / 2,
-      47,
-      10,
-      C.muted,
+      123,
+      TV_TYPE.status,
+      p.w - 56,
+      bettingSeconds > 0 ? C.gold : C.muted,
+      600,
     );
     c.textAlign = "left";
     finish(p);
+
     p = panels.intro;
     p.mesh.visible = !!introActive && !settingsOpen;
     c = begin(p);
@@ -373,29 +521,30 @@ export function createSceneUI(renderer, onAction) {
     text(
       c,
       testing ? "GETTING YOUR TABLE READY" : "CRAPSTV",
-      20,
-      27,
-      10,
+      30,
+      47,
+      36,
       C.gold,
       700,
     );
     text(
       c,
-      testing ? "Checking graphics performance" : "Your table is ready",
-      20,
-      58,
-      20,
+      testing ? "Checking graphics" : "Your table is ready",
+      30,
+      100,
+      40,
       C.ink,
-      600,
+      700,
     );
-    text(
+    fittedText(
       c,
       testing
-        ? "A short check tunes graphics for this display."
+        ? "A quick check for this display."
         : `${measured} · ${graphicsInfo.resolution || "Automatic resolution"}`,
-      20,
-      82,
-      11,
+      30,
+      145,
+      36,
+      p.w - 60,
       C.muted,
     );
     const progress = Math.max(
@@ -403,65 +552,51 @@ export function createSceneUI(renderer, onAction) {
       Math.min(1, graphicsInfo.progress ?? (testing ? 0 : 1)),
     );
     c.fillStyle = "rgba(199,171,115,.18)";
-    c.fillRect(20, 99, p.w - 40, 4);
+    c.fillRect(30, 172, p.w - 60, 8);
     c.fillStyle = C.gold;
-    c.fillRect(20, 99, (p.w - 40) * progress, 4);
-    text(
-      c,
-      testing
-        ? "You can change these choices in Graphics."
-        : "Automatic choices can be changed at any time.",
-      20,
-      126,
-      10,
-      C.muted,
-    );
-    text(c, "Graphics settings  ›", 20, 153, 11, C.gold, 600);
+    c.fillRect(30, 172, (p.w - 60) * progress, 8);
+    text(c, "You can change graphics in Settings.", 30, 224, 36, C.muted);
+    text(c, "Graphics settings  ›", 30, 279, 36, C.gold, 600);
     p.mesh.userData.buttons = [
-      { x: 15, y: 135, w: 180, h: 32, action: "graphics:open" },
+      { x: 20, y: 243, w: p.w - 40, h: 58, action: "graphics:open" },
     ];
     finish(p);
   }
   function resize(w, h) {
-    viewWidth = w;
+    layout = createTVLayout(w, h, {
+      uiSize,
+      labelMotion,
+      pixelRatio: renderer.getPixelRatio?.() || 1,
+      maxTextureSize: renderer.capabilities?.maxTextureSize || 4096,
+    });
     camera.aspect = w / h;
     camera.fov = THREE.MathUtils.radToDeg(2 * Math.atan(h / 2000));
     camera.updateProjectionMatrix();
-    const small = w < 650;
-    const place = (id, x, y, s = 1) => {
+    for (const [id, box] of Object.entries(layout.panels)) {
       const p = panels[id];
-      p.mesh.scale.setScalar(s);
+      if (p.w !== box.logicalWidth || p.h !== box.logicalHeight) {
+        p.mesh.geometry.dispose();
+        p.w = box.logicalWidth;
+        p.h = box.logicalHeight;
+        p.mesh.geometry = new THREE.PlaneGeometry(p.w, p.h);
+      }
+      if (
+        p.canvas.width !== box.backingWidth ||
+        p.canvas.height !== box.backingHeight
+      ) {
+        // Release immutable GPU storage before changing canvas dimensions.
+        p.texture.dispose();
+        p.canvas.width = box.backingWidth;
+        p.canvas.height = box.backingHeight;
+      }
+      p.backingScale = box.backingScale;
+      p.mesh.scale.setScalar(box.scale);
       p.mesh.position.set(
-        x - w / 2 + (p.w * s) / 2,
-        h / 2 - y - (p.h * s) / 2,
+        box.x - w / 2 + box.width / 2,
+        h / 2 - box.y - box.height / 2,
         0,
       );
-    };
-    place("settingsButton", small ? 12 : 24, small ? 14 : 24);
-    place("brand", small ? 64 : 82, small ? 0 : 4, small ? 0.76 : 1);
-    place(
-      "settings",
-      small ? 12 : 24,
-      small ? 70 : 84,
-      Math.min(1, (w - 24) / 304, (h - 100) / 368),
-    );
-    place(
-      "graphics",
-      small ? 12 : 24,
-      small ? 70 : 84,
-      Math.min(1, (w - 24) / 320, (h - 100) / 414),
-    );
-    const js = small ? 0.8 : 1;
-    place("join", w - 286 * js - (small ? 12 : 24), small ? 78 : 24, js);
-    const ss = Math.min(1, (w - 28) / 410);
-    place("status", (w - 410 * ss) / 2, h - 62 * ss - 20, ss);
-    const introScale = Math.min(1, (w - 32) / 430);
-    place(
-      "intro",
-      (w - 430 * introScale) / 2,
-      Math.max(150, (h - 174 * introScale) / 2),
-      introScale,
-    );
+    }
     redraw();
   }
   function update(next) {
@@ -469,6 +604,7 @@ export function createSceneUI(renderer, onAction) {
     current = { ...next, bettingSeconds: bettingSecondsRemaining(next.state) };
     const key = JSON.stringify([
       next.code,
+      next.joinURL,
       next.status,
       next.sound,
       next.error,
@@ -478,6 +614,7 @@ export function createSceneUI(renderer, onAction) {
       next.graphics,
       Math.round(next.graphicsInfo?.fps || 0),
       next.graphicsInfo?.resolution,
+      next.graphicsInfo?.uiResolution,
       next.graphicsInfo?.device,
       next.graphicsInfo?.status,
       next.graphicsInfo?.textureLabel,
@@ -498,12 +635,13 @@ export function createSceneUI(renderer, onAction) {
       const canvas = document.createElement("canvas");
       QRCode.toCanvas(canvas, qrURL, {
         margin: 1,
-        width: 180,
+        width: 512,
         color: { dark: "#091914", light: "#f0e7d6" },
       })
         .then(() => {
           if (alive) {
             qr = canvas;
+            qrVersion++;
             redraw();
           }
         })
@@ -538,12 +676,69 @@ export function createSceneUI(renderer, onAction) {
     }
     return null;
   }
+  function getActionPoints() {
+    const points = {};
+    for (const [id, p] of Object.entries(panels)) {
+      if (!p.mesh.visible) continue;
+      const box = layout.panels[id];
+      for (const button of p.mesh.userData.buttons) {
+        if (points[button.action]) continue;
+        const left = box.x + button.x * box.scale;
+        const top = box.y + button.y * box.scale;
+        const width = button.w * box.scale;
+        const height = button.h * box.scale;
+        points[button.action] = {
+          x: left + width / 2,
+          y: top + height / 2,
+          left,
+          top,
+          width,
+          height,
+          panel: id,
+        };
+      }
+    }
+    return points;
+  }
   return {
     scene,
     camera,
+    get layout() {
+      return layout;
+    },
+    get revision() {
+      return revision;
+    },
+    get labelMotion() {
+      return labelMotion;
+    },
+    get textMetrics() {
+      return Object.fromEntries(
+        Object.entries(panels).map(([id, p]) => [
+          id,
+          {
+            visible: p.mesh.visible,
+            ...layout.panels[id],
+            lines: p.mesh.userData.textMetrics || [],
+            ...(id === "join"
+              ? { address: p.mesh.userData.joinAddress, qr: JOIN_CARD.qr }
+              : {}),
+          },
+        ]),
+      );
+    },
     resize,
     update,
     pick,
+    getLayout() {
+      return layout;
+    },
+    getActionPoints,
+    getVisibleRects() {
+      return Object.entries(panels)
+        .filter(([, p]) => p.mesh.visible)
+        .map(([id]) => ({ id, ...layout.panels[id] }));
+    },
     get settingsPage() {
       return settingsPage;
     },
@@ -552,7 +747,27 @@ export function createSceneUI(renderer, onAction) {
       redraw();
     },
     activate(action) {
-      if (action === "graphics" || action === "graphics:open") {
+      if (action === "ui-size") {
+        uiSize = uiSize === "large" ? "compact" : "large";
+        try {
+          localStorage.setItem(TV_UI_STORAGE_KEY, uiSize);
+        } catch {
+          /* The in-session preference still works without storage. */
+        }
+        resize(layout.width, layout.height);
+      } else if (action === "labels") {
+        labelMotion =
+          TV_LABEL_MOTIONS[
+            (TV_LABEL_MOTIONS.indexOf(labelMotion) + 1) %
+              TV_LABEL_MOTIONS.length
+          ];
+        try {
+          localStorage.setItem(TV_LABEL_STORAGE_KEY, labelMotion);
+        } catch {
+          /* Keep the in-session preference without storage. */
+        }
+        resize(layout.width, layout.height);
+      } else if (action === "graphics" || action === "graphics:open") {
         settingsPage = "graphics";
         if (!current.settingsOpen) onAction("settings");
         redraw();

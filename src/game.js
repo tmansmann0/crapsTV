@@ -1,3 +1,5 @@
+import { puckHome } from "./puck-layout.js";
+import { wagerStackLayout } from "./wager-layout.js";
 import {
   DEFAULT_ROLL_COOLDOWN_SECONDS,
   MAX_ROLL_COOLDOWN_SECONDS,
@@ -79,6 +81,7 @@ export function createState(code = "LOCAL") {
     adminId: null,
     shooterId: null,
     point: null,
+    puck: puckHome(null),
     rolling: false,
     bettingOpenedAt: null,
     nextRollAt: null,
@@ -637,6 +640,9 @@ export function setAim(s, id, input, now = Date.now()) {
 }
 export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   throwController(s, id);
+  const puck =
+    s.puck?.point === s.point ? s.puck : puckHome(s.point, s.config.mode);
+  const stacks = wagerStackLayout(s);
   const controls = sanitizeGesture(
     gesture,
     s.aim?.playerId === id ? s.aim : undefined,
@@ -653,6 +659,8 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
         gesture: controls,
         startAt: 0,
         duration,
+        puck,
+        stacks,
       });
       break;
     } catch (error) {
@@ -841,6 +849,15 @@ export function finishRoll(s, dice = s.throw?.dice) {
     message = "Seven out. Pass the dice.";
     rotateShooter(s);
   }
+  const landedPuck = s.throw?.puckFrames?.at(-1);
+  s.puck =
+    s.point !== oldPoint || !landedPuck
+      ? puckHome(s.point, s.config.mode)
+      : {
+          ...puckHome(s.point, s.config.mode),
+          position: landedPuck.slice(1, 4),
+          quaternion: landedPuck.slice(4, 8),
+        };
   s.rolling = false;
   openBettingWindow(s);
   s.aim = null;

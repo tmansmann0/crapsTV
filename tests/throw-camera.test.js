@@ -1,12 +1,131 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PerspectiveCamera, Vector3 } from "three";
+import { PerspectiveCamera, Vector3, Quaternion } from "three";
+import { createTVLayout } from "../src/tv-layout.js";
+import { readFileSync } from "node:fs";
+import { createThrowTimeline, sampleThrow } from "../src/throw-motion.js";
 import {
   THROW_CAMERA_RIGS,
   RESULT_CAMERA_HOLD_MS,
   sampleThrowCamera,
+  sampleTableCamera,
+  BETWEEN_ROUND_BREATHER_MS,
+  BETTING_TABLE_BOUNDS,
+  fitBettingCamera,
   throwCameraRig,
 } from "../src/throw-camera.js";
+
+test("optional wide framing can fit full table/banks when explicitly requested", () => {
+  const seats = JSON.parse(
+    readFileSync(
+      new URL(
+        "../public/assets/table-player-rails-layout.json",
+        import.meta.url,
+      ),
+    ),
+  ).seats;
+  for (const [width, height] of [
+    [1920, 1080],
+    [3840, 2160],
+    [1280, 800],
+  ])
+    for (const uiSize of ["compact", "large"]) {
+      const layout = createTVLayout(width, height, { uiSize });
+      const hudRects = ["brand", "join", "status", "settingsButton"].map(
+        (id) => layout.panels[id],
+      );
+      const top = Math.max(
+        ...hudRects
+          .filter((r) => r.y + r.height <= height * 0.5)
+          .map((r) => r.y + r.height),
+      );
+      const bottom = Math.min(
+        ...hudRects.filter((r) => r.y >= height * 0.5).map((r) => r.y),
+      );
+      const shot = fitBettingCamera({
+        aspect: width / height,
+        top: top / height,
+        bottom: bottom / height,
+        horizontalLimit: 1 - (160 * (height / 1080)) / width,
+      });
+      const camera = new PerspectiveCamera(shot.fov, width / height, 0.1, 160);
+      camera.position.fromArray(shot.position);
+      camera.lookAt(new Vector3(...shot.target));
+      camera.updateMatrixWorld(true);
+      const points = [];
+      for (const x of [
+        BETTING_TABLE_BOUNDS.min[0],
+        BETTING_TABLE_BOUNDS.max[0],
+      ])
+        for (const y of [0, 1.9])
+          for (const z of [
+            BETTING_TABLE_BOUNDS.min[2],
+            BETTING_TABLE_BOUNDS.max[2],
+          ])
+            points.push([x, y, z]);
+      for (const seat of seats)
+        for (const slot of seat.stackSlots)
+          for (const dx of [-0.12, 0.12])
+            for (const dz of [-0.12, 0.12])
+              for (const y of [0.675, 1.8])
+                points.push([slot.position[0] + dx, y, slot.position[2] + dz]);
+      for (const point of points) {
+        const p = new Vector3(...point).project(camera),
+          py = ((1 - p.y) * height) / 2;
+        assert.ok(
+          Math.abs(p.x) < 1 && p.z > -1 && p.z < 1,
+          "table/bank point is in the camera frustum",
+        );
+        assert.ok(
+          py > top && py < bottom,
+          `${width}x${height} ${uiSize} bank point ${point} is beneath HUD`,
+        );
+      }
+    }
+});
+
+test("Auto rests wide in the lobby and nearly overhead during active betting", () => {
+  const lobby = sampleTableCamera({ state: { status: "lobby" }, now: 0 });
+  assert.equal(lobby.phase, "lobby");
+  const playing = sampleTableCamera({ state: { status: "playing" }, now: 0 });
+  assert.equal(playing.phase, "betting");
+  const horizontal = Math.hypot(
+    playing.position[0] - playing.target[0],
+    playing.position[2] - playing.target[2],
+  );
+  assert.ok(horizontal / (playing.position[1] - playing.target[1]) < 0.16);
+});
+
+test("a long betting window permits only a one-second breather after result hold", () => {
+  const state = {
+    status: "playing",
+    rolling: false,
+    throw: throwState,
+    nextRollAt: 13500,
+  };
+  const resultEnd = throwState.settledAt + RESULT_CAMERA_HOLD_MS;
+  assert.equal(
+    sampleTableCamera({ state, now: resultEnd - 1 }).phase,
+    "betting",
+  );
+  assert.equal(sampleTableCamera({ state, now: resultEnd }).phase, "breather");
+  assert.equal(
+    sampleTableCamera({ state, now: resultEnd + BETWEEN_ROUND_BREATHER_MS })
+      .phase,
+    "betting",
+  );
+  assert.equal(
+    sampleTableCamera({ state, now: resultEnd, reducedMotion: true }).phase,
+    "betting",
+  );
+  for (const nextRollAt of [resultEnd, resultEnd + 3999])
+    assert.equal(
+      sampleTableCamera({ state: { ...state, nextRollAt }, now: resultEnd })
+        .phase,
+      "betting",
+    );
+  assert.equal(sampleTableCamera({ state, now: 12000 }).phase, "betting");
+});
 
 const throwState = {
   id: "camera-test",
@@ -48,9 +167,9 @@ test("camera zoom progresses slowly without moving its rig toward the dice", () 
   const first = sample(1000),
     middle = sample(2100),
     last = sample(3199);
-  assert.equal(first.fov, 46);
+  assert.equal(first.fov, 54);
   assert.ok(first.fov > middle.fov && middle.fov > last.fov);
-  assert.ok(last.fov >= 40);
+  assert.ok(last.fov >= 48);
   assert.ok(
     Math.hypot(...last.position.map((v, i) => v - first.position[i])) < 0.051,
   );
@@ -79,73 +198,96 @@ test("late joining uses the current shot, and reduced motion skips choreography"
   );
 });
 
-test("all corner and overhead shots fit both complete dice in landscape and portrait", () => {
-  const spread = pose([-4.9, 0.15, 2.2], [4.9, 0.15, -2.2]);
-  const visited = new Set();
-  for (let seed = 0; seed < 24; seed++)
-    for (const aspect of [16 / 9, 1, 9 / 16])
-      for (const now of [1500, 3200]) {
-        const shot = sample(now, spread, {
-          throwState: { ...throwState, seed },
-          aspect,
-        });
-        visited.add(shot.rig);
-        const camera = new PerspectiveCamera(shot.fov, aspect, 0.1, 160);
-        camera.position.fromArray(shot.position);
-        camera.lookAt(new Vector3(...shot.target));
-        camera.updateMatrixWorld();
-        for (const { position } of spread.dice)
-          for (const dx of [-0.15, 0.15])
-            for (const dy of [-0.15, 0.15])
-              for (const dz of [-0.15, 0.15]) {
-                const projected = new Vector3(
-                  position[0] + dx,
-                  position[1] + dy,
-                  position[2] + dz,
-                ).project(camera);
-                assert.ok(
-                  Math.abs(projected.x) < 1 && Math.abs(projected.y) < 1,
-                  `rig ${shot.rig}, ${shot.phase}, aspect ${aspect}: dice clipped`,
-                );
-                assert.ok(projected.z > -1 && projected.z < 1);
-              }
-      }
-  assert.equal(visited.size, 4);
+test("inside table-level rigs keep both dice framed across actual recorded trajectories", () => {
+  let tested = 0;
+  for (let seed = 1; seed <= 16; seed++) {
+    let timeline;
+    try {
+      timeline = createThrowTimeline({
+        id: `low-camera-${seed}`,
+        seed,
+        startAt: 1000,
+        duration: 2500,
+        gesture: { x: ((seed % 3) - 1) * 0.7, power: 0.35 + (seed % 4) * 0.2 },
+      });
+    } catch (error) {
+      if (error.code === "DICE_UNSETTLED") continue;
+      throw error;
+    }
+    tested++;
+    const selected = throwCameraRig(timeline);
+    assert.equal(throwCameraRig(structuredClone(timeline)), selected);
+    for (let t = 0; t < 2200; t += 110) {
+      const pose = sampleThrow(timeline, 1000 + t);
+      const shot = sampleThrowCamera({
+        throwState: timeline,
+        pose,
+        now: 1000 + t,
+        aspect: 16 / 9,
+      });
+      assert.equal(shot.rig, selected);
+      assert.ok(shot.position[1] >= 0.38 && shot.position[1] <= 0.391);
+      assert.equal(Math.abs(shot.position[0]), 5);
+      assert.equal(Math.abs(shot.position[2]), 2.3);
+      const camera = new PerspectiveCamera(shot.fov, 16 / 9, 0.035, 160);
+      camera.position.fromArray(shot.position);
+      camera.lookAt(new Vector3(...shot.target));
+      camera.updateMatrixWorld();
+      for (const die of pose.dice)
+        for (const x of [-0.11, 0.11])
+          for (const y of [-0.11, 0.11])
+            for (const z of [-0.11, 0.11]) {
+              const p = new Vector3(x, y, z)
+                .applyQuaternion(new Quaternion(...die.quaternion))
+                .add(new Vector3(...die.position))
+                .project(camera);
+              assert.ok(
+                Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z > -1 && p.z < 1,
+                `seed ${seed} t=${t}: clipped`,
+              );
+            }
+    }
+  }
+  assert.ok(tested >= 10);
+});
+
+test("default playing view is close and top-down, independently of outer bank framing", () => {
+  const view = sampleTableCamera({
+    state: { status: "playing" },
+    now: 0,
+    aspect: 16 / 9,
+  });
+  assert.ok(view.position[1] >= 8 && view.position[1] <= 10);
+  assert.ok(Math.abs(view.position[2] - view.target[2]) < 1.6);
 });
 
 test("overhead results keep dice clear of brand, invite, and result panels", () => {
   for (const [width, height] of [
+    [1920, 1080],
+    [3840, 2160],
     [1280, 800],
     [650, 650],
     [390, 844],
   ]) {
-    const small = width < 650,
-      joinScale = small ? 0.8 : 1;
-    const statusScale = Math.min(1, (width - 28) / 410);
-    const panels = [
-      [
-        small ? 64 : 82,
-        small ? 0 : 4,
-        205 * (small ? 0.76 : 1),
-        86 * (small ? 0.76 : 1),
-      ],
-      [
-        width - 286 * joinScale - (small ? 12 : 24),
-        small ? 78 : 24,
-        286 * joinScale,
-        126 * joinScale,
-      ],
-      [
-        (width - 410 * statusScale) / 2,
-        height - 62 * statusScale - 20,
-        410 * statusScale,
-        62 * statusScale,
-      ],
-    ];
+    const layout = createTVLayout(width, height);
+    const hudRects = ["brand", "join", "status", "settingsButton"].map(
+      (id) => layout.panels[id],
+    );
+    const panels = hudRects.map(({ x, y, width, height }) => [
+      x,
+      y,
+      width,
+      height,
+    ]);
     for (const x of [-4.9, -2.5, 0, 2.5, 4.9])
       for (const z of [-2.3, -1, 0, 1, 2.3]) {
         const positions = pose([x, 0.11, z], [-x, 0.11, -z]);
-        const shot = sample(3200, positions, { aspect: width / height });
+        const shot = sample(3200, positions, {
+          aspect: width / height,
+          viewportWidth: width,
+          viewportHeight: height,
+          hudRects,
+        });
         const camera = new PerspectiveCamera(
           shot.fov,
           width / height,

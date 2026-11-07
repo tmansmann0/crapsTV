@@ -36,6 +36,7 @@ export const GRAPHICS_OPTIONS = Object.freeze({
     choice("auto", "Auto"),
     choice("1k", "1K"),
     choice("2k", "2K"),
+    choice("4k", "4K"),
     choice("native", "Native"),
   ]),
 });

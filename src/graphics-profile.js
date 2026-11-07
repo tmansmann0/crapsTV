@@ -1,4 +1,5 @@
 import { normalizeGraphics } from "./graphics-settings.js";
+import { automaticRenderScale } from "./display-resolution.js";
 
 const positive = (value, fallback) =>
   typeof value === "number" && Number.isFinite(value) && value > 0
@@ -11,20 +12,27 @@ const hardwareTextureLimit = (capabilities) =>
 
 /** Capability-only starting point; no user-agent, vendor or device-name guesses. */
 export function recommendGraphics(capabilities = {}) {
-  const dpr = nativeDpr(capabilities);
   const memory = positive(capabilities?.deviceMemory, Infinity);
   const threads = positive(capabilities?.hardwareConcurrency, Infinity);
   const software = capabilities?.software === true;
   const lowMemory = memory <= 4;
   const reduced = software || lowMemory || threads <= 2;
-  const dprCap = software ? 0.7 : lowMemory ? 1 : 1.5;
+  const physicalPixels =
+    (capabilities.viewportWidth || 0) *
+    (capabilities.viewportHeight || 0) *
+    nativeDpr(capabilities) ** 2;
   return {
     fps: software ? 24 : 60,
-    resolutionScale: Math.min(1, dprCap / dpr),
+    resolutionScale: automaticRenderScale(capabilities),
     antialias: !software && !lowMemory,
     modelDetail: reduced ? "optimized" : "auto",
     textureLimit:
-      reduced || hardwareTextureLimit(capabilities) < 2048 ? 1024 : 2048,
+      reduced || hardwareTextureLimit(capabilities) < 2048
+        ? 1024
+        : physicalPixels >= 3840 * 2160 &&
+            hardwareTextureLimit(capabilities) >= 4096
+          ? 4096
+          : 2048,
   };
 }
 
@@ -44,7 +52,7 @@ function safeProfile(profile, capabilities = {}) {
     modelDetail: ["auto", "optimized"].includes(profile.modelDetail)
       ? profile.modelDetail
       : fallback.modelDetail,
-    textureLimit: [1024, 2048].includes(profile.textureLimit)
+    textureLimit: [1024, 2048, 4096].includes(profile.textureLimit)
       ? profile.textureLimit
       : fallback.textureLimit,
   };
@@ -88,7 +96,7 @@ export function resolveGraphics(requested, profile, capabilities = {}) {
   const auto = safeProfile(profile, capabilities);
   const resolutionScale =
     settings.resolution === "auto"
-      ? auto.resolutionScale
+      ? Math.min(auto.resolutionScale, automaticRenderScale(capabilities))
       : Number(settings.resolution) / 100;
   const wantedTexture =
     settings.textures === "auto"
@@ -97,7 +105,9 @@ export function resolveGraphics(requested, profile, capabilities = {}) {
         ? Infinity
         : settings.textures === "1k"
           ? 1024
-          : 2048;
+          : settings.textures === "4k"
+            ? 4096
+            : 2048;
   return {
     fps: settings.fps === "auto" ? auto.fps : settings.fps,
     pixelRatio: nativeDpr(capabilities) * resolutionScale,

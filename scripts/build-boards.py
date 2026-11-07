@@ -73,12 +73,12 @@ def make(mode):
  path='M68 190 H126 V720 Q126 728 134 728 H1914 Q1922 728 1922 720 V190 H1980 V750 Q1980 786 1944 786 H104 Q68 786 68 750 Z' if mode=='classic' else 'M68 190 H195 V658 Q195 668 205 668 H1843 Q1853 668 1853 658 V190 H1980 V750 Q1980 786 1944 786 H104 Q68 786 68 750 Z'
  d.add(d.path(d=path,fill='none',stroke=GOLD,stroke_width=2))
  txt('PASS LINE',1024,932,32,IVORY,700,8,target=d)
- for x,angle in ([(99,-90),(1949,90)] if mode=='classic' else [(132,-90),(1917,90)]):
+ for x,angle in ([(99,90),(1949,-90)] if mode=='classic' else [(132,90),(1917,-90)]):
   t=d.text('PASS LINE',insert=(x,476),text_anchor='middle',font_family='Georgia, serif',font_size=25,font_weight=700,letter_spacing=4,fill=IVORY,transform=f'rotate({angle} {x} 476)');d.add(t)
  if mode=='classic':
   d.add(d.path(d='M145 195 H195 V660 Q195 668 203 668 H1845 Q1853 668 1853 660 V195 H1903 V683 Q1903 718 1868 718 H180 Q145 718 145 683 Z',fill='none',stroke=GOLD,stroke_width=1.7))
   txt('DON’T PASS BAR 12',1024,854,24,IVORY,600,4,target=d)
-  for x,angle in [(170,-90),(1878,90)]:
+  for x,angle in [(170,90),(1878,-90)]:
    d.add(d.text('DON’T PASS · BAR 12',insert=(x,472),text_anchor='middle',font_family='Arial, sans-serif',font_size=17,letter_spacing=2,fill=IVORY,transform=f'rotate({angle} {x} 472)'))
  else:
   txt('7 WINS ON THE COME-OUT  ·  EVERY OTHER TOTAL BECOMES A POINT',1024,844,17,GOLD,600,2,target=d)

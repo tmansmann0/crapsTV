@@ -63,6 +63,7 @@ npm run test:graphics   # actual WebGL settings, calibration and persistence che
 npm run test:learn      # animated lesson rules, controls and phone fit
 npm run test:payout     # board-to-bank payout presentation
 npm run test:layout     # stable Play layout across interaction states
+npm run test:tv         # Compact/Large layout and actual 1080p/4K glyph checks
 npm run test:online     # optional live PeerJS test against the published site
 npm run benchmark       # isolated twelve-player WebGL frame/draw benchmark
 npm run format          # format source, tests, and workflows
@@ -125,8 +126,10 @@ For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit
 
 The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the selected 24/30/60 FPS limit. Close camera views retain the original detailed chips.
 
-The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger.
+The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/4K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger. **UI size** is a separate local Compact/Large choice for each TV or display.
 
-Auto camera chooses one of four fixed corner positions for a throw, tracks the dice with a slow lens change, then cuts overhead briefly to show the settled faces. Strong direct hits can nudge or topple a few modeled wager chips, with bounded contact physics and gentle recovery. Manual orbit, fixed table/room views, and reduced-motion preferences take priority. See [camera and chip-contact details](docs/roll-presentation.md) and [betting-window rules](docs/betting-window.md).
+Auto uses a wide lobby view and a near-top-down betting view once play starts. Throws keep one of four corner positions, then cut overhead to show the settled faces. A short breather between rolls gives way to the betting view. Manual orbit, fixed Table/Room views, and reduced motion take priority. Strong direct hits can nudge or topple a few wager chips. The modeled ON/OFF puck and solid wager stacks participate in the authoritative dice simulation; the puck has a white ON face and black OFF face. See [camera and contact details](docs/roll-presentation.md), [puck model](docs/puck.md), and [betting-window rules](docs/betting-window.md).
+
+The TV interface defaults to Compact, with an optional Large size in TV Settings for longer viewing distances. Cards sit beside their chip piles, with chip footprints reserved against overlap. The renderer supports native 1080p/4K output, independently sharp UI at reduced 3D resolution, and a 4K raster of the vector felt. See [TV display QA](docs/tv-display-qa.md).
 
 Table finishes now use [calibrated PBR materials](docs/table-materials.md): satin walnut, textured leather, matte rubber and restrained brass, with consistent roughness and normal maps.

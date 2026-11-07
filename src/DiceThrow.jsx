@@ -1,7 +1,9 @@
 import { useBettingWindow } from "./use-betting-window.js";
 import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { puckHome } from "./puck-layout.js";
+import { wagerStackLayout } from "./wager-layout.js";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
@@ -38,7 +40,22 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     !justLanded &&
     remaining === 0 &&
     (player.id === state.shooterId || isAdmin);
-  latest.current = { state, aim, activeThrowId: observedThrow.current };
+  const launchProps = useMemo(
+    () => ({
+      puck:
+        state.puck && state.puck.point === state.point
+          ? state.puck
+          : puckHome(state.point, state.config.mode),
+      stacks: wagerStackLayout(state),
+    }),
+    [state],
+  );
+  latest.current = {
+    state,
+    aim,
+    launchProps,
+    activeThrowId: observedThrow.current,
+  };
   useEffect(() => {
     if (state.rolling || !connected || remaining > 0) {
       drag.current = null;
@@ -152,7 +169,12 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       if (time - lastTime < (document.hidden ? 500 : software ? 80 : 0)) return;
       const dt = lastTime ? Math.min(0.1, (time - lastTime) / 1000) : 1 / 60;
       lastTime = time;
-      const { state: s, aim: localAim, activeThrowId } = latest.current;
+      const {
+        state: s,
+        aim: localAim,
+        launchProps,
+        activeThrowId,
+      } = latest.current;
       // A freshly opened Roll tab is a ready close-up, not a replay of the
       // previous roll. Once observed, a throw keeps its final pose until unmount.
       const showingShared =
@@ -190,10 +212,10 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         ? sampleThrow(s.throw, Date.now() + (s.clockOffsetMs || 0))
         : null;
       const pose = localAim
-        ? aimDicePose(localAim)
+        ? aimDicePose(localAim, launchProps)
         : s.aim?.active
-          ? aimDicePose(s.aim)
-          : shared || aimDicePose();
+          ? aimDicePose(s.aim, launchProps)
+          : shared || aimDicePose(undefined, launchProps);
       pose.dice.forEach((p, i) => {
         dice[i].position.fromArray(p.position);
         dice[i].quaternion.fromArray(p.quaternion);

@@ -76,6 +76,56 @@ test("late motion is ignored so recovery cannot interrupt settlement", () => {
   late.frames = [frame(0, -1), frame(1500, -1), frame(1800, 1), frame(2500, 1)];
   assert.equal(findChipImpactCandidates(late, [stack()]).length, 0);
 });
+test("authoritative solid-stack contacts drive reactions when a rotated die stops outside the old reach gate", () => {
+  const chips = stack(6),
+    timeline = flight(0.23);
+  timeline.frames = [
+    frame(0, -1, 0.23),
+    frame(140, -0.31, 0.23),
+    frame(300, -0.8, 0.23),
+    frame(2500, -0.8, 0.23),
+  ];
+  for (const f of timeline.frames) {
+    f[5] = Math.sin(Math.PI / 8);
+    f[7] = Math.cos(Math.PI / 8);
+  }
+  assert.equal(findChipImpactCandidates(timeline, [chips]).length, 0);
+  timeline.stackContacts = [
+    {
+      stackId: chips.id,
+      die: 0,
+      time: 140,
+      speed: 5,
+      normal: [-1, 0, 0],
+      velocity: [5, 0, 0],
+      position: [-0.155, 0.23, 0],
+    },
+  ];
+  assert.equal(findChipImpactCandidates(timeline, [chips]).length, 1);
+  const [track] = createChipImpacts(timeline, [chips]);
+  assert.ok(track);
+  assert.ok(
+    track.frames.some((f) =>
+      f.poses.some(
+        (p, i) =>
+          Math.hypot(
+            p.position[0] - track.original[i].position[0],
+            p.position[2] - track.original[i].position[2],
+          ) > 0.001,
+      ),
+    ),
+  );
+  assert.ok(
+    track.startAt + track.physicsMs + track.recoveryMs <=
+      timeline.startAt + timeline.duration,
+  );
+  timeline.stackContacts = [];
+  assert.equal(
+    createChipImpacts(timeline, [chips]).length,
+    0,
+    "authoritative no-contact result does not invent a reaction",
+  );
+});
 test("Cannon contact actually moves and tips top chips while lower chips stay put", () => {
   const chips = stack(6);
   const tracks = createChipImpacts(flight(0.23), [chips]);

@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { upperDieFace } from "../../src/throw-motion.js";
+import { clickTV } from "../helpers/tv-actions.mjs";
 // Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
 // captured locally; CI retains every interaction/assertion and DOM trace.
 async function capture(page, options) {
@@ -64,14 +65,12 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       { timeout: 30000 },
     );
     await tv.waitForTimeout(500);
-    await tv.locator("canvas").click({
-      position: { x: 48, y: 48 },
-    });
+    await clickTV(tv, "settings");
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-settings-open",
       "true",
     );
-    await tv.locator("canvas").click({ position: { x: 130, y: 210 } });
+    await clickTV(tv, "camera");
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-camera",
       "table",
@@ -82,14 +81,12 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     ).json();
     // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
     const popup = tv.waitForEvent("popup");
-    await tv.locator("canvas").click({
-      position: { x: 130, y: 305 },
-    });
+    await clickTV(tv, "join");
     const controllerPopup = await popup;
     await controllerPopup.waitForURL(/\/join\?code=/);
     const controllerURL = controllerPopup.url();
     await controllerPopup.close();
-    await tv.locator("canvas").click({ position: { x: 48, y: 48 } });
+    await clickTV(tv, "settings");
     const phone = await controllers.newPage({
       viewport: { width: 390, height: 844 },
     });
@@ -322,6 +319,10 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-cinematic",
       "true",
+    );
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-amount-labels-visible",
+      "false",
     );
     await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
     await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);

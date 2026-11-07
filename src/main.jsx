@@ -357,6 +357,13 @@ function App() {
     }
   }, [status, state?.code]);
   const roomCode = state?.code || session?.code || "";
+  // An existing local process keeps its loaded rules after the static UI updates.
+  // Old hosts cannot gain corrected throws or physical props from a UI refresh.
+  const hostWarning =
+    state && (!state.puck || (state.throw && state.throw.version < 3))
+      ? "Older host: restart this server for current physics."
+      : "";
+  const visibleError = error || hostWarning;
   const joinLink = controllerURL(roomCode, session?.joinOrigin);
   const fallbackJoinLink =
     session?.lanOrigin && session.lanOrigin !== session.joinOrigin
@@ -394,7 +401,7 @@ function App() {
           state={state}
           code={roomCode}
           status={checking ? "connecting" : status}
-          error={error}
+          error={visibleError}
           sound={sound}
           settingsOpen={settingsOpen}
           joinURL={joinLink}
@@ -471,10 +478,10 @@ function App() {
           </nav>
         </header>
       )}
-      {error && (
+      {visibleError && (
         <div className="toast" role="alert">
           <Info size={18} />
-          {error}
+          {visibleError}
           <button aria-label="Dismiss" onClick={() => setError("")}>
             <X size={16} />
           </button>
