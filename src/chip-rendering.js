@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createChipBatch } from "./chip-batch.js";
 import { applyChipPatina } from "./chip-patina.js";
+import { applySurfaceProfile } from "./surface-profile.js";
 
 import {
   CHIP_DENOMINATIONS,
@@ -17,7 +18,7 @@ export {
 /** Owns the shared model/texture GPU resources for one renderer or scene. */
 export async function createChipFactory(
   renderer,
-  { resolveAsset, loadModel, loadTexture } = {},
+  { resolveAsset, loadModel, loadTexture, surfaceProfile = true } = {},
 ) {
   if (!resolveAsset) {
     const { assetURL } = await import("./asset-url.js");
@@ -74,6 +75,7 @@ export async function createChipFactory(
     ...[1, 2, 3].map((i) => loadData(`chip-normal-${i}.png`)),
     ...[1, 2, 3].map((i) => loadData(`chip-roughness-${i}.png`)),
     loadData("chip-patina.png"),
+    ...(surfaceProfile ? [loadData("chip-scratch-study.png")] : []),
   ]);
   const failure = loaded.find((result) => result.status === "rejected");
   if (failure) {
@@ -83,7 +85,8 @@ export async function createChipFactory(
   const [gltf, lowDetail, ...wearMaps] = loaded.map((result) => result.value);
   const normalMaps = wearMaps.slice(0, 3),
     roughnessMaps = wearMaps.slice(3, 6),
-    patinaMap = wearMaps[6];
+    patinaMap = wearMaps[6],
+    scratchMap = wearMaps[7];
   patinaMap.wrapS = patinaMap.wrapT = THREE.RepeatWrapping;
   try {
     // GLTFLoader.loadTextureImage converts a failed image request to null,
@@ -142,6 +145,8 @@ export async function createChipFactory(
           original.name === "ChipEngraving" ? 0.42 : 1,
         );
       material.envMapIntensity = 0.75;
+      if (surfaceProfile && /^Chip(Base|Inlay|Engraving)/.test(original.name))
+        applySurfaceProfile(material, "chip", { scratchTexture: scratchMap });
       if (opacity < 1) {
         material.transparent = true;
         material.opacity = opacity;

@@ -53,6 +53,8 @@ The table uses matched wood grain and pore maps, textured red padding and short-
 
 Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 pays double and 12 triple. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
 
+[Compare material strengths](https://tmansmann0.github.io/crapsTV/studies/materials/index.html): actual 4K renders with identical close/wide shots. Option 2 is the selected mix: stronger felt, restrained red padding and grime, visible chip scratches and fine-grained American walnut.
+
 ## Build, test, and review
 
 ```sh

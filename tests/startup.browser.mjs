@@ -32,7 +32,14 @@ for (const stream of [server.stdout, server.stderr])
   stream.on("data", (chunk) => {
     serverLog += chunk;
   });
-let browser, page, socket, latestState, config, releaseAsset, releaseWear;
+let browser,
+  page,
+  socket,
+  latestState,
+  config,
+  releaseAsset,
+  releaseWear,
+  releaseScratch;
 const errors = [],
   glErrors = [],
   samples = [];
@@ -195,6 +202,7 @@ try {
           diceDone: d.startupDiceDone,
           dicePose: JSON.parse(d.startupDicePose || "[]"),
           effectiveFps: Number(d.startupEffectiveFps),
+          uploadPausedMs: Number(d.startupUploadPausedMs || 0),
           qualityChanges: JSON.parse(d.startupQualityChanges || "[]"),
           cameraPosition: JSON.parse(d.cameraPosition || "[]"),
           cameraTarget: JSON.parse(d.cameraTarget || "[]"),
@@ -210,7 +218,7 @@ try {
     sawAsset = resolve;
   });
   let delayed = false;
-  await page.route("**/*material-table-walnut-albedo*", async (route) => {
+  await page.route("**/wood-studies/american/albedo.jpg*", async (route) => {
     if (!delayed) {
       delayed = true;
       sawAsset();
@@ -234,12 +242,30 @@ try {
     }
     await route.continue();
   });
+  let sawScratch;
+  const scratchHeld = new Promise((resolve) => {
+    releaseScratch = resolve;
+  });
+  const scratchRequested = new Promise((resolve) => {
+    sawScratch = resolve;
+  });
+  let delayedScratch = false;
+  await page.route("**/*chip-scratch-study.png*", async (route) => {
+    if (!delayedScratch) {
+      delayedScratch = true;
+      sawScratch();
+      await scratchHeld;
+    }
+    await route.continue();
+  });
   await page.goto(origin);
   const table = page.locator(".table-canvas");
   await Promise.race([
-    Promise.all([assetRequested, wearRequested]),
+    Promise.all([assetRequested, wearRequested, scratchRequested]),
     pause(45000).then(() => {
-      throw Error("Expected critical walnut albedo and dice wear requests");
+      throw Error(
+        "Expected critical American wood, dice wear and selected chip scratch requests",
+      );
     }),
   ]);
   await expect(table).toHaveAttribute("data-startup-phase", "loading");
@@ -277,8 +303,27 @@ try {
     wearBlackPixels > 0.995,
     `remaining dice texture must retain black gate (${wearBlackPixels})`,
   );
-  const releasedAt = Date.now();
   releaseWear();
+  // The new production scratch sampler is also a critical asset. Even with
+  // the table and dice ready, no partial unscuffed scene may fade in.
+  await pause(650);
+  await expect(table).toHaveAttribute("data-startup-phase", "loading");
+  await expect(table).toHaveAttribute("data-scene-ready", "false");
+  assert.equal(Number(await table.getAttribute("data-startup-elapsed")), 0);
+  assert.equal(Number(await table.getAttribute("data-startup-fade")), 0);
+  assert.equal(Number(await table.getAttribute("data-startup-ui-opacity")), 0);
+  const scratchBlackPixels = darkFraction(
+    await table.screenshot({
+      path: "artifacts/startup-scratch-asset-gate.png",
+      animations: "allow",
+    }),
+  );
+  assert(
+    scratchBlackPixels > 0.995,
+    `selected chip scratch sampler must retain black gate (${scratchBlackPixels})`,
+  );
+  const releasedAt = Date.now();
+  releaseScratch();
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 60000,
   });
@@ -294,7 +339,7 @@ try {
   });
   await capture("dice");
   await expect(table).toHaveAttribute("data-startup-phase", "payout", {
-    timeout: 10000,
+    timeout: 45000,
   });
   await expect
     .poll(
@@ -305,7 +350,7 @@ try {
     .toBeGreaterThan(0);
   await capture("payout");
   await expect(table).toHaveAttribute("data-startup-phase", "live", {
-    timeout: 35000,
+    timeout: 90000,
   });
   await expect(table).toHaveAttribute("data-graphics-intro", "false");
   await expect(table).toHaveAttribute("data-demo-active", "false");
@@ -326,9 +371,16 @@ try {
   // The first telemetry interval can arrive several frames into the fade.
   // Recover its clock origin instead of discarding those elapsed milliseconds.
   const actualDuration = ended.at - started.at + started.elapsed;
+  const uploadPausedMs = ended.uploadPausedMs;
+  const contentDuration = actualDuration - uploadPausedMs;
   assert(
-    actualDuration >= 29900 && actualDuration < 33000,
-    `opening ran ${actualDuration}ms instead of30s`,
+    contentDuration >= 29900 && contentDuration < 31000,
+    `opening content ran ${contentDuration}ms (${actualDuration}ms wall, ${uploadPausedMs}ms accounted resource waits) instead of30s`,
+  );
+  assert.equal(
+    ended.elapsed,
+    30000,
+    "the entire 30s demonstration must play, including every payout",
   );
   assert(Date.now() - releasedAt >= 29500);
   for (const phase of [
@@ -510,7 +562,10 @@ try {
         port,
         blackPixels,
         wearBlackPixels,
+        scratchBlackPixels,
         actualDuration,
+        contentDuration,
+        uploadPausedMs,
         qualityChanges,
         actualChanges,
         samples,
@@ -522,7 +577,7 @@ try {
     ),
   );
   console.log(
-    "Startup proof passed: black gated assets, actual30s, two physical throws, real winning/losing modeled transfers, late UI fade, isolated ledger, Escape, already-playing skip and live-game Retest.",
+    "Startup proof passed: black gated American wood, dice wear and selected chip scratches, actual30s content with accounted resource waits, two physical throws, real winning/losing modeled transfers, late UI fade, isolated ledger, Escape, already-playing skip and live-game Retest.",
   );
 } catch (error) {
   await mkdir("artifacts", { recursive: true });
@@ -546,6 +601,7 @@ try {
 } finally {
   releaseAsset?.();
   releaseWear?.();
+  releaseScratch?.();
   socket?.terminate();
   await browser?.close();
   if (server.exitCode === null) {

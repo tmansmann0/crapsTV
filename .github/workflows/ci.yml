@@ -41,9 +41,14 @@ jobs:
       - run: npm run test:learn
       - run: npm run test:graphics
       - run: npm run test:board
+      - run: npm run test:surface-parity
+        env:
+          SURFACE_PARITY_WIDTH: "960"
+          SURFACE_PARITY_HEIGHT: "540"
       - run: npm run test:tv
       - run: npm run test:tour
       - run: npm run test:startup
+      - run: npm run test:startup-retest
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -55,7 +55,7 @@ async function png(name) {
   return { width, height, pixels };
 }
 
-test("dice handling scuffs preserve polished colors, pip separation and translucent behavior", () => {
+test("selected dice handling scuffs preserve polished colors, pip separation and translucent behavior", () => {
   const n = new THREE.Texture(),
     r = new THREE.Texture();
   for (const color of Object.keys(DICE_COLORS))
@@ -73,7 +73,12 @@ test("dice handling scuffs preserve polished colors, pip separation and transluc
       assert.equal(m.opacity, 1);
       assert.equal(m.depthWrite, true);
       assert.equal(m.roughness, finish === "translucent" ? 0.5 : 1);
-      assert(m.normalScale.x >= 0.3 && m.normalScale.x <= 0.45);
+      assert.equal(
+        m.normalScale.x,
+        (finish === "translucent" ? 0.3 : 0.42) * 2.2,
+      );
+      assert.equal(m.clearcoatNormalScale.x, 0.26 * 2);
+      assert.equal(m.userData.surfaceProfile, "refined");
       assert(
         m.clearcoatNormalScale.x > 0 &&
           m.clearcoatNormalScale.x < m.normalScale.x,
@@ -186,4 +191,47 @@ test("felt provides continuous fine relief with grazing sheen, no displacement, 
     seam / (height * 2) < (interior / count) * 1.5,
     "repeat seam resembles adjacent fibres",
   );
+});
+
+test("dice preview opt-out and later appearance creations keep independent authored baselines", () => {
+  const n1 = new THREE.Texture(),
+    n2 = new THREE.Texture(),
+    roughness = new THREE.Texture();
+  const raw = createDiceMaterial(
+    { color: "red", finish: "solid" },
+    n1,
+    roughness,
+    false,
+    { surfaceProfile: false },
+  );
+  const first = createDiceMaterial(
+    { color: "red", finish: "solid" },
+    n1,
+    roughness,
+  );
+  const later = createDiceMaterial(
+    { color: "blue", finish: "translucent" },
+    n2,
+    roughness,
+  );
+  assert.equal(raw.normalScale.x, 0.42);
+  assert.equal(raw.clearcoatNormalScale.x, 0.26);
+  assert.equal(raw.userData.surfaceProfile, undefined);
+  assert.equal(first.normalScale.x, 0.42 * 2.2);
+  assert.equal(later.normalScale.x, 0.3 * 2.2);
+  assert.equal(first.normalMap, n1);
+  assert.equal(later.normalMap, n2);
+  assert.equal(later.transmission, 0.82);
+  assert.equal(
+    later.color.getHexString(),
+    new THREE.Color(DICE_COLORS.blue).getHexString(),
+  );
+  const shader = {
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.physical.vertexShader,
+    fragmentShader: THREE.ShaderLib.physical.fragmentShader,
+  };
+  later.onBeforeCompile(shader, {});
+  assert.equal(shader.uniforms.lookRoughnessContrast.value, 1.5);
+  for (const m of [raw, first, later]) m.dispose();
 });

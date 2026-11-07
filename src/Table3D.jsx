@@ -11,7 +11,7 @@ import { createTablePieces } from "./table-pieces.js";
 import { createTableMaterials } from "./table-materials.js";
 import { createTableCompositor } from "./table-compositor.js";
 import { createBoardArtwork } from "./board-artwork.js";
-import { createFeltSurfaceSettings } from "./felt-surface.js";
+import { createBoardMaterial } from "./board-material.js";
 import { puckHome } from "./puck-layout.js";
 import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
@@ -153,6 +153,9 @@ export default function Table3D(props) {
       probeWarmUntil = 0;
     let introLiveProbe = false;
     let liveCalibrationHold = null;
+    let pendingQualityFrame = null;
+    let introUploadPausedMs = 0;
+    let previousAnimationAt = null;
     let introQualityChanges = [];
     let sceneRevealedAt = introDone.current ? -Infinity : null;
     const introDuration = STARTUP_DURATION_MS;
@@ -405,12 +408,7 @@ export default function Table3D(props) {
     }
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(10.84, 5.4),
-      new THREE.MeshPhysicalMaterial({
-        color: 0xffffff,
-        ...createFeltSurfaceSettings(),
-        roughnessMap: roughness,
-        normalMap: normal,
-      }),
+      createBoardMaterial({ normalMap: normal, roughnessMap: roughness }),
     );
     board.rotation.x = -Math.PI / 2;
     board.position.y = 0.012;
@@ -515,6 +513,7 @@ export default function Table3D(props) {
       introLiveProbe = false;
       introSample = null;
       liveCalibrationHold = null;
+      pendingQualityFrame = null;
       nextFrameAt = 0;
     }
     function skipOpening(event) {
@@ -533,6 +532,8 @@ export default function Table3D(props) {
         introLiveProbe = latest.current.state?.status === "playing";
         introCandidate = introLiveProbe ? -1 : 0;
         liveCalibrationHold = null;
+        pendingQualityFrame = null;
+        introUploadPausedMs = 0;
         introQualityChanges = [];
         introFinishedAt = null;
         if (!introLiveProbe) sceneRevealedAt = performance.now();
@@ -694,6 +695,35 @@ export default function Table3D(props) {
     function animate(time) {
       frame = requestAnimationFrame(animate);
       if (restarting) return;
+      const animationGap =
+        previousAnimationAt === null ? 1000 / 60 : time - previousAnimationAt;
+      previousAnimationAt = time;
+      if (pendingQualityFrame) {
+        if (!document.hidden && introPaused === null) {
+          // Expensive texture uploads, shader variants and queued GPU work can
+          // finish well after the quality-change callback. Measure the NEXT
+          // RAF gap rather than guessing a fixed upload duration. The demo's
+          // content clock waits on its already-landed result instead of
+          // jumping over chip payouts when that work takes multiple seconds.
+          const pause = Math.max(
+            0,
+            time - pendingQualityFrame.at - pendingQualityFrame.normalFrameMs,
+          );
+          if (pendingQualityFrame.live) {
+            if (liveCalibrationHold) {
+              liveCalibrationHold.endAt = Math.max(
+                liveCalibrationHold.endAt + pause,
+                time + 700,
+              );
+              liveCalibrationHold.recoveryUntil = time + 700;
+            }
+          } else if (introStart !== null) {
+            introStart += pause;
+            introUploadPausedMs += pause;
+          }
+        }
+        pendingQualityFrame = null;
+      }
       if (document.hidden) {
         if (introPaused === null) introPaused = time;
         introPreviousFrame = null;
@@ -736,7 +766,11 @@ export default function Table3D(props) {
               const throwId = liveState?.throw?.id || null;
               if (
                 liveCalibrationHold &&
-                (!calibrationCanHold(liveState, liveNow, 0) ||
+                (((!liveCalibrationHold.recoveryUntil ||
+                  time >= liveCalibrationHold.recoveryUntil) &&
+                  !calibrationCanHold(liveState, liveNow, 0)) ||
+                  liveState?.rolling ||
+                  liveState?.aim?.active ||
                   liveCalibrationHold.throwId !== throwId)
               )
                 liveCalibrationHold = null;
@@ -795,6 +829,12 @@ export default function Table3D(props) {
                       software,
                     });
               applyRuntimeQuality();
+              pendingQualityFrame = {
+                at: time,
+                normalFrameMs: Math.min(50, Math.max(1, animationGap)),
+                live: introLiveProbe,
+              };
+              nextFrameAt = 0;
               introQualityChanges.push({
                 elapsed,
                 probe,
@@ -1220,6 +1260,7 @@ export default function Table3D(props) {
       el.dataset.startupUiOpacity = String(uiOpacity);
       el.dataset.demoActive = String(!!introSample && stageReady);
       el.dataset.startupProbe = String(introCandidate);
+      el.dataset.startupUploadPausedMs = String(introUploadPausedMs);
       el.dataset.startupQualityChanges = JSON.stringify(introQualityChanges);
       el.dataset.startupCalibrationHold = String(
         !!introSample?.calibrationHold || !!liveCalibrationHold,

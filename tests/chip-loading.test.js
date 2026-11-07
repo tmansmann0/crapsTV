@@ -200,8 +200,13 @@ test("scuff relief, roughness and engraving survive both instanced chip detail l
           material.roughnessMap,
           maps.get(`chip-roughness-${wear + 1}.png`),
         );
-        assert.deepEqual(material.normalScale.toArray(), [strength, strength]);
+        assert.deepEqual(material.normalScale.toArray(), [
+          strength * 2.3,
+          strength * 2.3,
+        ]);
         assert.equal(material.userData.chipPatina, true);
+        assert.equal(material.userData.surfaceProfile, "refined");
+        assert.equal(material.scratchMap, maps.get("chip-scratch-study.png"));
       }
     }
     const stamp = active.find(
@@ -214,6 +219,131 @@ test("scuff relief, roughness and engraving survive both instanced chip detail l
     );
     assert.equal(stamp.userData.chipPatina, true);
   }
+  factory.dispose();
+  f.allDisposed();
+});
+
+test("required scratch atlas failure waits for late resources and releases the entire gate", async () => {
+  const f = fixture(),
+    high = f.model(),
+    low = f.model(),
+    late = later();
+  let settled = false;
+  const promise = createChipFactory(renderer, {
+    resolveAsset: (n) => n,
+    loadModel: async (n) => (n === "chip-logo.glb" ? high : low),
+    loadTexture: (n) =>
+      n === "chip-scratch-study.png"
+        ? Promise.reject(new Error("scratch atlas offline"))
+        : n === "chip-normal-3.png"
+          ? late.promise
+          : Promise.resolve(f.texture()),
+  });
+  promise.catch(() => {
+    settled = true;
+  });
+  await new Promise(setImmediate);
+  assert.equal(settled, false);
+  for (const count of f.counts.values()) assert.equal(count, 0);
+  late.resolve(f.texture());
+  await assert.rejects(promise, /scratch atlas offline/);
+  f.allDisposed();
+});
+
+test("lazy denomination, wear and ghost caches receive selected scoring without new per-chip programs", async () => {
+  const f = fixture(),
+    maps = new Map();
+  const factory = await createChipFactory(renderer, {
+    resolveAsset: (n) => n,
+    loadModel: async () => f.model(),
+    loadTexture: async (n) => {
+      const t = f.texture();
+      maps.set(n, t);
+      return t;
+    },
+  });
+  const first = factory.create({ denomination: 500, wear: 0 });
+  const again = factory.create({ denomination: 500, wear: 0 });
+  assert.equal(first.children[0].material, again.children[0].material);
+  const ghost = factory.create({
+    denomination: 100000,
+    wear: 2,
+    opacity: 0.35,
+  });
+  const clay = ghost.children.find(
+    (m) => m.material.name === "ChipBase",
+  ).material;
+  assert.equal(clay.opacity, 0.35);
+  assert.equal(clay.depthWrite, false);
+  assert.deepEqual(clay.normalScale.toArray(), [0.44 * 2.3, 0.44 * 2.3]);
+  assert.equal(clay.scratchMap, maps.get("chip-scratch-study.png"));
+  assert.equal(
+    clay.customProgramCacheKey(),
+    first.children
+      .find((m) => m.material.name === "ChipBase")
+      .material.customProgramCacheKey(),
+  );
+  const shader = {
+    uniforms: {},
+    vertexShader: THREE.ShaderLib.standard.vertexShader,
+    fragmentShader: THREE.ShaderLib.standard.fragmentShader,
+  };
+  clay.onBeforeCompile(shader, {});
+  assert.equal(shader.uniforms.chipScratchRelief.value, 1);
+  assert.equal(shader.uniforms.chipScratchAlbedo.value, 0.4);
+  const specs = [100, 500, 2500, 10000, 50000, 100000].flatMap(
+    (denomination, d) =>
+      [0, 1, 2].flatMap((wear) =>
+        [1, 0.35].map((opacity) => ({
+          denomination,
+          wear,
+          opacity,
+          position: [d, 0, -8],
+        })),
+      ),
+  );
+  const batch = factory.createBatch(specs),
+    camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 500);
+  camera.updateMatrixWorld(true);
+  let ids;
+  for (const detail of ["full", "optimized"]) {
+    factory.updateLOD(batch, camera, 2160, detail);
+    const active = batch.children
+      .filter((m) => m.visible && m.count)
+      .map((m) => m.material);
+    const current = [...new Set(active.map((m) => m.uuid))].sort();
+    if (ids) assert.deepEqual(current, ids);
+    ids = current;
+    for (const material of active.filter((m) =>
+      /^Chip(Base|Inlay|Engraving)/.test(m.name),
+    )) {
+      assert.equal(material.userData.surfaceProfile, "refined");
+      assert.equal(material.scratchMap, maps.get("chip-scratch-study.png"));
+    }
+  }
+  factory.dispose();
+  f.allDisposed();
+});
+
+test("study opt-out keeps authored material baselines and skips the production scratch request", async () => {
+  const f = fixture(),
+    requests = [];
+  const factory = await createChipFactory(renderer, {
+    surfaceProfile: false,
+    resolveAsset: (n) => n,
+    loadModel: async () => f.model(),
+    loadTexture: async (n) => {
+      requests.push(n);
+      return f.texture();
+    },
+  });
+  const chip = factory.create({ denomination: 500, wear: 0 });
+  const clay = chip.children.find(
+    (m) => m.material.name === "ChipBase",
+  ).material;
+  assert.deepEqual(clay.normalScale.toArray(), [0.3, 0.3]);
+  assert.equal(clay.userData.surfaceProfile, undefined);
+  assert(!requests.includes("chip-scratch-study.png"));
   factory.dispose();
   f.allDisposed();
 });

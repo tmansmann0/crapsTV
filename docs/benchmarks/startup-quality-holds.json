@@ -1,10 +1,17 @@
 {
-  "actualDuration": 30015.4,
+  "materialProfile": "refined",
+  "woodLook": "american",
+  "actualDuration": 33682,
+  "contentDuration": 30015.80000000001,
+  "uploadPausedMs": 3666.1999999999916,
   "blackPixels": 1,
   "wearBlackPixels": 1,
+  "scratchBlackPixels": 1,
   "qualityChanges": [
     {
-      "elapsed": 9516.2,
+      "elapsed": 9516.400000000001,
+      "observedAt": 16221.199999988079,
+      "rafAt": 13993.1,
       "hold": "true",
       "rolling": "false",
       "diceDone": "true",
@@ -52,11 +59,11 @@
         }
       ],
       "change": {
-        "elapsed": 9516.2,
+        "elapsed": 9516.400000000001,
         "probe": 1,
         "phase": "result",
         "rolling": false,
-        "holdAge": 316.2000000000007,
+        "holdAge": 316.40000000000146,
         "quality": {
           "fps": 60,
           "pixelRatio": 0.82,
@@ -68,7 +75,9 @@
       }
     },
     {
-      "elapsed": 21915.7,
+      "elapsed": 21916.100000000002,
+      "observedAt": 30077.5,
+      "rafAt": 28592.5,
       "hold": "true",
       "rolling": "false",
       "diceDone": "true",
@@ -116,11 +125,11 @@
         }
       ],
       "change": {
-        "elapsed": 21915.7,
+        "elapsed": 21916.100000000002,
         "probe": 2,
         "phase": "result",
         "rolling": false,
-        "holdAge": 315.7000000000007,
+        "holdAge": 316.1000000000022,
         "quality": {
           "fps": 60,
           "pixelRatio": 1,
@@ -132,7 +141,9 @@
       }
     },
     {
-      "elapsed": 28665.5,
+      "elapsed": 28666.000000000004,
+      "observedAt": 36813.19999998808,
+      "rafAt": 36808.8,
       "hold": "true",
       "rolling": "false",
       "diceDone": "true",
@@ -180,11 +191,11 @@
         }
       ],
       "change": {
-        "elapsed": 28665.5,
+        "elapsed": 28666.000000000004,
         "probe": 3,
         "phase": "result",
         "rolling": false,
-        "holdAge": 305.5,
+        "holdAge": 306.00000000000364,
         "quality": {
           "fps": 60,
           "pixelRatio": 1,
@@ -196,6 +207,12 @@
       }
     }
   ],
+  "retest": {
+    "airborneFrames": 150,
+    "probe": 0,
+    "holdAge": 300,
+    "errors": []
+  },
   "errors": [],
   "glErrors": []
 }

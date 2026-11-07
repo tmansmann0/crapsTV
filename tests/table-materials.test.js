@@ -12,11 +12,12 @@ const names = [
   "Deep pine baize",
   "Player tray suede",
 ];
-const setup = () =>
+const setup = (surfaceProfile = true) =>
   createTableMaterials(
     { capabilities: { getMaxAnisotropy: () => 4 } },
     {
       resolveAsset: (n) => n,
+      surfaceProfile,
       loadTexture: async (name) => {
         const t = new THREE.Texture({ width: 32, height: 32 });
         t.name = name;
@@ -50,13 +51,13 @@ test("table overrides keep material identities and UVs with true map-encoded rou
   }
   assert.deepEqual(g.attributes.uv.array, uv);
   const wood = root.children[0].material;
-  assert.equal(wood.clearcoat, 0.16);
-  assert.equal(wood.clearcoatRoughness, 0.38);
-  assert.equal(wood.map.repeat.x, 0.8 / 4);
-  assert.equal(wood.normalMap.repeat.x, 0.8 / 4);
+  assert.equal(wood.clearcoat, 0.4);
+  assert.equal(wood.clearcoatRoughness, 0.3);
+  assert.equal(wood.map.repeat.x, 0.8 / 3.6);
+  assert.equal(wood.normalMap.repeat.x, 0.8 / 3.6);
   assert.equal(wood.map.channel, 1);
-  assert.equal(wood.normalScale.x, 0.82);
-  assert.equal(wood.envMapIntensity, 0.8);
+  assert.equal(wood.normalScale.x, 0.34);
+  assert.equal(wood.envMapIntensity, 0.85);
   assert.equal(wood.normalMap.channel, 1);
   assert.equal(
     root.children[2].material.normalMap.name,
@@ -86,6 +87,104 @@ test("only known table materials change and all maps are registered/disposed onc
   c.dispose();
   c.dispose();
   assert.equal(count, 20);
+});
+
+test("production loads only selected American maps and applies the chosen padding/felt profile once", async () => {
+  const c = await setup(),
+    root = new THREE.Group();
+  for (const name of names) {
+    const m = new THREE.MeshPhysicalMaterial();
+    m.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), m));
+  }
+  c.apply(root);
+  const [wood, padding, , , , felt, tray] = root.children.map(
+    (o) => o.material,
+  );
+  assert.equal(wood.userData.woodLook, "american");
+  assert.deepEqual(
+    [...c.textures]
+      .filter((t) => t.name.startsWith("wood-"))
+      .map((t) => t.name)
+      .sort(),
+    ["albedo.jpg", "normal.png", "roughness.png", "ao.png"]
+      .map((f) => "wood-studies/american/" + f)
+      .sort(),
+  );
+  assert(
+    ![...c.textures].some((t) =>
+      /smoked|natural|material-table-walnut/.test(t.name),
+    ),
+  );
+  assert.equal(wood.normalScale.x, 0.34);
+  assert.equal(wood.clearcoatNormalMap, null);
+  for (const [m, kind, normal, contrast] of [
+    [padding, "padding", 2, 1.5],
+    [felt, "felt", 0.6 * 3.6, 1.7],
+    [tray, "felt", 0.45 * 3.6, 1.7],
+  ]) {
+    assert.equal(m.normalScale.x, normal);
+    assert.equal(m.userData.surfaceProfile, "refined");
+    const shader = {
+      uniforms: {},
+      fragmentShader: "#include <common>\n#include <roughnessmap_fragment>",
+    };
+    m.onBeforeCompile(shader, {});
+    assert.equal(shader.uniforms.lookRoughnessContrast.value, contrast);
+    assert.equal(m.userData.materialLookKind, kind);
+  }
+  const previous = padding.normalScale.x;
+  c.apply(root);
+  assert.equal(root.children[1].material, padding);
+  assert.equal(padding.normalScale.x, previous);
+  c.dispose();
+});
+
+test("explicit legacy opt-out reproduces original wood and unamplified padding/felt", async () => {
+  const c = await setup(false),
+    root = new THREE.Group();
+  for (const name of [names[0], names[1], names[5]]) {
+    const m = new THREE.MeshPhysicalMaterial();
+    m.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), m));
+  }
+  c.apply(root);
+  const [wood, padding, felt] = root.children.map((m) => m.material);
+  assert.equal(wood.map.name, "material-table-walnut-albedo.jpg");
+  assert.equal(wood.map.repeat.x, 0.8 / 4);
+  assert.equal(wood.normalScale.x, 0.82);
+  assert.equal(wood.clearcoat, 0.16);
+  assert.equal(wood.clearcoatRoughness, 0.38);
+  assert.equal(wood.clearcoatNormalMap, wood.normalMap);
+  assert.equal(wood.clearcoatNormalScale.x, 0.28);
+  assert.equal(wood.aoMapIntensity, 0.5);
+  assert.equal(padding.normalScale.x, 1);
+  assert.equal(padding.aoMapIntensity, 0.55);
+  assert.equal(felt.normalScale.x, 0.6);
+  assert.equal(felt.sheen, 0.28);
+  for (const m of [wood, padding, felt])
+    assert.equal(m.userData.surfaceProfile, undefined);
+  assert(![...c.textures].some((t) => t.name.startsWith("wood-studies/")));
+  c.dispose();
+});
+
+test("a selected American texture failure rejects the startup asset gate and disposes all successful maps", async () => {
+  const disposed = [];
+  await assert.rejects(
+    createTableMaterials(null, {
+      resolveAsset: (name) => name,
+      loadTexture: async (name) => {
+        if (name === "wood-studies/american/normal.png")
+          throw Error("selected normal unavailable");
+        const t = new THREE.Texture();
+        t.addEventListener("dispose", () => disposed.push(name));
+        return t;
+      },
+    }),
+    /selected normal unavailable/,
+  );
+  assert.equal(disposed.length, 19);
+  assert.equal(new Set(disposed).size, 19);
 });
 
 test("encoded roughness stays in the matte/satin palette and texture budgets remain bounded", async () => {
@@ -118,7 +217,7 @@ test("standard glTF wood upgrades to physical satin while leather retains its ty
   );
   c.apply(root);
   assert.equal(root.children[0].material.isMeshPhysicalMaterial, true);
-  assert.equal(root.children[0].material.clearcoat, 0.16);
+  assert.equal(root.children[0].material.clearcoat, 0.4);
   assert.equal(root.children[0].material.side, THREE.DoubleSide);
   assert.equal(root.children[1].material.isMeshPhysicalMaterial, undefined);
   c.dispose();
@@ -137,16 +236,16 @@ test("baize and trays share fibre maps with a soft physical grazing sheen", asyn
   assert(baize.isMeshPhysicalMaterial && tray.isMeshPhysicalMaterial);
   assert.equal(baize.normalMap, tray.normalMap);
   assert.equal(baize.roughnessMap, tray.roughnessMap);
-  assert.equal(baize.normalScale.x, 0.6);
-  assert.equal(tray.normalScale.x, 0.45);
-  assert.equal(baize.sheen, 0.28);
+  assert.equal(baize.normalScale.x, 0.6 * 3.6);
+  assert.equal(tray.normalScale.x, 0.45 * 3.6);
+  assert.equal(baize.sheen, 0.28 * 1.9);
   assert.equal(baize.sheenRoughness, 0.9);
   assert.equal(baize.normalMap.repeat.x, 0.8 / 0.46);
   assert.equal(baize.clearcoat, 0);
   c.dispose();
 });
 
-test("pore occlusion and varnish normals stay aligned and shared across all table parts", async () => {
+test("selected scanned pores stay shared and aligned beneath smooth varnish across all table parts", async () => {
   const c = await setup();
   const root = new THREE.Group();
   for (let i = 0; i < 12; i++) {
@@ -160,9 +259,9 @@ test("pore occlusion and varnish normals stay aligned and shared across all tabl
   c.apply(root);
   const wood = root.children[0].material;
   assert(root.children.slice(0, 12).every((m) => m.material === wood));
-  assert.equal(wood.clearcoatNormalMap, wood.normalMap);
-  assert.equal(wood.clearcoatNormalScale.x, 0.28);
-  assert.equal(wood.aoMapIntensity, 0.5);
+  assert.equal(wood.clearcoatNormalMap, null);
+  assert.equal(wood.clearcoatNormalScale.x, 0);
+  assert.equal(wood.aoMapIntensity, 0.24);
   for (const material of [wood, root.children[12].material]) {
     assert(c.textures.has(material.aoMap));
     assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace);
@@ -170,7 +269,7 @@ test("pore occlusion and varnish normals stay aligned and shared across all tabl
     assert.equal(material.aoMap.channel, material.normalMap.channel);
     assert.deepEqual(material.aoMap.repeat, material.normalMap.repeat);
   }
-  assert.equal(root.children[12].material.aoMapIntensity, 0.55);
+  assert.equal(root.children[12].material.aoMapIntensity, 0.55 * 1.5);
   c.dispose();
 });
 

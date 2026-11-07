@@ -1,5 +1,13 @@
 # Table surface materials
 
+The current default is the user-selected **Clear scratches** profile (`refined`): American walnut, C felt, B red padding and the chosen chip wear. `src/table-materials.js` loads only the four American wood maps from `public/assets/wood-studies/american/`; the other candidate scans are excluded from production loading. Wood has final normal strength 0.34, roughness scalar 1, scanned pore AO at 0.24, smooth clearcoat 0.40 / roughness 0.30, environment intensity 0.85 and a 3.6-unit physical texture tile. The varnish does not reuse the substrate normal.
+
+Padding and felt use the central `applySurfaceProfile` helper once after their authored base settings: padding normal 2.0, pore AO 0.825 and roughness contrast 1.5; baize/tray normals 2.16/1.62, sheen 0.532 and roughness contrast 1.7. Wood receives no further profile amplification. Twenty shared PBR textures remain registered with the texture-quality controller, awaited by the same startup asset gate and disposed by the table material owner. The seven geometry/material batches and all model UVs/cupholder data are unchanged.
+
+`createTableMaterials(renderer, { surfaceProfile: false })` restores the original map selection, four-unit wood tile and unamplified base settings for A–D studies and older proof reproduction. Existing wood maps are preserved. The selected source scans, stain transforms, CC0 license and verified hashes are documented in [wood studies](wood-studies.md).
+
+## Earlier surface iterations and preserved sources
+
 `src/table-materials.js` applies a shared material per named surface before the table becomes visible. It loads tiling PBR textures from `public/assets/material-table-*`; `scripts/build-table-materials.py` regenerates them and writes the texture metadata/contact sheet.
 
 Albedo images use sRGB. Normal and roughness images use no color conversion. Wood color, normal, and roughness use the same physical UV1 mapping. Leather color follows the macro UV atlas; its physical surface detail uses UV1. Wood color is a 2K JPEG; wood and padded-rail normals are real/generated 2K maps, with other surface data at most 1K lossless PNG. Its matched maps tile together every four scene units with identical U/V scale. The printed betting felt keeps its separate board artwork and fiber maps.
@@ -153,3 +161,85 @@ The [75% scene / 1K material run](benchmarks/surface-scaled-4k.json) kept the
 print/UI at native 4K and measured 59.9 FPS with 16.7 ms P95. Each twelve-second
 sample verifies actual framebuffer dimensions and reports zero browser errors.
 These are device/workload measurements, not a guarantee for other GPUs.
+
+
+### Rounded pad geometry
+
+The 0.12.0 crown pass also fixes the physical profile under the leather material: 21 curvature-sampled rows and analytic normals replace the old nine-point section. Material maps and the .8-unit physical detail-UV scale stay unchanged. The crown adds 2,832 triangles; the table now has 40,684 triangles in seven batches, with all six non-leather exported mesh payloads identical to the preserved previous model. See [asset optimization](asset-optimization.md#rounded-padded-crown-0120) for the 42,000 cap, archived rollback sources and actual exported-data checks.
+
+## Choosing a stronger material treatment
+
+The [four-way material study](https://tmansmann0.github.io/crapsTV/studies/materials/index.html) renders
+Current, Enhanced, Pronounced and Bold from identical close and wide cameras.
+Each 3840 × 2160 capture uses the actual Three.js table, SVG print, runtime PBR
+materials, wear maps, casino lighting and 337 instanced chips. Differences are
+material controls, including broader seeded chip handling stains and rubs; there
+is no image-generation or image retouching. The manifest beside the images
+records camera poses, settings, native framebuffer size and model hash.
+
+The preview controller is deliberately separate from the live renderer. These
+options do not change the game's default materials while a visual direction is
+being selected. The Current option restores the original scalar values and
+shader hooks; focused tests cover reversibility, shared resources, color bounds
+and the order of patina clamping.
+
+Run `npm run study:materials` to regenerate all eight JPEGs (set
+`MATERIAL_STUDY_ANGLE` to select a graphics backend), then
+`npm run test:material-study` to verify the comparison page, shot switch and
+full-resolution inspector. On a local host, open
+`/studies/materials/index.html`. The interactive page lets users inspect every
+capture at 1:1 pixels rather than judging tiny thumbnails alone.
+
+The revised mix preserves C's playing-felt relief, B's red padding and lighter
+B-level grime. Its three scratch options add a separate shared 1K packed atlas
+for directional groove normals, clay exposure and abraded roughness, including
+gentler medallion hairlines. Scratch strength varies independently of dirt.
+The original A–D captures remain available.
+
+The revised wood uses a quieter [American walnut scan](https://polyhaven.com/a/american_walnut_veneer)
+with matched normal, roughness and AO from Poly Haven (CC0). Candidate scans,
+hashes, author credits and transformations are recorded in
+`assets/source/materials/wood-studies/provenance.json`. A dark transparent stain
+is applied in linear light; a smoother separate varnish fills the fine pores
+rather than embossing the substrate normal into the coating. The physical
+1-metre scan tile is mapped to 3.6 scene units. Geometry/UVs and the original
+wood maps remain preserved. `scripts/build-wood-studies.py` regenerates three
+scan candidates and `scripts/render-wood-studies.mjs` compares their actual
+Three.js close/wide views. The user-facing revised mix uses American walnut
+consistently, isolating the three chip-scratch strengths. Option 2 (Clear scratches) was selected and is applied at material creation in the live game.
+
+## Selected production treatment (0.12.0)
+
+The selected option is refined / Clear scratches: C felt, B red padding, B-level
+grime, balanced directional scoring and edge rubs, and dark American walnut.
+Material factories apply this treatment at creation, including later chip
+denominations, player dice and phone thumbnails. They retain shared materials,
+stable shader keys and instanced detail levels; there is no per-frame scene
+scan or unique material per chip. The separate printed playing plane receives
+the same felt treatment. A 1K scratch atlas is part of the owned, critical chip
+asset gate and texture registry. Pure data maps remain linear.
+
+The original A–D and revised study captures remain available, with explicit
+factory opt-outs so comparisons reproduce their pre-selection baselines rather
+than multiplying a study over the live treatment. The old wood maps and model
+rollback remain preserved.
+
+After the selected option-2 treatment was activated, chip dirt/stains were
+reduced by exactly 13% through a separate .87 multiplier. The original patina
+strength still drives scuffing and polish unchanged, and directional scratch
+relief/exposure, felt, padding and wood values are unchanged. Revised comparisons
+use the same reduction.
+
+Production factory materials were compared with raw factories plus the approved
+preview at native 4K: mean per-channel pixel differences were below 0.00015 in
+both fixed shots. This also renders six denominations, three wear states,
+opaque/ghost variants and both geometry levels. See
+[surface-production-parity.json](benchmarks/surface-production-parity.json).
+The selected production game retained approximately 60 FPS with 16.8 ms P95 in
+a twelve-player, physical-throw [native-4K sample](benchmarks/selected-native-4k.json)
+on the tested Apple M5 Pro, with actual 3840 × 2160 scene/UI buffers and no
+browser errors. This measures one device/workload rather than all GPUs.
+
+The matching selected-material [native-1080p sample](benchmarks/selected-native-1080p.json)
+also retained approximately 60 FPS (16.8 ms P95), with twelve players, a physical
+throw and verified 1920 × 1080 buffers.

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { createFeltSurfaceSettings, FELT_TILE_SIZE } from "./felt-surface.js";
+import { applySurfaceProfile } from "./surface-profile.js";
 
 const MAPS = {
   woodColor: ["material-table-walnut-albedo.jpg", true, 1],
@@ -22,6 +23,22 @@ const MAPS = {
   blackColor: ["material-table-black-albedo.png", true, 1],
   blackNormal: ["material-table-black-normal.png", false, 1],
   blackRough: ["material-table-black-roughness.png", false, 1],
+};
+// Keep the original maps for reproducible A–D comparisons. Production loads
+// only the selected four American walnut maps, never all preview candidates.
+const SELECTED_WOOD_MAPS = {
+  woodColor: ["wood-studies/american/albedo.jpg", true, 1],
+  woodNormal: ["wood-studies/american/normal.png", false, 1],
+  woodRough: ["wood-studies/american/roughness.png", false, 1],
+  woodAO: ["wood-studies/american/ao.png", false, 1],
+};
+const SELECTED_WOOD = {
+  strength: 0.34,
+  occlusionStrength: 0.24,
+  coat: 0.4,
+  coatRoughness: 0.3,
+  coatNormalStrength: 0,
+  environment: 0.85,
 };
 const MATERIALS = {
   "Hand-polished dark walnut": {
@@ -110,12 +127,14 @@ export async function createTableMaterials(
   {
     loadTexture = (url) => new THREE.TextureLoader().loadAsync(url),
     resolveAsset,
+    surfaceProfile = true,
   } = {},
 ) {
   if (!resolveAsset) {
     const { assetURL } = await import("./asset-url.js");
     resolveAsset = assetURL;
   }
+  const activeMaps = surfaceProfile ? { ...MAPS, ...SELECTED_WOOD_MAPS } : MAPS;
   const textures = new Set();
   const maps = {};
   const anisotropy = Math.min(
@@ -123,7 +142,7 @@ export async function createTableMaterials(
     renderer?.capabilities?.getMaxAnisotropy?.() || 1,
   );
   const loaded = await Promise.allSettled(
-    Object.entries(MAPS).map(async ([key, [file, color, channel]]) => {
+    Object.entries(activeMaps).map(async ([key, [file, color, channel]]) => {
       const texture = await loadTexture(resolveAsset(file));
       texture.name = file;
       texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -142,9 +161,13 @@ export async function createTableMaterials(
               ? "occlusion"
               : "roughness",
       };
-      // Matched scanned wood: a 4-unit tile on board-local physical Detail UV.
+      // Matched scan at its one-metre physical tile (3.6 scene units).
+      // Original comparison mode retains the former four-unit veneer tile.
       // Identical isotropic scale keeps pores proportional on tops/aprons/legs.
-      if (key.startsWith("wood")) texture.repeat.set(0.8 / 4, 0.8 / 4);
+      if (key.startsWith("wood")) {
+        const tile = surfaceProfile ? 3.6 : 4;
+        texture.repeat.setScalar(0.8 / tile);
+      }
       // Existing felt fibres were designed as a .46-world-unit tile.
       if (key.startsWith("felt"))
         texture.repeat.set(0.8 / FELT_TILE_SIZE, 0.8 / FELT_TILE_SIZE);
@@ -160,8 +183,11 @@ export async function createTableMaterials(
   const materials = new Map();
   let disposed = false;
   function replacement(original) {
-    const spec = MATERIALS[original.name];
-    if (!spec) return original;
+    const baseSpec = MATERIALS[original.name];
+    if (!baseSpec) return original;
+    const wood = original.name === "Hand-polished dark walnut";
+    const spec =
+      wood && surfaceProfile ? { ...baseSpec, ...SELECTED_WOOD } : baseSpec;
     if (materials.has(original.name)) return materials.get(original.name);
     const physical = original.name === "Hand-polished dark walnut" || spec.felt;
     const material = physical
@@ -192,8 +218,8 @@ export async function createTableMaterials(
       material.clearcoatRoughness = spec.coatRoughness ?? 0.75;
       material.clearcoatMap = null;
       material.clearcoatRoughnessMap = null;
-      // Varnish follows the photographed pores instead of reflecting as a
-      // perfectly flat second shell. Reuse the shared scan, no extra texture.
+      // American walnut uses the chosen smooth varnish over fine substrate
+      // pores. Legacy comparison mode retains its original pore-following coat.
       material.clearcoatNormalMap = spec.coatNormalStrength
         ? maps[spec.normal]
         : null;
@@ -202,9 +228,16 @@ export async function createTableMaterials(
         spec.coatNormalStrength ?? 0,
       );
     }
+    if (
+      surfaceProfile &&
+      (spec.felt || original.name === "Deep oxblood leather")
+    )
+      applySurfaceProfile(material, spec.felt ? "felt" : "padding");
     material.userData = {
       ...material.userData,
       tablePBR: true,
+      selectedSurfaceProfile: Boolean(surfaceProfile),
+      ...(wood ? { woodLook: surfaceProfile ? "american" : "original" } : {}),
       roughnessEncodedInMap: true,
     };
     material.needsUpdate = true;

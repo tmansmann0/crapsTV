@@ -83,6 +83,8 @@ for (let i = 0; i < 3; i++) {
         { color: ["red", "green", "blue"][i], finish: "solid" },
         normals[i],
         roughness[i],
+        false,
+        { surfaceProfile: false },
       );
   });
   scene.add(d);
@@ -101,6 +103,8 @@ window.capture = (view) => {
         },
         normals[i],
         roughness[i],
+        false,
+        { surfaceProfile: false },
       );
     });
   });

@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { applySurfaceProfile } from "./surface-profile.js";
 export const DICE_COLORS = {
   red: "#9e192d",
   green: "#147553",
@@ -16,10 +17,11 @@ export function createDiceMaterial(
   normalMap,
   roughnessMap,
   software = false,
+  { surfaceProfile = true } = {},
 ) {
   const translucent = appearance.finish === "translucent",
     color = DICE_COLORS[appearance.color] || DICE_COLORS.red;
-  return new THREE.MeshPhysicalMaterial({
+  const material = new THREE.MeshPhysicalMaterial({
     name: "DiceBody",
     color,
     // Three multiplies the map by this value. The authored texture is already
@@ -54,4 +56,6 @@ export function createDiceMaterial(
     attenuationDistance: 0.7,
     envMapIntensity: 1.1,
   });
+  if (surfaceProfile) applySurfaceProfile(material, "dice");
+  return material;
 }

@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>crapsTV · Surface study</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #0d1513;
+        color: #f2ecdd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      header {
+        max-width: 1800px;
+        margin: auto;
+        padding: 32px 30px 22px;
+      }
+      .eyebrow {
+        color: #c9ae77;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      h1 {
+        margin: 9px 0 12px;
+        font-size: clamp(25px, 3vw, 42px);
+        letter-spacing: -0.04em;
+        font-weight: 650;
+      }
+      p {
+        max-width: 850px;
+        line-height: 1.5;
+        color: #aebeb4;
+        margin: 8px 0;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 22px;
+      }
+      nav {
+        display: flex;
+        gap: 5px;
+        padding: 4px;
+        background: #17221e;
+        border-radius: 12px;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 1px solid #35473d;
+        color: inherit;
+        background: #19271f;
+        border-radius: 8px;
+        padding: 10px 16px;
+      }
+      nav button {
+        border: 0;
+        background: transparent;
+        color: #b6c4ba;
+      }
+      nav button[aria-pressed="true"] {
+        background: #ebdfc2;
+        color: #16261d;
+      }
+      .note {
+        font-size: 13px;
+        color: #92a89a;
+      }
+      main {
+        max-width: 1800px;
+        padding: 0 24px 32px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      article {
+        border: 1px solid #34463a;
+        background: #14211a;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .caption {
+        padding: 16px 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      h2 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: -0.02em;
+      }
+      .letter {
+        color: #cdb581;
+        margin-right: 9px;
+        font-size: 13px;
+      }
+      .description {
+        font-size: 13px;
+        margin: 7px 0 0;
+        color: #b3c0b5;
+      }
+      .image {
+        display: block;
+        border: 0;
+        padding: 0;
+        width: 100%;
+        position: relative;
+        border-radius: 0;
+        background: #111b16;
+        overflow: hidden;
+      }
+      .image img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+      }
+      .image::after {
+        content: "Inspect at full resolution ↗";
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        font-size: 12px;
+        background: #0c1514de;
+        padding: 8px 12px;
+        border-radius: 7px;
+        border: 1px solid #9e997350;
+      }
+      article:has(button:focus-visible) {
+        outline: 2px solid #d4b66b;
+      }
+      a {
+        color: #d6c38e;
+      }
+      dialog {
+        padding: 0;
+        border: 1px solid #425345;
+        border-radius: 14px;
+        width: 96vw;
+        max-width: none;
+        background: #0c1511;
+        color: inherit;
+      }
+      dialog::backdrop {
+        background: #050b09ed;
+      }
+      .dialogbar {
+        padding: 12px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+      .dialogtools {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .viewport {
+        overflow: auto;
+        max-height: 82vh;
+        background: #080e0b;
+      }
+      .viewport img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .viewport.native img {
+        width: 3840px;
+        max-width: none;
+      }
+      footer {
+        padding: 0 30px 32px;
+        max-width: 1800px;
+        margin: auto;
+        font-size: 13px;
+        color: #92a89a;
+        line-height: 1.6;
+      }
+      @media (max-width: 750px) {
+        header {
+          padding: 24px 18px 18px;
+        }
+        main {
+          padding: 0 12px 24px;
+          gap: 12px;
+          grid-template-columns: 1fr;
+        }
+        .caption {
+          padding: 14px;
+        }
+        .dialogtools a {
+          display: none;
+        }
+      }
+      article.selected {
+        border-color: #d4b66b;
+        box-shadow: 0 0 0 1px #d4b66b;
+      }
+      .collections {
+        max-width: 1752px;
+        margin: 0 auto 18px;
+        padding: 5px;
+        width: fit-content;
+      }
+      @media (min-width: 1400px) {
+        main.revised {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="eyebrow">crapsTV / material direction</div>
+      <h1>How much character should the table have?</h1>
+      <p>
+        Your revised mix: C felt, B padding, lighter grime, quieter walnut grain
+        and three scratch strengths. Every shot uses the same chips, lighting
+        and camera. Option 2 is the selected game treatment.
+      </p>
+      <div class="toolbar">
+        <nav aria-label="Camera shot">
+          <button type="button" data-shot="hero" aria-pressed="true">
+            Chip close-up
+          </button>
+          <button type="button" data-shot="wide" aria-pressed="false">
+            Wider table
+          </button>
+        </nav>
+        <span class="note"
+          >4K captures · Click an image to inspect the detail</span
+        >
+      </div>
+    </header>
+    <nav class="collections" aria-label="Comparison set">
+      <button type="button" data-set="revised" aria-pressed="true">
+        Revised mix</button
+      ><button type="button" data-set="original" aria-pressed="false">
+        Original A–D
+      </button>
+    </nav>
+    <main></main>
+    <footer>
+      The revised mix keeps your selected C felt and B padding, reduces grime,
+      and separates scratches from dirt. The original A–D comparisons remain
+      available. All views use identical lighting and geometry.
+    </footer>
+    <dialog>
+      <div class="dialogbar">
+        <strong id="detail-title"></strong>
+        <div class="dialogtools">
+          <button type="button" id="zoom">View 1:1 pixels</button>
+          <a id="original" target="_blank" rel="noopener">Open 4K image</a>
+          <button type="button" id="close" aria-label="Close image">
+            Close
+          </button>
+        </div>
+      </div>
+      <div class="viewport"><img alt="" /></div>
+    </dialog>
+    <script type="module">
+      const originalLooks = [
+        {
+          id: "baseline",
+          letter: "A",
+          label: "Previous default",
+          description: "The previous surface detail, as a reference.",
+        },
+        {
+          id: "enhanced",
+          letter: "B",
+          label: "Enhanced",
+          description: "A clear step up in grain, fibres and handling wear.",
+        },
+        {
+          id: "pronounced",
+          letter: "C",
+          label: "Pronounced",
+          description:
+            "Stronger surface character designed to read from the sofa.",
+        },
+        {
+          id: "bold",
+          letter: "D",
+          label: "Bold",
+          description:
+            "Pushed texture depth and patina, to judge the upper limit.",
+        },
+      ];
+      const revisedLooks = [
+        {
+          id: "mixed",
+          letter: "1",
+          label: "Selected mix",
+          description:
+            "C felt, B padding and lighter grime. Previous scratch strength for reference.",
+        },
+        {
+          id: "refined",
+          letter: "2",
+          label: "Clear scratches",
+          description:
+            "Selected for the game: visible handling scratches and edge abrasion.",
+        },
+        {
+          id: "scratch-forward",
+          letter: "3",
+          label: "Stronger scratches",
+          description:
+            "The same light grime, with more pronounced scratches and scuffs.",
+        },
+      ];
+      let selectedSet = "revised";
+      const main = document.querySelector("main"),
+        dialog = document.querySelector("dialog");
+      const viewport = document.querySelector(".viewport"),
+        detailImage = viewport.querySelector("img");
+      let shot = "hero";
+      const source = (look) => `./${shot}-${look.id}.jpg`;
+      function render() {
+        main.replaceChildren(
+          ...(selectedSet === "revised" ? revisedLooks : originalLooks).map(
+            (look) => {
+              const article = document.createElement("article");
+              if (look.id === "refined") article.classList.add("selected");
+              const caption = document.createElement("div");
+              caption.className = "caption";
+              const text = document.createElement("div");
+              const title = document.createElement("h2");
+              const letter = document.createElement("span");
+              letter.className = "letter";
+              letter.textContent = look.letter;
+              title.append(letter, document.createTextNode(look.label));
+              const description = document.createElement("p");
+              description.className = "description";
+              description.textContent = look.description;
+              text.append(title, description);
+              caption.append(text);
+              const button = document.createElement("button");
+              button.type = "button";
+              button.className = "image";
+              button.setAttribute(
+                "aria-label",
+                `Inspect ${look.label} at full resolution`,
+              );
+              const image = document.createElement("img");
+              image.src = source(look);
+              image.alt = `${look.label}: ${shot === "hero" ? "chip close-up" : "wider table"}`;
+              image.width = 3840;
+              image.height = 2160;
+              button.append(image);
+              button.addEventListener("click", () => {
+                detailImage.src = source(look);
+                detailImage.alt = image.alt;
+                document.querySelector("#detail-title").textContent =
+                  `${look.letter} · ${look.label}`;
+                document.querySelector("#original").href = source(look);
+                viewport.classList.remove("native");
+                document.querySelector("#zoom").textContent = "View 1:1 pixels";
+                dialog.showModal();
+              });
+              article.append(caption, button);
+              return article;
+            },
+          ),
+        );
+      }
+      document.querySelectorAll("[data-shot]").forEach((button) =>
+        button.addEventListener("click", () => {
+          shot = button.dataset.shot;
+          document
+            .querySelectorAll("[data-shot]")
+            .forEach((b) =>
+              b.setAttribute("aria-pressed", String(b === button)),
+            );
+          render();
+        }),
+      );
+      document
+        .querySelector("#close")
+        .addEventListener("click", () => dialog.close());
+      document.querySelector("#zoom").addEventListener("click", (event) => {
+        const native = viewport.classList.toggle("native");
+        event.currentTarget.textContent = native
+          ? "Fit image"
+          : "View 1:1 pixels";
+      });
+      document.querySelectorAll("[data-set]").forEach((button) =>
+        button.addEventListener("click", () => {
+          selectedSet = button.dataset.set;
+          document
+            .querySelectorAll("[data-set]")
+            .forEach((b) =>
+              b.setAttribute("aria-pressed", String(b === button)),
+            );
+          main.classList.toggle("revised", selectedSet === "revised");
+          render();
+        }),
+      );
+      main.classList.add("revised");
+      render();
+    </script>
+  </body>
+</html>

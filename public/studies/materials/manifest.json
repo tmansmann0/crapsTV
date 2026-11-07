@@ -1,0 +1,575 @@
+{
+  "results": [
+    {
+      "id": "baseline",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "profile": {
+        "id": "baseline",
+        "label": "Current",
+        "subtitle": "Restrained physical detail",
+        "chip": {
+          "normal": 1,
+          "engraving": 1,
+          "grime": 1,
+          "centerGrime": 1,
+          "macroGrime": 0,
+          "scuff": 0,
+          "contrast": 1
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 1,
+          "occlusion": 1,
+          "contrast": 1
+        },
+        "felt": {
+          "normal": 1,
+          "sheen": 1,
+          "contrast": 1
+        },
+        "dice": {
+          "normal": 1,
+          "coatNormal": 1,
+          "contrast": 1
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-baseline.jpg",
+      "bytes": 1826897
+    },
+    {
+      "id": "baseline",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "profile": {
+        "id": "baseline",
+        "label": "Current",
+        "subtitle": "Restrained physical detail",
+        "chip": {
+          "normal": 1,
+          "engraving": 1,
+          "grime": 1,
+          "centerGrime": 1,
+          "macroGrime": 0,
+          "scuff": 0,
+          "contrast": 1
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 1,
+          "occlusion": 1,
+          "contrast": 1
+        },
+        "felt": {
+          "normal": 1,
+          "sheen": 1,
+          "contrast": 1
+        },
+        "dice": {
+          "normal": 1,
+          "coatNormal": 1,
+          "contrast": 1
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-baseline.jpg",
+      "bytes": 1937411
+    },
+    {
+      "id": "enhanced",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "profile": {
+        "id": "enhanced",
+        "label": "Enhanced",
+        "subtitle": "More tactile, gently aged",
+        "chip": {
+          "normal": 1.8,
+          "engraving": 1.6,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.35
+        },
+        "wood": {
+          "normal": 1.9,
+          "coatNormal": 1.8,
+          "occlusion": 1.5,
+          "contrast": 1.5,
+          "colorContrast": 1.05
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 2,
+          "sheen": 1.4,
+          "contrast": 1.35
+        },
+        "dice": {
+          "normal": 1.8,
+          "coatNormal": 1.6,
+          "contrast": 1.35
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-enhanced.jpg",
+      "bytes": 2062654
+    },
+    {
+      "id": "enhanced",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "profile": {
+        "id": "enhanced",
+        "label": "Enhanced",
+        "subtitle": "More tactile, gently aged",
+        "chip": {
+          "normal": 1.8,
+          "engraving": 1.6,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.35
+        },
+        "wood": {
+          "normal": 1.9,
+          "coatNormal": 1.8,
+          "occlusion": 1.5,
+          "contrast": 1.5,
+          "colorContrast": 1.05
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 2,
+          "sheen": 1.4,
+          "contrast": 1.35
+        },
+        "dice": {
+          "normal": 1.8,
+          "coatNormal": 1.6,
+          "contrast": 1.35
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-enhanced.jpg",
+      "bytes": 2051994
+    },
+    {
+      "id": "pronounced",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "profile": {
+        "id": "pronounced",
+        "label": "Pronounced",
+        "subtitle": "Worn casino, clear from the couch",
+        "chip": {
+          "normal": 3,
+          "engraving": 2.5,
+          "grime": 3.1,
+          "centerGrime": 1.65,
+          "macroGrime": 0.34,
+          "scuff": 0.29,
+          "contrast": 1.85
+        },
+        "wood": {
+          "normal": 3.1,
+          "coatNormal": 3,
+          "occlusion": 2.2,
+          "contrast": 2.1,
+          "colorContrast": 1.12
+        },
+        "padding": {
+          "normal": 3.6,
+          "occlusion": 2.2,
+          "contrast": 2.05
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.8,
+          "coatNormal": 2.5,
+          "contrast": 1.7
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-pronounced.jpg",
+      "bytes": 2402167
+    },
+    {
+      "id": "pronounced",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "profile": {
+        "id": "pronounced",
+        "label": "Pronounced",
+        "subtitle": "Worn casino, clear from the couch",
+        "chip": {
+          "normal": 3,
+          "engraving": 2.5,
+          "grime": 3.1,
+          "centerGrime": 1.65,
+          "macroGrime": 0.34,
+          "scuff": 0.29,
+          "contrast": 1.85
+        },
+        "wood": {
+          "normal": 3.1,
+          "coatNormal": 3,
+          "occlusion": 2.2,
+          "contrast": 2.1,
+          "colorContrast": 1.12
+        },
+        "padding": {
+          "normal": 3.6,
+          "occlusion": 2.2,
+          "contrast": 2.05
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.8,
+          "coatNormal": 2.5,
+          "contrast": 1.7
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-pronounced.jpg",
+      "bytes": 2240393
+    },
+    {
+      "id": "bold",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "profile": {
+        "id": "bold",
+        "label": "Bold",
+        "subtitle": "Exaggerated texture and visible patina",
+        "chip": {
+          "normal": 4.6,
+          "engraving": 3.8,
+          "grime": 4.5,
+          "centerGrime": 2.1,
+          "macroGrime": 0.55,
+          "scuff": 0.47,
+          "contrast": 2.6
+        },
+        "wood": {
+          "normal": 4.7,
+          "coatNormal": 4.4,
+          "occlusion": 3.2,
+          "contrast": 3,
+          "colorContrast": 1.22
+        },
+        "padding": {
+          "normal": 5.5,
+          "occlusion": 3.2,
+          "contrast": 2.8
+        },
+        "felt": {
+          "normal": 6,
+          "sheen": 2.5,
+          "contrast": 2.2
+        },
+        "dice": {
+          "normal": 4.1,
+          "coatNormal": 3.7,
+          "contrast": 2.2
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-bold.jpg",
+      "bytes": 2765272
+    },
+    {
+      "id": "bold",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "profile": {
+        "id": "bold",
+        "label": "Bold",
+        "subtitle": "Exaggerated texture and visible patina",
+        "chip": {
+          "normal": 4.6,
+          "engraving": 3.8,
+          "grime": 4.5,
+          "centerGrime": 2.1,
+          "macroGrime": 0.55,
+          "scuff": 0.47,
+          "contrast": 2.6
+        },
+        "wood": {
+          "normal": 4.7,
+          "coatNormal": 4.4,
+          "occlusion": 3.2,
+          "contrast": 3,
+          "colorContrast": 1.22
+        },
+        "padding": {
+          "normal": 5.5,
+          "occlusion": 3.2,
+          "contrast": 2.8
+        },
+        "felt": {
+          "normal": 6,
+          "sheen": 2.5,
+          "contrast": 2.2
+        },
+        "dice": {
+          "normal": 4.1,
+          "coatNormal": 3.7,
+          "contrast": 2.2
+        }
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-bold.jpg",
+      "bytes": 2475286
+    }
+  ],
+  "errors": [],
+  "modelSha256": "20c30f65a6ffa7b93f49952439b03f50e1b94ac37a3d2f95df9e8b3c3876b26b",
+  "note": "Actual native-4K WebGL material variants; fixed camera, geometry, lighting, textures and scene. No image-generation/postprocessing; JPEG encoding only."
+}
