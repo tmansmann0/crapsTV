@@ -5,16 +5,16 @@
     "materialPrimitives": 102
   },
   "afterRetopology": {
-    "triangles": 34508,
+    "triangles": 37852,
     "meshes": 94,
     "materialPrimitives": 94
   },
   "after": {
-    "triangles": 34508,
+    "triangles": 37852,
     "meshes": 7,
     "materialPrimitives": 7
   },
-  "triangleReductionPercent": 84.13045877635112,
+  "triangleReductionPercent": 82.59261984474449,
   "meshReductionPercent": 93.13725490196079,
   "materialDrawCalls": 7,
   "removedHiddenObjects": [
@@ -182,6 +182,191 @@
     }
   ],
   "trayCornerSegments": 10,
+  "replacedLegacyCupObjects": [
+    "Brass cup lip",
+    "Brass cup lip.001",
+    "Brass cup lip.002",
+    "Brass cup lip.003",
+    "Cup well floor",
+    "Cup well floor.001",
+    "Cup well floor.002",
+    "Cup well floor.003",
+    "Recessed cup well",
+    "Recessed cup well.001",
+    "Recessed cup well.002",
+    "Recessed cup well.003"
+  ],
+  "cupholderValidation": [
+    {
+      "cup": 0,
+      "blenderCenter": [
+        -4.0,
+        -3.055
+      ],
+      "worldCenter": [
+        -4.0,
+        0.92,
+        3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862881548,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186685686,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 1,
+      "blenderCenter": [
+        -4.0,
+        3.055
+      ],
+      "worldCenter": [
+        -4.0,
+        0.92,
+        -3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862876087,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186678195,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 2,
+      "blenderCenter": [
+        4.0,
+        -3.055
+      ],
+      "worldCenter": [
+        4.0,
+        0.92,
+        3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862876086,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186678261,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 3,
+      "blenderCenter": [
+        4.0,
+        3.055
+      ],
+      "worldCenter": [
+        4.0,
+        0.92,
+        -3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862881524,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186685746,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    }
+  ],
+  "cupholderProfileVersion": 1,
   "woodUV": {
     "version": 2,
     "faces": 8069,

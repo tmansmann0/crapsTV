@@ -9,6 +9,7 @@ ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'public/assets';SOURCE=ROOT/'a
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(ROOT/'scripts'))
 from table_wood_uv import apply_wood_uv,prepare_miter_seams
+from table_cupholders import rebuild_cupholders
 preserve=[OUT/'table.glb',SOURCE/'table.blend',OUT/'table-player-rails.glb',SOURCE/'table-player-rails.blend']
 before_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}
 helpers=(ROOT/'scripts/build-models.py').read_text().split('\nclean()\nwood=')[0]
@@ -46,6 +47,11 @@ if wall:
         else:nx,ny=0,(1 if y>=0 else -1)
         vertex.co.x-=nx*.03;vertex.co.y-=ny*.03
     wall.data.update()
+# Discard legacy submerged lips and open bowls before generic retopology.
+legacy_cups=[]
+for obj in list(bpy.data.objects):
+    if obj.name.startswith(('Brass cup lip','Recessed cup well','Cup well floor')):
+        legacy_cups.append(obj.name);bpy.data.objects.remove(obj,do_unlink=True)
 # Simplify remaining curved static geometry without flattening cup or crown
 # silhouettes. Planar dissolve preserves UV and material boundaries.
 for o in list(bpy.data.objects):
@@ -61,6 +67,9 @@ for o in list(bpy.data.objects):
     if o.name not in ['Vertical rubber bounce wall','Rubber wall lower bead']:
         weighted=o.modifiers.new('Retopo face-weighted normals','WEIGHTED_NORMAL');weighted.keep_sharp=True
         bpy.ops.object.modifier_apply(modifier=weighted.name)
+# Cup profiles are already final topology; never run generic dissolve/collapse
+# or weighted normals over their continuous collar and inward bowl surfaces.
+_,cup_checks=rebuild_cupholders(brass,black)
 # Low-poly tray sections include the bevel in their profile. They retain exact
 # maximum bounds and the original suede floor/slot coordinates.
 original_rounded=rounded
@@ -215,14 +224,14 @@ for mat,objects in groups.items():
     objects[0].data.materials.clear();objects[0].data.materials.append(mat)
     for p in objects[0].data.polygons:p.material_index=0
 optimized=metrics()
-assert optimized['triangles']<=35000,optimized
+assert optimized['triangles']<=38500,optimized
 export('table-player-rails-optimized.pending.glb')
 (OUT/'table-player-rails-optimized.pending.glb').replace(OUT/'table-player-rails-optimized.glb')
 for im in bpy.data.images:
     if im.name.startswith('table-'):im.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails-optimized.pending.blend'),compress=True)
 (SOURCE/'table-player-rails-optimized.pending.blend').replace(SOURCE/'table-player-rails-optimized.blend')
-stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10,'woodUV':{'version':2,'faces':wood_faces,'mapping':'Board-local mitered panels and upright leg grain; physical UV1'}}
+stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10,'replacedLegacyCupObjects':legacy_cups,'cupholderValidation':cup_checks,'cupholderProfileVersion':1,'woodUV':{'version':2,'faces':wood_faces,'mapping':'Board-local mitered panels and upright leg grain; physical UV1'}}
 (OUT/'table-player-rails-optimized-stats.json').write_text(json.dumps(stats,indent=2)+'\n')
 if '--no-preview' in sys.argv:
     after_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}

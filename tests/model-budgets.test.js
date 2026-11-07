@@ -16,7 +16,7 @@ function triangles(gltf) {
 }
 test("active table keeps its geometric and draw-call budgets", async () => {
   const table = await model("table-player-rails-optimized.glb");
-  assert(triangles(table) <= 35000);
+  assert(triangles(table) <= 38500);
   assert(table.meshes.length <= 8);
   assert(
     table.materials.some((m) => m.normalTexture),

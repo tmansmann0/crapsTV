@@ -45,3 +45,15 @@ The overview and grazing-angle joint renders were visually inspected. The new cr
 - `assets/source/table.blend`: `274ea9a45126fb5156886385f895ced91770b83a67e7256809a08b40085e60d6`
 
 The build also records these hashes and closed-mesh check results in the layout JSON and fails if the original files change during generation. No commit is created by this workflow.
+
+## Cupholder repair
+
+The original .865-high brass lips survived the later crown rebuild, whose leather reaches .920. Their rims therefore intersected the padding and exposed alternating brass/leather sections as the camera moved. The optimized variant now rebuilds all four inserts at their original X=±4 / Z=±3.055 positions, using continuous 96-segment profiles. The rounded brass lip reaches .942 and covers the full cutout edge. A dark mounting sleeve seats it into the curved padding; the closed bowl has explicitly inward wall faces, a rounded lower transition and a real recessed floor at .656.
+
+`scripts/table_cupholders.py` owns these profiles; `scripts/build-optimized-table.py` installs them without passing the new surfaces through the generic decimator. Custom split normals remain continuous across material separation. Geometry is 37,852 triangles in seven material batches, within the 38,500 budget. Original table and legacy player-table GLBs/Blender sources retain their recorded hashes. Layout and game physics are unchanged.
+
+Four focused tests decode the actual exported GLB, including node transforms. At every holder they check the entire brass annulus, inward FrontSide wall hits, complete floor hits, 2,112 nondegenerate cup triangles and the dark mounting finish. Authoring checks verify closed, manifold, positive-volume shells. Actual Three.js material/HDR renders cover forty close/high/low/orbit views without errors. Reproduce them with `node scripts/render-cupholders.mjs after`.
+
+![Cupholder before and after, high and low](screenshots/cupholders-comparison.png)
+
+A short [native 4K regression sample](benchmarks/cupholders-native-4k.json) with twelve players, a physical throw, AA on, Auto chip detail and native textures recorded 360 frames in six seconds: 60.00 FPS and 16.8 ms P95 on the tested Apple M5 Pro. Scene and UI buffers both verified 3840 × 2160; no browser errors. This is device/workload evidence, not a universal frame-rate guarantee.

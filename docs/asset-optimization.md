@@ -4,7 +4,7 @@ The optimized files are separate variants. The previous table/variant sources an
 
 | Asset                                     | Before  | Optimized | Reduction |
 | ----------------------------------------- | ------- | --------- | --------- |
-| Player table triangles                    | 217,448 | 34,508    | 84.1%     |
+| Player table triangles                    | 217,448 | 37,852    | 82.6%     |
 | Player table mesh/material draws per pass | 102     | 7         | 93.1%     |
 | Detailed logo chip triangles              | 10,098  | 8,440     | 16.4%     |
 | Distant logo chip triangles               | 10,098  | 1,280     | 87.3%     |
@@ -48,4 +48,4 @@ At native 3840×2160, the measured Auto scene dropped from 2,145,010 drawn trian
 
 Run `npm run benchmark` for the idle scene. Set `BENCH_ROLL=1` for a throw and `BENCH_LABEL=custom-name` for separate JSON/screenshot output in `artifacts/`. Each run uses its own temporary server, twelve test players, and a real WebGL browser; it does not join existing rooms.
 
-The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Board-local UVs keep top-panel miters and vertical leg grain physically coherent. Denser corner arcs preserve close-up silhouettes; removing twelve fully hidden support caps leaves 34,508 active triangles and seven batches. See [table materials](table-materials.md) for the darker satin PBR finish and actual-render comparisons.
+The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Board-local UVs keep top-panel miters and vertical leg grain physically coherent. Denser corner arcs preserve close-up silhouettes; removing twelve fully hidden support caps left 34,508 triangles. Rebuilding the four recessed cupholders as clean rounded collars and closed bowls adds 3,344 triangles, giving 37,852 active triangles in the same seven batches. The 38,500-triangle budget keeps smooth close-up cup silhouettes without retaining the broken decimated profiles. See [table materials](table-materials.md) for the darker satin PBR finish and actual-render comparisons.
