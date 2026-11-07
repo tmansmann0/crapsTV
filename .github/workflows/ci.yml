@@ -1,8 +1,11 @@
 name: Verify crapsTV
 on:
   push:
-    branches: [main, "codex/**"]
+    branches: [main]
   pull_request:
+concurrency:
+  group: verify-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

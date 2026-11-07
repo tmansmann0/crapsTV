@@ -194,7 +194,8 @@ export default function Table3D({ state, preview = false }) {
     scene.add(chips);
     let chipKey = "";
     let prevRoll = null;
-    let landing = 1;
+    let settlingUntil = 0;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let clock = 0;
     const puck = new THREE.Mesh(
       new THREE.CylinderGeometry(0.28, 0.28, 0.12, 40),
@@ -222,14 +223,22 @@ export default function Table3D({ state, preview = false }) {
     let frame,
       lastTime = 0;
     function animate(time) {
-      if (time - lastTime < 33) {
+      const s = props.current.state;
+      if (s?.lastRoll?.id !== prevRoll) {
+        prevRoll = s?.lastRoll?.id;
+        settlingUntil = time + 1000;
+      }
+      // An idle felt is static: save GPU work between updates and honor reduced motion.
+      const moving =
+        !reducedMotion.matches && (s?.rolling || time < settlingUntil);
+      const frameInterval = document.hidden ? 1000 : moving ? 33 : 250;
+      if (time - lastTime < frameInterval) {
         frame = requestAnimationFrame(animate);
         return;
       }
       const dt = Math.min((time - lastTime) / 1000, 0.05);
       lastTime = time;
       clock += dt;
-      const s = props.current.state;
       const mode = s?.config.mode === "crapless" ? "crapless" : "classic";
       if (textures[mode] && board.material.map !== textures[mode]) {
         board.material.map = textures[mode];
@@ -277,14 +286,9 @@ export default function Table3D({ state, preview = false }) {
             }
           });
       }
-      if (s?.lastRoll?.id !== prevRoll) {
-        prevRoll = s?.lastRoll?.id;
-        landing = 0;
-      }
-      landing = Math.min(1, landing + dt * 3);
       const values = s?.lastRoll?.dice || [3, 4];
       dice.forEach((d, i) => {
-        if (s?.rolling) {
+        if (s?.rolling && !reducedMotion.matches) {
           d.position.y = 0.8 + Math.abs(Math.sin(clock * 9 + i)) * 1.2;
           d.position.x = (i ? 1.1 : -0.5) + Math.sin(clock * 5 + i) * 0.6;
           d.position.z = 0.3 + Math.cos(clock * 7 + i) * 0.5;
@@ -301,7 +305,10 @@ export default function Table3D({ state, preview = false }) {
               i ? 0.45 : -0.25,
             ),
           );
-          d.quaternion.slerp(q, Math.min(1, dt * 12));
+          d.quaternion.slerp(
+            q,
+            reducedMotion.matches ? 1 : Math.min(1, dt * 12),
+          );
           d.position.lerp(
             new THREE.Vector3(i ? 0.85 : -0.35, 0.37, 0.4),
             Math.min(1, dt * 9),
