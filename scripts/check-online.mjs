@@ -47,6 +47,7 @@ try {
   await phone.getByRole("button", { name: "Join", exact: true }).click();
   await phone.getByText("Table setup").waitFor();
   await phone.getByRole("button", { name: "Crapless craps" }).click();
+  await phone.getByLabel("Betting window (seconds)").fill("0");
   await phone.getByRole("button", { name: "Open the table" }).click();
   await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
   await phone.locator('[data-bet-id="pass"]').click();

@@ -1,3 +1,4 @@
+import { useBettingWindow } from "./use-betting-window.js";
 import { assetURL } from "./asset-url.js";
 import {
   createContext,
@@ -1112,6 +1113,8 @@ function RollOutcome({
   expanded,
   onToggle,
 }) {
+  const remaining = useBettingWindow(state);
+  const bettingLabel = remaining > 0 ? `Betting open · ${remaining}s` : null;
   const roll = state.lastRoll;
   if (state.rolling)
     return (
@@ -1136,7 +1139,8 @@ function RollOutcome({
         <span className="pg-strip-text">
           <b>Come-out roll</b>
           <small>
-            {isShooter ? "You have the dice" : `${shooterName} has the dice`}
+            {bettingLabel ||
+              (isShooter ? "You have the dice" : `${shooterName} has the dice`)}
           </small>
         </span>
       </div>
@@ -1176,7 +1180,8 @@ function RollOutcome({
       <span className="pg-strip-text" aria-live="polite">
         <b>{roll.message}</b>
         <small>
-          {isShooter ? "You have the dice" : `${shooterName} has the dice`}
+          {bettingLabel ||
+            (isShooter ? "You have the dice" : `${shooterName} has the dice`)}
         </small>
       </span>
       {tone !== "none" && (
@@ -1489,8 +1494,10 @@ export default function PhoneGame({
   const rows = useMemo(() => catalogue(state, player), [state, player]);
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
   const stake = sum(player.bets.map((b) => b.amount));
+  const remaining = useBettingWindow(state);
   const isShooter = state.shooterId === player.id,
-    canThrow = (isShooter || isAdmin) && !state.rolling && connected,
+    canThrow =
+      (isShooter || isAdmin) && !state.rolling && connected && remaining === 0,
     shooterName =
       state.players.find((p) => p.id === state.shooterId)?.name || "The host",
     canReup = equity(player) < state.config.minBet && !player.bets.length;
@@ -1736,7 +1743,8 @@ export default function PhoneGame({
       ? [
           {
             id: "dice",
-            label: canThrow ? "Roll" : "Dice",
+            label: isShooter || isAdmin ? "Roll" : "Dice",
+            badge: remaining || null,
             icon: Dices,
             ready: canThrow,
           },
@@ -1902,7 +1910,7 @@ export default function PhoneGame({
               className={ready ? "is-ready" : ""}
               onClick={() => setTab(id)}
             >
-              <span className="pg-nav-icon">
+              <span className="pg-nav-icon" aria-hidden="true">
                 <Icon size={21} aria-hidden="true" />
                 {badge && <b>{badge}</b>}
               </span>

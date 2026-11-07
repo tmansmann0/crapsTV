@@ -2,6 +2,7 @@ import { assetURL } from "./asset-url.js";
 import * as THREE from "three";
 import QRCode from "qrcode";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { bettingSecondsRemaining } from "./betting-window.js";
 
 // The TV overlay is rendered entirely as raycastable WebGL meshes.
 export function createSceneUI(renderer, onAction) {
@@ -121,6 +122,7 @@ export function createSceneUI(renderer, onAction) {
       graphics = DEFAULT_GRAPHICS,
       graphicsInfo = {},
       introActive,
+      bettingSeconds = 0,
     } = current;
     let p = panels.brand,
       c = begin(p, false);
@@ -336,7 +338,9 @@ export function createSceneUI(renderer, onAction) {
       const shooter = state.players.find((p) => p.id === state.shooterId);
       detail = state.rolling
         ? "Bets closed"
-        : `${shooter?.name || "Host"} to roll${state.lastRoll ? ` · ${state.lastRoll.dice.join(" + ")} = ${state.lastRoll.total}` : ""}`;
+        : bettingSeconds > 0
+          ? `Betting open · ${bettingSeconds}s before the next roll`
+          : `${shooter?.name || "Host"} to roll${state.lastRoll ? ` · ${state.lastRoll.dice.join(" + ")} = ${state.lastRoll.total}` : ""}`;
     }
     if (state?.status === "ended") {
       heading = "SESSION CLOSED";
@@ -462,7 +466,7 @@ export function createSceneUI(renderer, onAction) {
   }
   function update(next) {
     if (!next.settingsOpen && current.settingsOpen) settingsPage = "main";
-    current = next;
+    current = { ...next, bettingSeconds: bettingSecondsRemaining(next.state) };
     const key = JSON.stringify([
       next.code,
       next.status,
@@ -484,6 +488,7 @@ export function createSceneUI(renderer, onAction) {
       next.state?.status,
       next.state?.point,
       next.state?.rolling,
+      current.bettingSeconds,
       next.state?.lastRoll?.id,
       next.state?.shooterId,
       next.state?.players.map((p) => [p.id, p.name]),
@@ -539,7 +544,9 @@ export function createSceneUI(renderer, onAction) {
     resize,
     update,
     pick,
-    get settingsPage() { return settingsPage; },
+    get settingsPage() {
+      return settingsPage;
+    },
     setSettingsPage(page) {
       settingsPage = page === "graphics" ? "graphics" : "main";
       redraw();

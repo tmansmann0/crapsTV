@@ -25,6 +25,7 @@ function table() {
   const state = game.createState("TESTAB");
   const a = game.join(state, "Alice"),
     b = game.join(state, "Bob");
+  game.configure(state, a.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(state, a.id);
   return { state, a, b };
 }
@@ -216,7 +217,7 @@ test("hub transports include clock timestamps and reject forged throw outcomes",
   hub.connect("alice", (message) => messages.push(message));
   assert(Number.isFinite(messages[0].sentAt));
   hub.receive("alice", { type: "join", code: "TESTAB", name: "Alice" });
-  hub.receive("alice", { type: "start" });
+  hub.receive("alice", { type: "start", config: { rollCooldownSeconds: 0 } });
   hub.receive("alice", { type: "aim", aim: { x: -4, power: 4 } });
   assert.equal(hub.state.aim.x, -1);
   hub.receive("alice", {

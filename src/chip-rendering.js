@@ -146,7 +146,7 @@ export async function createChipFactory(renderer) {
       const position = new THREE.Vector3(),
         quaternion = new THREE.Quaternion(),
         scale = new THREE.Vector3();
-      for (const spec of specs) {
+      for (const [specIndex, spec] of specs.entries()) {
         const denomination = spec.denomination ?? 500,
           wear = (((spec.wear || 0) % 3) + 3) % 3;
         const diameter = spec.diameter ?? 0.23,
@@ -174,13 +174,20 @@ export async function createChipFactory(renderer) {
               mesh,
               material,
               matrices: [],
+              specIndices: [],
             });
           buckets
             .get(key)
             .matrices.push(transform.clone().multiply(mesh.matrixWorld));
+          buckets.get(key).specIndices.push(specIndex);
         }
       }
-      for (const { mesh, material, matrices } of buckets.values()) {
+      for (const {
+        mesh,
+        material,
+        matrices,
+        specIndices,
+      } of buckets.values()) {
         const batch = new THREE.InstancedMesh(
           mesh.geometry,
           material,
@@ -188,6 +195,9 @@ export async function createChipFactory(renderer) {
         );
         matrices.forEach((matrix, index) => batch.setMatrixAt(index, matrix));
         batch.castShadow = batch.receiveShadow = !material.transparent;
+        // Stable source indices let presentation physics move selected real chips
+        // without replacing shared geometry, materials, or LOD batches.
+        batch.userData.chipSpecIndices = specIndices;
         batch.instanceMatrix.needsUpdate = true;
         batch.computeBoundingSphere();
         const low = lowGeometry.get(mesh.material.name);

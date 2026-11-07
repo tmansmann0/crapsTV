@@ -1,4 +1,8 @@
 import {
+  DEFAULT_ROLL_COOLDOWN_SECONDS,
+  MAX_ROLL_COOLDOWN_SECONDS,
+} from "./betting-window.js";
+import {
   DEFAULT_GRAPHICS,
   mergeGraphics,
   normalizeGraphics,
@@ -57,7 +61,13 @@ export function createState(code = "LOCAL") {
   return {
     code,
     status: "lobby",
-    config: { mode: "craps", startingBank: 100000, minBet: 500, teach: false },
+    config: {
+      mode: "craps",
+      startingBank: 100000,
+      minBet: 500,
+      teach: false,
+      rollCooldownSeconds: DEFAULT_ROLL_COOLDOWN_SECONDS,
+    },
     display: {
       sound: false,
       camera: "auto",
@@ -70,6 +80,8 @@ export function createState(code = "LOCAL") {
     shooterId: null,
     point: null,
     rolling: false,
+    bettingOpenedAt: null,
+    nextRollAt: null,
     aim: null,
     throw: null,
     rolls: [],
@@ -364,6 +376,8 @@ export function configure(s, id, changes) {
     minBet = s.config.minBet,
     mode = s.config.mode,
     teach = s.config.teach,
+    rollCooldownSeconds = s.config.rollCooldownSeconds ??
+      DEFAULT_ROLL_COOLDOWN_SECONDS,
   } = changes;
   assert(["craps", "crapless"].includes(mode), "Choose craps or crapless.");
   assert(
@@ -377,7 +391,8 @@ export function configure(s, id, changes) {
     "Minimum must be $1 or more and fit the starting stack.",
   );
   assert(typeof teach === "boolean", "Teach mode must be on or off.");
-  s.config = { startingBank, minBet, mode, teach };
+  validateCooldown(rollCooldownSeconds);
+  s.config = { startingBank, minBet, mode, teach, rollCooldownSeconds };
   for (const p of s.players) {
     p.bank = startingBank;
     p.buyIn = startingBank;
@@ -388,8 +403,34 @@ export function start(s, id) {
   admin(s, id);
   assert(s.status === "lobby", "This session has already started.");
   s.status = "playing";
+  openBettingWindow(s);
   log(s, "Table is open. Place your bets!", "start");
 }
+function validateCooldown(seconds) {
+  assert(
+    Number.isInteger(seconds) &&
+      seconds >= 0 &&
+      seconds <= MAX_ROLL_COOLDOWN_SECONDS,
+    "Betting window must be a whole number from 0 to 60 seconds.",
+  );
+}
+function openBettingWindow(s) {
+  s.bettingOpenedAt = Date.now();
+  s.nextRollAt =
+    s.bettingOpenedAt +
+    (s.config.rollCooldownSeconds ?? DEFAULT_ROLL_COOLDOWN_SECONDS) * 1000;
+}
+export function setRollCooldown(s, id, seconds) {
+  admin(s, id);
+  assert(s.status !== "ended", "The session has ended.");
+  validateCooldown(seconds);
+  s.config.rollCooldownSeconds = seconds;
+  if (s.status === "playing" && !s.rolling) {
+    s.nextRollAt = (s.bettingOpenedAt ?? Date.now()) + seconds * 1000;
+    if (Date.now() < s.nextRollAt) s.aim = null;
+  }
+}
+
 export function setTeach(s, id, value) {
   admin(s, id);
   assert(typeof value === "boolean", "Invalid teach setting.");
@@ -567,6 +608,11 @@ function throwController(s, id) {
   assert(
     id === s.shooterId || id === s.adminId,
     "The shooter or host rolls the dice.",
+  );
+  const remaining = Math.ceil(((s.nextRollAt ?? 0) - Date.now()) / 1000);
+  assert(
+    remaining <= 0,
+    `Betting open. Wait ${remaining} second${remaining === 1 ? "" : "s"} before rolling.`,
   );
 }
 export function setAim(s, id, input, now = Date.now()) {
@@ -796,6 +842,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
     rotateShooter(s);
   }
   s.rolling = false;
+  openBettingWindow(s);
   s.aim = null;
   s.lastRoll = {
     id: uid(),

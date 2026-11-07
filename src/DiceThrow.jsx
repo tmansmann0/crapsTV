@@ -1,3 +1,4 @@
+import { useBettingWindow } from "./use-betting-window.js";
 import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
 import { useEffect, useRef, useState } from "react";
@@ -28,18 +29,22 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     !!observedThrow.current &&
     !state.rolling &&
     state.lastRoll?.throwId === observedThrow.current;
+  const remaining = useBettingWindow(state);
+  const canCustomize =
+    connected && !state.rolling && player.id === state.shooterId;
   const canThrow =
     connected &&
     !state.rolling &&
     !justLanded &&
+    remaining === 0 &&
     (player.id === state.shooterId || isAdmin);
   latest.current = { state, aim, activeThrowId: observedThrow.current };
   useEffect(() => {
-    if (state.rolling || !connected) {
+    if (state.rolling || !connected || remaining > 0) {
       drag.current = null;
       setAim(null);
     }
-  }, [state.rolling, connected]);
+  }, [state.rolling, connected, remaining]);
   useEffect(() => {
     const el = host.current;
     let renderer;
@@ -330,7 +335,9 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
               ? "LIVE WITH TV"
               : justLanded
                 ? "RETURNING TO PLAY"
-                : "DICE CLOSE-UP"}
+                : remaining > 0
+                  ? `BETTING OPEN · ${remaining}s`
+                  : "DICE CLOSE-UP"}
         </span>
       </div>
       <div
@@ -369,7 +376,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
                 key={color}
                 aria-label={`${color} dice`}
                 aria-pressed={shooter?.dice?.color === color}
-                disabled={!canThrow}
+                disabled={!canCustomize}
                 style={{ "--die": colors[color] }}
                 onClick={() => choose({ color })}
               />
@@ -378,7 +385,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
               className="dice-glass"
               aria-label="Solid dice"
               aria-pressed={shooter?.dice?.finish !== "translucent"}
-              disabled={!canThrow}
+              disabled={!canCustomize}
               onClick={() => choose({ finish: "solid" })}
             >
               Solid
@@ -387,7 +394,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
               className="dice-glass"
               aria-label="Translucent dice"
               aria-pressed={shooter?.dice?.finish === "translucent"}
-              disabled={!canThrow}
+              disabled={!canCustomize}
               onClick={() => choose({ finish: "translucent" })}
             >
               Glass
@@ -402,6 +409,14 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
             Roll the dice
           </button>
         )}
+        {!state.rolling &&
+          !justLanded &&
+          remaining > 0 &&
+          (player.id === state.shooterId || isAdmin) && (
+            <button className="dice-roll-button" disabled>
+              Betting open · {remaining}s
+            </button>
+          )}
         {state.rolling && (
           <button className="dice-roll-button" disabled>
             Dice are rolling…

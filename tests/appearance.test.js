@@ -6,6 +6,7 @@ test("only the current shooter may change validated dice, and never during a rol
   const s = game.createState("TESTAA"),
     a = game.join(s, "A"),
     b = game.join(s, "B");
+  game.configure(s, a.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(s, a.id);
   game.setDiceAppearance(s, a.id, { color: "blue", finish: "translucent" });
   assert.deepEqual(a.dice, { color: "blue", finish: "translucent" });
@@ -31,6 +32,7 @@ test("only the current shooter may change validated dice, and never during a rol
 test("quick color and finish choices preserve each other before a state echo", () => {
   const s = game.createState(),
     a = game.join(s, "A");
+  game.configure(s, a.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(s, a.id);
   game.setDiceAppearance(s, a.id, { color: "blue" });
   game.setDiceAppearance(s, a.id, { finish: "translucent" });

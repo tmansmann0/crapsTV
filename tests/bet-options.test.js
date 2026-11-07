@@ -5,6 +5,7 @@ import * as game from "../src/game.js";
 const setup = () => {
   const s = game.createState("QUICK");
   const p = game.join(s, "A");
+  game.configure(s, p.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(s, p.id);
   return { s, p };
 };

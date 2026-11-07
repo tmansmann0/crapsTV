@@ -11,6 +11,7 @@ import { createTablePieces } from "./table-pieces.js";
 import { createTableMaterials } from "./table-materials.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
+import { sampleThrowCamera } from "./throw-camera.js";
 import { assetURL as asset } from "./asset-url.js";
 import {
   DEFAULT_GRAPHICS,
@@ -530,10 +531,10 @@ export default function Table3D(props) {
       metricFrames = 0;
     const targetPosition = new THREE.Vector3(),
       tableTarget = new THREE.Vector3(0, 0.4, 0.5),
-      diceMidpoint = new THREE.Vector3(),
-      scratchPosition = new THREE.Vector3(),
+      shotTarget = new THREE.Vector3(),
       aimOffset = new THREE.Vector3(0.17, -0.07, 0),
       aimDirection = new THREE.Vector3();
+    let previousCameraShot = null;
     let nextFrameAt = 0;
     function animate(time) {
       frame = requestAnimationFrame(animate);
@@ -599,58 +600,41 @@ export default function Table3D(props) {
         previousRoll = s?.lastRoll?.id;
         settlingUntil = time + 1100;
       }
-      const shared = s?.throw
-        ? sampleThrow(s.throw, Date.now() + (s.clockOffsetMs || 0))
-        : null;
+      const throwTime = Date.now() + (s?.clockOffsetMs || 0);
+      const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
       const aiming = s?.aim?.active ? aimDicePose(s.aim) : null;
       const pose = aiming || shared;
-      const cinematic =
-        !reduced.matches && !!s?.throw && (s.rolling || time < settlingUntil);
+      const automaticCamera = time > userUntil && !dragStart;
+      const cameraShot =
+        automaticCamera && cameraMode === "auto" && !testing
+          ? sampleThrowCamera({
+              throwState: s?.throw,
+              pose: shared,
+              now: throwTime,
+              aspect: camera.aspect,
+              reducedMotion: reduced.matches,
+            })
+          : null;
+      const cinematic = !!cameraShot;
       controls.minDistance = cinematic
         ? 1.2
         : Math.min(8, camera.position.distanceTo(controls.target));
-      const targetFov = cinematic ? 38 : cameraMode === "room" ? 60 : 43;
-      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 5);
+      controls.minPolarAngle = cameraShot?.phase === "result" ? 0.0001 : 0.15;
+      controls.enableDamping = !cinematic;
+      const shotKey = cameraShot ? `${s.throw.id}:${cameraShot.phase}` : null;
+      const cut = shotKey !== null && shotKey !== previousCameraShot;
+      const targetFov = cameraShot?.fov ?? (cameraMode === "room" ? 60 : 43);
+      camera.fov += (targetFov - camera.fov) * (cut ? 1 : Math.min(1, dt * 5));
       camera.updateProjectionMatrix();
-      let cinematicDistance = 0;
-      if ((time > userUntil && !dragStart) || cinematic) {
+      if (automaticCamera) {
         const elapsed = (time - startTime) / 1000;
-        if (cinematic && shared) {
-          const mid = diceMidpoint
-            .fromArray(shared.dice[0].position)
-            .add(scratchPosition.fromArray(shared.dice[1].position))
-            .multiplyScalar(0.5);
-          const ending = shared.progress > 0.72;
-          const radius =
-            Math.max(
-              ...shared.dice.map((p) =>
-                scratchPosition.fromArray(p.position).distanceTo(mid),
-              ),
-            ) + 0.35;
-          const halfFov = Math.min(
-            THREE.MathUtils.degToRad(camera.fov / 2),
-            Math.atan(
-              Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
-                camera.aspect,
-            ),
-          );
-          const distance = Math.max(
-            ending ? 3.5 : 3.0,
-            (radius / Math.sin(halfFov)) * 1.12,
-          );
-          cinematicDistance = distance;
-          targetPosition
-            .set(
-              ending ? 0.18 : 0.28,
-              ending ? 0.8 : 0.72,
-              ending ? 0.58 : 0.64,
-            )
-            .normalize()
-            .multiplyScalar(distance)
-            .add(mid);
-          controls.target.copy(mid);
-          if (camera.position.distanceTo(mid) < distance)
-            camera.position.sub(mid).setLength(distance).add(mid);
+        if (cameraShot) {
+          // Flush any leftover manual orbit damping before the selected shot.
+          if (cut) controls.update();
+          targetPosition.fromArray(cameraShot.position);
+          shotTarget.fromArray(cameraShot.target);
+          controls.target.lerp(shotTarget, cut ? 1 : 1 - Math.exp(-dt * 7));
+          camera.position.copy(targetPosition);
         } else {
           controls.target.lerp(tableTarget, Math.min(1, dt * 3));
           if (testing && !reduced.matches && time > userUntil)
@@ -668,22 +652,17 @@ export default function Table3D(props) {
             const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
             targetPosition.set(drift, 6.0, 16.2);
           }
+          if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
+          camera.position.lerp(
+            targetPosition,
+            reduced.matches ? 1 : 1 - Math.exp(-dt * 1.6),
+          );
         }
-        if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
-        camera.position.lerp(
-          targetPosition,
-          reduced.matches ? 1 : 1 - Math.exp(-dt * (cinematic ? 5 : 1.6)),
-        );
       }
       controls.update();
-      if (
-        cinematicDistance &&
-        camera.position.distanceTo(controls.target) < cinematicDistance
-      )
-        camera.position
-          .sub(controls.target)
-          .setLength(cinematicDistance)
-          .add(controls.target);
+      previousCameraShot = shotKey;
+      el.dataset.cameraShot = cameraShot?.phase || "overview";
+      el.dataset.cameraRig = cameraShot ? String(cameraShot.rig) : "";
       const connected = current.status === "connected";
       const piecesChanged =
         s !== lastPiecesState ||
@@ -706,6 +685,9 @@ export default function Table3D(props) {
       el.dataset.transfers = String(pieces.transfers.children.length);
       el.dataset.sceneReady = String(stageReady);
       el.dataset.chips = String(pieces.chips.children.length);
+      const chipImpacts = pieces.impactStatus;
+      el.dataset.chipImpacts = String(chipImpacts.planned);
+      el.dataset.activeChipImpacts = String(chipImpacts.active);
       el.dataset.diceColor =
         s?.players.find((p) => p.id === s.shooterId)?.dice?.color || "red";
       el.dataset.diceFinish =

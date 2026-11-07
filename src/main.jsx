@@ -618,6 +618,50 @@ function Join({ state, name, setName, code, setCode, join }) {
     </main>
   );
 }
+function BettingWindowSetting({ state, send, connected }) {
+  const [seconds, setSeconds] = useState(
+    state.config.rollCooldownSeconds ?? 10,
+  );
+  useEffect(
+    () => setSeconds(state.config.rollCooldownSeconds ?? 10),
+    [state.config.rollCooldownSeconds],
+  );
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        send({ type: "cooldown", seconds: Number(seconds) });
+      }}
+    >
+      <label>
+        Betting window (seconds)
+        <input
+          aria-label="Betting window (seconds)"
+          type="number"
+          min="0"
+          max="60"
+          step="1"
+          required
+          value={seconds}
+          onChange={(event) => setSeconds(event.target.value)}
+          disabled={!connected}
+        />
+      </label>
+      <p className="fine-print">
+        Time to place bets after the table opens and each roll. 0 allows
+        immediate rolls.
+      </p>
+      <button
+        className="button outline small"
+        type="submit"
+        disabled={!connected}
+      >
+        Set betting window
+      </button>
+    </form>
+  );
+}
+
 function Phone({
   state,
   player,
@@ -762,6 +806,13 @@ function Phone({
               </button>
             </div>
           </div>
+          {state.status === "playing" && (
+            <BettingWindowSetting
+              state={state}
+              send={send}
+              connected={connected}
+            />
+          )}
           <label className="toggle-label">
             <span>
               <BookOpen size={16} />
@@ -869,7 +920,8 @@ function Setup({ state, send }) {
   const [bank, setBank] = useState(state.config.startingBank / 100),
     [min, setMin] = useState(state.config.minBet / 100),
     [mode, setMode] = useState(state.config.mode),
-    [teach, setTeach] = useState(state.config.teach);
+    [teach, setTeach] = useState(state.config.teach),
+    [cooldown, setCooldown] = useState(state.config.rollCooldownSeconds ?? 10);
   function start(e) {
     e.preventDefault();
     send({
@@ -879,6 +931,7 @@ function Setup({ state, send }) {
         minBet: Math.round(Number(min) * 100),
         mode,
         teach,
+        rollCooldownSeconds: Number(cooldown),
       },
     });
   }
@@ -937,6 +990,22 @@ function Setup({ state, send }) {
           />
         </label>
       </div>
+      <label>
+        Betting window (seconds)
+        <input
+          aria-label="Betting window (seconds)"
+          type="number"
+          min="0"
+          max="60"
+          step="1"
+          required
+          value={cooldown}
+          onChange={(event) => setCooldown(event.target.value)}
+        />
+        <small>
+          Time to place bets before each throw. 0 allows immediate rolls.
+        </small>
+      </label>
       <label className="toggle-label">
         <span>
           <BookOpen size={18} />

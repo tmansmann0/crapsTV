@@ -3,10 +3,10 @@
   "fps": 60.0023399241196,
   "p50Ms": 16.69999999999891,
   "p95Ms": 16.700000000000728,
-  "meanDraws": 113.40555555555555,
-  "meanTriangles": 2846298.8833333333,
+  "meanDraws": 126.38333333333334,
+  "meanTriangles": 1779477.711111111,
   "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
   "width": 1600,
   "height": 1000,
-  "rollingFps": 60.00055814472691
+  "rollingFps": 60.00211461196872
 }

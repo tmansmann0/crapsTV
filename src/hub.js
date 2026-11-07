@@ -114,6 +114,8 @@ export class RoomHub {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
+        else if (type === "cooldown")
+          game.setRollCooldown(s, pid, message.seconds);
         else if (type === "dice")
           game.setDiceAppearance(s, pid, message.appearance);
         else if (type === "display")

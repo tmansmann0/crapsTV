@@ -40,6 +40,7 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 
 - **Classic craps or crapless craps.** Rules lock at the start; teach mode can change during play.
 - **Starting stack and table minimum.** The first player chooses both.
+- **Time to bet.** A 10-second betting window follows table opening and each roll. The admin can set 0–60 seconds in setup or during play. Betting stays open while the host prevents early throws.
 - **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
 - **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The animated Learn lessons remain available, with simple explanations and local Classic/Crapless examples.
 - **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Taking odds lives directly below Pass Line on the main board, with current stake, legal increments, remaining capacity, and quick amounts. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
@@ -73,22 +74,22 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 
 ## Inside the project
 
-| Path | What lives here |
-| --- | --- |
-| `src/game.js` | Deterministic rules, cents-based ledger, probabilities, recaps |
-| `src/hub.js` | Shared room authority, private reconnect tokens, action validation |
-| `server/index.js` | Local HTTP/WebSocket host with same-origin check and heartbeat |
-| `server/local-discovery.js` | mDNS hostname advertisement, collision handling, and LAN-IP fallback |
-| `src/transport.js` | Local sockets or online PeerJS room transport |
-| `src/Table3D.jsx` | Blender models, finite HDR backdrop, cinematic shared dice playback |
-| `src/PhoneGame.jsx` | Stable phone board, chip bundles and animated payout results |
-| `src/LearnCenter.jsx` | Short animated lessons, examples and playback controls |
-| `src/DiceThrow.jsx` | 3D phone dice, aim gestures, and shared trajectory playback |
-| `src/throw-motion.js` | Authority-generated physics timeline and stateless frame sampling |
-| `public/assets/` | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
-| `assets/source/` | Editable Blender sources |
-| `public/audio/` | 51 MP3 announcements with manifests, hashes, and license notice |
-| `scripts/` | Optional reproducible board/model/audio generation |
+| Path                        | What lives here                                                        |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `src/game.js`               | Deterministic rules, cents-based ledger, probabilities, recaps         |
+| `src/hub.js`                | Shared room authority, private reconnect tokens, action validation     |
+| `server/index.js`           | Local HTTP/WebSocket host with same-origin check and heartbeat         |
+| `server/local-discovery.js` | mDNS hostname advertisement, collision handling, and LAN-IP fallback   |
+| `src/transport.js`          | Local sockets or online PeerJS room transport                          |
+| `src/Table3D.jsx`           | Blender models, finite HDR backdrop, cinematic shared dice playback    |
+| `src/PhoneGame.jsx`         | Stable phone board, chip bundles and animated payout results           |
+| `src/LearnCenter.jsx`       | Short animated lessons, examples and playback controls                 |
+| `src/DiceThrow.jsx`         | 3D phone dice, aim gestures, and shared trajectory playback            |
+| `src/throw-motion.js`       | Authority-generated physics timeline and stateless frame sampling      |
+| `public/assets/`            | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
+| `assets/source/`            | Editable Blender sources                                               |
+| `public/audio/`             | 51 MP3 announcements with manifests, hashes, and license notice        |
+| `scripts/`                  | Optional reproducible board/model/audio generation                     |
 
 No money changes hands. This is a casual game for friends; a human hosting a peer room controls that room’s authority. Sessions live in memory; save recap cards before stopping the local server or closing an online host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, hop bets, fire bets, buy/lay commission bets, or real-money gambling.
 
@@ -125,5 +126,7 @@ For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit
 The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the selected 24/30/60 FPS limit. Close camera views retain the original detailed chips.
 
 The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger.
+
+Auto camera chooses one of four fixed corner positions for a throw, tracks the dice with a slow lens change, then cuts overhead briefly to show the settled faces. Strong direct hits can nudge or topple a few modeled wager chips, with bounded contact physics and gentle recovery. Manual orbit, fixed table/room views, and reduced-motion preferences take priority. See [camera and chip-contact details](docs/roll-presentation.md) and [betting-window rules](docs/betting-window.md).
 
 Table finishes now use [calibrated PBR materials](docs/table-materials.md): satin walnut, textured leather, matte rubber and restrained brass, with consistent roughness and normal maps.

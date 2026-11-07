@@ -5,6 +5,7 @@ import * as game from "../src/game.js";
 function table() {
   const state = game.createState("BETLOG");
   const player = game.join(state, "Alice");
+  game.configure(state, player.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(state, player.id);
   return { state, player };
 }

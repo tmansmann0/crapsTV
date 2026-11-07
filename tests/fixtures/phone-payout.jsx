@@ -13,6 +13,7 @@ function reset({ kind = "pass", history = false } = {}) {
   state = game.createState("PAYOUT");
   const player = game.join(state, "Payout Tester");
   playerId = player.id;
+  game.configure(state, playerId, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(state, playerId);
   if (kind === "place-6") {
     game.beginRoll(state, playerId);

@@ -119,6 +119,29 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.bringToFront();
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
+    // Default ten-second betting window is enforced and the local countdown
+    // unlocks without a new server broadcast. Dice style stays editable.
+    await expect(phone.locator(".pg-strip-text small")).toContainText(
+      "Betting open",
+    );
+    await phone.getByRole("tab", { name: "Roll", exact: true }).click();
+    await expect(phone.locator(".dice-roll-button")).toBeDisabled();
+    await expect(phone.locator(".dice-roll-button")).toContainText(
+      "Betting open",
+    );
+    await expect(
+      phone.getByRole("button", { name: "blue dice", exact: true }),
+    ).toBeEnabled();
+    await expect(
+      phone.getByRole("button", { name: "Roll the dice", exact: true }),
+    ).toBeEnabled({ timeout: 15000 });
+    // The rest of this multi-roll fixture deliberately uses immediate throws.
+    await phone.getByRole("button", { name: "Open settings" }).click();
+    await phone.locator("summary").click();
+    await phone.getByLabel("Betting window (seconds)").fill("0");
+    await phone.getByRole("button", { name: "Set betting window" }).click();
+    await phone.getByRole("button", { name: "Close settings" }).click();
+    await phone.getByRole("tab", { name: "Play", exact: true }).click();
     await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
     for (const value of [5, 5, 1, 1, 1, 1])
       await phone
@@ -263,6 +286,12 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-camera",
       "room",
+    );
+    // Explicit room/table views stay fixed. Auto opts into throw direction.
+    await phone.getByLabel("TV camera").selectOption("auto");
+    await expect(tv.locator(".table-canvas")).toHaveAttribute(
+      "data-camera",
+      "auto",
     );
     await phone.getByRole("button", { name: "Close settings" }).click();
     const diceBox = await phone.getByTestId("phone-dice").boundingBox();

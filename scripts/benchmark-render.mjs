@@ -124,7 +124,9 @@ try {
       });
     });
   }
-  sockets[0].send(JSON.stringify({ type: "start" }));
+  sockets[0].send(
+    JSON.stringify({ type: "start", config: { rollCooldownSeconds: 0 } }),
+  );
   await page.waitForTimeout(200);
   for (const ws of sockets)
     ws.send(JSON.stringify({ type: "bet", betId: "pass", amount: 2500 }));

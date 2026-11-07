@@ -4,6 +4,11 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { money } from "./game.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import {
+  createChipImpacts,
+  sampleChipImpact,
+  CHIP_IMPACT_LIMITS,
+} from "./chip-impact.js";
+import {
   SEAT_LAYOUT,
   seatStackSlot,
   lineWagerX,
@@ -87,6 +92,12 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
   let flows = [],
     seatLayout = SEAT_LAYOUT,
     layoutRevision = 0;
+  let impactStacks = [],
+    impacts = [],
+    impactThrowId = null;
+  let impactStatus = { planned: 0, active: 0, chips: 0 };
+  const impactBindings = new Map();
+  const dirtyImpactChips = new Set();
   const flightObjects = new Map();
   const materials = new Set(),
     textures = new Set(),
@@ -384,6 +395,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     clearGroup(banks);
     clearGroup(chips);
     const specs = [];
+    impactStacks = [];
+    impactBindings.clear();
+    dirtyImpactChips.clear();
     players.forEach((player, i) => {
       const seat = layout(player);
       bankChipStacks(bankAmounts[i], {
@@ -391,8 +405,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       }).forEach((stack, slot) => {
         const center = seatStackSlot(seat, slot),
           height = 0.13 * 0.23 * 1.15;
-        for (let n = 0; n < stack.visibleCount; n++)
-          specs.push({
+        const impactStack = {
+          id: `bank:${player.id}:${slot}`,
+          floorY: center[1],
+          chips: [],
+        };
+        impactStacks.push(impactStack);
+        for (let n = 0; n < stack.visibleCount; n++) {
+          const spec = {
+            id: `${impactStack.id}:${n}`,
             denomination: stack.denomination,
             wear: (hash(player.id) + n) % 3,
             diameter: 0.23,
@@ -403,10 +424,17 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
               center[2],
             ],
             rotation: [0, (hash(player.id + slot + n) % 628) / 100, 0],
-          });
+          };
+          specs.push(spec);
+          impactStack.chips.push(spec);
+        }
       });
     });
-    if (specs.length) banks.add(chipFactory.createBatch(specs));
+    if (specs.length) {
+      const batch = chipFactory.createBatch(specs);
+      banks.add(batch);
+      bindImpactBatch(batch, specs);
+    }
     const wagerSpecs = [];
     wagers.forEach(({ route, player, visible }) => {
       if (visible <= 0) return;
@@ -417,13 +445,22 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         (route.bet.point || route.bet.type.startsWith("place-"));
       const diameter = compact ? 0.22 : 0.31;
       const pileChips = pileSpecs(visible, { seed: route.bet.id, diameter });
-      for (const spec of pileChips) {
-        wagerSpecs.push({
+      const impactStack = {
+        id: routeKey(route),
+        floorY: pile.position.y,
+        chips: [],
+      };
+      impactStacks.push(impactStack);
+      for (const [index, spec] of pileChips.entries()) {
+        const positioned = {
           ...spec,
+          id: `${impactStack.id}:${index}`,
           position: spec.position.map(
             (v, i) => v + pile.position.getComponent(i),
           ),
-        });
+        };
+        wagerSpecs.push(positioned);
+        impactStack.chips.push(positioned);
       }
       const marker = ring(player.color, diameter / 0.33);
       marker.position.y = 0.016;
@@ -457,7 +494,97 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       const batch = chipFactory.createBatch(wagerSpecs);
       batch.name = "Shared wager chip instances";
       chips.add(batch);
+      bindImpactBatch(batch, wagerSpecs);
     }
+  }
+  const impactPosition = new THREE.Vector3(),
+    impactQuaternion = new THREE.Quaternion(),
+    impactScale = new THREE.Vector3(),
+    impactMatrix = new THREE.Matrix4();
+  function bindImpactBatch(batch, specs) {
+    batch.traverse((mesh) => {
+      if (!mesh.isInstancedMesh || !mesh.userData.chipSpecIndices) return;
+      mesh.userData.chipSpecIndices.forEach((specIndex, index) => {
+        const spec = specs[specIndex];
+        if (!spec?.id) return;
+        const base = new THREE.Matrix4();
+        mesh.getMatrixAt(index, base);
+        const scale = new THREE.Vector3(
+          spec.diameter,
+          spec.diameter * (spec.thicknessScale ?? 1.3),
+          spec.diameter,
+        );
+        const original = new THREE.Matrix4().compose(
+          new THREE.Vector3(...spec.position),
+          new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(...spec.rotation),
+          ),
+          scale,
+        );
+        const binding = {
+          mesh,
+          index,
+          base,
+          local: original.invert().multiply(base),
+          scale,
+        };
+        if (!impactBindings.has(spec.id)) impactBindings.set(spec.id, []);
+        impactBindings.get(spec.id).push(binding);
+      });
+      // Cosmetic displacements remain visible at the edge of a batch's frustum.
+      if (mesh.boundingSphere)
+        mesh.boundingSphere.radius +=
+          CHIP_IMPACT_LIMITS.maxDisplacement + CHIP_IMPACT_LIMITS.maxLift;
+    });
+  }
+  function updateImpacts(state, now, mayPlan) {
+    if (mayPlan && state.rolling && state.throw?.id !== impactThrowId) {
+      impactThrowId = state.throw?.id;
+      impacts = state.throw ? createChipImpacts(state.throw, impactStacks) : [];
+      impactStatus = {
+        planned: impacts.length,
+        active: 0,
+        chips: impacts.reduce((n, track) => n + track.chipIds.length, 0),
+      };
+    }
+    const touched = new Set(),
+      activeIds = new Set();
+    let active = 0;
+    for (const track of impacts) {
+      const sample = sampleChipImpact(track, now);
+      if (!sample.active) continue;
+      active++;
+      track.chipIds.forEach((id, index) => {
+        activeIds.add(id);
+        const pose = sample.poses[index];
+        impactPosition.fromArray(pose.position);
+        impactQuaternion.fromArray(pose.quaternion);
+        for (const binding of impactBindings.get(id) || []) {
+          impactScale.copy(binding.scale);
+          impactMatrix
+            .compose(impactPosition, impactQuaternion, impactScale)
+            .multiply(binding.local);
+          binding.mesh.setMatrixAt(binding.index, impactMatrix);
+          touched.add(binding.mesh);
+        }
+      });
+    }
+    for (const id of dirtyImpactChips)
+      if (!activeIds.has(id)) {
+        for (const binding of impactBindings.get(id) || []) {
+          binding.mesh.setMatrixAt(binding.index, binding.base);
+          touched.add(binding.mesh);
+        }
+      }
+    dirtyImpactChips.clear();
+    activeIds.forEach((id) => dirtyImpactChips.add(id));
+    touched.forEach((mesh) => {
+      mesh.instanceMatrix.needsUpdate = true;
+    });
+    impacts = impacts.filter(
+      (track) => now < track.startAt + track.physicsMs + track.recoveryMs,
+    );
+    impactStatus.active = active;
   }
   function updatePreviews(state, players) {
     const key = JSON.stringify([
@@ -622,6 +749,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       if (previousState) {
         previousState = snapshotRef = null;
         flows = [];
+        impacts = [];
+        impactThrowId = null;
+        impactBindings.clear();
+        dirtyImpactChips.clear();
         for (const group of [chips, banks, labels, previews, transfers])
           clearGroup(group);
         flightObjects.clear();
@@ -630,13 +761,20 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       return;
     }
     const now = Date.now() + (state.clockOffsetMs || 0);
-    if (state.status !== "playing") flows = [];
+    if (state.status !== "playing") {
+      flows = [];
+      impacts = [];
+      impactThrowId = null;
+      impactStatus = { planned: 0, active: 0, chips: 0 };
+    }
     if (!connected) {
       reconnectBaseline = state.snapshotAt ?? state;
       previousState = null;
       flows = [];
       snapshotRef = null;
       connectedBefore = false;
+      impacts = [];
+      impactThrowId = null;
     }
     const waitingForFresh =
       !connectedBefore &&
@@ -654,6 +792,8 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         previousState.createdAt !== state.createdAt
       ) {
         flows = [];
+        impacts = [];
+        impactThrowId = null;
         lastStatic = "";
       }
       previousState = state;
@@ -665,6 +805,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       buildStatic(state, players, now);
       updatePreviews(state, players);
       updateFlights(state, now);
+      updateImpacts(
+        state,
+        now,
+        connected && !waitingForFresh && state.status === "playing",
+      );
     }
     updateLabels(state, players, now);
   }
@@ -680,7 +825,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       return !!chipFactory && dice[0].children.length > 0;
     },
     get animating() {
-      return flows.length > 0;
+      return flows.length > 0 || impacts.length > 0;
+    },
+    get impactStatus() {
+      return { ...impactStatus };
     },
     updateLOD(camera, height, detail = "auto") {
       if (!chipFactory) return false;

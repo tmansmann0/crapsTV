@@ -15,7 +15,7 @@ test("active come teach odds follow its own point, not the table point", () => {
 function table(mode = "craps") {
   const s = g.createState("ABCDEF");
   const p = g.join(s, "Alice");
-  g.configure(s, p.id, { mode });
+  g.configure(s, p.id, { mode, rollCooldownSeconds: 0 });
   g.start(s, p.id);
   return [s, p];
 }

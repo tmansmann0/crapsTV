@@ -5,6 +5,7 @@ import * as game from "../src/game.js";
 test("preparing a bet is visible without spending or creating wagers", () => {
   const s = game.createState(),
     p = game.join(s, "A");
+  game.configure(s, p.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(s, p.id);
   const bank = p.bank;
   assert.equal(game.previewBet(s, p.id, 1000, "place-6", 1000), true);
@@ -20,6 +21,7 @@ test("preparing a bet is visible without spending or creating wagers", () => {
 test("previews validate amount/target and clear for rolls and disconnects", () => {
   const s = game.createState(),
     p = game.join(s, "A");
+  game.configure(s, p.id, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(s, p.id);
   assert.throws(() => game.previewBet(s, p.id, p.bank + 1, null));
   assert.throws(() => game.previewBet(s, p.id, 500, "invented"));
@@ -39,7 +41,7 @@ test("stale preview errors are silent and cannot reject a real wager", () => {
   const messages = [];
   hub.connect("a", (m) => messages.push(m));
   hub.receive("a", { type: "join", name: "A", code: "PREVIEW" });
-  hub.receive("a", { type: "start" });
+  hub.receive("a", { type: "start", config: { rollCooldownSeconds: 0 } });
   const n = messages.length;
   hub.receive("a", { type: "bet-preview", amount: 99999999, betId: "pass" });
   assert.equal(messages.length, n);

@@ -24,6 +24,7 @@ function reset({
   state.config.mode = mode;
   const player = game.join(state, "Odds Tester");
   playerId = player.id;
+  game.configure(state, playerId, { rollCooldownSeconds: 0 }); // Immediate rolls for this isolated fixture.
   game.start(state, playerId);
   if (hasLine) game.place(state, playerId, line, 500);
   if (point) {
