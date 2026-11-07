@@ -1,0 +1,10 @@
+{
+  "version": "0.11.0",
+  "commit": "51797fd",
+  "purpose": "Preserved optimized table before rounded padded crown refinement. Copy each named file to its original public/assets or assets/source location to roll back.",
+  "sha256": {
+    "table-player-rails-optimized.glb": "930f738a4fc501a13784c01b363f1726d274cbeece5b06063976d83639df3a8f",
+    "table-player-rails-optimized-stats.json": "4808fbb53b37f5235a91471a5c9093705b9f76f92de03442e99ee206f29b1539",
+    "table-player-rails-optimized.blend": "ba6931217999db37dfc18f499742f7a7c5010f0a120ac9dcccb0cc8991dab3d2"
+  }
+}

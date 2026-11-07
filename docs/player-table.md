@@ -57,3 +57,8 @@ Four focused tests decode the actual exported GLB, including node transforms. At
 ![Cupholder before and after, high and low](screenshots/cupholders-comparison.png)
 
 A short [native 4K regression sample](benchmarks/cupholders-native-4k.json) with twelve players, a physical throw, AA on, Auto chip detail and native textures recorded 360 frames in six seconds: 60.00 FPS and 16.8 ms P95 on the tested Apple M5 Pro. Scene and UI buffers both verified 3840 × 2160; no browser errors. This is device/workload evidence, not a universal frame-rate guarantee.
+
+
+### Padded crown refinement
+
+Version 0.12.0 replaces the coarse nine-row padded cross-section with 21 curvature-sampled rows and analytic smooth normals. This removes the long flat-looking lighting bands while retaining all four cup cuts and the exact physical envelope. The active optimized table now contains 40,684 triangles / seven material batches, within the 42,000 cap. All six non-leather exported primitives remain identical to the archived 0.11.0 optimized model. Rollback files and their manifest are in `assets/source/legacy/0.11.0/`; see [asset optimization](asset-optimization.md#rounded-padded-crown-0120).

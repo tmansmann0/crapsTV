@@ -190,6 +190,15 @@ try {
           textureLimit: Number(d.graphicsTextures),
           modelDetail: d.graphicsModel,
           sceneResolution: d.sceneResolution,
+          hold: d.startupCalibrationHold,
+          rolling: d.startupRolling,
+          diceDone: d.startupDiceDone,
+          dicePose: JSON.parse(d.startupDicePose || "[]"),
+          effectiveFps: Number(d.startupEffectiveFps),
+          qualityChanges: JSON.parse(d.startupQualityChanges || "[]"),
+          cameraPosition: JSON.parse(d.cameraPosition || "[]"),
+          cameraTarget: JSON.parse(d.cameraTarget || "[]"),
+          cameraFov: Number(d.cameraFov),
         });
       });
   });
@@ -352,6 +361,72 @@ try {
     samples.some((s) => s.elapsed > 28200 && s.ui > 0 && s.ui < 1),
     "UI fades in during final1.8s",
   );
+  const qualityChanges = ended.qualityChanges;
+  assert.deepEqual(
+    qualityChanges.map((change) => change.probe),
+    [1, 2, 3],
+  );
+  const qualityKey = (sample) =>
+    JSON.stringify([
+      sample.effectiveFps,
+      sample.textureLimit,
+      sample.modelDetail,
+      sample.sceneResolution,
+    ]);
+  const demoSamples = samples.filter((sample) => sample.demo === "true");
+  const actualChanges = demoSamples.filter(
+    (sample, index) =>
+      index > 0 && qualityKey(sample) !== qualityKey(demoSamples[index - 1]),
+  );
+  for (const change of qualityChanges) {
+    const changed = demoSamples.find(
+      (sample) =>
+        sample.probe === change.probe &&
+        sample.qualityChanges.length === change.probe,
+    );
+    assert(changed, `missing actual render frame for probe ${change.probe}`);
+    assert.equal(changed.hold, "true");
+    assert.equal(changed.rolling, "false");
+    assert.equal(changed.diceDone, "true");
+    assert.equal(
+      changed.transfers.length,
+      0,
+      "resource upload happens before or after chip animations",
+    );
+    const before = demoSamples
+      .filter(
+        (sample) => sample.at < changed.at && sample.at >= changed.at - 250,
+      )
+      .at(0);
+    const after = demoSamples.find((sample) => sample.at >= changed.at + 150);
+    assert(
+      before && after,
+      "static result has enough visible camera lead and recovery",
+    );
+    assert.deepEqual(before.dicePose, changed.dicePose);
+    assert.deepEqual(after.dicePose, changed.dicePose);
+    assert.deepEqual(before.cameraPosition, changed.cameraPosition);
+    assert.deepEqual(after.cameraPosition, changed.cameraPosition);
+    assert.deepEqual(before.cameraTarget, changed.cameraTarget);
+    assert.deepEqual(after.cameraTarget, changed.cameraTarget);
+    assert.equal(before.cameraFov, changed.cameraFov);
+    assert.equal(after.cameraFov, changed.cameraFov);
+    assert(change.holdAge >= 300);
+  }
+  for (const sample of actualChanges) {
+    assert.equal(
+      sample.hold,
+      "true",
+      "actual graphics allocations change only inside static holds",
+    );
+    assert.equal(sample.rolling, "false");
+    assert.equal(sample.diceDone, "true");
+  }
+  assert.equal(
+    qualityKey(ended),
+    qualityKey(demoSamples.at(-1)),
+    "30s end does not trigger another quality resize/upload/FPS switch",
+  );
   assert.deepEqual(
     latestState,
     untouchedLobby,
@@ -436,6 +511,8 @@ try {
         blackPixels,
         wearBlackPixels,
         actualDuration,
+        qualityChanges,
+        actualChanges,
         samples,
         errors,
         glErrors,

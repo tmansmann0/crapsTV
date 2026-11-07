@@ -1,5 +1,31 @@
 const clamp = (n, low, high) => Math.max(low, Math.min(high, n));
+// Live retests request a probe at these ages, then wait for a safe result hold.
 export const STARTUP_PROBE_AT = [0, 6500, 14000, 22500];
+export const CALIBRATION_CAMERA_LEAD_MS = 300;
+export const CALIBRATION_HOLD_MS = 1000;
+
+/** No automatic reallocations while a player aims, dice move, or chips pay out. */
+export function calibrationCanHold(
+  state,
+  now,
+  minimumClearMs = CALIBRATION_HOLD_MS,
+) {
+  if (state?.rolling || state?.aim?.active) return false;
+  const flight = state?.throw;
+  if (flight && now < (flight.settledAt ?? flight.startAt + flight.duration))
+    return false;
+  const presentation = state?.lastRoll?.presentation;
+  if (presentation && now >= presentation.startAt && now < presentation.endAt)
+    return false;
+  // Leave the full camera lead before an upcoming payout camera/animation.
+  if (
+    presentation &&
+    now < presentation.startAt &&
+    presentation.startAt - now < minimumClearMs
+  )
+    return false;
+  return true;
+}
 
 /** Ramp only automatic preferences; resolveGraphics still applies each override. */
 export function startupCandidates(recommended, { software = false } = {}) {

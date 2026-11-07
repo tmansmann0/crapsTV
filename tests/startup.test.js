@@ -16,6 +16,8 @@ import {
   selectStartupProfile,
   probeStatistics,
   STARTUP_PROBE_AT,
+  calibrationCanHold,
+  CALIBRATION_HOLD_MS,
 } from "../src/startup-calibration.js";
 import { resolveGraphics } from "../src/graphics-profile.js";
 
@@ -285,4 +287,79 @@ test("manual FPS, resolution, AA, model and textures survive the startup ramp", 
     selectStartupProfile(software, [frames(500)], { software: true }),
     software[0],
   );
+});
+
+test("all visible startup quality changes fit physically landed static result holds", () => {
+  assert.deepEqual(
+    showcase.calibrationHolds.map((hold) => hold.probe),
+    [1, 2, 3],
+  );
+  for (const hold of showcase.calibrationHolds) {
+    assert(
+      hold.switchAt - hold.startAt >= 300,
+      "camera arrives before resource reallocations",
+    );
+    assert(
+      hold.endAt - hold.switchAt >= 500,
+      "static result remains visible after upload",
+    );
+    const before = sampleStartup(showcase, hold.switchAt - 100);
+    const during = sampleStartup(showcase, hold.switchAt + 100);
+    assert.equal(before.phase, "result");
+    assert.equal(during.phase, "result");
+    assert.equal(during.state.rolling, false);
+    assert.equal(during.pose.done, true);
+    assert.deepEqual(
+      before.pose.dice,
+      during.pose.dice,
+      "resting dice must not move during quality switches",
+    );
+    assert.deepEqual(
+      before.camera,
+      during.camera,
+      "quality switch must not coincide with a camera move",
+    );
+    const presentation = during.state.lastRoll.presentation;
+    assert(
+      hold.endAt <= presentation.startAt || hold.startAt >= presentation.endAt,
+      "hold must not interrupt modeled payout animations",
+    );
+  }
+  assert(showcase.calibrationHolds.at(-1).switchAt < STARTUP_DURATION_MS);
+});
+
+test("live retests wait for stationary dice and a clear payout window", () => {
+  const result = showcase.stages.find((stage) => stage.at === 9200).state;
+  const throwState = showcase.stages.find((stage) => stage.at === 6200).state;
+  assert.equal(calibrationCanHold(throwState, 7000), false);
+  assert.equal(
+    calibrationCanHold({ ...result, aim: { active: true } }, 9300),
+    false,
+  );
+  assert.equal(calibrationCanHold(result, 9300), true);
+  assert.equal(
+    calibrationCanHold(result, 9500),
+    false,
+    "new holds require room for the entire freeze",
+  );
+  assert.equal(
+    calibrationCanHold(result, 9500, 0),
+    true,
+    "existing hold survives its remaining lead",
+  );
+  assert.equal(
+    calibrationCanHold(result, 11000),
+    false,
+    "chip flights remain uninterrupted",
+  );
+  assert.equal(
+    calibrationCanHold(result, result.lastRoll.presentation.endAt + 1),
+    true,
+  );
+  assert.equal(
+    calibrationCanHold({ rolling: false }, 0),
+    true,
+    "an untouched stationary table can be measured",
+  );
+  assert.equal(CALIBRATION_HOLD_MS, 1000);
 });

@@ -4,7 +4,7 @@ The optimized files are separate variants. The previous table/variant sources an
 
 | Asset                                     | Before  | Optimized | Reduction |
 | ----------------------------------------- | ------- | --------- | --------- |
-| Player table triangles                    | 217,448 | 37,852    | 82.6%     |
+| Player table triangles                    | 217,448 | 40,684    | 81.3%     |
 | Player table mesh/material draws per pass | 102     | 7         | 93.1%     |
 | Detailed logo chip triangles              | 10,098  | 8,440     | 16.4%     |
 | Distant logo chip triangles               | 10,098  | 1,280     | 87.3%     |
@@ -51,3 +51,14 @@ Run `npm run benchmark` for the idle scene. Set `BENCH_ROLL=1` for a throw and `
 The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Board-local UVs keep top-panel miters and vertical leg grain physically coherent. Denser corner arcs preserve close-up silhouettes; removing twelve fully hidden support caps left 34,508 triangles. Rebuilding the four recessed cupholders as clean rounded collars and closed bowls adds 3,344 triangles, giving 37,852 active triangles in the same seven batches. The 38,500-triangle budget keeps smooth close-up cup silhouettes without retaining the broken decimated profiles. See [table materials](table-materials.md) for the darker satin PBR finish and actual-render comparisons.
 
 After all miter topology and UV edits, wood shading normals are regenerated rather than carrying obsolete custom corner data through BMesh. Flat horizontal surfaces use their actual face normals; rounded apron and bevel normals stay smooth. This correction leaves the physical triangle/UV signature, 37,852-triangle count and seven material batches unchanged. See the corner proof in [table materials](table-materials.md).
+
+
+## Rounded padded crown (0.12.0)
+
+The padded rail previously retained the nine-point source cross-section, producing broad longitudinal lighting bands despite smooth face flags. The optimizer had deliberately excluded this crown from decimation; adding surface textures could not repair that underlying profile. The crown now uses tangent-continuous curves sampled by curvature: 21 rows around the closed cross-section, with at most 14 degrees of normal turn between visible rows. Analytic normals also remain smooth through the long polygons produced by the four original cup cuts. The corner path retains 28 segments per quadrant.
+
+Only the padded crown changed: 3,176 → 6,008 triangles. The active table is **40,684 triangles in seven material batches**, within a **42,000-triangle** cap. Actual exported-data comparisons confirm identical position, index, UV and normal arrays for the six other materials, preserving the repaired wood corners, physical grain mapping, cupholders and trays. Crown bounds, cup openings, arc-length detail UV scale and collision dimensions remain unchanged; no all-table subdivision was added.
+
+The previous optimized GLB, editable Blender source and statistics are preserved under `assets/source/legacy/0.11.0/`, with a SHA-256 manifest. `scripts/refine-padded-crown.py` reproducibly applies the crown-only change to that snapshot; `scripts/build-optimized-table.py` also installs the same profile on a full table rebuild. `scripts/table_padded_crown.py` owns the curvature and normals. Regression tests inspect the actual GLB profile/normals, physical detail-UV scale, non-crown payload identity, rollback hashes and the triangle/batch budget.
+
+Matched real Three.js renders use the same environment, material maps, lighting, camera and 1600×1000 output. [Before close](screenshots/padded-crown-before-close.png) / [after close](screenshots/padded-crown-after-close.png), and [before raking](screenshots/padded-crown-before-raking.png) / [after raking](screenshots/padded-crown-after-raking.png). Both fixtures report nine draws including the two proof planes; table draw batches remain seven. The profile change is visible in the smoother highlight rolloff, not a changed leather texture.

@@ -35,6 +35,9 @@ import {
   startupCandidates,
   selectStartupProfile,
   STARTUP_PROBE_AT,
+  calibrationCanHold,
+  CALIBRATION_CAMERA_LEAD_MS,
+  CALIBRATION_HOLD_MS,
 } from "./startup-calibration.js";
 const GRAPHICS_STORAGE = "crapstv-graphics-v1";
 function savedGraphics() {
@@ -149,6 +152,8 @@ export default function Table3D(props) {
     let introSample = null,
       probeWarmUntil = 0;
     let introLiveProbe = false;
+    let liveCalibrationHold = null;
+    let introQualityChanges = [];
     let sceneRevealedAt = introDone.current ? -Infinity : null;
     const introDuration = STARTUP_DURATION_MS;
     const glInfo = renderer
@@ -498,19 +503,18 @@ export default function Table3D(props) {
     }
     function finishOpening(time, skipped = false) {
       if (introDone.current) return;
-      const measured = introReports.some((samples) => samples.length >= 8);
-      profileRef.current =
-        skipped && !measured
-          ? recommendedProfile
-          : selectStartupProfile(candidates, introReports, {
-              requestedFps: graphics.fps,
-              software,
-            });
+      // A completed opening already selected its final profile during the
+      // last static result hold. Escape retains the currently applied quality;
+      // skipping a visible throw must not trigger a surprise texture upload.
+      if (skipped && introStart === null && !introLiveProbe) {
+        profileRef.current = recommendedProfile;
+        applyRuntimeQuality();
+      }
       introDone.current = true;
       introFinishedAt = skipped && !introLiveProbe ? time : time - 1200;
       introLiveProbe = false;
       introSample = null;
-      applyRuntimeQuality();
+      liveCalibrationHold = null;
       nextFrameAt = 0;
     }
     function skipOpening(event) {
@@ -526,15 +530,19 @@ export default function Table3D(props) {
         introStart = null;
         introPreviousFrame = null;
         introReports = [[], [], []];
-        introCandidate = 0;
         introLiveProbe = latest.current.state?.status === "playing";
+        introCandidate = introLiveProbe ? -1 : 0;
+        liveCalibrationHold = null;
+        introQualityChanges = [];
         introFinishedAt = null;
         if (!introLiveProbe) sceneRevealedAt = performance.now();
         candidates = startupCandidates(recommendedProfile, { software });
         if (latest.current.settingsOpen && !introLiveProbe)
           latest.current.onAction?.("settings");
-        profileRef.current = candidates[0];
-        applyRuntimeQuality();
+        if (!introLiveProbe) {
+          profileRef.current = candidates[0];
+          applyRuntimeQuality();
+        }
         return;
       }
       const options = GRAPHICS_OPTIONS[key];
@@ -703,7 +711,9 @@ export default function Table3D(props) {
               if (!introLiveProbe) introShowcase ||= createStartupShowcase();
             }
             const elapsed = time - introStart;
-            const probe =
+            const liveState = latest.current.state;
+            const liveNow = Date.now() + (liveState?.clockOffsetMs || 0);
+            const scheduledProbe =
               elapsed >= STARTUP_PROBE_AT[3]
                 ? 3
                 : elapsed >= STARTUP_PROBE_AT[2]
@@ -711,6 +721,68 @@ export default function Table3D(props) {
                   : elapsed >= STARTUP_PROBE_AT[1]
                     ? 1
                     : 0;
+            const requestedProbe = introLiveProbe
+              ? introCandidate < 0
+                ? 0
+                : introCandidate < 3 &&
+                    scheduledProbe > introCandidate &&
+                    introReports[introCandidate].length >= 8
+                  ? introCandidate + 1
+                  : introCandidate
+              : scheduledProbe;
+            let hold;
+            if (introLiveProbe) {
+              const safe = calibrationCanHold(liveState, liveNow);
+              const throwId = liveState?.throw?.id || null;
+              if (
+                liveCalibrationHold &&
+                (!calibrationCanHold(liveState, liveNow, 0) ||
+                  liveCalibrationHold.throwId !== throwId)
+              )
+                liveCalibrationHold = null;
+              if (
+                !liveCalibrationHold &&
+                requestedProbe !== introCandidate &&
+                safe
+              ) {
+                liveCalibrationHold = {
+                  startAt: time,
+                  endAt: time + CALIBRATION_HOLD_MS,
+                  switchAt: time + CALIBRATION_CAMERA_LEAD_MS,
+                  probe: requestedProbe,
+                  throwId,
+                  camera: {
+                    position: camera.position.toArray(),
+                    target: controls.target.toArray(),
+                    fov: camera.fov,
+                  },
+                };
+                if (liveState?.throw && !reduced.matches) {
+                  const flight = liveState.throw;
+                  const settledAt =
+                    flight.settledAt ?? flight.startAt + flight.duration;
+                  liveCalibrationHold.camera = sampleThrowCamera({
+                    throwState: flight,
+                    pose: sampleThrow(flight, settledAt),
+                    now: settledAt,
+                    aspect: camera.aspect,
+                    viewportWidth: el.clientWidth,
+                    viewportHeight: el.clientHeight,
+                    hudRects: uiExclusions,
+                  });
+                }
+              }
+              if (liveCalibrationHold && time >= liveCalibrationHold.endAt)
+                liveCalibrationHold = null;
+              hold = liveCalibrationHold;
+            } else
+              hold = sampleStartup(introShowcase, elapsed, {
+                aspect: camera.aspect,
+                reducedMotion: reduced.matches,
+              }).calibrationHold;
+            const holdNow = introLiveProbe ? time : elapsed;
+            const probe =
+              hold && holdNow >= hold.switchAt ? hold.probe : introCandidate;
             if (probe !== introCandidate) {
               introCandidate = probe;
               introPreviousFrame = null;
@@ -723,8 +795,21 @@ export default function Table3D(props) {
                       software,
                     });
               applyRuntimeQuality();
+              introQualityChanges.push({
+                elapsed,
+                probe,
+                phase: "result",
+                rolling: !!(introLiveProbe ? liveState?.rolling : false),
+                holdAge: holdNow - hold.startAt,
+                quality: { ...quality },
+              });
             }
-            if (elapsed >= introDuration) finishOpening(time);
+            if (
+              elapsed >= introDuration &&
+              (!introLiveProbe ||
+                (introCandidate === 3 && !liveCalibrationHold))
+            )
+              finishOpening(time);
           }
         }
       }
@@ -734,7 +819,13 @@ export default function Table3D(props) {
       const testing = stageReady && !introDone.current;
       const interval =
         1000 /
-        (testing && graphics.fps === "auto" && !software ? 60 : quality.fps);
+        (testing &&
+        introCandidate < 3 &&
+        (!introLiveProbe || introCandidate >= 0) &&
+        graphics.fps === "auto" &&
+        !software
+          ? 60
+          : quality.fps);
       // Carry fractional deadlines: 24 FPS on a 60 Hz display needs alternating
       // two/three-refresh gaps, rather than accidentally becoming 20 FPS.
       if (!document.hidden && time + 0.75 < nextFrameAt) return;
@@ -837,17 +928,27 @@ export default function Table3D(props) {
         phase: "opening",
         shotKey: `opening:${introSample.camera.shotKey || introSample.phase}:${s.throw?.id || "establish"}`,
       };
-      const directedShot = openingShot || cameraShot || playerShot;
+      const calibrationShot = introLiveProbe &&
+        liveCalibrationHold &&
+        automaticCamera &&
+        cameraMode === "auto" && {
+          ...liveCalibrationHold.camera,
+          phase: "calibration-result",
+          shotKey: `calibration:${liveCalibrationHold.startAt}`,
+        };
+      const directedShot =
+        openingShot || calibrationShot || cameraShot || playerShot;
       const cinematic = !!directedShot;
       controls.minDistance = cinematic ? 0.18 : 0.35;
       controls.minPolarAngle = cinematic ? 0.0001 : 0.15;
       controls.maxPolarAngle = directedShot ? Math.PI - 0.01 : 1.43;
       controls.enableDamping = !cinematic;
-      const shotKey = openingShot
-        ? openingShot.shotKey
-        : cameraShot
-          ? `${s.throw.id}:${cameraShot.phase}`
-          : playerShot?.shotKey || null;
+      const shotKey =
+        openingShot || calibrationShot
+          ? directedShot.shotKey
+          : cameraShot
+            ? `${s.throw.id}:${cameraShot.phase}`
+            : playerShot?.shotKey || null;
       const cut = shotKey !== null && shotKey !== previousCameraShot;
       const targetFov = !automaticCamera
         ? camera.fov
@@ -1119,6 +1220,14 @@ export default function Table3D(props) {
       el.dataset.startupUiOpacity = String(uiOpacity);
       el.dataset.demoActive = String(!!introSample && stageReady);
       el.dataset.startupProbe = String(introCandidate);
+      el.dataset.startupQualityChanges = JSON.stringify(introQualityChanges);
+      el.dataset.startupCalibrationHold = String(
+        !!introSample?.calibrationHold || !!liveCalibrationHold,
+      );
+      el.dataset.startupRolling = String(!!s?.rolling);
+      el.dataset.startupDiceDone = String(!s?.throw || !!shared?.done);
+      el.dataset.startupDicePose = JSON.stringify(shared?.dice || []);
+      el.dataset.startupEffectiveFps = String(1000 / interval);
       if (uiRevision !== ui.revision) {
         uiRevision = ui.revision;
         uiExclusions = ui.getVisibleRects();
@@ -1190,7 +1299,12 @@ export default function Table3D(props) {
           renderer.clearDepth();
           renderer.render(fadeScene, fadeCamera);
         }
-        if (testing && introCandidate < 3 && time > probeWarmUntil) {
+        if (
+          testing &&
+          introCandidate >= 0 &&
+          introCandidate < 3 &&
+          time > probeWarmUntil
+        ) {
           if (introPreviousFrame !== null)
             introReports[introCandidate].push(time - introPreviousFrame);
           introPreviousFrame = time;

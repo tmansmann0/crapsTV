@@ -358,7 +358,7 @@ test("active wood UV1 has no stretched or collapsed triangles; protected sources
     ),
   );
   assert.equal(stats.woodUV.version, 2);
-  assert.equal(stats.after.triangles, 37852);
+  assert.equal(stats.after.triangles, 40684);
   assert.equal(stats.after.materialPrimitives, 7);
   for (const [name, hash] of Object.entries(stats.preservedSha256)) {
     assert.equal(

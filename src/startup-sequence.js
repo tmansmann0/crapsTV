@@ -104,7 +104,30 @@ export function createStartupShowcase() {
   throwAndSettle(6200, 2);
   place(16500, 1);
   throwAndSettle(18600, 64);
-  return { stages, duration: STARTUP_DURATION_MS };
+  const results = stages.filter(
+    (stage) =>
+      stage.state.lastRoll &&
+      !stage.state.rolling &&
+      stage.at === stage.state.lastRoll.at,
+  );
+  const calibrationHolds = results.map((stage, index) => ({
+    probe: index + 1,
+    startAt: stage.at,
+    switchAt: stage.at + 300,
+    endAt: stage.state.lastRoll.presentation.startAt - 40,
+    throwState: stage.state.throw,
+  }));
+  const final = results.at(-1);
+  const lastPayoutAt = final.state.lastRoll.presentation.endAt;
+  const finalHoldAt = lastPayoutAt + 120;
+  calibrationHolds.push({
+    probe: 3,
+    startAt: finalHoldAt,
+    switchAt: finalHoldAt + 300,
+    endAt: STARTUP_DURATION_MS,
+    throwState: final.state.throw,
+  });
+  return { stages, calibrationHolds, duration: STARTUP_DURATION_MS };
 }
 
 /** Clock-seekable camera, fades and real modeled chip/dice snapshots. */
@@ -119,6 +142,10 @@ export function sampleStartup(
     showcase.stages[0];
   const state = entry.state;
   const pose = state.throw ? sampleThrow(state.throw, time) : null;
+  const calibrationHold =
+    showcase.calibrationHolds.find(
+      (hold) => time >= hold.startAt && time < hold.endAt,
+    ) || null;
   let camera;
   const playerShot = sampleTableCamera({
     state,
@@ -135,6 +162,16 @@ export function sampleStartup(
   });
   if (reducedMotion) {
     camera = { position: [0, 10.5, 2.2], target: [0, 0.3, 0], fov: 45 };
+  } else if (calibrationHold) {
+    const throwState = calibrationHold.throwState;
+    const settledAt =
+      throwState.settledAt ?? throwState.startAt + throwState.duration;
+    camera = sampleThrowCamera({
+      throwState,
+      pose: sampleThrow(throwState, settledAt),
+      now: settledAt,
+      aspect,
+    });
   } else if (time < 2200) {
     const t = smooth(time / 2200);
     camera = {
@@ -191,12 +228,15 @@ export function sampleStartup(
       (time - STARTUP_UI_AT) / (STARTUP_DURATION_MS - STARTUP_UI_AT),
     ),
     done: elapsed >= STARTUP_DURATION_MS,
-    phase: state.rolling
-      ? "dice"
-      : playerShot.phase.startsWith("outcome")
-        ? "payout"
-        : time < 3800
-          ? "materials"
-          : "table",
+    calibrationHold,
+    phase: calibrationHold
+      ? "result"
+      : state.rolling
+        ? "dice"
+        : playerShot.phase.startsWith("outcome")
+          ? "payout"
+          : time < 3800
+            ? "materials"
+            : "table",
   };
 }

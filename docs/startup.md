@@ -48,3 +48,22 @@ Automatic graphics candidates ramp resolution, texture limits and model detail.
 Measurements choose a sustainable candidate at the requested frame budget;
 explicit FPS, resolution, antialiasing, model and texture choices still take
 precedence when the final graphics configuration is resolved.
+
+Automatic resource changes wait for static landed-dice shots. The demonstration
+derives those windows from its actual physics and payout timestamps; the
+current takes switch at about 9.5, 21.9 and 28.7 seconds. Each camera is already
+stationary for at least 300 ms before texture uploads, framebuffer resizing or
+model/FPS changes begin. Payout transfers do not overlap those holds. Ending at
+30 seconds retains the selected settings rather than applying them again.
+Skipping a visible opening also retains its current quality.
+
+Live Retest keeps the current quality during aiming, throws and payout
+animations. It advances one probe at a time after a safe hold and sufficient
+samples; waiting for a real round can extend the retest beyond 30 seconds. It
+never delays a player's next roll or changes the ledger. Run
+`npm run test:startup-retest` for an isolated real-authority airborne test.
+
+The [recorded hold proof](benchmarks/startup-quality-holds.json) checks actual
+framebuffer/texture/FPS changes against camera position, target, FOV and dice
+poses sampled 250 ms before and 150 ms after each change. The measured opening
+was 30.015 seconds with both black asset gates intact.

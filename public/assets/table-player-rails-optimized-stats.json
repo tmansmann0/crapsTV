@@ -5,16 +5,16 @@
     "materialPrimitives": 102
   },
   "afterRetopology": {
-    "triangles": 37852,
+    "triangles": 40684,
     "meshes": 94,
     "materialPrimitives": 94
   },
   "after": {
-    "triangles": 37852,
+    "triangles": 40684,
     "meshes": 7,
     "materialPrimitives": 7
   },
-  "triangleReductionPercent": 82.59261984474449,
+  "triangleReductionPercent": 81.29023950553696,
   "meshReductionPercent": 93.13725490196079,
   "materialDrawCalls": 7,
   "removedHiddenObjects": [
@@ -476,5 +476,129 @@
     "version": 2,
     "faces": 8069,
     "mapping": "Board-local mitered panels and upright leg grain; physical UV1"
+  },
+  "paddedCrown": {
+    "version": 1,
+    "visibleCurveSegments": 18,
+    "profileRows": 21,
+    "cornerSegments": 28,
+    "triangles": 6008,
+    "analyticCornerNormals": true,
+    "cupCutFaces": 208,
+    "boundaryEdges": 0,
+    "nonManifoldEdges": 0,
+    "maxProfileTurnDegrees": 14,
+    "profile": [
+      [
+        0.595,
+        0.64
+      ],
+      [
+        0.6,
+        0.74
+      ],
+      [
+        0.5955458965589351,
+        0.7752786786466203
+      ],
+      [
+        0.5808823127018501,
+        0.8135623541548025
+      ],
+      [
+        0.5578218535214808,
+        0.8469268949514004
+      ],
+      [
+        0.5343045669439939,
+        0.867498585476654
+      ],
+      [
+        0.48985311160275313,
+        0.8895570420825535
+      ],
+      [
+        0.40798672605057207,
+        0.9122413918377162
+      ],
+      [
+        0.32355386777722983,
+        0.9196690076972311
+      ],
+      [
+        0.29,
+        0.92
+      ],
+      [
+        0.259969398918097,
+        0.9165182505309662
+      ],
+      [
+        0.18151576354830656,
+        0.8851936364542516
+      ],
+      [
+        0.10607100502124173,
+        0.8461993287814118
+      ],
+      [
+        0.03170780761070449,
+        0.8055051601970246
+      ],
+      [
+        0.010267554137880507,
+        0.7963292981998166
+      ],
+      [
+        0.004974297220476716,
+        0.7920739796481894
+      ],
+      [
+        0.002228491062450634,
+        0.7884699400791106
+      ],
+      [
+        0.0007047968471596335,
+        0.7849662607244079
+      ],
+      [
+        2.644929959124106e-05,
+        0.7810043151757788
+      ],
+      [
+        0.0,
+        0.78
+      ],
+      [
+        0.0,
+        0.74
+      ]
+    ],
+    "bounds": [
+      [
+        -6.050000190734863,
+        6.050000190734863
+      ],
+      [
+        -3.3399999141693115,
+        3.3399999141693115
+      ],
+      [
+        0.6399999856948853,
+        0.9200000166893005
+      ]
+    ],
+    "previousTriangles": 3176,
+    "triangleDelta": 2832,
+    "triangleBudget": 42000,
+    "rollback": "assets/source/legacy/0.11.0",
+    "unchangedNonCrownBlenderSha256": {
+      "Optimized Aged champagne brass": "1d4756cc3411708287911e6b33a488de46e1f8c5635916503edadb15f9da4913",
+      "Optimized Dark pine pyramid bounce rubber": "12c80b881c82bda486616e26c86eac683dc79dbd0eefc3e1bdeae0b5d48de683",
+      "Optimized Dark recessed cup wells": "9d9279d6457b12d2563ac049cbfe133cbe031a126e5a71dc942e82a1e7d2e329",
+      "Optimized Deep pine baize": "f4033ddd2c543618b0d64c639c661448f41c6e0e810c4fa52dae39c1a34d7737",
+      "Optimized Hand-polished dark walnut": "6678c262862a38fb315daa7b1735ebd7b228613193fb0b916fa14d9e9172ebfd",
+      "Optimized Player tray suede": "6c142a2b452bf1f14e07f55e7137d59b55cffab178ab032c3fa7b9bd80c24ad9"
+    }
   }
 }
