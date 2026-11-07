@@ -61,18 +61,14 @@ const save = (key, value) => {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
 };
-function Brand({ large = false }) {
+function Brand() {
   return (
-    <a
-      className={`brand ${large ? "large" : ""}`}
-      href={location.pathname}
-      aria-label="crapsTV home"
-    >
-      <Dices />
-      <span>
-        craps<span>TV</span>
-        <i>✦</i>
-      </span>
+    <a className="brand" href={document.baseURI} aria-label="crapsTV home">
+      <img
+        className="brand-logo"
+        src={new URL("assets/brand-logo.png", document.baseURI).href}
+        alt="crapsTV"
+      />
     </a>
   );
 }
@@ -176,6 +172,7 @@ function App() {
     [status, setStatus] = useState("connecting"),
     [error, setError] = useState(""),
     [sound, setSound] = useState(false),
+    [settingsOpen, setSettingsOpen] = useState(false),
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
@@ -254,6 +251,9 @@ function App() {
       transport.current = null;
     };
   }, [session?.kind, session?.code]);
+  useEffect(() => {
+    if (state?.display) setSound(state.display.sound);
+  }, [state?.display?.revision]);
   useAnnouncer(state, sound && view === "tv");
   const send = (message) => transport.current?.send(message),
     player = state?.players.find((p) => p.id === playerId),
@@ -307,6 +307,7 @@ function App() {
   const roomCode = state?.code || session?.code || "";
   const joinLink = controllerURL(roomCode, session?.joinOrigin);
   const sceneAction = async (action) => {
+    if (action === "settings") setSettingsOpen((v) => !v);
     if (action === "join") window.open(joinLink, "_blank", "noopener");
     if (action === "sound") setSound((value) => !value);
     if (action === "fullscreen") {
@@ -337,10 +338,14 @@ function App() {
           status={checking ? "connecting" : status}
           error={error}
           sound={sound}
+          settingsOpen={settingsOpen}
           joinURL={joinLink}
           onAction={sceneAction}
         />
         <div className="scene-accessibility" aria-label="Table controls">
+          <button onClick={() => sceneAction("settings")}>
+            Table settings
+          </button>
           <p role="status">
             {status}. Room {roomCode}.{" "}
             {state?.status === "ended"
@@ -455,6 +460,7 @@ function App() {
           send={send}
           confirm={setConfirm}
           connected={status === "connected"}
+          onDisplayAction={sceneAction}
         />
       )}
       {confirm && (
@@ -550,7 +556,15 @@ function Join({ state, name, setName, code, setCode, join }) {
     </main>
   );
 }
-function Phone({ state, player, isAdmin, send, confirm, connected }) {
+function Phone({
+  state,
+  player,
+  isAdmin,
+  send,
+  confirm,
+  connected,
+  onDisplayAction,
+}) {
   const [tab, setTab] = useState("table"),
     [chip, setChip] = useState(500),
     [group, setGroup] = useState("The essentials");
@@ -803,6 +817,53 @@ function Phone({ state, player, isAdmin, send, confirm, connected }) {
               </button>
             </div>
           )}
+          {isShooter && (
+            <section className="dice-customizer" aria-label="Your dice">
+              <h3>Your dice</h3>
+              <div className="dice-colors">
+                {["red", "green", "blue"].map((color) => (
+                  <button
+                    key={color}
+                    aria-label={`${color} dice`}
+                    aria-pressed={(player.dice?.color || "red") === color}
+                    disabled={disabled}
+                    className={`dice-color ${color}`}
+                    onClick={() =>
+                      send({
+                        type: "dice",
+                        appearance: {
+                          color,
+                          finish: player.dice?.finish || "solid",
+                        },
+                      })
+                    }
+                  >
+                    {color}
+                  </button>
+                ))}
+              </div>
+              <div className="dice-finishes">
+                {["solid", "translucent"].map((finish) => (
+                  <button
+                    key={finish}
+                    aria-pressed={(player.dice?.finish || "solid") === finish}
+                    disabled={disabled}
+                    onClick={() =>
+                      send({
+                        type: "dice",
+                        appearance: {
+                          color: player.dice?.color || "red",
+                          finish,
+                        },
+                      })
+                    }
+                  >
+                    {finish}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="roll-controls">
             {isShooter || isAdmin ? (
               <button
@@ -841,6 +902,60 @@ function Phone({ state, player, isAdmin, send, confirm, connected }) {
         </summary>
         {isAdmin && (
           <>
+            <div className="admin-display-settings">
+              <h3>TV settings</h3>
+              <label className="toggle-label">
+                <span>TV announcer</span>
+                <input
+                  aria-label="TV announcer"
+                  type="checkbox"
+                  checked={state.display?.sound || false}
+                  onChange={(e) =>
+                    send({
+                      type: "display",
+                      settings: { sound: e.target.checked },
+                    })
+                  }
+                />
+              </label>
+              <label>
+                TV camera
+                <select
+                  aria-label="TV camera"
+                  value={state.display?.camera || "auto"}
+                  onChange={(e) =>
+                    send({
+                      type: "display",
+                      settings: { camera: e.target.value },
+                    })
+                  }
+                >
+                  <option value="auto">Auto</option>
+                  <option value="table">Table</option>
+                  <option value="room">Room</option>
+                </select>
+              </label>
+              <div className="button-row">
+                <button
+                  className="button outline small"
+                  onClick={() => onDisplayAction("copy")}
+                >
+                  Copy invite
+                </button>
+                <button
+                  className="button outline small"
+                  onClick={() => onDisplayAction("join")}
+                >
+                  Controller
+                </button>
+                <button
+                  className="button outline small"
+                  onClick={() => onDisplayAction("fullscreen")}
+                >
+                  Fullscreen this device
+                </button>
+              </div>
+            </div>
             <label className="toggle-label">
               <span>
                 <BookOpen size={16} />

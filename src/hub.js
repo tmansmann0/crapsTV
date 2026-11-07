@@ -93,6 +93,10 @@ export class RoomHub {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
+        else if (type === "dice")
+          game.setDiceAppearance(s, pid, message.appearance);
+        else if (type === "display")
+          game.setDisplaySettings(s, pid, message.settings);
         else if (type === "bet")
           game.place(s, pid, message.betId, message.amount);
         else if (type === "remove") game.remove(s, pid, message.betId);

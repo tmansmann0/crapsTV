@@ -166,22 +166,55 @@ normalnode=leather.node_tree.nodes.new('ShaderNodeNormalMap');normalnode.inputs[
 leather.node_tree.links.new(normaltex.outputs['Color'],normalnode.inputs['Color'])
 leather.node_tree.links.new(normalnode.outputs['Normal'],leather.node_tree.nodes.get('Principled BSDF').inputs['Normal'])
 
-# Felt is recessed beneath a sculpted, padded rail. The crown stays near Y=.3.
+# The bed remains Y=0. Raised casino walls have a Y=.92 padded crown.
 slab('Recessed pine playing bed',10.9,5.6,.94,-.32,0,felt)
 ring('Substantial walnut apron',[(11.96,6.66,1.24,-.94),(12,6.7,1.25,-.18),(11.05,5.75,1.02,-.18),(10.98,5.68,.98,-.94)],wood,.045)
 ring('Walnut lower plinth',[(11.89,6.59,1.20,-1.02),(11.98,6.68,1.245,-.94),(11.13,5.83,1.06,-.94),(11.13,5.83,1.06,-1.02)],wood,.025)
 for z in (-.84,-.26):
     ring('Fine brass apron inlay',[(12.005,6.705,1.255,z),(12.005,6.705,1.255,z+.012),(11.98,6.68,1.245,z+.012),(11.98,6.68,1.245,z)],brass,.003)
+# Raised walnut chassis supports the rubber wall and upholstered crown.
+ring('Raised walnut wall chassis',[(11.96,6.66,1.24,-.20),(11.96,6.66,1.24,.64),(10.94,5.52,.93,.64),(10.94,5.52,.93,-.20)],wood,.025)
 # Eight cross-sectional rings form a real upholstered crown instead of a slab.
 rail=ring('Sculpted upholstered oxblood rail',[
-    (11.93,6.63,1.22,-.16),(12,6.7,1.25,.04),
-    (11.97,6.67,1.235,.18),(11.83,6.53,1.165,.285),
-    (11.62,6.32,1.06,.32),(11.31,6.01,1.02,.27),
-    (11.02,5.72,.99,.13),(10.90,5.60,.94,-.05),
-    (10.90,5.60,.94,-.18)],leather,0)
-# A low interior wood wall and brass bead make the playing bed read as recessed.
-ring('Interior walnut cushion support',[(10.94,5.64,.96,-.20),(10.94,5.64,.96,.04),(10.89,5.59,.935,.04),(10.89,5.59,.935,-.20)],wood,.009)
-ring('Inner brass bead',[(10.955,5.655,.966,.048),(10.95,5.65,.964,.069),(10.918,5.618,.947,.069),(10.918,5.618,.947,.048)],brass,.006)
+    (11.93,6.63,1.22,.54),(12,6.7,1.25,.69),
+    (11.97,6.67,1.235,.81),(11.83,6.53,1.165,.885),
+    (11.62,6.32,1.06,.92),(11.31,6.01,1.02,.87),
+    (11.02,5.72,.99,.73),(10.90,5.48,.89,.65),
+    (10.90,5.48,.89,.60)],leather,0)
+# Proper vertical rubber bounce wall: the flat inner face is X +/-5.45,
+# Z +/-2.74, Y=.02..74. Pyramids project .03 into the playing volume.
+rubber=material('Dark pine pyramid bounce rubber',(.008,.025,.019),.83)
+ring('Vertical rubber bounce wall',[(11.10,5.68,.99,.02),(11.10,5.68,.99,.74),(10.90,5.48,.89,.74),(10.90,5.48,.89,.02)],rubber,0)
+ring('Rubber wall lower bead',[(10.915,5.495,.897,.018),(10.915,5.495,.897,.043),(10.895,5.475,.887,.043),(10.895,5.475,.887,.018)],rubber,.004)
+ring('Brass cushion support detail',[(11.965,6.665,1.243,.582),(11.965,6.665,1.243,.594),(11.940,6.640,1.230,.594),(11.940,6.640,1.230,.582)],brass,.003)
+# Low-poly molded pyramid rubber on all four straight sides and rounded corners.
+# One joined mesh retains the physical texture without hundreds of draw calls.
+perimeter=rounded(10.90,5.48,.89,n=36)
+segments=[];total=0
+for i,point in enumerate(perimeter):
+    nextpoint=perimeter[(i+1)%len(perimeter)]
+    dx,dy=nextpoint[0]-point[0],nextpoint[1]-point[1]
+    length=math.hypot(dx,dy)
+    segments.append((total,length,point,(dx/length,dy/length)))
+    total+=length
+vertices=[];polys=[]
+for row,height in enumerate((.18,.38,.58)):
+    distance=.1+(row%2)*.10
+    while distance<total:
+        for start,length,point,tangent in segments:
+            if start<=distance<start+length:
+                t=(distance-start)
+                x,y=point[0]+t*tangent[0],point[1]+t*tangent[1]
+                tx,ty=tangent;nx,ny=-ty,tx
+                offset=len(vertices)
+                vertices.extend([(x,y,height+.078),(x+tx*.078,y+ty*.078,height),(x,y,height-.078),(x-tx*.078,y-ty*.078,height),(x+nx*.030,y+ny*.030,height)])
+                polys.extend((offset+a,offset+b,offset+4) for a,b in ((0,1),(1,2),(2,3),(3,0)))
+                break
+        distance+=.20
+mesh=bpy.data.meshes.new('Molded rubber pyramid mesh');mesh.from_pydata(vertices,[],polys);mesh.update()
+studs=bpy.data.objects.new('Molded rubber pyramids',mesh);bpy.context.collection.objects.link(studs)
+finish(studs,studs.name,rubber)
+for face in mesh.polygons:face.use_smooth=False
 # A stitched seam follows the outer shoulder; tiny dashes retain softness.
 seam=material('Oxblood seam thread',(.10,.036,.028),.8)
 outerpath=rounded(11.88,6.58,1.19,n=100)
@@ -189,7 +222,7 @@ stitches=[]
 for i in range(0,len(outerpath),3):
     x,y=outerpath[i]
     xn,yn=outerpath[(i+1)%len(outerpath)]
-    dash=cube('Upholstery stitch',(.034,.006,.004),((x+xn)/2,(y+yn)/2,.232),seam,0)
+    dash=cube('Upholstery stitch',(.034,.006,.004),((x+xn)/2,(y+yn)/2,.832),seam,0)
     dash.rotation_euler.z=math.atan2(yn-y,xn-x)
     stitches.append(dash)
 bpy.ops.object.select_all(action='DESELECT')
@@ -199,21 +232,21 @@ stitches[0].name='Continuous rail stitch detail'
 # Real cut-through holes with dark recessed cups and polished brass rims.
 for x in (-4.0,4.0):
     for y in (-3.055,3.055):
-        bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=.18,depth=.8,location=(x,y,.10))
+        bpy.ops.mesh.primitive_cylinder_add(vertices=48,radius=.18,depth=1.0,location=(x,y,.75))
         cutter=bpy.context.object
         bpy.context.view_layer.objects.active=rail
         mod=rail.modifiers.new('Recessed cup holder cutout','BOOLEAN')
         mod.operation='DIFFERENCE';mod.object=cutter
         bpy.ops.object.modifier_apply(modifier=mod.name)
         bpy.data.objects.remove(cutter,do_unlink=True)
-        cylinder('Cup well floor',.176,.018,(x,y,-.15),black)
+        cylinder('Cup well floor',.176,.018,(x,y,.648),black)
         # Open sides, with the floor visible down inside.
         path=[(math.cos(a*math.tau/48)*.176+x,math.sin(a*math.tau/48)*.176+y) for a in range(48)]
-        verts=[(px,py,z) for z in (-.15,.26) for px,py in path]
+        verts=[(px,py,z) for z in (.648,.865) for px,py in path]
         faces=[(i,(i+1)%48,(i+1)%48+48,i+48) for i in range(48)]
         mesh=bpy.data.meshes.new('Cup wall');mesh.from_pydata(verts,[],faces);mesh.update()
         well=bpy.data.objects.new('Recessed cup well',mesh);bpy.context.collection.objects.link(well);finish(well,well.name,black)
-        bpy.ops.mesh.primitive_torus_add(major_radius=.18,minor_radius=.015,major_segments=48,minor_segments=8,location=(x,y,.265))
+        bpy.ops.mesh.primitive_torus_add(major_radius=.18,minor_radius=.015,major_segments=48,minor_segments=8,location=(x,y,.865))
         finish(bpy.context.object,'Brass cup lip',brass)
 # Broad end pedestals feel like furniture, with smaller inset feet.
 for x in (-3.75,3.75):
@@ -221,14 +254,14 @@ for x in (-3.75,3.75):
     cube('Inset black pedestal foot',(1.19,3.82,.18),(x,0,-2.43),black,.06)
     cube('Brass pedestal reveal',(1.15,3.70,.045),(x,0,-2.31),brass,.015)
 # Small dealer rack on the far rail, outside the playing/odds surface.
-cube('Dealer walnut chip rack',(2.40,.49,.16),(0,3.04,.32),wood,.055)
-cube('Rack dark inset',(2.25,.39,.07),(0,3.04,.42),black,.03)
+cube('Dealer walnut chip rack',(2.40,.49,.16),(0,3.04,.92),wood,.055)
+cube('Rack dark inset',(2.25,.39,.07),(0,3.04,1.02),black,.03)
 chipcolors=[(.62,.55,.40),(.42,.015,.025),(.015,.12,.075),(.025,.07,.20),(.14,.045,.20),(.025,.027,.025)]
 for j,col in enumerate(chipcolors):
     cm=material(f'Dealer chip color {j}',col,.4)
     parts=[]
     for k in range(8):
-        parts.append(cylinder('Dealer rack chip',.139,.032,(-.94+j*.376,2.9+k*.038,.49),cm,(math.pi/2,0,0)))
+        parts.append(cylinder('Dealer rack chip',.139,.032,(-.94+j*.376,2.9+k*.038,1.09),cm,(math.pi/2,0,0)))
     bpy.ops.object.select_all(action='DESELECT')
     for part in parts:part.select_set(True)
     bpy.context.view_layer.objects.active=parts[0];bpy.ops.object.join()
@@ -252,6 +285,11 @@ if not environment.exists(): environment=OUT/'casino-studio.hdr'
 env.image=bpy.data.images.load(str(environment))
 scene.world.node_tree.links.new(env.outputs['Color'],nodes.get('Background').inputs['Color'])
 nodes.get('Background').inputs['Strength'].default_value=.6
+# Inspection lighting belongs only to the preview, not the exported asset.
+for loc,energy,size,color in [((0,-2,8),1500,7,(1,.88,.72)),((-5,3,6),950,5,(.76,.86,1))]:
+    bpy.ops.object.light_add(type='AREA',location=loc)
+    lamp=bpy.context.object;lamp.data.energy=energy;lamp.data.shape='DISK';lamp.data.size=size;lamp.data.color=color
+    lamp.rotation_euler=(Vector((0,0,0))-lamp.location).to_track_quat('-Z','Y').to_euler()
 board=bpy.data.materials.new('Classic layout QA texture')
 board.use_nodes=True
 bn=board.node_tree.nodes

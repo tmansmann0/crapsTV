@@ -44,6 +44,20 @@ try {
   await phone.getByRole("button", { name: "Crapless craps" }).click();
   await phone.getByRole("button", { name: "Open the table" }).click();
   await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
+  await phone.getByRole("button", { name: "blue dice" }).click();
+  await phone.getByRole("button", { name: "translucent", exact: true }).click();
+  await host.waitForFunction(
+    () =>
+      document.querySelector(".table-canvas")?.dataset.diceFinish ===
+      "translucent",
+  );
+  await phone.locator("summary").click();
+  await phone.getByLabel("TV camera").selectOption("room");
+  await host.waitForFunction(
+    () => document.querySelector(".table-canvas")?.dataset.camera === "room",
+  );
+  await phone.locator("summary").click();
+
   await phone
     .getByRole("button", { name: "Place bet", exact: false })
     .first()

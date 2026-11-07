@@ -26,8 +26,13 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   await tv.waitForTimeout(2300);
   const viewport = tv.viewportSize();
   await tv.locator("canvas").click({
-    position: { x: viewport.width / 2 - 120, y: viewport.height - 40 },
+    position: { x: 48, y: 48 },
   });
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-settings-open",
+    "true",
+  );
+  await tv.locator("canvas").click({ position: { x: 130, y: 210 } });
   await expect(tv.locator(".table-canvas")).toHaveAttribute(
     "data-camera",
     "table",
@@ -39,7 +44,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
   const popup = tv.waitForEvent("popup");
   await tv.locator("canvas").click({
-    position: { x: viewport.width / 2 + 120, y: viewport.height - 40 },
+    position: { x: 130, y: 305 },
   });
   const phone = await popup;
   await phone.setViewportSize({ width: 390, height: 844 });
@@ -62,11 +67,38 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   await bob.getByText("Your chips are waiting.").waitFor();
   await phone.getByRole("button", { name: "Open the table" }).click();
   await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
+  await phone.getByRole("button", { name: "blue dice" }).click();
+  await phone.getByRole("button", { name: "translucent", exact: true }).click();
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-dice-color",
+    "blue",
+  );
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-dice-finish",
+    "translucent",
+  );
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-player-labels",
+    "2",
+  );
+  await phone.locator("summary").click();
+  await phone.getByLabel("TV camera").selectOption("room");
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-camera",
+    "room",
+  );
+  await phone.locator("summary").click();
+
   await phone
     .getByRole("button", { name: "Place bet", exact: false })
     .first()
     .click();
   await phone.getByRole("tab", { name: "My bets (1)" }).waitFor();
+  await expect
+    .poll(async () =>
+      Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
+    )
+    .toBeGreaterThan(0);
   await bob.getByRole("button", { name: "One roll", exact: true }).click();
   await bob
     .getByRole("button", { name: "Place bet", exact: false })

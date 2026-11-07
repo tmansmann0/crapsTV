@@ -30,7 +30,7 @@ These commands are the same in macOS/Linux terminals, Windows PowerShell, and Wi
 
 1. Open the [online game](https://tmansmann0.github.io/crapsTV/) on your TV/laptop. It opens the 3D scene and automatically hosts an online room.
 2. Keep that tab open. Friends scan its QR or open [/join](https://tmansmann0.github.io/crapsTV/join), enter their name and six-character room code, and join.
-3. The **first player to join** becomes the game admin. The TV itself is a spectator until someone opens **Controller** in a separate tab.
+3. The **first player to join** becomes the game admin. The TV itself is a spectator until someone opens **Phone controller** from Settings in a separate tab.
 
 GitHub Pages serves the static app. PeerJS’s free public signaling service introduces the browsers; game messages then travel over WebRTC. The host browser owns the session. **Some corporate networks, symmetric NATs, or restrictive firewalls require a TURN relay; this free build does not bundle a paid relay.** If a connection cannot be made, use local play or another network. Closing/reloading the hosting tab ends the online room; it is not a persistent game server. Phone reloads can rejoin the same seat while the host remains open.
 
@@ -88,8 +88,20 @@ MIT licensed original code and assets; included third-party dependencies and fon
 
 ## Camera and TV controls
 
-The TV page has no outer navigation, sidebar, headings, or footer. Every visible label and control is a mesh rendered within its WebGL canvas. The clipped DOM controls exist only for keyboard/screen-reader access. The in-scene camera control cycles **auto → table → room**. Drag to orbit and scroll/pinch to zoom. Auto view makes a slow sweep, moves in for a roll, and pauses automatic movement after manual interaction. Reduced-motion settings disable the drift and dice tumble. Dice are 0.27 table units, versus the original 0.7.
+The TV page has no outer navigation, sidebar, headings, or footer. Every visible label and control is a mesh rendered within its WebGL canvas. The clipped DOM controls exist only for keyboard/screen-reader access. The top-left settings button reveals announcer, camera (**auto → table → room**), invite, controller, and fullscreen controls. Admin phones can change shared TV sound/camera settings; fullscreen applies to the device receiving the gesture. Drag to orbit and scroll/pinch to zoom. Auto view makes a slow sweep, moves in for a roll, and pauses automatic movement after manual interaction. Reduced-motion settings disable the drift and dice tumble. Dice are now 0.22 table units, with recessed pips and selectable red/green/blue solid or translucent resin.
 
 `/join?code=ABCDEF` is the dedicated phone route. The static build includes a GitHub Pages `404.html` entry and sets its base path before loading modules, so direct controller links and refreshes resolve under `/crapsTV/`. Legacy `?join=` invitations still enter the controller.
 
 [HDR environment details](docs/environment.md).
+
+## Detailed playing pieces and display controls
+
+The actual generated logo is used on the TV. Player names and stacks are 2D labels anchored to their seats around the table, rather than a screen-corner list. The TV settings menu starts closed. Admin controllers have shared announcer and camera settings plus invite/controller/fullscreen actions.
+
+Chips load a real modeled GLB with edge inserts, engraved medallions, and three independently seeded wear/roughness variants. Dice have Boolean-cut pip cavities and subtle wear maps. The current shooter can pick red, green, or blue and solid or translucent resin; choices are stored by the authority and cannot be changed mid-roll or by another player.
+
+Dice animation uses Cannon rigid bodies against the felt and the table’s raised rubber walls. The visual throw does not choose or change the cryptographically generated game result. The dice settle to the authoritative faces after the bounce. The rubber contact boundary is X=±5.42/Z=±2.71 with a .92-unit top rail.
+
+For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit sphere inside the scene. Dolly/zoom therefore changes the room perspective along with the table. The same HDR still supplies PMREM reflections, but the sphere is an approximate backdrop, not a fully collision-modeled room.
+
+[Chip sources and maps](docs/chips.md) · [Dice sources and customization](docs/dice.md)

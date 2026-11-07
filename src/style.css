@@ -2251,3 +2251,73 @@ body:has(.immersive-screen) {
   gap: 20px;
   color: #e4dbc7;
 }
+.dice-customizer {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 20px;
+  background: #ebe4d6;
+}
+.dice-customizer h3,
+.admin-display-settings h3 {
+  font-family: Georgia, serif;
+  font-weight: 400;
+  font-size: 20px;
+  margin-bottom: 12px;
+}
+.dice-colors,
+.dice-finishes {
+  display: flex;
+  gap: 8px;
+}
+.dice-colors button {
+  flex: 1;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  padding: 10px;
+  color: #fff;
+  text-transform: capitalize;
+  font-size: 12px;
+}
+.dice-colors .red {
+  background: #8b2530;
+}
+.dice-colors .green {
+  background: #23674e;
+}
+.dice-colors .blue {
+  background: #245b8a;
+}
+.dice-colors button[aria-pressed="true"] {
+  outline: 2px solid #af8c54;
+  outline-offset: 2px;
+}
+.dice-finishes {
+  margin-top: 13px;
+}
+.dice-finishes button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 6px;
+  background: #ded3c0;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+.dice-finishes button[aria-pressed="true"] {
+  background: #47322a;
+  color: #f3ead8;
+}
+.admin-display-settings {
+  padding: 15px 0 23px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.admin-display-settings .button-row {
+  flex-wrap: wrap;
+}
+.brand-logo {
+  display: block;
+  width: 145px;
+  height: 62px;
+  object-fit: contain;
+}

@@ -46,6 +46,7 @@ export function createState(code = "LOCAL") {
     code,
     status: "lobby",
     config: { mode: "craps", startingBank: 100000, minBet: 500, teach: true },
+    display: { sound: false, camera: "auto", revision: 0 },
     players: [],
     adminId: null,
     shooterId: null,
@@ -283,6 +284,11 @@ export function join(s, name) {
   const p = {
     id: uid(),
     name,
+    seat:
+      Array.from({ length: 12 }, (_, i) => i).find(
+        (i) => !s.players.some((p) => !p.left && p.seat === i),
+      ) ?? 0,
+    dice: { color: "red", finish: "solid" },
     color: COLORS[s.players.length % COLORS.length],
     bank: s.config.startingBank,
     buyIn: s.config.startingBank,
@@ -436,6 +442,42 @@ export function reup(s, id) {
   });
   log(s, `${p.name} is back in the game.`, "reup");
 }
+export function setDiceAppearance(s, id, appearance) {
+  const p = active(s, id);
+  assert(s.status !== "ended", "The session has ended.");
+  assert(id === s.shooterId, "You can customize the dice on your turn.");
+  assert(!s.rolling, "Wait until the dice have landed.");
+  assert(
+    appearance && typeof appearance === "object" && !Array.isArray(appearance),
+    "Invalid dice appearance.",
+  );
+  assert(
+    ["red", "green", "blue"].includes(appearance.color),
+    "Choose red, green or blue dice.",
+  );
+  assert(
+    ["solid", "translucent"].includes(appearance.finish),
+    "Choose solid or translucent dice.",
+  );
+  p.dice = { color: appearance.color, finish: appearance.finish };
+}
+export function setDisplaySettings(s, id, options) {
+  admin(s, id);
+  assert(
+    options && typeof options === "object" && !Array.isArray(options),
+    "Invalid display settings.",
+  );
+  const current = s.display || { sound: false, camera: "auto", revision: 0 };
+  const sound = options.sound ?? current.sound,
+    camera = options.camera ?? current.camera;
+  assert(typeof sound === "boolean", "Sound must be on or off.");
+  assert(
+    ["auto", "table", "room"].includes(camera),
+    "Choose auto, table or room view.",
+  );
+  s.display = { sound, camera, revision: current.revision + 1 };
+}
+
 export function beginRoll(s, id) {
   betting(s);
   active(s, id);

@@ -5,6 +5,8 @@ import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { createSceneUI } from "./scene-ui.js";
+import { createTablePieces } from "./table-pieces.js";
+import { createDicePhysics, DICE_SIZE } from "./dice-physics.js";
 const asset = (name) => new URL(`assets/${name}`, document.baseURI).href;
 const rotations = {
   1: [0, 0, 0],
@@ -14,51 +16,6 @@ const rotations = {
   3: [0, 0, Math.PI / 2],
   4: [0, 0, -Math.PI / 2],
 };
-function chipLocation(bet, mode) {
-  const points =
-    mode === "crapless"
-      ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
-      : [4, 5, 6, 8, 9, 10];
-  const [kind, number] = bet.type.split("-");
-  let x = 1024,
-    y = 900;
-  // Pass odds sit in the generous unprinted area behind the pass line.
-  if (bet.type === "pass") {
-    y = 920;
-  } else if (bet.type === "odds" && bet.parentType === "pass") {
-    x = 1024;
-    y = 1085;
-  } else if (kind === "place" || bet.point) {
-    const n = bet.point || Number(number);
-    x = 136 + ((points.indexOf(n) + 0.5) * 1776) / points.length;
-    y = kind === "place" ? 290 : bet.type === "odds" ? 380 : 345;
-  } else if (bet.type === "dont") y = 840;
-  else if (bet.type === "come") y = 470;
-  else if (bet.type === "dontcome") {
-    x = 285;
-    y = 465;
-  } else if (bet.type === "field") y = 710;
-  else if (kind === "hard") {
-    const i = [4, 6, 8, 10].indexOf(Number(number));
-    x = mode === "classic" ? (i % 2 ? 370 : 210) : 1740;
-    y = mode === "classic" ? (i < 2 ? 640 : 735) : 520 + i * 67;
-  } else if (kind === "prop" || bet.type === "craps") {
-    const row =
-      bet.type === "craps"
-        ? 1
-        : Number(number) === 7
-          ? 0
-          : [2, 12].includes(Number(number))
-            ? 2
-            : 3;
-    x = mode === "classic" ? 1750 : 1940;
-    y = 520 + row * 67;
-  } else if (kind === "big") {
-    x = Number(number) === 6 ? 720 : 1320;
-    y = 785;
-  }
-  return [(x / 2048 - 0.5) * 10.84, ((y * 0.82) / 1024 - 0.5) * 5.4];
-}
 export default function Table3D(props) {
   const host = useRef(),
     latest = useRef(props);
@@ -81,7 +38,13 @@ export default function Table3D(props) {
       readyEnvironment = null,
       cameraMode = "auto",
       userUntil = 0,
-      dragStart = null;
+      dragStart = null,
+      environmentShell = null,
+      environmentTarget = null,
+      displayRevision = -1,
+      physicsRollActive = false,
+      previousRolling = false,
+      physicalSettleUntil = 0;
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
     renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.enabled = true;
@@ -141,12 +104,23 @@ export default function Table3D(props) {
         return;
       }
       texture.mapping = THREE.EquirectangularReflectionMapping;
-      scene.background = texture;
-      scene.backgroundIntensity = 0.75;
-      scene.backgroundBlurriness = 0.018;
-      scene.backgroundRotation.y = Math.PI / 2;
+      // A finite inward-facing shell lets dolly/zoom change the room's scale.
+      environmentShell = new THREE.Mesh(
+        new THREE.SphereGeometry(42, 96, 64),
+        new THREE.MeshBasicMaterial({
+          map: texture,
+          side: THREE.BackSide,
+          color: 0xd4d4d4,
+          toneMapped: true,
+        }),
+      );
+      environmentShell.position.y = 2.2;
+      environmentShell.rotation.y = Math.PI / 2;
+      environmentShell.userData.environment = true;
+      scene.add(environmentShell);
       scene.environmentRotation.y = Math.PI / 2;
-      scene.environment = pmrem.fromEquirectangular(texture).texture;
+      environmentTarget = pmrem.fromEquirectangular(texture);
+      scene.environment = environmentTarget.texture;
       scene.environmentIntensity = 1.2;
       readyEnvironment = texture;
       el.dataset.environment = name;
@@ -234,19 +208,10 @@ export default function Table3D(props) {
         t.anisotropy = renderer.capabilities.getMaxAnisotropy();
         textures[mode] = t;
       });
-    const dice = [new THREE.Group(), new THREE.Group()];
-    dice.forEach((d, i) => {
-      d.position.set(i ? 0.4 : -0.35, 0.15, -0.05);
-      d.scale.setScalar(0.27);
-      scene.add(d);
-    });
-    loader.load(asset("dice.glb"), (g) => {
-      if (alive) dice.forEach((d) => d.add(addObject(g.scene.clone(true))));
-    });
-    const chips = new THREE.Group();
-    scene.add(chips);
-    let chipKey = "",
-      previousRoll = null,
+    const pieces = createTablePieces(scene, renderer);
+    const dice = pieces.dice;
+    const physics = createDicePhysics();
+    let previousRoll = null,
       settlingUntil = 0;
     const puck = new THREE.Mesh(
       new THREE.CylinderGeometry(0.2, 0.2, 0.085, 48),
@@ -288,7 +253,7 @@ export default function Table3D(props) {
           ? "grabbing"
           : "grab";
     }
-    el.addEventListener("pointerdown", pointerDown);
+    el.addEventListener("pointerdown", pointerDown, true);
     el.addEventListener("pointerup", pointerUp);
     el.addEventListener("pointermove", pointerMove);
     el.addEventListener("pointercancel", () => {
@@ -313,7 +278,8 @@ export default function Table3D(props) {
     function animate(time) {
       frame = requestAnimationFrame(animate);
       if (document.hidden && time - lastTime < 500) return;
-      const dt = Math.min((time - lastTime) / 1000, 0.06);
+      const frameDelta = (time - lastTime) / 1000;
+      const dt = Math.min(frameDelta, 0.06);
       const interval =
         latest.current.state?.rolling || dragStart || time < settlingUntil
           ? 33
@@ -326,6 +292,12 @@ export default function Table3D(props) {
       const current = latest.current,
         s = current.state,
         mode = s?.config.mode === "crapless" ? "crapless" : "classic";
+      if (s?.display && s.display.revision !== displayRevision) {
+        displayRevision = s.display.revision;
+        cameraMode = s.display.camera;
+        userUntil = 0;
+        el.dataset.camera = cameraMode;
+      }
       if (textures[mode] && board.material.map !== textures[mode]) {
         board.material.map = textures[mode];
         board.material.needsUpdate = true;
@@ -346,65 +318,44 @@ export default function Table3D(props) {
         );
       }
       controls.update();
-      const nextChipKey = JSON.stringify([
-        mode,
-        s?.players.map((p) => [p.id, p.left, p.bets]),
-      ]);
-      if (nextChipKey !== chipKey) {
-        chipKey = nextChipKey;
-        while (chips.children.length) {
-          const chip = chips.children[0];
-          chip.geometry.dispose();
-          chip.material.dispose();
-          chips.remove(chip);
-        }
-        s?.players
-          .filter((p) => !p.left)
-          .forEach((p, i) =>
-            p.bets.forEach((b) => {
-              const parent = p.bets.find((x) => x.id === b.parent);
-              const [x, z] = chipLocation(
-                { ...b, parentType: parent?.type },
-                mode,
-              );
-              for (
-                let n = 0;
-                n < Math.min(5, Math.ceil(b.amount / 2500));
-                n++
-              ) {
-                const chip = new THREE.Mesh(
-                  new THREE.CylinderGeometry(0.1, 0.1, 0.036, 32),
-                  new THREE.MeshStandardMaterial({
-                    color: p.color,
-                    roughness: 0.45,
-                  }),
-                );
-                chip.position.set(
-                  x + ((i % 4) - 1.5) * 0.17,
-                  0.034 + n * 0.038,
-                  z + Math.floor(i / 4) * 0.13,
-                );
-                chip.castShadow = true;
-                chips.add(chip);
-              }
-            }),
-          );
-      }
+      pieces.update(s);
+      el.dataset.settingsOpen = String(!!current.settingsOpen);
+      el.dataset.playerLabels = String(pieces.labels.children.length);
+      el.dataset.chips = String(pieces.chips.children.length);
+      el.dataset.diceColor =
+        s?.players.find((p) => p.id === s.shooterId)?.dice?.color || "red";
+      el.dataset.diceFinish =
+        s?.players.find((p) => p.id === s.shooterId)?.dice?.finish || "solid";
       if (s?.lastRoll?.id !== previousRoll) {
         previousRoll = s?.lastRoll?.id;
         settlingUntil = time + 1100;
       }
       const values = s?.lastRoll?.dice || [3, 4];
+      if (s?.rolling && !previousRolling && !reduced.matches) {
+        physics.throwDice((s.rolls?.length || 0) + 1);
+        physicsRollActive = true;
+      }
+      if (!s?.rolling && previousRolling) physicalSettleUntil = time + 400;
+      previousRolling = !!s?.rolling;
+      const simulating =
+        physicsRollActive &&
+        !reduced.matches &&
+        (!!s?.rolling || time < physicalSettleUntil);
+      if (simulating) physics.step(frameDelta);
+      else if (physicsRollActive) {
+        physics.stop();
+        physicsRollActive = false;
+      }
       dice.forEach((die, i) => {
-        if (s?.rolling && !reduced.matches) {
-          die.position.set(
-            (i ? 0.55 : -0.55) + Math.sin(time * 0.009 + i) * 0.45,
-            0.25 + Math.abs(Math.sin(time * 0.013 + i)) * 0.65,
-            Math.cos(time * 0.007 + i) * 0.3,
+        if (simulating) {
+          const body = physics.bodies[i];
+          die.position.set(body.position.x, body.position.y, body.position.z);
+          die.quaternion.set(
+            body.quaternion.x,
+            body.quaternion.y,
+            body.quaternion.z,
+            body.quaternion.w,
           );
-          die.rotation.x += dt * (7 + i);
-          die.rotation.y += dt * 6;
-          die.rotation.z += dt * 8;
         } else {
           const q = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(...rotations[values[i]]),
@@ -416,12 +367,11 @@ export default function Table3D(props) {
             ),
           );
           die.quaternion.slerp(q, reduced.matches ? 1 : Math.min(1, dt * 11));
-          die.position.lerp(
-            new THREE.Vector3(i ? 0.42 : -0.34, 0.15, -0.06),
-            Math.min(1, dt * 10),
-          );
+          die.position.y +=
+            (DICE_SIZE / 2 + 0.007 - die.position.y) * Math.min(1, dt * 12);
         }
       });
+      el.dataset.wallHits = String(physics.wallHits);
       const pts =
         mode === "crapless"
           ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
@@ -445,7 +395,9 @@ export default function Table3D(props) {
       observer.disconnect();
       controls.dispose();
       ui.dispose();
-      el.removeEventListener("pointerdown", pointerDown);
+      physics.stop();
+      pieces.dispose();
+      el.removeEventListener("pointerdown", pointerDown, true);
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);
       scene.traverse((o) => {
@@ -457,7 +409,7 @@ export default function Table3D(props) {
       Object.values(textures).forEach((t) => t.dispose());
       normal.dispose();
       readyEnvironment?.dispose();
-      scene.environment?.dispose();
+      environmentTarget?.dispose();
       pmrem.dispose();
       renderer.dispose();
       renderer.domElement.remove();

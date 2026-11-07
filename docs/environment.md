@@ -20,14 +20,14 @@ The script requests Metal rendering when available and otherwise uses CPU Cycles
 - The camera is at `(0, 0, 1.6)`, looking horizontally toward `+Y`; the center of the panorama faces the back bar. The panoramic seam is behind the camera at the lounge side.
 - The room is 24m wide (`X`) by 18m deep (`Y`) with a 5.5m ceiling.
 - The central space is deliberately clear for the live craps table. Surrounding tables are roughly 7m to the sides, and the bar is about 7m in front.
-- The floor lies at Z=0 in the original room. In a Three.js Y-up scene, the equivalent floor is world Y=0. Since an equirectangular background is infinitely distant, it does not provide geometric occlusion or translational parallax; the app's table, dice, and chips provide foreground geometry.
+- The floor lies at Z=0 in the original room. In a Three.js Y-up scene, the equivalent floor is world Y=0. The runtime projects the panorama onto a finite shell to approximate translational parallax; the table, dice, and chips provide the actual foreground geometry and occlusion.
 - Original modeling includes walnut and ivory panels, brass pilasters, six opal chandeliers, warm sconces, coffered ceiling, carpet, three lounge settings, four additional game tables with chairs, and a stocked bar.
 
 ## Three.js use
 
-Load `casino-room.exr` with `EXRLoader`, assign `EquirectangularReflectionMapping`, and use it for **both** `scene.background` and the PMREM input for `scene.environment`. EXRLoader's default color space for this scene-linear source should remain linear; do not tag it as sRGB. Keep renderer tone mapping enabled for the visible HDR background and lit objects. If rotating the background for composition, apply the same orientation to the lighting environment.
+Load `casino-room.exr` with `EXRLoader`, assign `EquirectangularReflectionMapping`, and use it for the inward-facing finite backdrop sphere and the PMREM input for `scene.environment`. EXRLoader's default color space for this scene-linear source should remain linear; do not tag it as sRGB. Keep renderer tone mapping enabled for the visible HDR background and lit objects. If rotating the background for composition, apply the same orientation to the lighting environment.
 
-This is a full 360-degree background, so orbiting/rotating the camera changes the view naturally. A panoramic background remains infinitely distant and cannot replace room geometry for free walking or collision. The procedural `casino-studio.hdr` and AI-generated `casino-panorama.png` remain separate earlier alternatives; neither was used to make this file.
+The current app projects this 360-degree environment onto an inward-facing sphere of radius 42, centered at world Y=2.2. This intentionally approximates a 3D room: camera dolly/zoom changes the visible backdrop scale. PMREM lighting remains derived from the original linear HDR. It is not a fully modeled room and does not provide furniture collisions; the table and dice have real foreground geometry and colliders. The procedural `casino-studio.hdr` and AI-generated `casino-panorama.png` remain separate earlier alternatives; neither was used to make this file.
 
 ## Verification
 
