@@ -1,6 +1,11 @@
 import { mkdir } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
+// Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
+// captured locally; CI retains every interaction/assertion and DOM trace.
+async function capture(page, options) {
+  if (!process.env.CI) await page.screenshot(options);
+}
 test("TV and phones complete a session, reconnect and export a recap", async ({
   browser,
 }) => {
@@ -27,17 +32,15 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     "data-camera",
     "table",
   );
-  await tv.screenshot({ path: "artifacts/tv-lobby.png", fullPage: true });
+  await capture(tv, { path: "artifacts/tv-lobby.png", fullPage: true });
   const cfg = await (
     await tv.request.get("http://127.0.0.1:4321/api/config")
   ).json();
   // The visible controller button is a raycast target inside WebGL, not a DOM overlay.
   const popup = tv.waitForEvent("popup");
-  await tv
-    .locator("canvas")
-    .click({
-      position: { x: viewport.width / 2 + 120, y: viewport.height - 40 },
-    });
+  await tv.locator("canvas").click({
+    position: { x: viewport.width / 2 + 120, y: viewport.height - 40 },
+  });
   const phone = await popup;
   await phone.setViewportSize({ width: 390, height: 844 });
   phone.on("pageerror", (e) => errors.push(e.message));
@@ -45,7 +48,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   await phone.getByLabel("Your name").fill("Tyler");
   await phone.getByRole("button", { name: "Join", exact: true }).click();
   await phone.getByText("Set the night in motion.").waitFor();
-  await phone.screenshot({ path: "artifacts/phone-setup.png", fullPage: true });
+  await capture(phone, { path: "artifacts/phone-setup.png", fullPage: true });
   const bob = await browser.newPage({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -69,14 +72,14 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     .getByRole("button", { name: "Place bet", exact: false })
     .first()
     .click();
-  await phone.screenshot({
+  await capture(phone, {
     path: "artifacts/phone-playing.png",
     fullPage: true,
   });
   await phone.getByRole("button", { name: "Roll the dice" }).click();
   await phone.getByRole("button", { name: "Dice are rolling…" }).waitFor();
   await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
-  await tv.screenshot({ path: "artifacts/tv-playing.png", fullPage: true });
+  await capture(tv, { path: "artifacts/tv-playing.png", fullPage: true });
   // Reload must preserve identity and chips, rather than creating another seat.
   await phone.reload();
   await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
@@ -94,8 +97,8 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   await phone.getByRole("button", { name: "Save your recap card" }).click();
   const download = await downloadP;
   await download.saveAs("artifacts/recap.png");
-  await phone.screenshot({ path: "artifacts/phone-recap.png", fullPage: true });
-  await tv.screenshot({ path: "artifacts/tv-recaps.png", fullPage: true });
+  await capture(phone, { path: "artifacts/phone-recap.png", fullPage: true });
+  await capture(tv, { path: "artifacts/tv-recaps.png", fullPage: true });
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
