@@ -5,6 +5,14 @@ import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { WebSocket } from "ws";
 import { clickTV } from "./helpers/tv-actions.mjs";
+// This checks real context/input behavior rather than native-resolution visual
+// fidelity (covered separately). Full-size software MSAA can saturate a Linux
+// runner and block Chromium's acknowledgement of the click that enables it.
+const viewport = process.env.CI
+  ? { width: 800, height: 500 }
+  : { width: 1280, height: 800 };
+const scaledResolution = `${Math.floor(viewport.width * 0.75)}x${Math.floor(viewport.height * 0.75)}`;
+const nativeResolution = `${viewport.width}x${viewport.height}`;
 const port = 4449;
 const server = spawn(process.execPath, ["server/index.js"], {
   env: {
@@ -40,7 +48,7 @@ try {
     ],
   });
   const page = await browser.newPage({
-      viewport: { width: 1280, height: 800 },
+      viewport,
     }),
     errors = [],
     glErrors = [];
@@ -68,12 +76,14 @@ try {
       target: JSON.parse(el.dataset.cameraTarget),
     }));
   // A modifier pan translates eye and target together; ordinary drag orbits.
-  await page.mouse.move(640, 350);
+  const dragStart = { x: viewport.width / 2, y: viewport.height * 0.4375 };
+  const dragEnd = { x: viewport.width * 0.578125, y: dragStart.y };
+  await page.mouse.move(dragStart.x, dragStart.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();
   await expect(table).toHaveAttribute("data-camera-manual", "true");
   const beforePan = await cameraPose();
-  await page.mouse.move(740, 350, { steps: 12 });
+  await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 12 });
   await page.mouse.up();
   await page.keyboard.up("Shift");
   await expect
@@ -94,9 +104,9 @@ try {
   );
   await page.waitForTimeout(500);
   const beforeOrbit = await cameraPose();
-  await page.mouse.move(640, 350);
+  await page.mouse.move(dragStart.x, dragStart.y);
   await page.mouse.down();
-  await page.mouse.move(740, 350, { steps: 12 });
+  await page.mouse.move(dragEnd.x, dragEnd.y, { steps: 12 });
   await page.mouse.up();
   await expect
     .poll(async () => {
@@ -139,6 +149,21 @@ try {
   await expect(table).toHaveAttribute("data-graphics-fps", "60");
   await click("graphics:antialias"); // auto -> on
   await requested("antialias", "on");
+  await expect(table).toHaveAttribute("data-scene-ready", "true", {
+    timeout: 45000,
+  });
+  const actualAntialias = () =>
+    page
+      .locator("canvas")
+      .evaluate(
+        (canvas) =>
+          canvas.getContext("webgl2").getContextAttributes().antialias,
+      );
+  assert.equal(
+    await actualAntialias(),
+    true,
+    "On creates an actual MSAA context",
+  );
   await click("graphics:antialias"); // on -> off, rebuild WebGL
   await requested("antialias", "off");
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
@@ -146,15 +171,17 @@ try {
   });
   await expect(table).toHaveAttribute("data-graphics-page", "graphics");
   assert.equal(
-    await page
-      .locator("canvas")
-      .evaluate((c) => c.getContext("webgl2").getContextAttributes().antialias),
+    await actualAntialias(),
     false,
+    "Off recreates a non-MSAA context",
   );
   await click("graphics:resolution"); // auto -> 75 percent native pixels
   await requested("resolution", "75");
-  await expect(table).toHaveAttribute("data-scene-resolution", "960x600");
-  await expect(table).toHaveAttribute("data-ui-resolution", "1280x800");
+  await expect(table).toHaveAttribute(
+    "data-scene-resolution",
+    scaledResolution,
+  );
+  await expect(table).toHaveAttribute("data-ui-resolution", nativeResolution);
   await click("graphics:modelDetail");
   await requested("modelDetail", "full");
   await click("graphics:modelDetail"); // auto -> full -> optimized
@@ -201,8 +228,16 @@ try {
     timeout: 20000,
   });
   await expect(table).toHaveAttribute("data-graphics-textures", "1024");
-  await expect(table).toHaveAttribute("data-scene-resolution", "960x600");
-  assert.equal(await page.locator("canvas").evaluate((c) => c.width), 1280);
+  await expect(table).toHaveAttribute(
+    "data-scene-resolution",
+    scaledResolution,
+  );
+  assert.deepEqual(
+    await page
+      .locator("canvas")
+      .evaluate((canvas) => [canvas.width, canvas.height]),
+    [viewport.width, viewport.height],
+  );
   ws = new WebSocket(`ws://127.0.0.1:${port}/socket`);
   await new Promise((resolve, reject) => {
     ws.once("open", () =>
@@ -255,6 +290,7 @@ try {
   console.log(
     JSON.stringify({
       ok: true,
+      viewport,
       checks: [
         "intro calibration",
         "Shift-left-drag pans and normal drag orbits",
