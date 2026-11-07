@@ -1,3 +1,9 @@
+import {
+  createThrowTimeline,
+  sanitizeGesture,
+  THROW_DURATION,
+} from "./throw-motion.js";
+
 // Shared authoritative rules. All money is integer cents; no browser trusts another player's balance.
 export const COLORS = [
   "#f2bd68",
@@ -45,13 +51,15 @@ export function createState(code = "LOCAL") {
   return {
     code,
     status: "lobby",
-    config: { mode: "craps", startingBank: 100000, minBet: 500, teach: true },
+    config: { mode: "craps", startingBank: 100000, minBet: 500, teach: false },
     display: { sound: false, camera: "auto", revision: 0 },
     players: [],
     adminId: null,
     shooterId: null,
     point: null,
     rolling: false,
+    aim: null,
+    throw: null,
     rolls: [],
     lastRoll: null,
     log: [],
@@ -484,14 +492,55 @@ export function setDisplaySettings(s, id, options) {
   s.display = { sound, camera, revision: current.revision + 1 };
 }
 
-export function beginRoll(s, id) {
+function throwController(s, id) {
   betting(s);
   active(s, id);
   assert(
     id === s.shooterId || id === s.adminId,
     "The shooter or host rolls the dice.",
   );
+}
+export function setAim(s, id, input, now = Date.now()) {
+  throwController(s, id);
+  assert(
+    input && typeof input === "object" && !Array.isArray(input),
+    "Invalid aim.",
+  );
+  assert(
+    input.active === undefined || typeof input.active === "boolean",
+    "Invalid aim state.",
+  );
+  const gesture = sanitizeGesture(input);
+  if (input.active === false) {
+    if (s.aim?.playerId === id) s.aim = null;
+    return true;
+  }
+  // Authority-side cap supplements the phone's 100ms sending interval.
+  if (s.aim?.playerId === id && now - s.aim.at < 100) return false;
+  s.aim = { ...gesture, playerId: id, active: true, at: now };
+  return true;
+}
+export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
+  throwController(s, id);
+  const controls = sanitizeGesture(
+    gesture,
+    s.aim?.playerId === id ? s.aim : undefined,
+  );
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const timeline = createThrowTimeline({
+    id: uid(),
+    playerId: id,
+    shooterId: s.shooterId,
+    seed,
+    dice: [randomDie(), randomDie()],
+    gesture: controls,
+    startAt: Date.now(),
+    duration,
+  });
+  s.throw = timeline;
+  s.aim = null;
   s.rolling = true;
+  return timeline;
 }
 function settle(p, b, result, multiplier = 1, stay = false) {
   if (result === "win") {
@@ -512,7 +561,10 @@ function settle(p, b, result, multiplier = 1, stay = false) {
   }
   if (!stay || result !== "win") p.bets = p.bets.filter((x) => x.id !== b.id);
 }
-export function finishRoll(s, dice = [randomDie(), randomDie()]) {
+export function finishRoll(
+  s,
+  dice = s.throw?.dice || [randomDie(), randomDie()],
+) {
   assert(s.rolling, "No roll in progress.");
   assert(
     Array.isArray(dice) &&
@@ -520,6 +572,11 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
       dice.every((n) => Number.isInteger(n) && n >= 1 && n <= 6),
     "Invalid dice.",
   );
+  if (s.throw && dice.some((n, i) => n !== s.throw.dice[i])) {
+    // Trusted deterministic rule tests may override the outcome directly.
+    // Keep their visible final orientation consistent as well.
+    s.throw = createThrowTimeline({ ...s.throw, dice });
+  }
   const total = dice[0] + dice[1],
     oldPoint = s.point,
     crapless = s.config.mode === "crapless";
@@ -527,6 +584,24 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
   for (const p of s.players.filter((p) => !p.left)) {
     const before = equity(p),
       pending = [...p.bets];
+    // Capture labels while traveled parent bets are still present. Odds labels
+    // depend on that parent, which may be removed by its settlement below.
+    const labels = new Map(
+      pending.map((bet) => [bet.id, describeBet(s, p, bet)?.name || bet.type]),
+    );
+    const settlements = [];
+    const settleBet = (bet, result, multiplier = 1, stay = false) => {
+      const beforeBet = equity(p);
+      const amount = bet.amount;
+      settle(p, bet, result, multiplier, stay);
+      settlements.push({
+        betId: bet.id,
+        label: labels.get(bet.id),
+        result,
+        delta: equity(p) - beforeBet,
+        amount,
+      });
+    };
     // Parent line outcomes determine odds outcomes, regardless of iteration order.
     const outcomes = new Map();
     for (const b of pending.filter((b) =>
@@ -547,7 +622,7 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
       else b.point = total;
       if (result) {
         outcomes.set(b.id, result);
-        settle(p, b, result);
+        settleBet(b, result);
       }
     }
     for (const b of pending.filter((b) => b.type === "odds")) {
@@ -555,11 +630,11 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
         result = outcomes.get(b.parent);
       if (!result) continue;
       if (!oldPoint && parent?.type === "come") {
-        settle(p, b, "push");
+        settleBet(b, "push");
         continue;
       }
       const against = ["dont", "dontcome"].includes(parent?.type);
-      settle(p, b, result, against ? WAYS[b.point] / 6 : 6 / WAYS[b.point]);
+      settleBet(b, result, against ? WAYS[b.point] / 6 : 6 / WAYS[b.point]);
     }
     for (const b of pending.filter(
       (b) => !["pass", "dont", "come", "dontcome", "odds"].includes(b.type),
@@ -568,7 +643,7 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
         n = Number(ns);
       if (["place", "hard"].includes(kind) && !oldPoint) continue;
       if (kind === "place") {
-        if (total === 7) settle(p, b, "lose");
+        if (total === 7) settleBet(b, "lose");
         else if (total === n) {
           const ratio = [2, 12].includes(n)
             ? 11 / 2
@@ -579,28 +654,26 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
                 : [5, 9].includes(n)
                   ? 7 / 5
                   : 7 / 6;
-          settle(p, b, "win", ratio, true);
+          settleBet(b, "win", ratio, true);
         }
       } else if (kind === "hard") {
         if (total === 7 || (total === n && dice[0] !== dice[1]))
-          settle(p, b, "lose");
+          settleBet(b, "lose");
         else if (total === n)
-          settle(p, b, "win", [4, 10].includes(n) ? 7 : 9, true);
+          settleBet(b, "win", [4, 10].includes(n) ? 7 : 9, true);
       } else if (kind === "big") {
-        if (total === 7) settle(p, b, "lose");
-        else if (total === n) settle(p, b, "win", 1, true);
+        if (total === 7) settleBet(b, "lose");
+        else if (total === n) settleBet(b, "win", 1, true);
       } else if (kind === "prop")
-        settle(
-          p,
+        settleBet(
           b,
           total === n ? "win" : "lose",
           [2, 12].includes(n) ? 30 : n === 7 ? 4 : 15,
         );
       else if (b.type === "craps")
-        settle(p, b, [2, 3, 12].includes(total) ? "win" : "lose", 7);
+        settleBet(b, [2, 3, 12].includes(total) ? "win" : "lose", 7);
       else if (b.type === "field")
-        settle(
-          p,
+        settleBet(
           b,
           [2, 3, 4, 9, 10, 11, 12].includes(total) ? "win" : "lose",
           total === 2 ? 2 : total === 12 ? 3 : 1,
@@ -608,7 +681,8 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
     }
     p.stats.rolls++;
     const delta = equity(p) - before;
-    if (delta) events.push({ playerId: p.id, name: p.name, delta });
+    if (settlements.length || delta)
+      events.push({ playerId: p.id, name: p.name, delta, bets: settlements });
     p.history.push({
       roll: s.rolls.length + 1,
       equity: equity(p),
@@ -643,6 +717,7 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
     rotateShooter(s);
   }
   s.rolling = false;
+  s.aim = null;
   s.lastRoll = {
     id: uid(),
     index: s.rolls.length + 1,
@@ -652,6 +727,7 @@ export function finishRoll(s, dice = [randomDie(), randomDie()]) {
     message,
     events,
     pointBefore: oldPoint,
+    throwId: s.throw?.id || null,
     at: Date.now(),
   };
   s.rolls.push(s.lastRoll);
@@ -687,6 +763,7 @@ export function leave(s, id) {
       s.players.find((x) => !x.left)?.id ||
       null;
   if (s.shooterId === id) rotateShooter(s);
+  if (s.aim?.playerId === id) s.aim = null;
   log(s, `${p.name} cashed out with ${money(p.bank)}.`, "leave");
 }
 export function end(s, id) {
@@ -698,6 +775,7 @@ export function end(s, id) {
     p.bets = [];
   }
   s.status = "ended";
+  s.aim = null;
   s.endedAt = Date.now();
   log(s, "That’s a wrap. What a night.", "session-ended");
 }
@@ -705,6 +783,7 @@ export function changeConnection(s, id, connected) {
   const p = s.players.find((x) => x.id === id);
   if (!p || p.left) return;
   p.connected = connected;
+  if (!connected && s.aim?.playerId === id) s.aim = null;
 }
 export function transfer(s, id, to) {
   admin(s, id);

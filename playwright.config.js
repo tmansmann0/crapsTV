@@ -18,7 +18,9 @@ export default defineConfig({
     },
     launchOptions: {
       args: [
-        "--use-angle=swiftshader",
+        process.platform === "darwin" && !process.env.CI
+          ? "--use-angle=metal"
+          : "--use-angle=swiftshader",
         "--enable-webgl",
         "--ignore-gpu-blocklist",
       ],

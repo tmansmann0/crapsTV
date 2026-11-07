@@ -2,7 +2,7 @@ import * as game from "./game.js";
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
-  constructor(code, { rollDelay = 1700 } = {}) {
+  constructor(code, { rollDelay = 2500 } = {}) {
     this.state = game.createState(code);
     this.clients = new Map();
     this.tokens = new Map();
@@ -16,7 +16,11 @@ export class RoomHub {
       window: Date.now(),
       count: 0,
     });
-    send({ type: "state", state: game.snapshot(this.state) });
+    send({
+      type: "state",
+      state: game.snapshot(this.state),
+      sentAt: Date.now(),
+    });
   }
   send(id, message) {
     try {
@@ -26,7 +30,11 @@ export class RoomHub {
     }
   }
   broadcast() {
-    const message = { type: "state", state: game.snapshot(this.state) };
+    const message = {
+      type: "state",
+      state: game.snapshot(this.state),
+      sentAt: Date.now(),
+    };
     for (const id of this.clients.keys()) this.send(id, message);
   }
   disconnect(id) {
@@ -53,6 +61,19 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (type === "clock") {
+        if (
+          typeof message.clientAt !== "number" ||
+          !Number.isFinite(message.clientAt)
+        )
+          throw Error("Invalid clock timestamp.");
+        this.send(id, {
+          type: "clock",
+          clientAt: message.clientAt,
+          serverAt: Date.now(),
+        });
+        return;
+      }
       if (type === "join") {
         if (message.code !== s.code)
           throw Error("That room code doesn’t match.");
@@ -104,8 +125,10 @@ export class RoomHub {
         else if (type === "leave") game.leave(s, pid);
         else if (type === "end") game.end(s, pid);
         else if (type === "transfer") game.transfer(s, pid, message.playerId);
-        else if (type === "roll") {
-          game.beginRoll(s, pid);
+        else if (type === "aim") {
+          if (!game.setAim(s, pid, message.aim)) return;
+        } else if (type === "roll") {
+          game.beginRoll(s, pid, message.gesture, { duration: this.rollDelay });
           this.timer = setTimeout(() => {
             try {
               game.finishRoll(this.state);

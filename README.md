@@ -39,11 +39,12 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Classic craps or crapless craps.** Rules lock at the start; teach mode can change during play.
 - **Starting stack and table minimum.** The first player chooses both.
 - **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
-- **Teach mode** adds win probabilities, profit payouts, and house edges beside every offered wager. The table guide is always available, including current odds bets.
-- **Real betting windows.** The shooter or admin rolls; betting locks while the dice animate. Random results come from the authority’s cryptographic random generator.
+- **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The visual practice tutorial and rules/payout guide are always available.
+- **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available.
+- **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw, and random results come from the authority’s cryptographic random generator.
 - **Re-up without losing your story.** With no open bets and total chips below the minimum, refill to the starting stack. Added chips count as new buy-in, never as winnings.
 - **Cash out or close the table.** Unresolved wagers are returned. Each player gets a personal recap, net-result chart, biggest win, comeback count, and downloadable **1080×1440 PNG** or editable SVG.
-- **Bundled announcer.** Tap the speaker on the TV to enable the original male Kokoro voice pack. It announces rolls, points, seven-outs, join/leave, re-ups, and other major events. Browsers require that user gesture before sound.
+- **Bundled announcer.** Open Settings on the TV to enable the original male Kokoro voice pack. It announces rolls, points, seven-outs, join/leave, re-ups, and other major events. Browsers require that user gesture before sound.
 
 Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 pays double and 12 triple. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
 
@@ -58,7 +59,7 @@ npm run test:online     # optional live PeerJS test against the published site
 npm run format          # format source, tests, and workflows
 ```
 
-CI tests and builds on Ubuntu, Windows, and macOS. The browser test covers first-player admin, a second phone, bets, rolling, a phone reload, ending the session, and a downloaded PNG. Dice/payout tests exercise both modes and wagering edge cases. Visual snapshots are saved locally to ignored `artifacts/`.
+CI tests and builds on Ubuntu, Windows, and macOS. The browser test covers first-player admin, a second phone, chip bundling/drag placement, practice without changing the live bank, shared swipe throws, visual roll results, a phone reload, ending the session, and a downloaded PNG. Dice/payout tests exercise both modes and wagering edge cases. Visual snapshots are saved locally to ignored `artifacts/`.
 
 Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publish crapsTV** and select the source branch; `main` also publishes after merge. Pages must be set to **GitHub Actions**. A PR can be reviewed without merging; publishing a chosen branch does not merge it.
 
@@ -70,7 +71,10 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `src/hub.js` | Shared room authority, private reconnect tokens, action validation |
 | `server/index.js` | Local HTTP/WebSocket host with same-origin check and heartbeat |
 | `src/transport.js` | Local sockets or online PeerJS room transport |
-| `src/Table3D.jsx` | Blender models, equirectangular artwork, real HDR lighting, dice animation |
+| `src/Table3D.jsx` | Blender models, finite HDR backdrop, cinematic shared dice playback |
+| `src/PhoneGame.jsx` | Compact phone board, chip bundles, results, and safe practice tutorial |
+| `src/DiceThrow.jsx` | 3D phone dice, aim gestures, and shared trajectory playback |
+| `src/throw-motion.js` | Authority-generated physics timeline and stateless frame sampling |
 | `public/assets/` | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
 | `assets/source/` | Editable Blender sources |
 | `public/audio/` | 51 MP3 announcements with manifests, hashes, and license notice |
@@ -88,7 +92,7 @@ MIT licensed original code and assets; included third-party dependencies and fon
 
 ## Camera and TV controls
 
-The TV page has no outer navigation, sidebar, headings, or footer. Every visible label and control is a mesh rendered within its WebGL canvas. The clipped DOM controls exist only for keyboard/screen-reader access. The top-left settings button reveals announcer, camera (**auto → table → room**), invite, controller, and fullscreen controls. Admin phones can change shared TV sound/camera settings; fullscreen applies to the device receiving the gesture. Drag to orbit and scroll/pinch to zoom. Auto view makes a slow sweep, moves in for a roll, and pauses automatic movement after manual interaction. Reduced-motion settings disable the drift and dice tumble. Dice are now 0.22 table units, with recessed pips and selectable red/green/blue solid or translucent resin.
+The TV page has no outer navigation, sidebar, headings, or footer. Every visible label and control is a mesh rendered within its WebGL canvas. The clipped DOM controls exist only for keyboard/screen-reader access. The top-left settings button reveals announcer, camera (**auto → table → room**), invite, controller, and fullscreen controls. Admin phones can change shared TV sound/camera settings; fullscreen applies to the device receiving the gesture. Drag to orbit and scroll/pinch to zoom. Auto view makes a slow sweep, moves in for a roll, and pauses automatic movement after manual interaction. Reduced-motion settings disable the drift and cinematic camera travel. Dice are now 0.22 table units, with recessed pips and selectable red/green/blue solid or translucent resin.
 
 `/join?code=ABCDEF` is the dedicated phone route. The static build includes a GitHub Pages `404.html` entry and sets its base path before loading modules, so direct controller links and refreshes resolve under `/crapsTV/`. Legacy `?join=` invitations still enter the controller.
 
@@ -105,3 +109,5 @@ Dice animation uses Cannon rigid bodies against the felt and the table’s raise
 For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit sphere inside the scene. Dolly/zoom therefore changes the room perspective along with the table. The same HDR still supplies PMREM reflections, but the sphere is an approximate backdrop, not a fully collision-modeled room.
 
 [Chip sources and maps](docs/chips.md) · [Dice sources and customization](docs/dice.md)
+
+[Phone interface and throw synchronization](docs/phone-and-throws.md).

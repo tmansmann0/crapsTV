@@ -1,3 +1,4 @@
+import { assetURL } from "./asset-url.js";
 import * as THREE from "three";
 import QRCode from "qrcode";
 
@@ -57,7 +58,7 @@ export function createSceneUI(renderer, onAction) {
       redraw();
     }
   };
-  img.src = new URL("assets/brand-logo.png", document.baseURI).href;
+  img.src = assetURL("brand-logo.png");
   function begin(p, glass = true) {
     const c = p.ctx;
     c.setTransform(2, 0, 0, 2, 0, 0);

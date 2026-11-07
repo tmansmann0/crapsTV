@@ -43,33 +43,39 @@ try {
   await phone.getByText("Set the night in motion.").waitFor();
   await phone.getByRole("button", { name: "Crapless craps" }).click();
   await phone.getByRole("button", { name: "Open the table" }).click();
-  await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
-  await phone.getByRole("button", { name: "blue dice" }).click();
-  await phone.getByRole("button", { name: "translucent", exact: true }).click();
+  await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
+  await phone.locator('[data-bet-id="pass"]').click();
+  await phone.getByRole("button", { name: /Place \$5/ }).click();
+  await phone.getByRole("tab", { name: "Roll", exact: true }).click();
+  await phone.getByRole("button", { name: "blue dice", exact: true }).click();
+  await phone
+    .getByRole("button", { name: "Translucent dice", exact: true })
+    .click();
   await host.waitForFunction(
     () =>
       document.querySelector(".table-canvas")?.dataset.diceFinish ===
       "translucent",
   );
+  await phone.getByRole("button", { name: "Open settings" }).click();
   await phone.locator("summary").click();
   await phone.getByLabel("TV camera").selectOption("room");
   await host.waitForFunction(
     () => document.querySelector(".table-canvas")?.dataset.camera === "room",
   );
-  await phone.locator("summary").click();
-
-  await phone
-    .getByRole("button", { name: "Place bet", exact: false })
-    .first()
-    .click();
-  await phone.getByRole("button", { name: "Roll the dice" }).click();
-  await phone.getByRole("button", { name: "Dice are rolling…" }).waitFor();
-  await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
+  await phone.getByRole("button", { name: "Close settings" }).click();
+  await phone.getByTestId("phone-dice").locator("canvas").waitFor();
+  const box = await phone.getByTestId("phone-dice").boundingBox();
+  await phone.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.85);
+  await phone.mouse.down();
+  await phone.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.25, {
+    steps: 12,
+  });
+  await phone.mouse.up();
+  await phone.locator(".pg-strip.is-result").waitFor();
   await host.screenshot({ path: "artifacts/online-table.png", fullPage: true });
   await phone.reload();
-  await phone
-    .getByRole("button", { name: "Roll the dice" })
-    .waitFor({ timeout: 30000 });
+  await phone.locator(".pg-shell").waitFor({ timeout: 30000 });
+  await phone.getByRole("button", { name: "Open settings" }).click();
   await phone.locator("summary").click();
   await phone.getByRole("button", { name: "Close table for everyone" }).click();
   await phone
@@ -86,7 +92,7 @@ try {
       url,
       code,
       mode: "crapless",
-      flow: "static host → remote phone → bet → roll → reconnect → close",
+      flow: "static host → remote phone → chip bet → shared swipe throw → reconnect → close",
       errors,
     }),
   );

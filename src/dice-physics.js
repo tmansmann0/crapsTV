@@ -7,7 +7,8 @@ import {
   Material,
   ContactMaterial,
 } from "cannon-es";
-// Render-only rigid bodies. Authoritative game results stay in game.js.
+// Rigid body simulation used by the authority to precompute a shared throw.
+// Retained stepping API also supports isolated physics/asset checks.
 export const DICE_SIZE = 0.22;
 export const BOUNDS = { x: 5.42, z: 2.71, height: 0.92, cornerRadius: 0.86 };
 export function createDicePhysics() {
@@ -75,16 +76,26 @@ export function createDicePhysics() {
       if (e.body.material === rubber) wallHits++;
     }),
   );
-  function throwDice(seed = 1) {
+  function throwDice(seed = 1, gesture = { x: 0, power: 0.65 }) {
     elapsed = 0;
     wallHits = 0;
     running = true;
-    const q = (seed % 13) / 13;
+    const q = ((seed >>> 0) % 997) / 997;
+    const aim = Math.max(-1, Math.min(1, gesture.x || 0));
+    const power = Math.max(0, Math.min(1, gesture.power ?? 0.65));
     bodies.forEach((b, i) => {
       b.wakeUp();
-      b.position.set(i ? 0.38 : -0.38, 0.36 + i * 0.07, 1.88);
+      b.position.set(
+        aim * 0.55 + (i ? 0.19 : -0.19),
+        0.15 + power * 0.18 + i * 0.03,
+        1.9 - power * 0.15,
+      );
       b.quaternion.setFromEuler(q * 2 + i * 0.7, 0.4 + i * 0.8, 0.6 + q);
-      b.velocity.set((i ? 1 : -1) * (1.0 + q), 2.6 + i * 0.25, -8.8 - q);
+      b.velocity.set(
+        aim * 3.4 + (i ? 1 : -1) * (0.35 + q * 0.35),
+        1.9 + power * 1.2 + i * 0.15,
+        -7.4 - power * 3.1 - q * 0.3,
+      );
       b.angularVelocity.set(11 + i * 3, 8 - q * 3, 13 - i * 5);
       b.force.setZero();
       b.torque.setZero();

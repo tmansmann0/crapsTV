@@ -13,6 +13,25 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   const errors = [];
   const tv = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   tv.on("pageerror", (e) => errors.push(e.message));
+  let rejectedOnce = false;
+  await tv.context().routeWebSocket("**/socket", (ws) => {
+    const server = ws.connectToServer();
+    let name = "";
+    ws.onMessage((raw) => {
+      const message = JSON.parse(raw);
+      if (message.type === "join") name = message.name || name;
+      if (name === "Tyler" && message.type === "bet" && !rejectedOnce) {
+        rejectedOnce = true;
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            message: "That bet changed. Please retry.",
+          }),
+        );
+      } else server.send(raw);
+    });
+  });
+
   await tv.goto("http://127.0.0.1:4321");
   const scene = tv.getByTestId("casino-scene");
   await expect(scene).toHaveAttribute("data-room-code", /^[A-Z2-9]{6}$/);
@@ -46,12 +65,16 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     position: { x: 130, y: 305 },
   });
   const phone = await popup;
+  await tv.locator("canvas").click({ position: { x: 48, y: 48 } });
   await phone.setViewportSize({ width: 390, height: 844 });
   phone.on("pageerror", (e) => errors.push(e.message));
   await phone.getByRole("heading", { name: "Join table" }).waitFor();
   await phone.getByLabel("Your name").fill("Tyler");
   await phone.getByRole("button", { name: "Join", exact: true }).click();
-  await phone.getByText("Set the night in motion.").waitFor();
+  await phone.getByText("Table setup").waitFor();
+  await expect(
+    phone.locator('.setup input[type="checkbox"]'),
+  ).not.toBeChecked();
   await capture(phone, { path: "artifacts/phone-setup.png", fullPage: true });
   const bob = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -65,9 +88,66 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   await bob.getByRole("button", { name: "Join", exact: true }).click();
   await bob.getByText("Your chips are waiting.").waitFor();
   await phone.getByRole("button", { name: "Open the table" }).click();
-  await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
-  await phone.getByRole("button", { name: "blue dice" }).click();
-  await phone.getByRole("button", { name: "translucent", exact: true }).click();
+  await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
+  await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
+  await phone.locator('[data-bet-id="pass"]').click();
+  await phone.getByRole("button", { name: /Place \$5/ }).click();
+  await expect(phone.locator(".pg-notice")).toContainText("That bet changed");
+  await expect(
+    phone.getByRole("button", { name: /Bundle of \$5/ }),
+  ).toBeVisible();
+  await phone.getByRole("button", { name: /Place \$5/ }).click();
+  await expect(phone.locator(".pg-wallet")).toContainText("$5");
+  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
+  await phone.getByRole("button", { name: "Add $1 chip", exact: true }).click();
+  const bundle = await phone
+    .getByRole("button", { name: /Bundle of \$6/ })
+    .boundingBox();
+  const field = await phone.locator('[data-bet-id="field"]').boundingBox();
+  await phone.mouse.move(
+    bundle.x + bundle.width / 2,
+    bundle.y + bundle.height / 2,
+  );
+  await phone.mouse.down();
+  await phone.mouse.move(
+    field.x + field.width / 2,
+    field.y + field.height / 2,
+    { steps: 10 },
+  );
+  await phone.mouse.up();
+  await expect(phone.locator(".pg-wallet")).toContainText("$11");
+  await expect
+    .poll(async () =>
+      Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
+    )
+    .toBeGreaterThan(0);
+  await bob.locator('[data-bet-id="field"]').click();
+  await bob.getByRole("button", { name: /Place \$5/ }).click();
+  await capture(phone, { path: "artifacts/phone-playing.png", fullPage: true });
+  const bankBefore = await phone.locator(".pg-wallet dd").allTextContents();
+  await phone.getByRole("tab", { name: "Learn", exact: true }).click();
+  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
+  await phone.getByRole("button", { name: "Add $5 chip", exact: true }).click();
+  await phone.locator('[data-bet-id="practice-pass"]').click();
+  await phone.getByRole("button", { name: /Place \$10/ }).click();
+  await phone.getByRole("button", { name: "Throw practice dice" }).click();
+  await expect(phone.locator(".pg-practice-result")).toBeVisible();
+  expect(await phone.locator(".pg-wallet dd").allTextContents()).toEqual(
+    bankBefore,
+  );
+  await capture(phone, {
+    path: "artifacts/phone-tutorial.png",
+    fullPage: true,
+  });
+  await phone.getByRole("tab", { name: "Roll", exact: true }).click();
+  await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
+    "data-loaded",
+    "true",
+  );
+  await phone.getByRole("button", { name: "blue dice", exact: true }).click();
+  await phone
+    .getByRole("button", { name: "Translucent dice", exact: true })
+    .click();
   await expect(tv.locator(".table-canvas")).toHaveAttribute(
     "data-dice-color",
     "blue",
@@ -80,44 +160,57 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     "data-player-labels",
     "2",
   );
+  await phone.getByRole("button", { name: "Open settings" }).click();
   await phone.locator("summary").click();
   await phone.getByLabel("TV camera").selectOption("room");
   await expect(tv.locator(".table-canvas")).toHaveAttribute(
     "data-camera",
     "room",
   );
-  await phone.locator("summary").click();
-
-  await phone
-    .getByRole("button", { name: "Place bet", exact: false })
-    .first()
-    .click();
-  await phone.getByRole("tab", { name: "My bets (1)" }).waitFor();
+  await phone.getByRole("button", { name: "Close settings" }).click();
+  const diceBox = await phone.getByTestId("phone-dice").boundingBox();
+  await phone.mouse.move(
+    diceBox.x + diceBox.width * 0.5,
+    diceBox.y + diceBox.height * 0.85,
+  );
+  await phone.mouse.down();
+  await phone.mouse.move(
+    diceBox.x + diceBox.width * 0.65,
+    diceBox.y + diceBox.height * 0.25,
+    { steps: 12 },
+  );
+  await phone.mouse.up();
+  await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-cinematic",
+    "true",
+  );
+  await expect(phone.locator(".pg-strip.is-result")).toBeVisible();
+  const throwId = await phone
+    .getByTestId("phone-dice")
+    .getAttribute("data-throw-id");
+  expect(throwId).toBeTruthy();
+  await expect(tv.locator(".table-canvas")).toHaveAttribute(
+    "data-throw-id",
+    throwId,
+  );
   await expect
-    .poll(async () =>
-      Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
-    )
-    .toBeGreaterThan(0);
-  await bob.getByRole("button", { name: "One roll", exact: true }).click();
-  await bob
-    .getByRole("button", { name: "Place bet", exact: false })
-    .first()
-    .click();
+    .poll(async () => {
+      const a = await tv.locator(".table-canvas").getAttribute("data-pose");
+      const b = await phone.getByTestId("phone-dice").getAttribute("data-pose");
+      return a && a === b;
+    })
+    .toBeTruthy();
+  await expect(phone.locator(".pg-outcome .pg-die")).toHaveCount(2);
   await capture(phone, {
-    path: "artifacts/phone-playing.png",
+    path: "artifacts/phone-dice-result.png",
     fullPage: true,
   });
-  await phone.getByRole("button", { name: "Roll the dice" }).click();
-  await phone.getByRole("button", { name: "Dice are rolling…" }).waitFor();
-  await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
   await capture(tv, { path: "artifacts/tv-playing.png", fullPage: true });
   // Reload must preserve identity and chips, rather than creating another seat.
   await phone.reload();
-  await phone.getByRole("button", { name: "Roll the dice" }).waitFor();
-  assert.equal(
-    await phone.getByRole("heading", { name: "Hey, Tyler" }).count(),
-    1,
-  );
+  await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
+  await phone.getByRole("button", { name: "Open settings" }).click();
   await phone.locator("summary").click();
   await phone.getByRole("button", { name: "Close table for everyone" }).click();
   await phone

@@ -1,9 +1,15 @@
+import { disposeModel } from "./three-resources.js";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { money } from "./game.js";
 import { DICE_SIZE } from "./dice-physics.js";
-const asset = (n) => new URL(`assets/${n}`, document.baseURI).href;
-const DICE_COLORS = { red: "#9e192d", green: "#147553", blue: "#195bab" };
+import {
+  createChipFactory,
+  chipStackForAmount,
+  CHIP_DENOMINATIONS,
+} from "./chip-rendering.js";
+import { assetURL as asset } from "./asset-url.js";
+import { createDiceMaterial, diceWearIndex } from "./dice-material.js";
 export function chipLocation(bet, mode) {
   const points =
     mode === "crapless"
@@ -55,7 +61,9 @@ const hash = (s) =>
   [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
 export function createTablePieces(scene, renderer) {
   let alive = true,
-    chipTemplate = null,
+    chipFactory = null,
+    dealerRoot = null,
+    dealerRack = null,
     chipVersion = 0,
     lastChips = "",
     lastLabels = "",
@@ -73,12 +81,6 @@ export function createTablePieces(scene, renderer) {
     textures.add(t);
     return t;
   }
-  const chipNormals = [1, 2, 3].map((i) =>
-      linearTexture(`chip-normal-${i}.png`),
-    ),
-    chipRoughness = [1, 2, 3].map((i) =>
-      linearTexture(`chip-roughness-${i}.png`),
-    );
   const diceNormals = [1, 2, 3].map((i) => linearTexture(`dice-wear-${i}.png`)),
     diceRoughness = linearTexture("dice-roughness.png");
   const chips = new THREE.Group(),
@@ -91,30 +93,111 @@ export function createTablePieces(scene, renderer) {
     scene.add(d);
   });
   const diceMaterialCache = new Map(),
-    chipMaterialCache = new Map();
+    ownerMaterialCache = new Map();
+  const ownerRingGeometry = new THREE.TorusGeometry(0.221, 0.009, 6, 40);
+  geometries.add(ownerRingGeometry);
   function remember(object) {
     object.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
         geometries.add(o.geometry);
-        for (const m of Array.isArray(o.material) ? o.material : [o.material])
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
           materials.add(m);
+          for (const value of Object.values(m))
+            if (value?.isTexture) textures.add(value);
+        }
       }
     });
   }
   loader.load(asset("dice.glb"), (g) => {
-    if (!alive) return;
+    if (!alive) {
+      disposeModel(g.scene);
+      return;
+    }
     remember(g.scene);
     dice.forEach((d) => d.add(g.scene.clone(true)));
     lastDice = "";
   });
-  loader.load(asset("chip.glb"), (g) => {
-    if (!alive) return;
-    remember(g.scene);
-    chipTemplate = g.scene;
-    chipVersion++;
-  });
+  createChipFactory(renderer)
+    .then((factory) => {
+      if (!alive) {
+        factory.dispose();
+        return;
+      }
+      chipFactory = factory;
+      chipVersion++;
+      buildDealerRack();
+    })
+    .catch((error) =>
+      console.error("Could not load modeled casino chips", error),
+    );
+  function buildDealerRack() {
+    if (!chipFactory || !dealerRoot || dealerRack) return;
+    dealerRoot.traverse((object) => {
+      if (/^Dealer chip stack \d+$/.test(object.name)) object.visible = false;
+    });
+    dealerRack = new THREE.Group();
+    dealerRack.name = "Modeled dealer chip inventory";
+    CHIP_DENOMINATIONS.forEach(({ value }, column) => {
+      for (let row = 0; row < 8; row++) {
+        const chip = chipFactory.create({
+          denomination: value,
+          wear: (column + row) % 3,
+          diameter: 0.278,
+          thicknessScale: 1,
+        });
+        chip.rotation.x = Math.PI / 2;
+        chip.rotation.y = (column + row) * 0.13;
+        chip.position.set(-0.94 + column * 0.376, 1.09, -2.9 - row * 0.038);
+        dealerRack.add(chip);
+      }
+    });
+    dealerRoot.add(dealerRack);
+  }
+  function clearWagers() {
+    chips.traverse((object) => {
+      if (object.isSprite) {
+        object.material.map?.dispose();
+        object.material.dispose();
+      }
+    });
+    chips.clear();
+  }
+  function ownerLabel(player, amount) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "rgba(10,16,14,.94)";
+    context.beginPath();
+    context.roundRect(3, 3, 506, 122, 32);
+    context.fill();
+    context.strokeStyle = player.color;
+    context.lineWidth = 6;
+    context.stroke();
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillStyle = "#f7f0df";
+    context.font = "700 45px Manrope,Arial";
+    const initials = player.name
+      .trim()
+      .split(/\s+/)
+      .map((s) => s[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+    context.fillText(`${initials} · ${money(amount)}`, 256, 65, 460);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+  }
   function clearLabels() {
     while (labels.children.length) {
       const group = labels.children[0];
@@ -138,29 +221,14 @@ export function createTablePieces(scene, renderer) {
       dice.forEach((d, i) =>
         d.traverse((o) => {
           if (!o.isMesh || !o.material?.name.includes("DiceBody")) return;
-          const variant = (hash(shooter?.id || "house") + i) % 3,
+          const variant = diceWearIndex(shooter?.id, i),
             key = `${appearance.color}/${appearance.finish}/${variant}`;
           if (!diceMaterialCache.has(key)) {
-            const translucent = appearance.finish === "translucent";
-            const m = new THREE.MeshPhysicalMaterial({
-              name: "DiceBody",
-              color: DICE_COLORS[appearance.color] || DICE_COLORS.red,
-              roughness: translucent ? 0.14 : 0.27,
-              metalness: 0,
-              normalMap: diceNormals[variant],
-              normalScale: new THREE.Vector2(0.27, 0.27),
-              roughnessMap: diceRoughness,
-              clearcoat: 1,
-              clearcoatRoughness: 0.12,
-              transmission: translucent ? 0.82 : 0,
-              thickness: 0.16,
-              ior: 1.48,
-              attenuationColor: new THREE.Color(
-                DICE_COLORS[appearance.color] || DICE_COLORS.red,
-              ),
-              attenuationDistance: 0.7,
-              envMapIntensity: 1.1,
-            });
+            const m = createDiceMaterial(
+              appearance,
+              diceNormals[variant],
+              diceRoughness,
+            );
             materials.add(m);
             diceMaterialCache.set(key, m);
           }
@@ -173,9 +241,9 @@ export function createTablePieces(scene, renderer) {
       state?.config.mode,
       players.map((p) => [p.id, p.color, p.bets]),
     ]);
-    if (key !== lastChips && chipTemplate) {
+    if (key !== lastChips && chipFactory) {
       lastChips = key;
-      chips.clear();
+      clearWagers();
       players.forEach((p, i) =>
         p.bets.forEach((b) => {
           const parent = p.bets.find((x) => x.id === b.parent),
@@ -183,33 +251,61 @@ export function createTablePieces(scene, renderer) {
               { ...b, parentType: parent?.type },
               state.config.mode,
             );
-          for (let n = 0; n < Math.min(5, Math.ceil(b.amount / 2500)); n++) {
-            const group = chipTemplate.clone(true),
-              variant = (hash(b.id) + n) % 3;
-            group.scale.setScalar(0.22);
+          const pile = new THREE.Group(),
+            diameter = 0.38,
+            thicknessScale = 1.3;
+          const height = 0.13 * diameter * thicknessScale;
+          // Seat the full modeled sidewall above the felt, not halfway inside it.
+          const columns = state.config.mode === "crapless" ? 2 : 3;
+          pile.position.set(
+            x + ((i % columns) - (columns - 1) / 2) * 0.47,
+            0,
+            z + Math.floor(i / columns) * 0.48,
+          );
+          const stack = chipStackForAmount(b.amount, 8);
+          stack.chips.forEach((denomination, n) => {
+            const group = chipFactory.create({
+              denomination,
+              wear: (hash(b.id) + n) % 3,
+              diameter,
+              thicknessScale,
+            });
             group.position.set(
-              x + ((i % 4) - 1.5) * 0.18,
-              0.016 + n * 0.031,
-              z + Math.floor(i / 4) * 0.14,
+              n ? Math.sin(n * 2.1) * 0.01 : 0,
+              0.014 + height / 2 + n * (height + 0.002),
+              n ? Math.cos(n * 1.7) * 0.01 : 0,
             );
             group.rotation.y = (hash(b.id + String(n)) % 628) / 100;
-            group.traverse((o) => {
-              if (!o.isMesh) return;
-              const original = o.material;
-              const mk = `${original.name}/${p.color}/${variant}`;
-              if (!chipMaterialCache.has(mk)) {
-                const m = original.clone();
-                if (original.name.startsWith("ChipBase")) m.color.set(p.color);
-                m.normalMap = chipNormals[variant];
-                m.normalScale = new THREE.Vector2(0.5, 0.5);
-                m.roughnessMap = chipRoughness[variant];
-                materials.add(m);
-                chipMaterialCache.set(mk, m);
-              }
-              o.material = chipMaterialCache.get(mk);
+            pile.add(group);
+          });
+          if (!ownerMaterialCache.has(p.color)) {
+            const material = new THREE.MeshStandardMaterial({
+              color: p.color,
+              roughness: 0.4,
+              metalness: 0.22,
             });
-            chips.add(group);
+            materials.add(material);
+            ownerMaterialCache.set(p.color, material);
           }
+          const ring = new THREE.Mesh(
+            ownerRingGeometry,
+            ownerMaterialCache.get(p.color),
+          );
+          ring.rotation.x = -Math.PI / 2;
+          ring.position.y = 0.025;
+          ring.castShadow = true;
+          pile.add(ring);
+          const label = ownerLabel(p, b.amount);
+          label.position.set(0, 0.014 + height * stack.chips.length + 0.12, 0);
+          label.scale.set(0.66, 0.165, 1);
+          pile.add(label);
+          pile.userData = {
+            playerId: p.id,
+            betId: b.id,
+            amount: b.amount,
+            truncatedStack: stack.truncated,
+          };
+          chips.add(pile);
         }),
       );
     }
@@ -269,11 +365,17 @@ export function createTablePieces(scene, renderer) {
     dice,
     chips,
     labels,
+    installDealerRack(tableRoot) {
+      dealerRoot = tableRoot;
+      buildDealerRack();
+    },
     update,
     dispose() {
       alive = false;
       clearLabels();
-      chips.clear();
+      clearWagers();
+      dealerRack?.removeFromParent();
+      chipFactory?.dispose();
       dice.forEach((d) => scene.remove(d));
       scene.remove(chips, labels);
       for (const g of geometries) g.dispose();

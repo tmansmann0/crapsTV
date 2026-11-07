@@ -1,3 +1,4 @@
+import { assetURL } from "./asset-url.js";
 import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -31,6 +32,8 @@ function Table3D(props) {
   );
 }
 import Recap from "./recap.jsx";
+import PhoneGame from "./PhoneGame.jsx";
+import DiceThrow from "./DiceThrow.jsx";
 import { catalogue, describeBet, money, equity, net } from "./game.js";
 import {
   detectLocal,
@@ -66,7 +69,7 @@ function Brand() {
     <a className="brand" href={document.baseURI} aria-label="crapsTV home">
       <img
         className="brand-logo"
-        src={new URL("assets/brand-logo.png", document.baseURI).href}
+        src={assetURL("brand-logo.png")}
         alt="crapsTV"
       />
     </a>
@@ -176,6 +179,10 @@ function App() {
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
+  const confirmDialog = useRef(null);
+  useEffect(() => {
+    if (confirm) confirmDialog.current?.showModal();
+  }, [confirm]);
   const transport = useRef(null),
     errorTimer = useRef(null);
   const toast = (message) => {
@@ -211,9 +218,43 @@ function App() {
     setState(null);
     setPlayerId(null);
     const key = `crapstv:${session.code}`;
+    let clockOffset = null,
+      bestRoundTrip = Infinity,
+      clockStarted = false;
+    const clockTimers = [];
     const onMessage = (m) => {
-      if (m.type === "state") setState(m.state);
-      else if (m.type === "welcome") {
+      if (m.type === "state") {
+        if (!clockStarted && Object.hasOwn(m.state, "throw")) {
+          clockStarted = true;
+          for (const delay of [0, 250, 750])
+            clockTimers.push(
+              setTimeout(
+                () =>
+                  transport.current?.send({
+                    type: "clock",
+                    clientAt: Date.now(),
+                  }),
+                delay,
+              ),
+            );
+        }
+        setState({
+          ...m.state,
+          clockOffsetMs:
+            clockOffset ??
+            (typeof m.sentAt === "number" ? m.sentAt - Date.now() : 0),
+        });
+      } else if (m.type === "clock") {
+        const now = Date.now(),
+          roundTrip = now - m.clientAt;
+        if (roundTrip >= 0 && roundTrip < bestRoundTrip) {
+          bestRoundTrip = roundTrip;
+          clockOffset = m.serverAt - (m.clientAt + now) / 2;
+          setState((current) =>
+            current ? { ...current, clockOffsetMs: clockOffset } : current,
+          );
+        }
+      } else if (m.type === "welcome") {
         setPlayerId(m.playerId);
         const old = getSaved(key) || {};
         save(key, { ...old, token: m.token, playerId: m.playerId });
@@ -226,6 +267,7 @@ function App() {
     const onStatus = (value) => {
       setStatus(value);
       if (value === "connected") {
+        clockStarted = false;
         const saved = getSaved(key);
         if (saved?.token)
           transport.current?.send({
@@ -247,6 +289,7 @@ function App() {
             onStatus,
           );
     return () => {
+      clockTimers.forEach(clearTimeout);
       transport.current?.close();
       transport.current = null;
     };
@@ -369,41 +412,49 @@ function App() {
     );
   return (
     <>
-      <header className="header">
-        <Brand />
-        <nav>
-          <span className="desktop-only tagline">PHONE CONTROLLER</span>
-          {session && (
-            <button
-              className={`connection ${status === "connected" ? "online" : ""}`}
-              onClick={() => status !== "connected" && location.reload()}
-            >
-              <span />
-              {status === "connected"
-                ? "Table connected"
-                : status === "connecting"
-                  ? "Connecting…"
-                  : "Reconnect"}
-            </button>
-          )}
-          <button
-            className="icon-button"
-            aria-label={sound ? "Mute announcer" : "Enable announcer"}
-            onClick={() => setSound((v) => !v)}
-          >
-            {sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
-          </button>
-          {session && (
+      {(!player || state?.status !== "playing" || player.left) && (
+        <header className="header">
+          <Brand />
+          <nav>
+            <span className="desktop-only tagline">PHONE CONTROLLER</span>
+            {session && (
+              <button
+                className={`connection ${status === "connected" ? "online" : ""}`}
+                onClick={() => status !== "connected" && location.reload()}
+              >
+                <span />
+                {status === "connected"
+                  ? "Table connected"
+                  : status === "connecting"
+                    ? "Connecting…"
+                    : "Reconnect"}
+              </button>
+            )}
             <button
               className="icon-button"
-              title={view === "tv" ? "Play on this screen" : "Show TV display"}
-              onClick={() => setView((v) => (v === "tv" ? "phone" : "tv"))}
+              aria-label={sound ? "Mute announcer" : "Enable announcer"}
+              onClick={() => setSound((v) => !v)}
             >
-              {view === "tv" ? <Smartphone size={19} /> : <Monitor size={19} />}
+              {sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
             </button>
-          )}
-        </nav>
-      </header>
+            {session && (
+              <button
+                className="icon-button"
+                title={
+                  view === "tv" ? "Play on this screen" : "Show TV display"
+                }
+                onClick={() => setView((v) => (v === "tv" ? "phone" : "tv"))}
+              >
+                {view === "tv" ? (
+                  <Smartphone size={19} />
+                ) : (
+                  <Monitor size={19} />
+                )}
+              </button>
+            )}
+          </nav>
+        </header>
+      )}
       {error && (
         <div className="toast" role="alert">
           <Info size={18} />
@@ -461,46 +512,40 @@ function App() {
           confirm={setConfirm}
           connected={status === "connected"}
           onDisplayAction={sceneAction}
+          serverError={error}
         />
       )}
       {confirm && (
-        <div className="modal-backdrop">
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="confirm-title"
-          >
-            <div className="eyebrow">LAST CALL</div>
-            <h2 id="confirm-title">
-              {confirm === "end"
-                ? "Close the table?"
-                : "Cash out for the night?"}
-            </h2>
-            <p>
-              {confirm === "end"
-                ? "Everyone gets their remaining chips back and a personal recap. This ends the session for all players."
-                : "Your open bets are returned to your stack. Your recap is ready to save when you leave."}
-            </p>
-            <div className="button-row">
-              <button
-                className="button outline"
-                onClick={() => setConfirm(null)}
-              >
-                Keep playing
-              </button>
-              <button
-                className="button dark"
-                onClick={() => {
-                  send({ type: confirm });
-                  setConfirm(null);
-                }}
-              >
-                {confirm === "end" ? "Close for everyone" : "Cash out"}
-              </button>
-            </div>
-          </section>
-        </div>
+        <dialog
+          ref={confirmDialog}
+          className="modal confirmation-dialog"
+          aria-labelledby="confirm-title"
+          onCancel={() => setConfirm(null)}
+        >
+          <div className="eyebrow">LAST CALL</div>
+          <h2 id="confirm-title">
+            {confirm === "end" ? "Close the table?" : "Cash out for the night?"}
+          </h2>
+          <p>
+            {confirm === "end"
+              ? "Everyone gets their remaining chips back and a personal recap. This ends the session for all players."
+              : "Your open bets are returned to your stack. Your recap is ready to save when you leave."}
+          </p>
+          <div className="button-row">
+            <button className="button outline" onClick={() => setConfirm(null)}>
+              Keep playing
+            </button>
+            <button
+              className="button dark"
+              onClick={() => {
+                send({ type: confirm });
+                setConfirm(null);
+              }}
+            >
+              {confirm === "end" ? "Close for everyone" : "Cash out"}
+            </button>
+          </div>
+        </dialog>
       )}
     </>
   );
@@ -564,463 +609,171 @@ function Phone({
   confirm,
   connected,
   onDisplayAction,
+  serverError,
 }) {
-  const [tab, setTab] = useState("table"),
-    [chip, setChip] = useState(500),
-    [group, setGroup] = useState("The essentials");
-  const items = catalogue(state, player),
-    isShooter = state.shooterId === player.id,
-    disabled = state.rolling || !connected;
-  const canReup = equity(player) < state.config.minBet && !player.bets.length;
-  const diceChoice = useRef(player.dice || { color: "red", finish: "solid" });
-  const pendingDice = useRef(null);
-  useEffect(() => {
-    const incoming = player.dice || { color: "red", finish: "solid" };
-    const pending = pendingDice.current;
-    if (
-      !pending ||
-      disabled ||
-      !isShooter ||
-      (incoming.color === pending.color && incoming.finish === pending.finish)
-    ) {
-      diceChoice.current = incoming;
-      pendingDice.current = null;
-    }
-  }, [player.dice, disabled, isShooter]);
-  function chooseDice(patch) {
-    // Preserve taps immediately, even before the server echoes the first choice.
-    // Send both fields to remain compatible with already-running local rooms.
-    const appearance = { ...diceChoice.current, ...patch };
-    diceChoice.current = appearance;
-    pendingDice.current = appearance;
-    send({ type: "dice", appearance });
-  }
-  return (
-    <main className="phone-page">
-      <div className="phone-head">
-        <div>
-          <div className="eyebrow">
-            ROOM {state.code} {isAdmin && <span>· HOST</span>}
-          </div>
-          <h1>
-            Hey, {player.name}
-            <span>✦</span>
-          </h1>
-        </div>
-        <div className="avatar" style={{ "--player": player.color }}>
-          {player.name[0].toUpperCase()}
-        </div>
-      </div>
-      <section className="wallet">
-        <div>
-          <span>YOUR STACK</span>
-          <strong>{money(player.bank)}</strong>
-          <small>
-            {money(player.bets.reduce((n, b) => n + b.amount, 0))} on the felt
-          </small>
-        </div>
-        <div>
-          <span>TONIGHT</span>
-          <b className={net(player) >= 0 ? "positive" : "negative"}>
-            {net(player) >= 0 ? "+" : "−"}
-            {money(Math.abs(net(player)))}
-          </b>
-          <small>{player.stats.reups} re-ups</small>
-        </div>
-      </section>
-      {state.status === "lobby" ? (
+  const disabled = state.rolling || !connected;
+  const settingsArea = (
+    <details className="session-controls">
+      <summary>
+        {isAdmin ? "Host controls" : "Your session"}
+        <ChevronDown size={15} />
+      </summary>
+      {isAdmin && (
         <>
-          {isAdmin ? (
-            <Setup state={state} send={send} />
-          ) : (
-            <section className="waiting-card">
-              <Dices size={35} />
-              <h2>Your chips are waiting.</h2>
-              <p>The host is setting up the table. You’re in.</p>
-              <div className="player-dots">
-                {state.players
-                  .filter((p) => !p.left)
-                  .map((p) => (
-                    <span
-                      key={p.id}
-                      style={{ background: p.color }}
-                      title={p.name}
-                    >
-                      {p.name[0]}
-                    </span>
-                  ))}
-              </div>
-            </section>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="phone-game-status">
-            <span>
-              {state.rolling
-                ? "DICE ARE OUT"
-                : state.point
-                  ? `POINT IS ${state.point}`
-                  : "COME-OUT ROLL"}
-            </span>
-            <span>
-              {state.lastRoll
-                ? `Last roll: ${state.lastRoll.dice.join(" + ")} = ${state.lastRoll.total}`
-                : "Time to start something."}
-            </span>
-          </div>
-          {state.lastRoll && (
-            <div className="phone-result" aria-live="polite">
-              {state.lastRoll.message}
-              {state.lastRoll.events.find((e) => e.playerId === player.id) && (
-                <b>
-                  {state.lastRoll.events.find((e) => e.playerId === player.id)
-                    .delta >= 0
-                    ? "+"
-                    : "−"}
-                  {money(
-                    Math.abs(
-                      state.lastRoll.events.find(
-                        (e) => e.playerId === player.id,
-                      ).delta,
-                    ),
-                  )}
-                </b>
-              )}
-            </div>
-          )}
-          <div className="phone-tabs" role="tablist">
-            {[
-              ["table", "Place bets"],
-              ["bets", `My bets (${player.bets.length})`],
-              ["learn", "Table guide"],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={tab === id}
-                className={tab === id ? "active" : ""}
-                onClick={() => setTab(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {tab === "table" && (
-            <>
-              <div className="chip-select">
-                <span>CHOOSE A CHIP</span>
-                <div>
-                  {[500, 2500, 10000, 50000].map((n) => (
-                    <button
-                      key={n}
-                      onClick={() => setChip(n)}
-                      className={chip === n ? "selected" : ""}
-                    >
-                      {money(n)}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="group-tabs">
-                {[...new Set(items.map((b) => b.group))].map((g) => (
-                  <button
-                    className={group === g ? "active" : ""}
-                    key={g}
-                    onClick={() => setGroup(g)}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-              <div className="bet-list">
-                {items
-                  .filter((b) => b.group === group)
-                  .map((b) => (
-                    <BetCard
-                      key={b.id}
-                      bet={b}
-                      chip={chip}
-                      teach={state.config.teach}
-                      disabled={
-                        disabled ||
-                        player.bank <
-                          Math.max(
-                            b.minimum,
-                            Math.ceil(chip / b.quantum) * b.quantum,
-                          )
-                      }
-                      send={send}
-                    />
-                  ))}
-              </div>
-              {group === "True odds" &&
-                !items.some((b) => b.group === group) && (
-                  <p>Place a line bet and establish its point to add odds.</p>
-                )}
-            </>
-          )}
-          {tab === "bets" && (
-            <div className="active-bets">
-              {player.bets.length ? (
-                player.bets.map((b) => {
-                  const meta = describeBet(state, player, b),
-                    locked = b.point && ["pass", "come"].includes(b.type),
-                    off =
-                      !state.point &&
-                      (b.type.startsWith("place") ||
-                        b.type.startsWith("hard") ||
-                        (b.type === "odds" &&
-                          player.bets.find((p) => p.id === b.parent)?.type ===
-                            "come"));
-                  return (
-                    <article key={b.id}>
-                      <div>
-                        <h3>
-                          {meta?.name || b.type}
-                          {b.point && b.type !== "odds" ? ` · ${b.point}` : ""}
-                        </h3>
-                        <b>{money(b.amount)}</b>
-                        <span>
-                          {locked
-                            ? "Locked until its point resolves"
-                            : off
-                              ? "Off on this come-out roll"
-                              : "Working on the next roll"}
-                        </span>
-                        {state.config.teach && meta && (
-                          <p>
-                            {meta.payout} profit ·{" "}
-                            {(meta.prob * 100).toFixed(1)}% win chance
-                          </p>
-                        )}
-                      </div>
-                      <button
-                        aria-label={`Take down ${meta?.name || b.type}`}
-                        disabled={disabled || locked}
-                        onClick={() => send({ type: "remove", betId: b.id })}
-                      >
-                        <Minus size={17} />
-                      </button>
-                    </article>
-                  );
-                })
-              ) : (
-                <section className="empty-bets">
-                  <Dices size={36} />
-                  <h3>A clean felt.</h3>
-                  <p>Pick your chip and place a bet to get in on it.</p>
-                  <button
-                    className="text-button"
-                    onClick={() => setTab("table")}
-                  >
-                    Find your bet <ArrowRight size={16} />
-                  </button>
-                </section>
-              )}
-            </div>
-          )}
-          {tab === "learn" && <Guide state={state} items={items} />}
-          {canReup && (
-            <div className="reup-banner">
-              <RefreshCw size={24} />
-              <div>
-                <h3>Down, but never out.</h3>
-                <p>
-                  Re-up to {money(state.config.startingBank)}. Your recap keeps
-                  the full story.
-                </p>
-              </div>
-              <button
-                className="button dark small"
-                disabled={disabled}
-                onClick={() => send({ type: "reup" })}
-              >
-                Re-up
-              </button>
-            </div>
-          )}
-          {isShooter && (
-            <section className="dice-customizer" aria-label="Your dice">
-              <h3>Your dice</h3>
-              <div className="dice-colors">
-                {["red", "green", "blue"].map((color) => (
-                  <button
-                    key={color}
-                    aria-label={`${color} dice`}
-                    aria-pressed={(player.dice?.color || "red") === color}
-                    disabled={disabled}
-                    className={`dice-color ${color}`}
-                    onClick={() => chooseDice({ color })}
-                  >
-                    {color}
-                  </button>
-                ))}
-              </div>
-              <div className="dice-finishes">
-                {["solid", "translucent"].map((finish) => (
-                  <button
-                    key={finish}
-                    aria-pressed={(player.dice?.finish || "solid") === finish}
-                    disabled={disabled}
-                    onClick={() => chooseDice({ finish })}
-                  >
-                    {finish}
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-          <div className="roll-controls">
-            {isShooter || isAdmin ? (
-              <button
-                className="button dark jumbo roll-button"
-                disabled={disabled}
-                onClick={() => send({ type: "roll" })}
-              >
-                <Dices size={22} />
-                {state.rolling
-                  ? "Dice are rolling…"
-                  : isShooter
-                    ? "Roll the dice"
-                    : "Roll for the table"}
-                <ArrowRight size={20} />
-              </button>
-            ) : (
-              <p>
-                <Dices size={19} />
-                {state.players.find((p) => p.id === state.shooterId)?.name ||
-                  "The host"}{" "}
-                has the dice.
-              </p>
-            )}
-            <span>
-              {state.rolling
-                ? "No more bets until the dice settle."
-                : "Everyone’s bets lock when the dice roll."}
-            </span>
-          </div>
-        </>
-      )}
-      <details className="session-controls">
-        <summary>
-          {isAdmin ? "Host controls" : "Your session"}
-          <ChevronDown size={15} />
-        </summary>
-        {isAdmin && (
-          <>
-            <div className="admin-display-settings">
-              <h3>TV settings</h3>
-              <label className="toggle-label">
-                <span>TV announcer</span>
-                <input
-                  aria-label="TV announcer"
-                  type="checkbox"
-                  checked={state.display?.sound || false}
-                  onChange={(e) =>
-                    send({
-                      type: "display",
-                      settings: { sound: e.target.checked },
-                    })
-                  }
-                />
-              </label>
-              <label>
-                TV camera
-                <select
-                  aria-label="TV camera"
-                  value={state.display?.camera || "auto"}
-                  onChange={(e) =>
-                    send({
-                      type: "display",
-                      settings: { camera: e.target.value },
-                    })
-                  }
-                >
-                  <option value="auto">Auto</option>
-                  <option value="table">Table</option>
-                  <option value="room">Room</option>
-                </select>
-              </label>
-              <div className="button-row">
-                <button
-                  className="button outline small"
-                  onClick={() => onDisplayAction("copy")}
-                >
-                  Copy invite
-                </button>
-                <button
-                  className="button outline small"
-                  onClick={() => onDisplayAction("join")}
-                >
-                  Controller
-                </button>
-                <button
-                  className="button outline small"
-                  onClick={() => onDisplayAction("fullscreen")}
-                >
-                  Fullscreen this device
-                </button>
-              </div>
-            </div>
+          <div className="admin-display-settings">
+            <h3>TV settings</h3>
             <label className="toggle-label">
-              <span>
-                <BookOpen size={16} />
-                Teach mode
-              </span>
+              <span>TV announcer</span>
               <input
+                aria-label="TV announcer"
                 type="checkbox"
-                checked={state.config.teach}
+                checked={state.display?.sound || false}
                 onChange={(e) =>
-                  send({ type: "teach", value: e.target.checked })
+                  send({
+                    type: "display",
+                    settings: { sound: e.target.checked },
+                  })
                 }
               />
             </label>
-            {state.players.filter((p) => !p.left && p.id !== player.id).length >
-              0 && (
-              <label>
-                Pass host controls
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value)
-                      send({ type: "transfer", playerId: e.target.value });
-                    e.target.value = "";
-                  }}
-                >
-                  <option value="" disabled>
-                    Choose a player
-                  </option>
-                  {state.players
-                    .filter((p) => !p.left && p.id !== player.id)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                        {!p.connected ? " (offline)" : ""}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            )}
-            {state.status === "playing" && (
-              <button
-                className="button outline"
-                disabled={disabled}
-                onClick={() => confirm("end")}
+            <label>
+              TV camera
+              <select
+                aria-label="TV camera"
+                value={state.display?.camera || "auto"}
+                onChange={(e) =>
+                  send({
+                    type: "display",
+                    settings: { camera: e.target.value },
+                  })
+                }
               >
-                Close table for everyone
+                <option value="auto">Auto</option>
+                <option value="table">Table</option>
+                <option value="room">Room</option>
+              </select>
+            </label>
+            <div className="button-row">
+              <button
+                className="button outline small"
+                onClick={() => onDisplayAction("copy")}
+              >
+                Copy invite
               </button>
-            )}
-          </>
-        )}
-        <button
-          className="text-button"
-          disabled={disabled}
-          onClick={() => confirm("leave")}
-        >
-          <LogOut size={16} /> Cash out & leave
-        </button>
-      </details>
+              <button
+                className="button outline small"
+                onClick={() => onDisplayAction("join")}
+              >
+                Controller
+              </button>
+              <button
+                className="button outline small"
+                onClick={() => onDisplayAction("fullscreen")}
+              >
+                Fullscreen this device
+              </button>
+            </div>
+          </div>
+          <label className="toggle-label">
+            <span>
+              <BookOpen size={16} />
+              Teach mode
+            </span>
+            <input
+              type="checkbox"
+              checked={state.config.teach}
+              onChange={(e) => send({ type: "teach", value: e.target.checked })}
+            />
+          </label>
+          {state.players.filter((p) => !p.left && p.id !== player.id).length >
+            0 && (
+            <label>
+              Pass host controls
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value)
+                    send({ type: "transfer", playerId: e.target.value });
+                  e.target.value = "";
+                }}
+              >
+                <option value="" disabled>
+                  Choose a player
+                </option>
+                {state.players
+                  .filter((p) => !p.left && p.id !== player.id)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {!p.connected ? " (offline)" : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+          {state.status === "playing" && (
+            <button
+              className="button outline"
+              disabled={disabled}
+              onClick={() => confirm("end")}
+            >
+              Close table for everyone
+            </button>
+          )}
+        </>
+      )}
+      <button
+        className="text-button"
+        disabled={disabled}
+        onClick={() => confirm("leave")}
+      >
+        <LogOut size={16} /> Cash out & leave
+      </button>
+    </details>
+  );
+
+  if (state.status === "playing")
+    return (
+      <PhoneGame
+        state={state}
+        player={player}
+        isAdmin={isAdmin}
+        send={send}
+        connected={connected}
+        settingsArea={settingsArea}
+        serverError={serverError}
+        rollArea={
+          <DiceThrow
+            state={state}
+            player={player}
+            isAdmin={isAdmin}
+            send={send}
+            connected={connected}
+          />
+        }
+      />
+    );
+  return (
+    <main className="phone-page">
+      {isAdmin ? (
+        <Setup state={state} send={send} />
+      ) : (
+        <section className="waiting-card">
+          <Dices size={35} />
+          <h2>Your chips are waiting.</h2>
+          <p>The host is setting up the table.</p>
+          <div className="player-dots">
+            {state.players
+              .filter((p) => !p.left)
+              .map((p) => (
+                <span key={p.id} style={{ background: p.color }} title={p.name}>
+                  {p.name[0]}
+                </span>
+              ))}
+          </div>
+        </section>
+      )}
+      {settingsArea}
     </main>
   );
 }
@@ -1044,20 +797,16 @@ function Setup({ state, send }) {
   return (
     <form className="setup" onSubmit={start}>
       <div className="eyebrow">
-        <Crown size={15} /> YOU MAKE THE HOUSE RULES
+        <Crown size={15} /> HOST SETTINGS
       </div>
-      <h2>Set the night in motion.</h2>
+      <h2>Table setup</h2>
       <div className="mode-picker">
         {[
-          [
-            "craps",
-            "Classic craps",
-            "The original. Seven, eleven, and a little nerve.",
-          ],
+          ["craps", "Classic craps", "7 or 11 wins on the come-out."],
           [
             "crapless",
             "Crapless craps",
-            "Every number but seven can become a point.",
+            "Every number except 7 can become the point.",
           ],
         ].map(([v, title, desc]) => (
           <button
@@ -1116,115 +865,8 @@ function Setup({ state, send }) {
       <button type="submit" className="button dark jumbo">
         Open the table <ArrowRight size={18} />
       </button>
-      <p className="fine-print">
-        You can toggle teaching anytime. Rules lock at the first roll.
-      </p>
+      <p className="fine-print">Teach mode can be changed during play.</p>
     </form>
   );
 }
-function BetCard({ bet, chip, teach, disabled, send }) {
-  const amount = Math.max(
-      bet.minimum,
-      Math.ceil(chip / bet.quantum) * bet.quantum,
-    ),
-    allowed = bet.available && !disabled;
-  return (
-    <article className={`bet-card ${!bet.available ? "unavailable" : ""}`}>
-      <div className="bet-title">
-        <h3>{bet.name}</h3>
-        <span>{bet.payout}</span>
-      </div>
-      <p>{bet.description}</p>
-      {teach && (
-        <div className="teach-data">
-          <span>
-            <b>{(bet.prob * 100).toFixed(1)}%</b> win chance
-          </span>
-          <span>
-            <b>{bet.edge.toFixed(2)}%</b> house edge
-          </span>
-        </div>
-      )}
-      <button
-        disabled={!allowed}
-        onClick={() => send({ type: "bet", betId: bet.id, amount })}
-      >
-        {bet.available ? (
-          <>
-            <Plus size={15} /> {money(amount)}
-            <span>{amount !== chip ? "proper bet size" : "Place bet"}</span>
-          </>
-        ) : bet.id === "pass" || bet.id === "dont" ? (
-          "Available on the come-out"
-        ) : (
-          "Available once a point is set"
-        )}
-      </button>
-    </article>
-  );
-}
-function Guide({ state, items }) {
-  return (
-    <section className="guide">
-      <div className="eyebrow">A LITTLE KNOW-HOW GOES A LONG WAY</div>
-      <h2>Meet the table.</h2>
-      <p>
-        {state.config.mode === "crapless"
-          ? "In crapless, a come-out 7 wins. Every other number becomes the point. There is no don’t side."
-          : "On the come-out, 7 or 11 wins a pass bet. 2, 3, or 12 loses. Any other number sets the point."}{" "}
-        Once the point is set, pass bets want it to repeat before a 7.
-      </p>
-      <div className="guide-note">
-        <Info size={18} />
-        <p>
-          Payouts show <b>profit</b>, with your original stake also returned
-          when a bet closes. Persistent place, big-number and hardway bets stay
-          on the felt after a win.
-        </p>
-      </div>
-      <p>
-        Place bets, hardways and come odds are off on come-out rolls. Traveled
-        come bets still work. Don’t come odds remain working. Odds are capped at
-        5× the original line bet. Proper bet sizes keep payouts exact to the
-        dollar.
-      </p>
-      <h3>The whole menu</h3>
-      <p className="muted">
-        Win chances describe a full bet through resolution, not necessarily the
-        next roll. Place and hardway odds exclude off rolls. A fresh don’t bet
-        can also push on 12. Line odds shown after a point apply to that point.
-      </p>
-      <div className="odds-table">
-        <div>
-          <b>BET</b>
-          <b>WIN</b>
-          <b>EDGE</b>
-        </div>
-        {items.map((b) => (
-          <div key={b.id}>
-            <span>
-              {b.name}
-              <small>{b.payout}</small>
-            </span>
-            <span>{(b.prob * 100).toFixed(1)}%</span>
-            <span>{b.edge.toFixed(2)}%</span>
-          </div>
-        ))}
-      </div>
-      <p className="muted">
-        This house pays field 2 at 2:1 and field 12 at 3:1. Crapless places 2/12
-        at 11:2 and 3/11 at 11:4. Table rules vary in real casinos. Every roll
-        is independent.
-      </p>
-      <a
-        href="https://www.mdgaming.com/wp-content/uploads/2026/04/Craps-Standard-Rules-Version-1.5-accessible.pdf"
-        target="_blank"
-        rel="noreferrer"
-      >
-        Craps rules reference ↗
-      </a>
-    </section>
-  );
-}
-
 createRoot(document.getElementById("root")).render(<App />);

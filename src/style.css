@@ -2321,3 +2321,14 @@ body:has(.immersive-screen) {
   height: 62px;
   object-fit: contain;
 }
+
+.confirmation-dialog {
+  border: 0;
+  width: min(450px, calc(100vw - 32px));
+  margin: auto;
+  color: var(--ink);
+}
+.confirmation-dialog::backdrop {
+  background: #1e151ab3;
+  backdrop-filter: blur(4px);
+}

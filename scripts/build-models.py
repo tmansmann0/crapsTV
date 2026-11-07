@@ -31,18 +31,21 @@ def material(name, color, roughness=.5, metal=0):
 def finish(obj,name,mat,bevel=0):
     obj.name=name
     obj.data.materials.append(mat)
-    if not obj.data.uv_layers:
+    if obj.data.uv_layers.get('Material UV') is None:
+        while obj.data.uv_layers: obj.data.uv_layers.remove(obj.data.uv_layers[0])
         uv=obj.data.uv_layers.new(name='Material UV')
+        detail=obj.data.uv_layers.new(name='Detail UV')
         for poly in obj.data.polygons:
             for index in poly.loop_indices:
-                co=obj.data.vertices[obj.data.loops[index].vertex_index].co
+                co=obj.matrix_world @ obj.data.vertices[obj.data.loops[index].vertex_index].co
                 if abs(poly.normal.z)>.5:
-                    xy=((co.x+6)/12,(co.y+3.35)/6.7)
+                    physical=(co.x+6,co.y+3.35)
                 elif abs(poly.normal.y)>.5:
-                    xy=((co.x+6)/4,(co.z+1)*.8)
+                    physical=(co.x+6,co.z+2.5)
                 else:
-                    xy=((co.y+3.35)/3,(co.z+1)*.8)
-                uv.data[index].uv=xy
+                    physical=(co.y+3.35,co.z+2.5)
+                uv.data[index].uv=(physical[0]/35.3,physical[1]/4)
+                detail.data[index].uv=(physical[0]/.8,physical[1]/.8)
     if bevel:
         mod=obj.modifiers.new('Soft crafted edges','BEVEL')
         mod.width=bevel
@@ -87,6 +90,30 @@ def ring(name,layers,mat,bevel=.025):
     mesh=bpy.data.meshes.new(name)
     mesh.from_pydata(verts,[],faces)
     mesh.update()
+    # A continuous arc-length unwrap follows the wood grain around every
+    # curved apron, instead of switching planar projections per polygon.
+    atlas=mesh.uv_layers.new(name='Material UV')
+    detail=mesh.uv_layers.new(name='Detail UV')
+    reference=rounded(*layers[0][:3])
+    arc=[0.0]
+    for i in range(count):
+        p0,p1=reference[i],reference[(i+1)%count]
+        arc.append(arc[-1]+math.hypot(p1[0]-p0[0],p1[1]-p0[1]))
+    profile=[0.0]
+    for j in range(len(layers)):
+        one,two=layers[j],layers[(j+1)%len(layers)]
+        profile.append(profile[-1]+math.sqrt(((one[0]-two[0])/2)**2+(one[3]-two[3])**2))
+    leather='leather' in mat.name.lower()
+    for j in range(len(layers)):
+        nj=(j+1)%len(layers)
+        for i in range(count):
+            poly=mesh.polygons[j*count+i]
+            us=(arc[i],arc[i+1],arc[i+1],arc[i])
+            heights=(layers[j][3]+2.5,layers[j][3]+2.5,layers[nj][3]+2.5,layers[nj][3]+2.5)
+            vs=(profile[j],profile[j],profile[j+1],profile[j+1]) if leather else heights
+            for loop_index,uu,vv in zip(poly.loop_indices,us,vs):
+                atlas.data[loop_index].uv=(uu/35.3,vv/(1.6 if leather else 4.0))
+                detail.data[loop_index].uv=(uu/.8,vv/.8)
     obj=bpy.data.objects.new(name,mesh)
     bpy.context.collection.objects.link(obj)
     bpy.context.view_layer.objects.active=obj
@@ -124,11 +151,50 @@ def image_texture(name, rgb):
     return image
 
 
-def textured(mat, image):
+def texture_node(mat,image,uv='Material UV'):
     nodes=mat.node_tree.nodes
-    tex=nodes.new('ShaderNodeTexImage')
-    tex.image=image
-    mat.node_tree.links.new(tex.outputs['Color'],nodes.get('Principled BSDF').inputs['Base Color'])
+    tex=nodes.new('ShaderNodeTexImage');tex.image=image
+    tex.interpolation='Linear';tex.extension='REPEAT'
+    mapping=nodes.new('ShaderNodeUVMap');mapping.uv_map=uv
+    mat.node_tree.links.new(mapping.outputs['UV'],tex.inputs['Vector'])
+    return tex
+
+
+def textured(mat,image):
+    tex=texture_node(mat,image)
+    mat.node_tree.links.new(tex.outputs['Color'],mat.node_tree.nodes.get('Principled BSDF').inputs['Base Color'])
+
+
+def value_noise(width,height,columns,rows,seed,wrap=False):
+    rng=np.random.default_rng(seed)
+    grid=rng.random((rows+1,columns+1),dtype=np.float32)
+    if wrap:
+        grid[-1]=grid[0];grid[:,-1]=grid[:,0]
+    x=np.linspace(0,columns,width,endpoint=False,dtype=np.float32)
+    y=np.linspace(0,rows,height,endpoint=False,dtype=np.float32)
+    ix=x.astype(int);iy=y.astype(int)
+    fx=x-ix;fy=y-iy
+    fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy)
+    top=grid[:,ix]*(1-fx)+grid[:,ix+1]*fx
+    return (top[iy]*(1-fy[:,None])+top[iy+1]*fy[:,None]).astype(np.float32)
+
+
+def add_surface_detail(mat,prefix,height,roughness,strength=1):
+    # Tangent-space normals derive from coherent height variation, rather than
+    # independent RGB noise. Detail UV uses one tile per .8 world units.
+    dx=(np.roll(height,-1,axis=1)-np.roll(height,1,axis=1))/(1.6/height.shape[1])
+    dy=(np.roll(height,-1,axis=0)-np.roll(height,1,axis=0))/(1.6/height.shape[0])
+    vector=np.stack((-dx,-dy,np.ones_like(height)),axis=2)
+    vector/=np.linalg.norm(vector,axis=2,keepdims=True)
+    normal=image_texture(prefix+'-normal',vector*.5+.5)
+    normal.colorspace_settings.name='Non-Color'
+    tex=texture_node(mat,normal,'Detail UV')
+    node=mat.node_tree.nodes.new('ShaderNodeNormalMap');node.uv_map='Detail UV';node.inputs['Strength'].default_value=strength
+    mat.node_tree.links.new(tex.outputs['Color'],node.inputs['Color'])
+    mat.node_tree.links.new(node.outputs['Normal'],mat.node_tree.nodes.get('Principled BSDF').inputs['Normal'])
+    r=image_texture(prefix+'-roughness',np.repeat(roughness[:,:,None],3,axis=2));r.colorspace_settings.name='Non-Color'
+    tex=texture_node(mat,r,'Detail UV')
+    mat.node_tree.links.new(tex.outputs['Color'],mat.node_tree.nodes.get('Principled BSDF').inputs['Roughness'])
 
 
 def cylinder(name,radius,depth,loc,mat,rotation=None):
@@ -146,25 +212,28 @@ leather.node_tree.nodes.get('Principled BSDF').inputs['Coat Weight'].default_val
 brass=material('Aged champagne brass',(.54,.36,.13),.27,.9)
 felt=material('Deep pine baize',(.009,.075,.055),.97)
 black=material('Dark recessed cup wells',(.004,.005,.004),.36,.3)
-# Real embedded base-color texture makes the grain portable to glTF viewers.
-rng=np.random.default_rng(28)
-yy,xx=np.mgrid[0:512,0:512]
-u,v=xx/512,yy/512
-swirl=np.sin(u*12+np.sin(v*8)*.7)+np.sin(u*31+v*4)*.25
-grain=np.sin(v*185+swirl*2.3)+.36*np.sin(v*680+swirl*4)
-noise=rng.normal(0,.025,(512,512))
-woodrgb=np.clip(np.array([.31,.185,.095])[None,None,:]*(1+.22*grain[:,:,None]+noise[:,:,None]),0,1)
+# Unique full-perimeter color atlases have restrained, nonperiodic grain.
+# Physical arc-length UVs keep it continuous around rounded corners. No sine
+# bands, per-face projection changes, or high-contrast RGB noise are used.
+W,H=4096,512
+cloud=value_noise(W,H,23,12,28)-.5
+ribbons=value_noise(W,H,47,150,29)-.5
+fibres=value_noise(W,H,130,340,30)-.5
+wood_variation=.12*cloud+.055*ribbons+.018*fibres
+woodrgb=np.clip(np.array([.285,.159,.087])[None,None,:]*(1+wood_variation[:,:,None]),0,1)
 textured(wood,image_texture('table-walnut-grain',woodrgb))
-leatherrgb=np.clip(np.array([.25,.047,.074])[None,None,:]*(1+rng.normal(0,.1,(512,512,1))),0,1)
+leather_variation=.035*(value_noise(W,H,32,9,31)-.5)+.012*(value_noise(W,H,190,58,32)-.5)
+leatherrgb=np.clip(np.array([.235,.047,.071])[None,None,:]*(1+leather_variation[:,:,None]),0,1)
 textured(leather,image_texture('table-oxblood-leather',leatherrgb))
-normalrgb=np.ones((256,256,3),dtype=np.float32)
-normalrgb[:,:,:2]=.5+rng.normal(0,.035,(256,256,2))
-normalimage=image_texture('table-leather-normal',normalrgb)
-normalimage.colorspace_settings.name='Non-Color'
-normaltex=leather.node_tree.nodes.new('ShaderNodeTexImage');normaltex.image=normalimage
-normalnode=leather.node_tree.nodes.new('ShaderNodeNormalMap');normalnode.inputs['Strength'].default_value=.22
-leather.node_tree.links.new(normaltex.outputs['Color'],normalnode.inputs['Color'])
-leather.node_tree.links.new(normalnode.outputs['Normal'],leather.node_tree.nodes.get('Principled BSDF').inputs['Normal'])
+# Subtle pores and rubbed patches use coherent seamless detail maps, at the
+# same physical density on the apron, legs, curved rail, and rack.
+N=1024
+wood_pores=value_noise(N,N,35,230,35,True)-.5
+wood_wear=value_noise(N,N,10,10,36,True)-.5
+add_surface_detail(wood,'table-walnut',wood_pores*.00045+wood_wear*.00012,np.clip(.34+wood_pores*.055+wood_wear*.04,.27,.42),.7)
+leather_pores=value_noise(N,N,235,235,40,True)-.5
+leather_wear=value_noise(N,N,13,13,41,True)-.5
+add_surface_detail(leather,'table-leather',leather_pores*.00022+leather_wear*.00010,np.clip(.46+leather_pores*.045+leather_wear*.045,.39,.53),.7)
 
 # The bed remains Y=0. Raised casino walls have a Y=.92 padded crown.
 slab('Recessed pine playing bed',10.9,5.6,.94,-.32,0,felt)
@@ -314,3 +383,11 @@ scene.render.filepath=str(OUT/'table-preview.png')
 scene.render.film_transparent=True
 bpy.ops.render.render(write_still=True)
 print('Created refined table.glb, table.blend, embedded material textures, and table-preview.png; dice and environments preserved')
+
+# Close-up check for the texture mapping and material response.
+camera.location=(2.6,-5.4,1.8)
+camera.rotation_euler=(Vector((.6,-2.65,.30))-camera.location).to_track_quat('-Z','Y').to_euler()
+camera.data.lens=52
+scene.cycles.samples=32
+scene.render.filepath=str(OUT/'table-material-closeup.png')
+bpy.ops.render.render(write_still=True)

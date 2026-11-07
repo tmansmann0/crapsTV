@@ -4,10 +4,12 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { HDRLoader } from "three/addons/loaders/HDRLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { disposeModel } from "./three-resources.js";
 import { createSceneUI } from "./scene-ui.js";
 import { createTablePieces } from "./table-pieces.js";
-import { createDicePhysics, DICE_SIZE } from "./dice-physics.js";
-const asset = (name) => new URL(`assets/${name}`, document.baseURI).href;
+import { DICE_SIZE } from "./dice-physics.js";
+import { sampleThrow, aimDicePose } from "./throw-motion.js";
+import { assetURL as asset } from "./asset-url.js";
 const rotations = {
   1: [0, 0, 0],
   6: [Math.PI, 0, 0],
@@ -41,10 +43,7 @@ export default function Table3D(props) {
       dragStart = null,
       environmentShell = null,
       environmentTarget = null,
-      displayRevision = -1,
-      physicsRollActive = false,
-      previousRolling = false,
-      physicalSettleUntil = 0;
+      displayRevision = -1;
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
     renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.enabled = true;
@@ -166,7 +165,10 @@ export default function Table3D(props) {
       return object;
     }
     loader.load(asset("table.glb"), (g) => {
-      if (alive) scene.add(addObject(g.scene));
+      if (alive) {
+        scene.add(addObject(g.scene));
+        pieces.installDealerRack(g.scene);
+      } else disposeModel(g.scene);
     });
     const weaveSize = 128,
       weave = new Uint8Array(weaveSize * weaveSize * 4);
@@ -210,7 +212,16 @@ export default function Table3D(props) {
       });
     const pieces = createTablePieces(scene, renderer);
     const dice = pieces.dice;
-    const physics = createDicePhysics();
+    const aimArrow = new THREE.ArrowHelper(
+      new THREE.Vector3(0, 0, -1),
+      new THREE.Vector3(0, 0.05, 1.9),
+      2,
+      0xe7c78c,
+      0.22,
+      0.12,
+    );
+    aimArrow.visible = false;
+    scene.add(aimArrow);
     let previousRoll = null,
       settlingUntil = 0;
     const puck = new THREE.Mesh(
@@ -286,9 +297,6 @@ export default function Table3D(props) {
           : 66;
       if (time - lastTime < interval) return;
       lastTime = time;
-      const targetFov = cameraMode === "room" ? 60 : 43;
-      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 3);
-      camera.updateProjectionMatrix();
       const current = latest.current,
         s = current.state,
         mode = s?.config.mode === "crapless" ? "crapless" : "classic";
@@ -302,22 +310,90 @@ export default function Table3D(props) {
         board.material.map = textures[mode];
         board.material.needsUpdate = true;
       }
-      if (time > userUntil && !dragStart) {
+      if (s?.lastRoll?.id !== previousRoll) {
+        previousRoll = s?.lastRoll?.id;
+        settlingUntil = time + 1100;
+      }
+      const shared = s?.throw
+        ? sampleThrow(s.throw, Date.now() + (s.clockOffsetMs || 0))
+        : null;
+      const aiming = s?.aim?.active ? aimDicePose(s.aim) : null;
+      const pose = aiming || shared;
+      const cinematic =
+        !reduced.matches && !!s?.throw && (s.rolling || time < settlingUntil);
+      controls.minDistance = cinematic
+        ? 1.2
+        : Math.min(8, camera.position.distanceTo(controls.target));
+      const targetFov = cinematic ? 38 : cameraMode === "room" ? 60 : 43;
+      camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 5);
+      camera.updateProjectionMatrix();
+      let cinematicDistance = 0;
+      if ((time > userUntil && !dragStart) || cinematic) {
         const elapsed = (time - startTime) / 1000;
-        if (cameraMode === "table") targetPosition.set(0.01, 14, 6.5);
-        else if (cameraMode === "room") targetPosition.set(9, 3.0, 16);
-        else if (s?.rolling) targetPosition.set(2.2, 5.7, 9.2);
-        else {
-          const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
-          targetPosition.set(drift, 4.2, 13.2);
+        if (cinematic && shared) {
+          const mid = new THREE.Vector3()
+            .fromArray(shared.dice[0].position)
+            .add(new THREE.Vector3().fromArray(shared.dice[1].position))
+            .multiplyScalar(0.5);
+          const ending = shared.progress > 0.72;
+          const radius =
+            Math.max(
+              ...shared.dice.map((p) =>
+                new THREE.Vector3().fromArray(p.position).distanceTo(mid),
+              ),
+            ) + 0.35;
+          const halfFov = Math.min(
+            THREE.MathUtils.degToRad(camera.fov / 2),
+            Math.atan(
+              Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) *
+                camera.aspect,
+            ),
+          );
+          const distance = Math.max(
+            ending ? 3.5 : 3.0,
+            (radius / Math.sin(halfFov)) * 1.12,
+          );
+          cinematicDistance = distance;
+          targetPosition
+            .set(
+              ending ? 0.18 : 0.28,
+              ending ? 0.8 : 0.72,
+              ending ? 0.58 : 0.64,
+            )
+            .normalize()
+            .multiplyScalar(distance)
+            .add(mid);
+          controls.target.copy(mid);
+          if (camera.position.distanceTo(mid) < distance)
+            camera.position.sub(mid).setLength(distance).add(mid);
+        } else {
+          controls.target.lerp(
+            new THREE.Vector3(0, 0.3, 0),
+            Math.min(1, dt * 3),
+          );
+          if (cameraMode === "table") targetPosition.set(0.01, 14, 6.5);
+          else if (cameraMode === "room") targetPosition.set(9, 3.0, 16);
+          else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
+          else {
+            const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
+            targetPosition.set(drift, 4.2, 13.2);
+          }
         }
         if (camera.aspect < 1) targetPosition.multiplyScalar(1.45);
         camera.position.lerp(
           targetPosition,
-          reduced.matches ? 1 : 1 - Math.exp(-dt * 1.6),
+          reduced.matches ? 1 : 1 - Math.exp(-dt * (cinematic ? 5 : 1.6)),
         );
       }
       controls.update();
+      if (
+        cinematicDistance &&
+        camera.position.distanceTo(controls.target) < cinematicDistance
+      )
+        camera.position
+          .sub(controls.target)
+          .setLength(cinematicDistance)
+          .add(controls.target);
       pieces.update(s);
       el.dataset.settingsOpen = String(!!current.settingsOpen);
       el.dataset.playerLabels = String(pieces.labels.children.length);
@@ -326,52 +402,33 @@ export default function Table3D(props) {
         s?.players.find((p) => p.id === s.shooterId)?.dice?.color || "red";
       el.dataset.diceFinish =
         s?.players.find((p) => p.id === s.shooterId)?.dice?.finish || "solid";
-      if (s?.lastRoll?.id !== previousRoll) {
-        previousRoll = s?.lastRoll?.id;
-        settlingUntil = time + 1100;
-      }
-      const values = s?.lastRoll?.dice || [3, 4];
-      if (s?.rolling && !previousRolling && !reduced.matches) {
-        physics.throwDice((s.rolls?.length || 0) + 1);
-        physicsRollActive = true;
-      }
-      if (!s?.rolling && previousRolling) physicalSettleUntil = time + 400;
-      previousRolling = !!s?.rolling;
-      const simulating =
-        physicsRollActive &&
-        !reduced.matches &&
-        (!!s?.rolling || time < physicalSettleUntil);
-      if (simulating) physics.step(frameDelta);
-      else if (physicsRollActive) {
-        physics.stop();
-        physicsRollActive = false;
-      }
-      dice.forEach((die, i) => {
-        if (simulating) {
-          const body = physics.bodies[i];
-          die.position.set(body.position.x, body.position.y, body.position.z);
-          die.quaternion.set(
-            body.quaternion.x,
-            body.quaternion.y,
-            body.quaternion.z,
-            body.quaternion.w,
-          );
-        } else {
+      if (pose) {
+        pose.dice.forEach((p, i) => {
+          dice[i].position.fromArray(p.position);
+          dice[i].quaternion.fromArray(p.quaternion);
+        });
+      } else {
+        const values = s?.lastRoll?.dice || [3, 4];
+        dice.forEach((die, i) => {
           const q = new THREE.Quaternion().setFromEuler(
             new THREE.Euler(...rotations[values[i]]),
           );
-          q.premultiply(
-            new THREE.Quaternion().setFromAxisAngle(
-              new THREE.Vector3(0, 1, 0),
-              i ? 0.45 : -0.25,
-            ),
-          );
           die.quaternion.slerp(q, reduced.matches ? 1 : Math.min(1, dt * 11));
-          die.position.y +=
-            (DICE_SIZE / 2 + 0.007 - die.position.y) * Math.min(1, dt * 12);
-        }
-      });
-      el.dataset.wallHits = String(physics.wallHits);
+          die.position.y = DICE_SIZE / 2 + 0.007;
+        });
+      }
+      aimArrow.visible = !!aiming;
+      if (aiming) {
+        aimArrow.position
+          .fromArray(aiming.dice[0].position)
+          .add(new THREE.Vector3(0.17, -0.07, 0));
+        aimArrow.setDirection(new THREE.Vector3().fromArray(aiming.direction));
+        aimArrow.setLength(0.8 + aiming.power * 2.2, 0.22, 0.12);
+      }
+      el.dataset.throwId = s?.throw?.id || "";
+      el.dataset.pose = pose ? JSON.stringify(pose.dice) : "";
+      el.dataset.cinematic = String(cinematic);
+      el.dataset.wallHits = String(shared?.wallHits || 0);
       const pts =
         mode === "crapless"
           ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12]
@@ -395,17 +452,23 @@ export default function Table3D(props) {
       observer.disconnect();
       controls.dispose();
       ui.dispose();
-      physics.stop();
       pieces.dispose();
       el.removeEventListener("pointerdown", pointerDown, true);
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);
+      const sceneTextures = new Set();
       scene.traverse((o) => {
         o.geometry?.dispose();
         if (o.material)
-          for (const m of Array.isArray(o.material) ? o.material : [o.material])
+          for (const m of Array.isArray(o.material)
+            ? o.material
+            : [o.material]) {
+            for (const value of Object.values(m))
+              if (value?.isTexture) sceneTextures.add(value);
             m.dispose();
+          }
       });
+      sceneTextures.forEach((t) => t.dispose());
       Object.values(textures).forEach((t) => t.dispose());
       normal.dispose();
       readyEnvironment?.dispose();
