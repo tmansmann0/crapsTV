@@ -1,0 +1,2 @@
+# Rollback manifests promise the original bytes, including JSON line endings.
+assets/source/legacy/0.11.0/** -text
