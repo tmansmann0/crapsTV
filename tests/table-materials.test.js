@@ -43,8 +43,16 @@ test("table overrides keep material identities and UVs with true map-encoded rou
   for (const object of root.children) {
     assert(names.includes(object.material.name));
     assert.equal(object.material.roughness, 1);
-    assert(object.material.roughnessMap);
-    assert.equal(object.material.roughnessMap.colorSpace, THREE.NoColorSpace);
+    if (object.material.userData.feltLook === "soft-wool") {
+      assert.equal(object.material.roughnessMap, null);
+      assert.equal(
+        object.material.normalMap.name,
+        "felt-studies/wool-fibres.png",
+      );
+    } else {
+      assert(object.material.roughnessMap);
+      assert.equal(object.material.roughnessMap.colorSpace, THREE.NoColorSpace);
+    }
     assert.equal(object.material.normalMap.channel, 1);
     assert.equal(object.material.normalMap.flipY, false);
     assert.equal(object.material.map.colorSpace, THREE.SRGBColorSpace);
@@ -78,7 +86,7 @@ test("only known table materials change and all maps are registered/disposed onc
   root.add(new THREE.Mesh(new THREE.BoxGeometry(), other));
   c.apply(root);
   assert.equal(root.children[0].material, other);
-  assert.equal(c.textures.size, 20);
+  assert.equal(c.textures.size, 19);
   let count = 0;
   for (const t of c.textures) {
     t.addEventListener("dispose", () => count++);
@@ -86,7 +94,7 @@ test("only known table materials change and all maps are registered/disposed onc
   }
   c.dispose();
   c.dispose();
-  assert.equal(count, 20);
+  assert.equal(count, 19);
 });
 
 test("production loads only selected American maps and applies the chosen padding/felt profile once", async () => {
@@ -118,11 +126,7 @@ test("production loads only selected American maps and applies the chosen paddin
   );
   assert.equal(wood.normalScale.x, 0.34);
   assert.equal(wood.clearcoatNormalMap, null);
-  for (const [m, kind, normal, contrast] of [
-    [padding, "padding", 2, 1.5],
-    [felt, "felt", 0.6 * 3.6, 1.7],
-    [tray, "felt", 0.45 * 3.6, 1.7],
-  ]) {
+  for (const [m, kind, normal, contrast] of [[padding, "padding", 2, 1.5]]) {
     assert.equal(m.normalScale.x, normal);
     assert.equal(m.userData.surfaceProfile, "refined");
     const shader = {
@@ -132,6 +136,12 @@ test("production loads only selected American maps and applies the chosen paddin
     m.onBeforeCompile(shader, {});
     assert.equal(shader.uniforms.lookRoughnessContrast.value, contrast);
     assert.equal(m.userData.materialLookKind, kind);
+  }
+  for (const m of [felt, tray]) {
+    assert.equal(m.userData.feltLook, "soft-wool");
+    assert.equal(m.normalMap.name, "felt-studies/wool-fibres.png");
+    assert.equal(m.roughnessMap, null);
+    assert.equal(m.sheen, 0.75);
   }
   const previous = padding.normalScale.x;
   c.apply(root);
@@ -183,8 +193,8 @@ test("a selected American texture failure rejects the startup asset gate and dis
     }),
     /selected normal unavailable/,
   );
-  assert.equal(disposed.length, 19);
-  assert.equal(new Set(disposed).size, 19);
+  assert.equal(disposed.length, 18);
+  assert.equal(new Set(disposed).size, 18);
 });
 
 test("encoded roughness stays in the matte/satin palette and texture budgets remain bounded", async () => {
@@ -236,11 +246,13 @@ test("baize and trays share fibre maps with a soft physical grazing sheen", asyn
   assert(baize.isMeshPhysicalMaterial && tray.isMeshPhysicalMaterial);
   assert.equal(baize.normalMap, tray.normalMap);
   assert.equal(baize.roughnessMap, tray.roughnessMap);
-  assert.equal(baize.normalScale.x, 0.6 * 3.6);
-  assert.equal(tray.normalScale.x, 0.45 * 3.6);
-  assert.equal(baize.sheen, 0.28 * 1.9);
-  assert.equal(baize.sheenRoughness, 0.9);
-  assert.equal(baize.normalMap.repeat.x, 0.8 / 0.46);
+  assert.equal(baize.normalScale.x, 1);
+  assert.equal(tray.normalScale.x, 1);
+  assert.equal(baize.sheen, 0.75);
+  assert.equal(baize.sheenRoughness, 0.69);
+  assert.equal(baize.normalMap.repeat.x, 1);
+  assert.equal(baize.normalMap.name, "felt-studies/wool-fibres.png");
+  assert.equal(baize.roughnessMap, null);
   assert.equal(baize.clearcoat, 0);
   c.dispose();
 });
@@ -468,4 +480,25 @@ test("active wood UV1 has no stretched or collapsed triangles; protected sources
       name,
     );
   }
+});
+
+test("selected wool atlas participates in the all-assets startup gate and failed loads release successful resources", async () => {
+  const disposed = [];
+  await assert.rejects(
+    createTableMaterials(null, {
+      resolveAsset: (name) => name,
+      loadTexture: async (name) => {
+        if (name === "felt-studies/wool-fibres.png")
+          throw Error("wool atlas unavailable");
+        const texture = new THREE.Texture();
+        texture.addEventListener("dispose", () => disposed.push(name));
+        return texture;
+      },
+    }),
+    /wool atlas unavailable/,
+  );
+  assert.equal(disposed.length, 18);
+  assert.equal(new Set(disposed).size, disposed.length);
+  assert(!disposed.includes("felt-normal.png"));
+  assert(!disposed.includes("felt-roughness.png"));
 });

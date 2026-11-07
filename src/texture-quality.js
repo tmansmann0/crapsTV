@@ -72,6 +72,8 @@ function unsupported(texture) {
  * format, type and colorSpace remain unchanged. Every cap is derived from the
  * native image, never from an earlier downsample. `createCanvas` is optional
  * injection for tests/non-DOM hosts; normal callers need only the limit.
+ * Critical artwork can set userData.minimumTextureSize to retain a minimum
+ * edge resolution independently of the material cap. It never upscales assets.
  */
 export function createTextureQuality(
   initialLimit = Infinity,
@@ -179,6 +181,9 @@ export function createTextureQuality(
   function plan(record, cap) {
     refreshPending(record);
     const size = imageSize(record.image);
+    const minimum = record.texture.userData?.minimumTextureSize;
+    if (size && Number.isInteger(minimum) && minimum > 0)
+      cap = Math.max(cap, Math.min(minimum, Math.max(size.width, size.height)));
     if (!size || Math.max(size.width, size.height) <= cap)
       return { record, image: record.image };
     const scale = cap / Math.max(size.width, size.height);

@@ -1,0 +1,23 @@
+{
+  "previewOnly": false,
+  "generator": "scripts/build-felt-study.py",
+  "seed": 735901,
+  "size": [
+    1024,
+    1024
+  ],
+  "channels": [
+    "normalX",
+    "normalY",
+    "fibreCoverage",
+    "mattedNap"
+  ],
+  "fibres": 19000,
+  "directions": "uniform random azimuth; gently curved short fibres",
+  "runtimeSampling": "three independently rotated/offset samples at incommensurate scales plus broad world-space nap",
+  "sha256": "ffefb954a9ec72b933a666250cb48eb73e651983068f404bfccf640b6b4d329c",
+  "bytes": 2494366,
+  "physicalDisplacement": false,
+  "geometryAdded": false,
+  "selected": "B material only; no strand geometry"
+}

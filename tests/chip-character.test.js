@@ -128,7 +128,11 @@ test("patina shader uses one shared sampler, retains logo maps and has a stable 
   assert.match(shader.fragmentShader, /diffuseColor \*= vChipVertexColor/);
   assert(!shader.fragmentShader.includes("#include <color_fragment>"));
   assert.match(shader.fragmentShader, /roughnessFactor = clamp/);
-  assert.match(material.customProgramCacheKey(), /chip-patina-v1$/);
+  assert.match(material.customProgramCacheKey(), /chip-patina-v2$/);
+  assert(
+    !shader.fragmentShader.includes("chipGroove"),
+    "no uniform radial dirt belt",
+  );
   assert.equal(material.map, map);
   assert.equal(material.normalMap, normal);
 });

@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { createFeltSurfaceSettings } from "./felt-surface.js";
-import { applySurfaceProfile } from "./surface-profile.js";
+import { applySoftWoolFelt } from "./felt-material.js";
 
-/** Physical felt under the independently budgeted SVG-sourced ink atlas. */
+/** Selected B soft wool under the independently budgeted SVG-sourced ink.
+ * normalMap is the packed wool fibre atlas in production; no strand geometry. */
 export function createBoardMaterial({
   normalMap = null,
   roughnessMap = null,
@@ -15,6 +16,6 @@ export function createBoardMaterial({
     normalMap,
     roughnessMap,
   });
-  if (surfaceProfile) applySurfaceProfile(material, "felt");
+  if (surfaceProfile) applySoftWoolFelt(material, normalMap);
   return material;
 }

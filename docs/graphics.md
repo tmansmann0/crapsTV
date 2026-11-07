@@ -8,9 +8,9 @@ Open the TV gear, then **Graphics**. Everything remains inside the 3D canvas. Ad
 | Antialiasing | Auto, On, Off               | Controls native WebGL edge smoothing. Changing it rebuilds the graphics context while preserving the room and settings panel.                                                                                                               |
 | Resolution   | Auto, 75%, 100%, 150%, 200% | Scales the 3D scene buffer. The interface retains native display resolution, capped at 4K; the panel reports both sizes.                                                                                                                    |
 | Model detail | Auto, Full, Optimized       | Controls chip geometry. Full always uses the original detailed chips; Optimized always uses the smaller variant. Auto switches by projected size, with hysteresis. The table itself always uses the optimized, silhouette-preserving model. |
-| Textures     | Auto, 1K, 2K, 4K, Native    | Caps each asset's longest image dimension. Native restores the original source up to GPU limits. Images are never upscaled, and HDR values remain HDR.                                                                                      |
+| Textures     | Auto, 1K, 2K, 4K, Native    | Caps surface images. Critical chip lettering retains its dedicated 2K maps; table lettering has a separate native display budget. Native restores original sources up to GPU limits. Images are never upscaled, and HDR values remain HDR. |
 
-These are texture dimensions, not video resolution. Most painted table/chip textures are at most 2K; the vector betting layout is also supplied as a genuine 4096×2048 raster, and the casino environment is 4K. Selecting Native cannot manufacture detail from a smaller source. UI text and join codes use dynamically sized native-resolution canvas textures.
+These are texture dimensions, not video resolution. Most painted table/chip textures are at most 2K and the casino environment is 4K. The outlined betting layout is rendered independently of the surface-texture cap. Its preserved 2K/4K raster exports are available for older studies and authoring. Selecting Native cannot manufacture detail from a smaller source. UI text and join codes use dynamically sized native-resolution canvas textures. Chip lettering uses a dedicated full-face UV channel with 1,832 source texels across the wordmark, while its wear retains the original coordinates. Only the logo albedo and engraving normal retain a 2K minimum under lower surface settings; a smaller source is never enlarged.
 
 The display targets are 1920×1080 and 3840×2160. On capable hardware, Auto starts at native display resolution up to a 4K pixel budget, including a 1920×1080 CSS viewport at device pixel ratio 2. Low-memory/software devices start conservatively. A reduced 3D resolution uses a linear-HDR offscreen target and a tone-mapped composite; the TV interface is drawn afterward at native resolution. Devices without renderable floating-point targets use a combined-resolution fallback, reported by the actual buffer metrics. Explicit supersampling choices remain available within GPU limits.
 
@@ -29,3 +29,18 @@ The diagnostic compares rendered frame intervals against the requested frame bud
 The requested [Three.js Performance Checklist](https://marceloretana.com/checklist/threejs-performance-checklist) was reviewed against this scene. The implementation uses shared/instanced chip geometry, material batches, an indexed seven-mesh table, bounded texture sizes, cached static shadows, correct culling bounds, and explicit GPU-resource cleanup. The renderer avoids rebuilding stationary banks every frame. The table's optimization does not require switching between table LODs; optional chip detail is still useful because hundreds of distant chips otherwise dominate triangle counts.
 
 Progressive pop-in was deliberately avoided: the table appears after critical models/textures/shaders are ready, matching the requested stable scene. KTX2 and mesh compression remain possible loading optimizations, but are not required for the measured frame-rate improvement. Deterministic disposal is used rather than relying on garbage-collection finalizers for GPU cleanup.
+
+## Native print and selected wool validation
+
+The native vector print, dedicated chip medallion maps and selected B wool were
+checked with twelve players, full chip geometry, native textures, antialiasing
+and an actual throw under the automatic camera. On the tested Apple M5 Pro,
+both native [3840 × 2160](benchmarks/clarity-native-4k.json) and
+[1920 × 1080](benchmarks/clarity-native-1080p.json) produced 360 frames in six
+seconds, approximately 60 FPS with a 16.7 ms frame-interval P95. The harness
+verified the actual scene and UI framebuffers rather than inferring them from
+CSS dimensions. Triangle/draw totals include the rendering passes. These are
+measurements for this device and workload, not a performance promise for every
+GPU. Board-specific pixel tests and the retained SVG sources are documented in
+[board design](board-design.md); chip source-density and texture-cap checks are
+documented in [chips](chips.md).

@@ -4,7 +4,7 @@ import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
 import { createTableMaterials } from "/src/table-materials.js";
 import { createChipFactory } from "/src/chip-rendering.js";
 import { chipStackPose } from "/src/chip-character.js";
-import { createBoardArtwork } from "/src/board-artwork.js";
+import { createRasterBoardArtwork } from "/src/board-raster-artwork.js";
 import { createBoardMaterial } from "/src/board-material.js";
 import { createDiceMaterial } from "/src/dice-material.js";
 import {
@@ -13,9 +13,11 @@ import {
 } from "/src/material-look.js";
 import { createChipScratchPreview } from "/src/chip-scratch-preview.js";
 import { createWoodLookPreview } from "/src/wood-look.js";
+import { createFeltSurface } from "/src/felt-material.js";
 const asset = (name) => "/assets/" + name;
 const fixtureParams = new URLSearchParams(location.search);
 const production = fixtureParams.has("production");
+const selectedFelt = fixtureParams.get("selectedFelt") === "soft-wool";
 const initialWidth = Number(fixtureParams.get("width")) || 3840;
 const initialHeight = Number(fixtureParams.get("height")) || 2160;
 const renderer = new THREE.WebGLRenderer({
@@ -99,14 +101,14 @@ async function data(name) {
   return t;
 }
 const [feltNormal, feltRoughness] = await Promise.all([
-  data("felt-normal.png"),
+  data(production ? "felt-studies/wool-fibres.png" : "felt-normal.png"),
   data("felt-roughness.png"),
 ]);
 for (const t of [feltNormal, feltRoughness]) {
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(10.84 / 0.46, 5.4 / 0.46);
 }
-const artwork = createBoardArtwork(renderer, {
+const artwork = createRasterBoardArtwork(renderer, {
   resolveAsset: asset,
   deviceMemory: 8,
   mobile: false,
@@ -204,7 +206,56 @@ for (let i = 0; i < 2; i++) {
   });
   scene.add(die);
 }
-const controller = production ? null : createMaterialLookController(scene);
+// Historical studies retain their original C-felt recipe unless this explicit
+// parity mode asks for the newer approved material. The reference applies the
+// authored B values independently to raw materials, rather than using the
+// production board/table factory selection path.
+const referenceWool = [],
+  referenceWoolAtlases = [];
+if (selectedFelt && !production) {
+  const atlas = await data("felt-studies/wool-fibres.png");
+  referenceWoolAtlases.push(atlas);
+  atlas.wrapS = atlas.wrapT = THREE.RepeatWrapping;
+  const found = new Set();
+  scene.traverse((object) => {
+    if (
+      object.material?.userData?.materialLookKind === "felt" ||
+      ["Deep pine baize", "Player tray suede"].includes(object.material?.name)
+    )
+      found.add(object.material);
+  });
+  for (const material of found) {
+    const controller = createFeltSurface(material, atlas);
+    controller.apply({
+      relief: 0.7,
+      tile: 0.43,
+      sheen: 0.75,
+      sheenRoughness: 0.69,
+      sheenColor: "#47775a",
+      nap: 0.035,
+      colour: 0.035,
+      fibre: 0.09,
+    });
+    referenceWool.push(controller);
+  }
+}
+const lookRoot = selectedFelt
+  ? {
+      traverse(visitor) {
+        scene.traverse((object) => {
+          const m = object.material;
+          if (
+            m &&
+            (m.userData?.materialLookKind === "felt" ||
+              ["Deep pine baize", "Player tray suede"].includes(m.name))
+          )
+            return;
+          visitor(object);
+        });
+      },
+    }
+  : scene;
+const controller = production ? null : createMaterialLookController(lookRoot);
 const scratchAtlas = production ? null : await data("chip-scratch-study.png");
 if (scratchAtlas)
   scratchAtlas.wrapS = scratchAtlas.wrapT = THREE.RepeatWrapping;
@@ -290,6 +341,10 @@ window.materialLookPreview = {
       height: renderer.domElement.height,
       camera: view,
       production,
+      feltLook:
+        production || selectedFelt
+          ? "B soft wool — material only"
+          : "Historical look profile",
       profile: controller ? controller.describe(id) : MATERIAL_LOOKS.refined,
       woodLook: woodPreview
         ? woodPreview.describe(revised ? selectedWood : "original")
@@ -311,6 +366,10 @@ window.materialLookPreview = {
     return renderer.domElement.toDataURL(type, quality);
   },
   dispose() {
+    referenceWool.forEach((controller) => controller.dispose());
+    referenceWoolAtlases.forEach((texture) => texture.dispose());
+    for (const texture of [feltNormal, feltRoughness, ...diceMaps])
+      texture.dispose();
     woodPreview?.dispose();
     scratchPreview?.dispose();
     scratchAtlas?.dispose();

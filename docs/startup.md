@@ -32,16 +32,18 @@ node tests/startup.browser.mjs
 
 Run GPU checks one at a time. This script starts and closes its own server on
 an unused ephemeral port with mDNS disabled; it never joins an existing room.
-It holds the selected American-walnut albedo, a dice wear map and the chip
-scratch atlas independently. It releases wood, then dice, and verifies the
-actual canvas stays black until the final scratch atlas is ready.
+It holds the selected American-walnut albedo, dice wear map, chip scratch atlas,
+packed wool atlas and native vector-board geometry. It releases them in stages
+and checks actual black canvas pixels and an untouched opening clock until the
+last required asset is ready. The native ink render target is allocated and
+drawn before the black gate opens, followed by world shader compilation.
 It then observes the complete opening on a real clock. Telemetry is sampled immediately after the application frame with the same requestAnimationFrame timestamp, so slow software draws cannot make stale DOM values look like a shortened opening. It checks both
 throws, winning and losing chip transfers, UI fade timing, Escape, an already
 playing room, live-game Graphics Retest with the UI visible and no demo, and
 the unchanged authority ledger. Screenshots and sampled
 telemetry are saved as `artifacts/startup-*.png` and `artifacts/startup-qa.json`.
 Set `STARTUP_TEST_DEV=1` to exercise current sources through Vite instead of the
-production build. CI uses an 800×500 viewport and keeps all three black-pixel proofs;
+production build. CI uses an 800×500 viewport and keeps all five black-pixel proofs;
 other screenshots are optional there (`STARTUP_CAPTURE=1`). Local GPU runs use
 1280×800 and retain all screenshots.
 

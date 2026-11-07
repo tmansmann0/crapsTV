@@ -76,7 +76,7 @@
           "license": "CC0-1.0"
         },
         "chips": 337,
-        "sharedStudyMaterials": 29,
+        "sharedStudyMaterials": 26,
         "calls": 36,
         "triangles": 2921494,
         "drawBuffers": [
@@ -176,9 +176,9 @@
       },
       "comparison": {
         "exactPng": false,
-        "meanAbsoluteDifference": 0.00013162495177469137,
+        "meanAbsoluteDifference": 0.00013334297839506172,
         "maxChannelDifference": 14,
-        "changedPixels": 2839
+        "changedPixels": 2837
       }
     },
     "wide": {
@@ -257,7 +257,7 @@
           "license": "CC0-1.0"
         },
         "chips": 337,
-        "sharedStudyMaterials": 29,
+        "sharedStudyMaterials": 26,
         "calls": 53,
         "triangles": 2771134,
         "drawBuffers": [
@@ -357,9 +357,9 @@
       },
       "comparison": {
         "exactPng": false,
-        "meanAbsoluteDifference": 0.0001436812789351852,
-        "maxChannelDifference": 12,
-        "changedPixels": 3137
+        "meanAbsoluteDifference": 0.00014202353395061727,
+        "maxChannelDifference": 13,
+        "changedPixels": 3111
       }
     }
   },

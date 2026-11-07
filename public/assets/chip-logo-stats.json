@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "high": {
     "file": "chip-logo.glb",
     "triangles": 8440,
@@ -10,7 +10,7 @@
       "diameter": 1,
       "height": 0.13
     },
-    "bytes": 273000
+    "bytes": 302276
   },
   "low": {
     "file": "chip-logo-lod.glb",
@@ -22,7 +22,7 @@
       "diameter": 1,
       "height": 0.13
     },
-    "bytes": 46264
+    "bytes": 46976
   },
   "materials": [
     "ChipBase",
@@ -32,6 +32,11 @@
   ],
   "engraving": "Direct original brand-logo.png luminance/alpha mask; recessed .0032 scene-unit normal relief; no letter/pip boolean geometry",
   "atlas": "chip-logo-atlas.json",
+  "medallionUV": {
+    "channel": 1,
+    "fullFace": true,
+    "originalWearUV0Preserved": true
+  },
   "preservedSha256": {
     "public/assets/chip.glb": "04c4a96926e074d3f1e3596ae6c53dc9842d76a5f70302464dd82728bb1b7dee",
     "public/assets/chip-lod.glb": "20ca4f9e2f5b9ee56ded0290267e429c2312aa3da4494c68f15b0544f15f4b28",

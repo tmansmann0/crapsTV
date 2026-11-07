@@ -88,8 +88,11 @@ export function createTableCompositor(renderer) {
     const shadowUpdate = renderer.shadowMap.needsUpdate;
     const hidden = [];
     const others = [];
+    const nativeObjects = new Set();
+    nativeSurface.traverse((object) => nativeObjects.add(object));
     world.traverse((object) => {
-      if (!object.visible || !object.isMesh || object === nativeSurface) return;
+      if (!object.visible || !object.isMesh || nativeObjects.has(object))
+        return;
       others.push(object);
       // Preserve already-composited translucent dice and ghost chips too:
       // native felt must not paint over their visible silhouettes.

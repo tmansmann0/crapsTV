@@ -395,12 +395,12 @@ export default function Table3D(props) {
           stageError = "Table texture could not load. Refresh to retry.";
         },
       );
-    const normal = loadDetail("felt-normal.png"),
-      roughness = loadDetail("felt-roughness.png");
-    for (const texture of [normal, roughness]) {
+    const normal = loadDetail("felt-studies/wool-fibres.png");
+    for (const texture of [normal]) {
       texture.colorSpace = THREE.NoColorSpace;
       texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-      texture.repeat.set(10.84 / 0.46, 5.4 / 0.46);
+      texture.flipY = false;
+      texture.repeat.set(1, 1);
       texture.anisotropy = Math.min(
         8,
         renderer.capabilities.getMaxAnisotropy(),
@@ -408,7 +408,7 @@ export default function Table3D(props) {
     }
     const board = new THREE.Mesh(
       new THREE.PlaneGeometry(10.84, 5.4),
-      createBoardMaterial({ normalMap: normal, roughnessMap: roughness }),
+      createBoardMaterial({ normalMap: normal }),
     );
     board.rotation.x = -Math.PI / 2;
     board.position.y = 0.012;
@@ -416,6 +416,7 @@ export default function Table3D(props) {
     scene.add(board);
     compositor.setNativeSurface(board);
     const boardArtwork = createBoardArtwork(renderer, {
+      board,
       resolveAsset: asset,
       initialMode:
         latest.current.state?.config.mode === "crapless"
@@ -429,11 +430,10 @@ export default function Table3D(props) {
     boardArtwork.ready
       .then(() => {
         if (!alive) return;
-        board.material.map = boardArtwork.texture;
-        board.material.needsUpdate = true;
         boardsLoaded = 2;
-        el.dataset.boardPrintResolution = String(boardArtwork.width);
-        el.dataset.boardPrintSource = "svg";
+        el.dataset.boardPrintResolution = "native-vector";
+        el.dataset.boardPrintSource = "svg-geometry";
+        el.dataset.boardPrintTriangles = String(boardArtwork.triangles);
       })
       .catch(() => {
         stageError = "Table layout could not load. Refresh to retry.";
@@ -509,7 +509,14 @@ export default function Table3D(props) {
         applyRuntimeQuality();
       }
       introDone.current = true;
-      introFinishedAt = skipped && !introLiveProbe ? time : time - 1200;
+      // Live Retest never fades the UI. Input event time can be slightly ahead
+      // of the next RAF timestamp, so a synthetic 1200ms fade endpoint can
+      // otherwise briefly drop its opacity below one after Escape.
+      introFinishedAt = introLiveProbe
+        ? -Infinity
+        : skipped
+          ? time
+          : time - 1200;
       introLiveProbe = false;
       introSample = null;
       liveCalibrationHold = null;
@@ -905,10 +912,7 @@ export default function Table3D(props) {
         el.dataset.camera = cameraMode;
       }
       boardArtwork.select(mode);
-      if (boardArtwork.texture && board.material.map !== boardArtwork.texture) {
-        board.material.map = boardArtwork.texture;
-        board.material.needsUpdate = true;
-      }
+      el.dataset.boardPrintTriangles = String(boardArtwork.triangles);
       if (s?.lastRoll?.id !== previousRoll) {
         previousRoll = s?.lastRoll?.id;
         settlingUntil = time + 1100;
@@ -1166,7 +1170,7 @@ export default function Table3D(props) {
         !warming &&
         tableLoaded &&
         puckLoaded &&
-        detailLoaded === 2 &&
+        detailLoaded === 1 &&
         boardsLoaded === 2 &&
         piecesLoaded &&
         readyEnvironment &&
@@ -1183,7 +1187,12 @@ export default function Table3D(props) {
             finishOpening(time, true);
           }
         }
-        startupCompile = Promise.resolve(compositor.compile(scene, camera))
+        startupCompile = boardArtwork
+          .compile(camera, {
+            width: compositor.plan.uiWidth,
+            height: compositor.plan.uiHeight,
+          })
+          .then(() => compositor.compile(scene, camera))
           .then(() => {
             if (alive) {
               stageReady = true;
@@ -1315,6 +1324,14 @@ export default function Table3D(props) {
           !!aiming ||
           !!s?.rolling ||
           time < settlingUntil;
+        if (stageReady) {
+          boardArtwork.render(camera, {
+            width: compositor.plan.uiWidth,
+            height: compositor.plan.uiHeight,
+          });
+          el.dataset.boardInkResolution = `${boardArtwork.metrics.width}x${boardArtwork.metrics.height}`;
+          el.dataset.boardInkSamples = String(boardArtwork.metrics.samples);
+        }
         compositor.render(stageReady ? scene : null, camera);
         renderer.clearDepth();
         if (stageReady) {
@@ -1388,6 +1405,7 @@ export default function Table3D(props) {
         fadeMaterial.dispose();
         pieces.dispose();
         tableMaterials?.dispose();
+        boardArtwork.dispose();
         const sceneTextures = new Set();
         scene.traverse((o) => {
           o.geometry?.dispose();
@@ -1401,9 +1419,8 @@ export default function Table3D(props) {
             }
         });
         sceneTextures.forEach((t) => t.dispose());
-        boardArtwork.dispose();
         normal.dispose();
-        roughness.dispose();
+
         readyEnvironment?.dispose();
         environmentTarget?.dispose();
         pmrem.dispose();

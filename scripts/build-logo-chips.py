@@ -6,6 +6,7 @@ import bpy,math,json,hashlib,sys
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'public/assets';SOURCE=ROOT/'assets/source'
 sys.dont_write_bytecode=True;sys.path.insert(0,str(ROOT/'scripts'))
 from glb_shared_images import externalize_images
+from chip_medallion_uv import compact_medallion_uv
 protected=[OUT/'chip.glb',OUT/'chip-lod.glb',SOURCE/'chip.blend',SOURCE/'chip-lod.blend']
 hashes={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in protected}
 HIGH=[(.31,.049),(.33,.049),(.342,.056),(.37,.056),(.39,.057),(.422,.062),(.476,.065),(.490,.061),(.498,.051),(.50,.044),(.50,-.044),(.498,-.051),(.490,-.061),(.476,-.065),(.422,-.062),(.39,-.057),(.37,-.056),(.342,-.056),(.33,-.049),(.31,-.049)]
@@ -32,6 +33,13 @@ def uv_mesh(obj):
         if max(xs)-min(xs)>.5 and abs(p.normal.z)<.45:
             for li in p.loop_indices:
                 if uv.data[li].uv.x<.5:uv.data[li].uv.x+=1
+    # UV0 stays byte-for-byte in the original clay/patina coordinates. UV1
+    # gives the entire 2K map to each medallion face, reusing the same pixels.
+    detail=obj.data.uv_layers.new(name='Medallion detail UV')
+    for p in obj.data.polygons:
+        for li in p.loop_indices:
+            co=obj.data.vertices[obj.data.loops[li].vertex_index].co
+            detail.data[li].uv=(.5+co.x/.626,.5+(co.y if p.normal.z>0 else -co.y)/.626) if obj.data.materials[0].name=='ChipEngraving' else uv.data[li].uv
 
 def logo_material():
     old=bpy.data.materials.get('ChipEngraving')
@@ -45,10 +53,17 @@ def logo_material():
             norm=n.new('ShaderNodeNormalMap');norm.inputs['Strength'].default_value=1
             l.new(t.outputs['Color'],norm.inputs['Color']);l.new(norm.outputs['Normal'],b.inputs[socket])
         else:l.new(t.outputs['Color'],b.inputs[socket])
+    uvnode=n.new('ShaderNodeUVMap');uvnode.uv_map='Medallion detail UV'
+    for node in n:
+        if node.type=='TEX_IMAGE':l.new(uvnode.outputs['UV'],node.inputs['Vector'])
     return m
 
 def build(low=False):
     bpy.ops.wm.open_mainfile(filepath=str(SOURCE/'chip.blend'))
+    for image in bpy.data.images:
+        if image.name.startswith(('chip-color','chip-normal-','chip-roughness-')) and (OUT/(image.name+'.png')).exists():
+            if image.packed_file:image.unpack(method='REMOVE')
+            image.filepath=str(OUT/(image.name+'.png'));image.reload();image.pack()
     mats={m.name:m for m in bpy.data.materials}
     for o in list(bpy.data.objects):bpy.data.objects.remove(o,do_unlink=True)
     base=mats['ChipBase'];inlay=mats['ChipInlay'];metal=mats['ChipMetal'];engrave=logo_material()
@@ -106,6 +121,7 @@ def build(low=False):
     bpy.ops.export_scene.gltf(filepath=str(OUT/(name+'.pending.glb')),export_format='GLB',use_selection=True,export_yup=True,export_apply=True,export_texcoords=True,export_normals=True)
     (OUT/(name+'.pending.glb')).replace(OUT/(name+'.glb'))
     externalize_images(OUT/(name+'.glb'),OUT)
+    compact_medallion_uv(OUT/(name+'.glb'))
     bpy.ops.file.pack_all();bpy.context.preferences.filepaths.save_version=0
     bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/(name+'.pending.blend')),compress=True)
     (SOURCE/(name+'.pending.blend')).replace(SOURCE/(name+'.blend'))
@@ -113,5 +129,5 @@ def build(low=False):
 
 high=build();low=build(True)
 for path,h in hashes.items():assert hashlib.sha256((ROOT/path).read_bytes()).hexdigest()==h,path
-stat={'version':1,'high':high,'low':low,'materials':['ChipBase','ChipInlay','ChipEngraving','ChipMetal'],'engraving':'Direct original brand-logo.png luminance/alpha mask; recessed .0032 scene-unit normal relief; no letter/pip boolean geometry','atlas':'chip-logo-atlas.json','preservedSha256':hashes,'brandLogoSha256':hashlib.sha256((OUT/'brand-logo.png').read_bytes()).hexdigest()}
+stat={'version':2,'high':high,'low':low,'materials':['ChipBase','ChipInlay','ChipEngraving','ChipMetal'],'engraving':'Direct original brand-logo.png luminance/alpha mask; recessed .0032 scene-unit normal relief; no letter/pip boolean geometry','atlas':'chip-logo-atlas.json','medallionUV':{'channel':1,'fullFace':True,'originalWearUV0Preserved':True},'preservedSha256':hashes,'brandLogoSha256':hashlib.sha256((OUT/'brand-logo.png').read_bytes()).hexdigest()}
 (OUT/'chip-logo-stats.json').write_text(json.dumps(stat,indent=2)+'\n');print(json.dumps(stat,indent=2))

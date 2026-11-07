@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { createFeltSurfaceSettings, FELT_TILE_SIZE } from "./felt-surface.js";
 import { applySurfaceProfile } from "./surface-profile.js";
+import { applySoftWoolFelt } from "./felt-material.js";
 
 const MAPS = {
   woodColor: ["material-table-walnut-albedo.jpg", true, 1],
@@ -134,7 +135,15 @@ export async function createTableMaterials(
     const { assetURL } = await import("./asset-url.js");
     resolveAsset = assetURL;
   }
-  const activeMaps = surfaceProfile ? { ...MAPS, ...SELECTED_WOOD_MAPS } : MAPS;
+  const activeMaps = surfaceProfile
+    ? {
+        ...MAPS,
+        ...SELECTED_WOOD_MAPS,
+        feltNormal: ["felt-studies/wool-fibres.png", false, 1],
+      }
+    : { ...MAPS };
+  // Selected wool packs normals and nap/roughness into one shared atlas.
+  if (surfaceProfile) delete activeMaps.feltRough;
   const textures = new Set();
   const maps = {};
   const anisotropy = Math.min(
@@ -169,7 +178,7 @@ export async function createTableMaterials(
         texture.repeat.setScalar(0.8 / tile);
       }
       // Existing felt fibres were designed as a .46-world-unit tile.
-      if (key.startsWith("felt"))
+      if (key.startsWith("felt") && !(surfaceProfile && key === "feltNormal"))
         texture.repeat.set(0.8 / FELT_TILE_SIZE, 0.8 / FELT_TILE_SIZE);
       maps[key] = texture;
       textures.add(texture);
@@ -228,11 +237,10 @@ export async function createTableMaterials(
         spec.coatNormalStrength ?? 0,
       );
     }
-    if (
-      surfaceProfile &&
-      (spec.felt || original.name === "Deep oxblood leather")
-    )
-      applySurfaceProfile(material, spec.felt ? "felt" : "padding");
+    if (surfaceProfile && spec.felt)
+      applySoftWoolFelt(material, maps.feltNormal);
+    if (surfaceProfile && original.name === "Deep oxblood leather")
+      applySurfaceProfile(material, "padding");
     material.userData = {
       ...material.userData,
       tablePBR: true,

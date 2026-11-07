@@ -1,0 +1,51 @@
+{
+  "nativeTextureCapPixelComparisons": [
+    {
+      "flip": 0,
+      "nativeBuffer": [
+        3840,
+        2160
+      ],
+      "meanChannelDifference": 0.0,
+      "maxChannelDifference": 0,
+      "changedPixels": 0
+    },
+    {
+      "flip": 1,
+      "nativeBuffer": [
+        3840,
+        2160
+      ],
+      "meanChannelDifference": 0.0,
+      "maxChannelDifference": 0,
+      "changedPixels": 0
+    }
+  ],
+  "wordmarkROI": [
+    620,
+    880,
+    1480,
+    1250
+  ],
+  "contourMetric": "Mean of strongest 5% horizontal luminance gradients in identical rendered wordmark crop; not a metadata texel estimate",
+  "contourGradients": {
+    "before": 9.34315013885498,
+    "after": 30.29616355895996
+  },
+  "contourGain": 3.242606948267751,
+  "frameDraws": 8,
+  "frameTriangles": 9720,
+  "glErrors": [],
+  "actualHighTriangles": 8440,
+  "actualLODtriangles": 1280,
+  "geometryAndWearUV0CanonicalEquality": true,
+  "criticalAlbedoNormalMinimum": 2048,
+  "logoEffectiveTexels": 1832.08,
+  "previousLogoEffectiveTexels": 516.096,
+  "diagnostics": [
+    "lit",
+    "no-patina",
+    "no-normals",
+    "flat-albedo"
+  ]
+}

@@ -218,6 +218,8 @@ test("scuff relief, roughness and engraving survive both instanced chip detail l
       "logo relief stays alongside the clay scuffs",
     );
     assert.equal(stamp.userData.chipPatina, true);
+    assert.equal(stamp.map.userData.minimumTextureSize, 2048);
+    assert.equal(stamp.normalMap.userData.minimumTextureSize, 2048);
   }
   factory.dispose();
   f.allDisposed();

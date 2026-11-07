@@ -52,8 +52,9 @@ varying vec4 vChipVertexColor;
 diffuseColor *= vChipVertexColor;
 vec3 chipSurface = texture2D(chipPatinaMap, fract(vChipPatinaUv + vChipPatina.xy)).rgb;
 float chipRadius = min(length((vChipPatinaUv - vec2(0.25,0.63)) / 0.225), length((vChipPatinaUv - vec2(0.75,0.63)) / 0.225));
-float chipGroove = exp(-pow((chipRadius - 0.78) / 0.075, 2.0));
-float chipDirt = min(0.9, chipSurface.r + chipGroove * 0.32) * vChipPatina.z * chipPatinaStrength;
+// Dirt follows individual handling patches. Molded rings come from geometry,
+// never an identical concentric brown belt painted onto every denomination.
+float chipDirt = min(0.9, chipSurface.r) * vChipPatina.z * chipPatinaStrength;
 float chipScuff = chipSurface.g * vChipPatina.z * chipPatinaStrength;
 float chipPolish = chipSurface.b * (0.35 + vChipPatina.z * 0.65) * chipPatinaStrength;
 diffuseColor.rgb *= mix(vec3(1.0), vec3(0.77,0.73,0.66), chipDirt);
@@ -67,6 +68,6 @@ roughnessFactor = clamp(roughnessFactor + chipDirt * 0.14 + chipScuff * 0.14 - c
 `,
       );
   };
-  material.customProgramCacheKey = () => `${previousKey}/chip-patina-v1`;
+  material.customProgramCacheKey = () => `${previousKey}/chip-patina-v2`;
   return material;
 }

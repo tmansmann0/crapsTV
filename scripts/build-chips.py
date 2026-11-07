@@ -35,10 +35,7 @@ surface=(rad1<1.015)|(rad2<1.015)|(v>.79)
 rng=np.random.default_rng(801)
 grain=rng.normal(0,.010,(N,N))
 albedo=np.clip(.92+grain,.80,.97)
-# Printed fine guide rings, subdued to retain broad runtime tint range.
-for rad in (rad1,rad2):
-    albedo-=np.exp(-((rad-.75)/.006)**2)*.10
-    albedo-=np.exp(-((rad-.82)/.005)**2)*.06
+# Uniform guide circles are omitted: molded geometry supplies the real rings.
 albedo=np.where(surface,albedo,.92)
 color=save_map('chip-color',np.repeat(albedo[:,:,None],3,axis=2))
 
@@ -48,7 +45,6 @@ for variant,seed in enumerate([913,721,406],1):
     # Fine clay grain, circular manufacturing traces, and unique shallow scuffs.
     h=rng.normal(0,.007,(N,N)).astype(np.float32)
     h+=.010*np.sin(2*np.pi*(u*41+v*7))
-    for rad in (rad1,rad2):h+=.007*np.sin(rad*340)
     for k in range(32+variant*8):
         cx=rng.uniform(.03,.97);cy=rng.uniform(.07,.75)
         theta=rng.uniform(0,2*math.pi);length=rng.uniform(.018,.09)

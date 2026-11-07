@@ -14,8 +14,10 @@ A uses emerald, restrained oxblood, engraved cartouches and distinct Field endpo
 | `assets/source/board-design/lib.mjs` | Shared vector primitives and geometry using the runtime coordinate helper |
 | `assets/source/board-design/text/board-*.svg` | Editable live-text masters, with named bet groups |
 | `public/assets/board-*.svg` | Portable outlined production SVGs, with semantic region metadata |
-| `public/assets/board-*.png` | 2048 × 1024 runtime textures |
-| `public/assets/board-*-4k.png` | 4096 × 2048 runtime textures |
+| `public/assets/board-*.png` | Preserved historical raster exports |
+| `public/assets/board-*-vector.bin` | Precompiled outlined contours for native display rendering |
+| `public/assets/board-*-vector.json` | Source/binary provenance, paints and clipping metadata |
+| `public/assets/board-*-minified.png` | 2048 × 1024 filtered distant-view fallback, derived without repeated hatch |
 | `public/assets/board-layout.json` | Actual printed rectangles and physical anchors for every supported wager and traveled/odds alias |
 | `src/board-layout.js` | Shared pure coordinate contract |
 
@@ -63,3 +65,41 @@ The local exploration renders and Claude’s original rationale remain in `artif
 ![Classic board in the actual renderer](screenshots/board-classic-3d.png)
 
 ![Crapless board in the actual renderer](screenshots/board-crapless-3d.png)
+
+## Native print renderer
+
+The production renderer uses actual outlined SVG contours: 48,462 triangles for
+classic and 51,428 for crapless. The source SVGs, editable text masters, layout
+manifest and earlier raster exports remain unchanged. The build strips only
+the repetitive decorative hatch from its derived outputs. Glyph holes, source
+paint order, clips, constant-opacity masks and encoded-sRGB compositing are
+preserved. Strokes are baked as non-overlapping outlines to avoid opacity seams.
+The original logo retains its own source image and painter-order position.
+
+One color-only, four-sample native ink target supplies albedo to the opaque
+physical felt. It receives ordinary lighting, shadows and chip/dice occlusion.
+It redraws only when the camera, mode or buffer dimensions change. The native
+surface pass keeps the print independent of reduced scene resolution; material
+texture settings do not downsample it. Below roughly one screen pixel per 2K
+texel, a mipmapped hatch-free fallback stabilizes subpixel lines. Close cameras
+use vectors exclusively. The selected B cloth shading then softens dark felt
+without raised strands or fuzzy printed letters.
+
+At 3840 × 2160 the RGBA8 resolved/MSAA targets require an estimated 158.2 MiB.
+Both fallback modes after switching, the original logo and vector buffers bring
+the estimated worst case to about 191 MiB. This removes the former 128 MiB CPU
+8K bitmap; it is a memory tradeoff, not a universal VRAM reduction. No browser
+VRAM measurement API is assumed. The target is allocated and drawn behind the
+opening's black asset gate.
+
+Rebuild derived binaries and filtered fallbacks with
+`node scripts/build-board-geometry.mjs`. Run `npm run test:board`; add
+`BOARD_FULL_MATRIX=1` for both antialias contexts and the native 4K matrix.
+The [16-case pixel report](benchmarks/board-artwork.json) covers both rulesets,
+1K/4K surface settings, 35%/50%/native scene resolution, actual ink hashes,
+solid/ghost occlusion and visible macro pixels with a magenta-poisoned fallback.
+The [slanted-edge measurement](benchmarks/board-edge-sharpness.json) records a
+0.744-pixel 10–90% ivory-edge width in the final native 4K output. The source and
+CPU review with Claude is recorded in [board resolution review](board-resolution-review.md).
+
+![Native 4K print in a reduced-resolution game scene](screenshots/board-vector-close.png)

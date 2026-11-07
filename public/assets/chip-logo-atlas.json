@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "source": "brand-logo.png",
   "sourceSha256": "e76a3ac9bdc42e820ba25753402e7a0ba41948d4c4491208025ebf213848361e",
   "sourceCrop": [
@@ -8,7 +8,7 @@
     1906,
     805
   ],
-  "maskMethod": "Original alpha times smooth threshold of original gold/ivory luminance; burgundy backing excluded, original wordmark/dice/counters preserved",
+  "maskMethod": "Exact original alpha/gold luminance; sharp source albedo, independently rounded recessed bevel",
   "generatedArtwork": false,
   "atlasSize": [
     2048,
@@ -32,36 +32,40 @@
       2048
     ]
   },
-  "bevelBlurPixels": 2.4,
-  "bevelReference": {
-    "pixels": 1.2,
-    "atlasSize": 1024
-  },
+  "mapping": "One full-face dedicated medallion map, shared by front and back through UV1; original UV0 preserved for clay wear",
+  "uvChannel": 1,
+  "tileSceneWidth": 0.626,
+  "effectiveLogoPixels": 1832.08,
+  "previousEffectiveLogoPixels": 516.0960000000001,
+  "linearDetailGain": 3.5499,
+  "bevelBlurPixels": 8.519701810436635,
+  "bevelSceneWidth": 0.0026041666666666665,
+  "albedoBlurPixels": 0,
   "logoSceneWidth": 0.56,
   "logoSceneHeight": 0.2340740740740741,
   "cutDepth": 0.0032,
   "sourceBlenderUV": {
     "front": [
-      0.25,
-      0.37
+      0.5,
+      0.5
     ],
     "back": [
-      0.75,
-      0.37
+      0.5,
+      0.5
     ],
-    "radius": 0.225
+    "radius": 0.5
   },
   "pngCenters": {
     "front": [
-      0.25,
-      0.63
+      0.5,
+      0.5
     ],
     "back": [
-      0.75,
-      0.63
+      0.5,
+      0.5
     ]
   },
-  "backUV": "Back local Y is reflected before export, making text upright when the chip flips about X",
+  "backUV": "Back local Y reflected before export; original UV0 remains unchanged for all patina/scuff channels",
   "normalConvention": "OpenGL +Y",
   "mapFiles": {
     "albedo": "chip-logo-albedo.png",

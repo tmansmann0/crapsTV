@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "source": "brand-logo.png",
+  "sourceSha256": "e76a3ac9bdc42e820ba25753402e7a0ba41948d4c4491208025ebf213848361e",
+  "sourceCrop": [
+    16,
+    15,
+    1906,
+    805
+  ],
+  "maskMethod": "Original alpha times smooth threshold of original gold/ivory luminance; burgundy backing excluded, original wordmark/dice/counters preserved",
+  "generatedArtwork": false,
+  "atlasSize": [
+    2048,
+    2048
+  ],
+  "mapSizes": {
+    "albedo": [
+      2048,
+      2048
+    ],
+    "normal": [
+      2048,
+      2048
+    ],
+    "roughness": [
+      1024,
+      1024
+    ],
+    "height": [
+      2048,
+      2048
+    ]
+  },
+  "bevelBlurPixels": 2.4,
+  "bevelReference": {
+    "pixels": 1.2,
+    "atlasSize": 1024
+  },
+  "logoSceneWidth": 0.56,
+  "logoSceneHeight": 0.2340740740740741,
+  "cutDepth": 0.0032,
+  "sourceBlenderUV": {
+    "front": [
+      0.25,
+      0.37
+    ],
+    "back": [
+      0.75,
+      0.37
+    ],
+    "radius": 0.225
+  },
+  "pngCenters": {
+    "front": [
+      0.25,
+      0.63
+    ],
+    "back": [
+      0.75,
+      0.63
+    ]
+  },
+  "backUV": "Back local Y is reflected before export, making text upright when the chip flips about X",
+  "normalConvention": "OpenGL +Y",
+  "mapFiles": {
+    "albedo": "chip-logo-albedo.png",
+    "normal": "chip-logo-normal.png",
+    "roughness": "chip-logo-roughness.png",
+    "height": "chip-logo-height.png",
+    "mark": "chip-logo-mark.png"
+  }
+}

@@ -47,6 +47,13 @@ export async function createChipFactory(
       for (const material of Array.isArray(object.material)
         ? object.material
         : [object.material]) {
+        if (material.name === "ChipEngraving") {
+          // Critical brand detail has a dedicated shared medallion map/UV1.
+          // Clay wear remains on UV0 and follows the normal texture budget.
+          for (const key of ["map", "normalMap"])
+            if (material[key]?.isTexture)
+              material[key].userData.minimumTextureSize = 2048;
+        }
         materials.add(material);
         for (const value of Object.values(material))
           if (value?.isTexture) {

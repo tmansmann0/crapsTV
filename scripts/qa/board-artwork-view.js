@@ -1,9 +1,13 @@
 import * as THREE from "three";
 import { createTableCompositor } from "/src/table-compositor.js";
 import { createBoardArtwork } from "/src/board-artwork.js";
+import { createBoardMaterial } from "/src/board-material.js";
 import { createTextureQuality } from "/src/texture-quality.js";
+const options = new URLSearchParams(location.search),
+  W = Number(options.get("width") || 3840),
+  H = Number(options.get("height") || 2160);
 const renderer = new THREE.WebGLRenderer({
-  antialias: true,
+  antialias: options.get("aa") !== "0",
   preserveDrawingBuffer: true,
 });
 renderer.autoClear = false;
@@ -14,11 +18,9 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.setClearColor(0x151b17);
 document.body.style.margin = "0";
-document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(43, 16 / 9, 0.035, 100);
-camera.position.set(0, 7, 3.4);
-camera.lookAt(0, 0, 0);
+document.body.append(renderer.domElement);
+const scene = new THREE.Scene(),
+  camera = new THREE.PerspectiveCamera(43, W / H, 0.035, 100);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x283b28, 2));
 const light = new THREE.DirectionalLight(0xffffff, 2);
 light.position.set(-3, 7, 4);
@@ -33,18 +35,23 @@ Object.assign(light.shadow.camera, {
   far: 20,
 });
 scene.add(light);
+const wool = await new THREE.TextureLoader().loadAsync(
+  "/assets/felt-studies/wool-fibres.png",
+);
+wool.colorSpace = THREE.NoColorSpace;
+wool.flipY = false;
+wool.wrapS = wool.wrapT = THREE.RepeatWrapping;
 const board = new THREE.Mesh(
   new THREE.PlaneGeometry(10.84, 5.4),
-  new THREE.MeshStandardMaterial({ roughness: 0.98 }),
+  createBoardMaterial({ normalMap: wool }),
 );
 board.rotation.x = -Math.PI / 2;
 board.position.y = 0.012;
 board.receiveShadow = true;
 scene.add(board);
-// A chip-sized blue solid deliberately covers the printed pass-line lettering.
 const solid = new THREE.Mesh(
   new THREE.CylinderGeometry(0.28, 0.28, 0.2, 48),
-  new THREE.MeshBasicMaterial({ color: 0x126bd1, toneMapped: true }),
+  new THREE.MeshBasicMaterial({ color: 0x126bd1 }),
 );
 solid.position.set(0, 0.125, 1.69);
 solid.castShadow = true;
@@ -53,19 +60,13 @@ const ghost = solid.clone();
 ghost.material = solid.material.clone();
 ghost.material.transparent = true;
 ghost.material.opacity = 0.35;
+ghost.material.depthWrite = false;
 ghost.position.x = -0.8;
 scene.add(ghost);
-const compositor = createTableCompositor(renderer);
-compositor.setNativeSurface(board);
-const art = createBoardArtwork(renderer, {
-  resolveAsset: (name) => "/assets/" + name,
-  deviceMemory: 8,
-  mobile: false,
-});
-await art.ready;
 const cap = createTextureQuality(4096);
+cap.register(wool);
 const woodMap = await new THREE.TextureLoader().loadAsync(
-  "/assets/material-table-walnut-albedo.jpg",
+  "/assets/wood-studies/american/albedo.jpg",
 );
 woodMap.colorSpace = THREE.SRGBColorSpace;
 cap.register(woodMap);
@@ -75,129 +76,157 @@ const wood = new THREE.Mesh(
 );
 wood.position.y = -0.15;
 scene.add(wood);
-board.material.map = art.texture;
-board.material.needsUpdate = true;
-camera.updateMatrixWorld();
-const point = solid.position.clone().project(camera);
-const ghostPoint = ghost.position.clone().project(camera);
-const patchPoint = new THREE.Vector3(0, 0.012, -0.35).project(camera);
+const compositor = createTableCompositor(renderer);
+compositor.setNativeSurface(board);
+const art = createBoardArtwork(renderer, {
+  board,
+  resolveAsset: (name) => "/assets/" + name,
+  samples: Number(options.get("samples") || 4),
+});
+await art.ready;
+const poison = new THREE.DataTexture(new Uint8Array([255, 0, 255, 255]), 1, 1);
+poison.needsUpdate = true;
+function pose(name) {
+  if (name === "macro") {
+    camera.position.set(-3.48, 0.8, -1.006);
+    camera.lookAt(-3.48, 0.012, -1.01);
+  } else {
+    camera.position.set(0, 7, 3.4);
+    camera.lookAt(0, 0, 0);
+  }
+  camera.updateMatrixWorld();
+}
+function pixelAt(point) {
+  const q = point.clone().project(camera),
+    out = new Uint8Array(4);
+  renderer
+    .getContext()
+    .readPixels(
+      Math.round(((q.x + 1) * W) / 2),
+      Math.round(((q.y + 1) * H) / 2),
+      1,
+      1,
+      renderer.getContext().RGBA,
+      renderer.getContext().UNSIGNED_BYTE,
+      out,
+    );
+  return [...out];
+}
+async function hashInk() {
+  const p = new Uint8Array(W * H * 4);
+  renderer.readRenderTargetPixels(art.target, 0, 0, W, H, p);
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", p))]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("");
+}
+function bufferInfo() {
+  const gl = renderer.getContext(),
+    p = renderer.properties.get(art.target),
+    old = gl.getParameter(gl.RENDERBUFFER_BINDING);
+  const result = {};
+  for (const [name, buffer] of [
+    ["color", p.__webglColorRenderbuffer?.[0]],
+    ["depth", p.__webglDepthRenderbuffer],
+  ])
+    if (buffer) {
+      gl.bindRenderbuffer(gl.RENDERBUFFER, buffer);
+      result[name + "Samples"] = gl.getRenderbufferParameter(
+        gl.RENDERBUFFER,
+        gl.RENDERBUFFER_SAMPLES,
+      );
+      result[name + "Format"] = gl.getRenderbufferParameter(
+        gl.RENDERBUFFER,
+        gl.RENDERBUFFER_INTERNAL_FORMAT,
+      );
+    }
+  gl.bindRenderbuffer(gl.RENDERBUFFER, old);
+  return result;
+}
 window.proof = {
   ready: true,
-  async lifecycle() {
-    const disposable = createBoardArtwork(renderer, {
-      resolveAsset: (name) => "/assets/" + name,
-      software: true,
-    });
-    disposable.dispose();
-    await disposable.ready;
-    if (disposable.texture)
-      throw Error("Disposed pending load retained texture");
-    const rapid = createBoardArtwork(renderer, {
-      resolveAsset: (name) => "/assets/" + name,
-      software: true,
-    });
-    rapid.select("crapless");
-    await rapid.ready;
-    if (rapid.mode !== "crapless")
-      throw Error("Initial mode changed during decode");
-    const previous = rapid.texture;
-    rapid.select("classic");
-    for (let i = 0; i < 300 && rapid.mode !== "classic"; i++)
-      await new Promise((r) => setTimeout(r, 10));
-    if (rapid.mode !== "classic" || previous.image.width !== 0)
-      throw Error("Mode replacement retained old bitmap");
-    const final = rapid.texture;
-    rapid.dispose();
-    if (final.image.width !== 0) throw Error("Active bitmap was not closed");
-    const failed = createBoardArtwork(renderer, {
-      resolveAsset: () => "data:image/svg+xml,broken",
-      software: true,
-    });
-    let rejected = false;
-    try {
-      await failed.ready;
-    } catch {
-      rejected = true;
-    }
-    failed.select("crapless");
-    failed.dispose();
-    if (!rejected) throw Error("Invalid SVG did not fail readiness");
-    return {
-      pendingDispose: true,
-      initialModeChange: true,
-      oldBitmapClosed: true,
-      activeBitmapClosed: true,
-      invalidSourceRejected: true,
-    };
-  },
-  async render(mode = "classic", scale = 0.75, nativePrint = true) {
+  async render(
+    mode = "classic",
+    scale = 0.75,
+    nativePrint = true,
+    { view = "overview", textureLimit = 1024, poisonAtlas = false } = {},
+  ) {
+    pose(view);
     art.select(mode);
-    for (let i = 0; i < 300 && art.mode !== mode; i++)
-      await new Promise((r) => setTimeout(r, 10));
-    if (art.mode !== mode) throw Error("Artwork mode switch failed");
-    board.material.map = art.texture;
+    cap.setLimit(textureLimit);
+    board.material.map = poisonAtlas ? poison : null;
+    if (!art.fallbackTexture.userData.referenceImage)
+      art.fallbackTexture.userData.referenceImage = art.fallbackTexture.image;
+    // The poison changes image dimensions. Release immutable GPU storage so
+    // this actually uploads the replacement rather than retaining old pixels.
+    art.fallbackTexture.dispose();
+    if (poisonAtlas) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 4;
+      const c = canvas.getContext("2d");
+      c.fillStyle = "#ff00ff";
+      c.fillRect(0, 0, 4, 4);
+      art.fallbackTexture.image = canvas;
+    } else
+      art.fallbackTexture.image = art.fallbackTexture.userData.referenceImage;
+    art.fallbackTexture.needsUpdate = true;
     board.material.needsUpdate = true;
-    // Exercise the real cap manager, which has no ownership of print textures.
-    cap.setLimit(1024);
     const plan = compositor.resize({
-      width: 3840,
-      height: 2160,
+      width: W,
+      height: H,
       devicePixelRatio: 1,
       scenePixelRatio: scale,
-      antialias: true,
+      antialias: options.get("aa") !== "0",
     });
     compositor.setNativeSurface(nativePrint ? board : null);
-    renderer.info.reset();
+    await art.compile(camera, { width: plan.uiWidth, height: plan.uiHeight });
     await compositor.compile(scene, camera);
+    renderer.info.reset();
     renderer.shadowMap.needsUpdate = true;
+    art.render(camera, { width: plan.uiWidth, height: plan.uiHeight });
     compositor.render(scene, camera);
-    const pixels = new Uint8Array(4);
+    const point = new THREE.Vector3(
+        ...(view === "macro" ? [-3.48, 0.012, -1.01] : [0, 0.012, -0.35]),
+      ).project(camera),
+      patch = new Uint8Array(512 * 100 * 4);
     renderer
       .getContext()
       .readPixels(
-        Math.round((point.x + 1) * 1920),
-        Math.round((point.y + 1) * 1080),
-        1,
-        1,
-        renderer.getContext().RGBA,
-        renderer.getContext().UNSIGNED_BYTE,
-        pixels,
-      );
-    const ghostPixel = new Uint8Array(4);
-    renderer
-      .getContext()
-      .readPixels(
-        Math.round((ghostPoint.x + 1) * 1920),
-        Math.round((ghostPoint.y + 1) * 1080),
-        1,
-        1,
-        renderer.getContext().RGBA,
-        renderer.getContext().UNSIGNED_BYTE,
-        ghostPixel,
-      );
-    const patch = new Uint8Array(512 * 100 * 4);
-    renderer
-      .getContext()
-      .readPixels(
-        Math.round((patchPoint.x + 1) * 1920) - 256,
-        Math.round((patchPoint.y + 1) * 1080) - 50,
+        Math.round(((point.x + 1) * W) / 2) - 256,
+        Math.round(((point.y + 1) * H) / 2) - 50,
         512,
         100,
         renderer.getContext().RGBA,
         renderer.getContext().UNSIGNED_BYTE,
         patch,
       );
+    const inkHash = await hashInk();
     return {
-      patch: [...patch],
-      ghostPixel: [...ghostPixel],
       plan,
-      width: art.texture.image.width,
-      height: art.texture.image.height,
-      printSource: art.texture.name,
+      printSource: "native-svg-geometry",
+      ...art.metrics,
+      buffer: bufferInfo(),
+      inkHash,
       modeledTextureWidth: woodMap.image.width,
-      solidPixel: [...pixels],
+      solidPixel: view === "overview" ? pixelAt(solid.position) : null,
+      ghostPixel: view === "overview" ? pixelAt(ghost.position) : null,
+      patch: [...patch],
       calls: renderer.info.render.calls,
       triangles: renderer.info.render.triangles,
     };
+  },
+  async edges() {
+    const p = new Uint8Array(W * H * 4);
+    renderer
+      .getContext()
+      .readPixels(
+        0,
+        0,
+        W,
+        H,
+        renderer.getContext().RGBA,
+        renderer.getContext().UNSIGNED_BYTE,
+        p,
+      );
+    return { width: W, height: H, pixels: [...p] };
   },
 };

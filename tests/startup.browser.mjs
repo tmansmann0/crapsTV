@@ -40,6 +40,7 @@ let browser,
   releaseAsset,
   releaseWear,
   releaseScratch;
+const extraAssetGates = [];
 const errors = [],
   glErrors = [],
   samples = [];
@@ -258,13 +259,32 @@ try {
     }
     await route.continue();
   });
+  for (const [name, pattern] of [
+    ["felt", "**/felt-studies/wool-fibres.png*"],
+    ["vector", "**/board-classic-vector.bin*"],
+  ]) {
+    let release, requested;
+    const held = new Promise((resolve) => (release = resolve));
+    const seen = new Promise((resolve) => (requested = resolve));
+    extraAssetGates.push({ name, release, seen });
+    await page.route(pattern, async (route) => {
+      requested();
+      await held;
+      await route.continue();
+    });
+  }
   await page.goto(origin);
   const table = page.locator(".table-canvas");
   await Promise.race([
-    Promise.all([assetRequested, wearRequested, scratchRequested]),
+    Promise.all([
+      assetRequested,
+      wearRequested,
+      scratchRequested,
+      ...extraAssetGates.map((gate) => gate.seen),
+    ]),
     pause(45000).then(() => {
       throw Error(
-        "Expected critical American wood, dice wear and selected chip scratch requests",
+        "Expected critical wood, dice, chip scratch, wool atlas and vector board requests",
       );
     }),
   ]);
@@ -322,8 +342,29 @@ try {
     scratchBlackPixels > 0.995,
     `selected chip scratch sampler must retain black gate (${scratchBlackPixels})`,
   );
-  const releasedAt = Date.now();
   releaseScratch();
+  for (const gate of extraAssetGates) {
+    await pause(650);
+    await expect(table).toHaveAttribute("data-scene-ready", "false");
+    assert.equal(Number(await table.getAttribute("data-startup-elapsed")), 0);
+    assert.equal(Number(await table.getAttribute("data-startup-fade")), 0);
+    assert.equal(
+      Number(await table.getAttribute("data-startup-ui-opacity")),
+      0,
+    );
+    const fraction = darkFraction(
+      await table.screenshot({
+        path: `artifacts/startup-${gate.name}-asset-gate.png`,
+        animations: "allow",
+      }),
+    );
+    assert(
+      fraction > 0.995,
+      `${gate.name} must retain black gate (${fraction})`,
+    );
+    gate.release();
+  }
+  const releasedAt = Date.now();
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 60000,
   });
@@ -577,7 +618,7 @@ try {
     ),
   );
   console.log(
-    "Startup proof passed: black gated American wood, dice wear and selected chip scratches, actual30s content with accounted resource waits, two physical throws, real winning/losing modeled transfers, late UI fade, isolated ledger, Escape, already-playing skip and live-game Retest.",
+    "Startup proof passed: black gated wood, dice wear, chip scratches, wool atlas and vector board, actual30s content with accounted resource waits, two physical throws, real winning/losing modeled transfers, late UI fade, isolated ledger, Escape, already-playing skip and live-game Retest.",
   );
 } catch (error) {
   await mkdir("artifacts", { recursive: true });
@@ -602,6 +643,7 @@ try {
   releaseAsset?.();
   releaseWear?.();
   releaseScratch?.();
+  extraAssetGates.forEach((gate) => gate.release());
   socket?.terminate();
   await browser?.close();
   if (server.exitCode === null) {

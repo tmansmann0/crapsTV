@@ -5,8 +5,15 @@ import { createHash } from "node:crypto";
 import { PNG } from "pngjs";
 const file = (name) => new URL("../public/assets/" + name, import.meta.url);
 const digest = (data) => createHash("sha256").update(data).digest("hex");
-async function model(name) {
-  const bytes = await readFile(file(name)),
+async function model(name, archive = false) {
+  const bytes = await readFile(
+      archive
+        ? new URL(
+            "../assets/source/legacy/chip-logo-d256e2d/" + name,
+            import.meta.url,
+          )
+        : file(name),
+    ),
     length = bytes.readUInt32LE(12),
     g = JSON.parse(bytes.toString("utf8", 20, 20 + length)),
     base = 28 + length;
@@ -65,7 +72,10 @@ test("logo chip variants retain shared materials, dimensions and geometry budget
     assert(engraving.normalTexture);
     assert(engraving.pbrMetallicRoughness.baseColorTexture);
     assert.equal(engraving.pbrMetallicRoughness.roughnessFactor ?? 1, 1);
-    assert(bytes.length < 300000, "shared images are not embedded twice");
+    assert(
+      bytes.length < 320000,
+      "shared maps stay external; only medallion gains UV1",
+    );
     for (const image of g.images) {
       assert(!("bufferView" in image));
       const [name, query] = image.uri.split("?v=");
@@ -86,6 +96,7 @@ test("front and back logos have matching readable orientation after an X flip", 
       pos = values(p.attributes.POSITION),
       uv = values(p.attributes.TEXCOORD_0),
       norm = values(p.attributes.NORMAL);
+    const detail = values(p.attributes.TEXCOORD_1);
     let front = 0,
       back = 0;
     for (let i = 0; i < pos.length; i++) {
@@ -95,6 +106,8 @@ test("front and back logos have matching readable orientation after an X flip", 
       const top = y > 0;
       assert(Math.abs(uv[i][0] - ((top ? 0.25 : 0.75) + x * 0.45)) < 1e-5);
       assert(Math.abs(uv[i][1] - (0.63 + (top ? z : -z) * 0.45)) < 1e-5);
+      assert(Math.abs(detail[i][0] - (0.5 + x / 0.626)) < 1e-5);
+      assert(Math.abs(detail[i][1] - (0.5 + (top ? z : -z) / 0.626)) < 1e-5);
       if (top) front++;
       else back++;
     }
@@ -167,11 +180,15 @@ test("engraving is recessed height with real normal bevels and roughness, preser
   assert.equal(color.width, 2048, "macro albedo retains true source detail");
   assert.equal(normal.width, 2048, "macro bevel normal has the same detail");
   assert.equal(rough.width, 1024, "roughness remains a bounded 1K map");
-  assert.equal(
-    meta.bevelBlurPixels / meta.atlasSize[0],
-    1.2 / 1024,
+  assert(
+    Math.abs(
+      (meta.bevelBlurPixels / meta.atlasSize[0]) * meta.tileSceneWidth -
+        1.2 / 1024 / 0.45,
+    ) < 1e-12,
     "physical bevel width stays unchanged",
   );
+  assert.equal(meta.albedoBlurPixels, 0);
+  assert(meta.effectiveLogoPixels > 1800 && meta.linearDetailGain > 3.5);
   assert(inside > 1000 && outside > 10000);
   assert(
     insideHeight / inside < outsideHeight / outside - 60,
@@ -185,4 +202,82 @@ test("engraving is recessed height with real normal bevels and roughness, preser
       hash,
       name,
     );
+});
+
+test("dedicated medallion UV preserves all original geometry, normals and wear UV0 on both LODs", async () => {
+  for (const name of ["chip-logo.glb", "chip-logo-lod.glb"]) {
+    const before = await model(name, true),
+      after = await model(name);
+    const triangles = (data, material) => {
+      const p = data.g.meshes
+        .flatMap((m) => m.primitives)
+        .find((p) => data.g.materials[p.material].name === material);
+      const attrs = ["POSITION", "NORMAL", "TEXCOORD_0"].map((k) =>
+        data.values(p.attributes[k]),
+      );
+      const ids = data.values(p.indices).flat(),
+        out = [];
+      for (let i = 0; i < ids.length; i += 3) {
+        const rows = ids.slice(i, i + 3).map((id) =>
+          attrs
+            .flatMap((a) => a[id])
+            .map((n) => n.toFixed(6))
+            .join(","),
+        );
+        const rotated = [
+          rows.join("|"),
+          [rows[1], rows[2], rows[0]].join("|"),
+          [rows[2], rows[0], rows[1]].join("|"),
+        ];
+        out.push(rotated.sort()[0]);
+      }
+      return out.sort();
+    };
+    for (const mat of ["ChipBase", "ChipInlay", "ChipEngraving", "ChipMetal"])
+      assert.deepEqual(
+        triangles(after, mat),
+        triangles(before, mat),
+        `${name}/${mat} keeps original triangle winding, shape, normals and scuff coordinates`,
+      );
+    const material = after.g.materials.find((m) => m.name === "ChipEngraving");
+    assert.equal(material.normalTexture.texCoord, 1);
+    assert.equal(material.pbrMetallicRoughness.baseColorTexture.texCoord, 1);
+    for (const p of after.g.meshes.flatMap((m) => m.primitives))
+      assert.equal(
+        "TEXCOORD_1" in p.attributes,
+        after.g.materials[p.material].name === "ChipEngraving",
+      );
+  }
+});
+
+test("clay guide paint and machining ripples no longer introduce radial grime bands", async () => {
+  const image = PNG.sync.read(await readFile(file("chip-color.png")));
+  const means = [];
+  for (const r of [0.73, 0.75, 0.77, 0.8, 0.82, 0.84]) {
+    let total = 0,
+      count = 0;
+    for (let y = 0; y < image.height; y++)
+      for (let x = 0; x < image.width; x++) {
+        const radius =
+          Math.hypot(
+            (x + 0.5) / image.width - 0.25,
+            (y + 0.5) / image.height - 0.63,
+          ) / 0.225;
+        if (Math.abs(radius - r) < 0.004) {
+          total += image.data[(y * image.width + x) * 4];
+          count++;
+        }
+      }
+    means.push(total / count);
+  }
+  assert(
+    Math.abs(means[1] - (means[0] + means[2]) / 2) < 2,
+    "no painted .75-radius dark circle",
+  );
+  assert(
+    Math.abs(means[4] - (means[3] + means[5]) / 2) < 2,
+    "no painted .82-radius dark circle",
+  );
+  const metadata = JSON.parse(await readFile(file("chip-clay-detail.json")));
+  assert(metadata.removed.some((v) => v.includes("sin(radius*340)")));
 });

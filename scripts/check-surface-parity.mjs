@@ -1,7 +1,7 @@
 import { createServer } from "vite";
 import { chromium } from "@playwright/test";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { pngDifference } from "./png-difference.mjs";
 import assert from "node:assert/strict";
 const width = Number(process.env.SURFACE_PARITY_WIDTH) || 3840;
 const height =
@@ -54,6 +54,7 @@ try {
     const query = new URLSearchParams({
       width: String(width),
       height: String(height),
+      selectedFelt: "soft-wool",
     });
     if (mode === "production") query.set("production", "1");
     if (angle === "swiftshader") query.set("software", "1");
@@ -89,23 +90,14 @@ try {
   for (const shot of ["hero", "wide"]) {
     const a = report.shots[shot].reference.file,
       b = report.shots[shot].production.file;
-    const exact = (await readFile(a)).equals(await readFile(b));
-    const pixels = JSON.parse(
-      execFileSync(
-        "python3",
-        [
-          "-c",
-          `import json,sys,numpy as np\nfrom PIL import Image\na=np.asarray(Image.open(sys.argv[1]),dtype=np.int16);b=np.asarray(Image.open(sys.argv[2]),dtype=np.int16);d=np.abs(a-b)\nprint(json.dumps({'meanAbsoluteDifference':float(d.mean()),'maxChannelDifference':int(d.max()),'changedPixels':int(np.any(d!=0,axis=2).sum())}))`,
-          a,
-          b,
-        ],
-        { encoding: "utf8" },
-      ),
-    );
+    const first = await readFile(a),
+      second = await readFile(b);
+    const exact = first.equals(second);
+    const pixels = pngDifference(first, second);
     report.shots[shot].comparison = { exactPng: exact, ...pixels };
     assert(
       pixels.meanAbsoluteDifference < 1,
-      `${shot}: production must match approved refined preview`,
+      `${shot}: production must match independently authored selected B wool + refined surfaces`,
     );
   }
   assert.deepEqual(errors, []);

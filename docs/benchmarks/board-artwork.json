@@ -1,33 +1,46 @@
 {
+  "dimension": {
+    "width": 3840,
+    "height": 2160
+  },
   "results": [
     {
       "mode": "classic",
       "name": "scaled",
-      "ghostPixel": [
-        0,
-        59,
-        139,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
         "uiRatio": 1,
-        "sceneRatio": 0.75,
+        "sceneRatio": 0.5,
         "uiWidth": 3840,
         "uiHeight": 2160,
-        "sceneWidth": 2880,
-        "sceneHeight": 1620,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
         "split": true
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced classic felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
         113,
         207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
         255
       ],
       "calls": 7,
@@ -36,31 +49,40 @@
     {
       "mode": "classic",
       "name": "native-print",
-      "ghostPixel": [
-        0,
-        59,
-        139,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
         "uiRatio": 1,
-        "sceneRatio": 0.75,
+        "sceneRatio": 0.5,
         "uiWidth": 3840,
         "uiHeight": 2160,
-        "sceneWidth": 2880,
-        "sceneHeight": 1620,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
         "split": true
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced classic felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
         113,
         207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
         255
       ],
       "calls": 11,
@@ -69,12 +91,7 @@
     {
       "mode": "classic",
       "name": "native-world",
-      "ghostPixel": [
-        0,
-        49,
-        78,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
@@ -86,9 +103,17 @@
         "sceneHeight": 2160,
         "split": false
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced classic felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
@@ -96,37 +121,84 @@
         207,
         255
       ],
+      "ghostPixel": [
+        0,
+        49,
+        77,
+        255
+      ],
       "calls": 6,
       "triangles": 782
+    },
+    {
+      "mode": "classic",
+      "name": "poisoned-macro",
+      "aa": 1,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.35,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1344,
+        "sceneHeight": 756,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 2,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "69695d1966c3349e1ba0db7ea1d2947765da6901d9514f752157e10043166484",
+      "modeledTextureWidth": 1024,
+      "solidPixel": null,
+      "ghostPixel": null,
+      "calls": 7,
+      "triangles": 414
     },
     {
       "mode": "crapless",
       "name": "scaled",
-      "ghostPixel": [
-        0,
-        59,
-        139,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
         "uiRatio": 1,
-        "sceneRatio": 0.75,
+        "sceneRatio": 0.5,
         "uiWidth": 3840,
         "uiHeight": 2160,
-        "sceneWidth": 2880,
-        "sceneHeight": 1620,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
         "split": true
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced crapless felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
         113,
         207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
         255
       ],
       "calls": 7,
@@ -135,31 +207,40 @@
     {
       "mode": "crapless",
       "name": "native-print",
-      "ghostPixel": [
-        0,
-        59,
-        139,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
         "uiRatio": 1,
-        "sceneRatio": 0.75,
+        "sceneRatio": 0.5,
         "uiWidth": 3840,
         "uiHeight": 2160,
-        "sceneWidth": 2880,
-        "sceneHeight": 1620,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
         "split": true
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced crapless felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
         113,
         207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
         255
       ],
       "calls": 11,
@@ -168,12 +249,7 @@
     {
       "mode": "crapless",
       "name": "native-world",
-      "ghostPixel": [
-        0,
-        49,
-        78,
-        255
-      ],
+      "aa": 1,
       "plan": {
         "width": 3840,
         "height": 2160,
@@ -185,9 +261,17 @@
         "sceneHeight": 2160,
         "split": false
       },
-      "width": 8192,
-      "height": 4096,
-      "printSource": "SVG-sourced crapless felt print (8192)",
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
       "modeledTextureWidth": 1024,
       "solidPixel": [
         0,
@@ -195,16 +279,363 @@
         207,
         255
       ],
+      "ghostPixel": [
+        0,
+        49,
+        77,
+        255
+      ],
       "calls": 6,
       "triangles": 782
+    },
+    {
+      "mode": "crapless",
+      "name": "poisoned-macro",
+      "aa": 1,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.35,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1344,
+        "sceneHeight": 756,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 4,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "ccf7cb673fc92c84c9110c92ea6926b429836bec4ef20629811751b6dca595f5",
+      "modeledTextureWidth": 1024,
+      "solidPixel": null,
+      "ghostPixel": null,
+      "calls": 7,
+      "triangles": 414
+    },
+    {
+      "mode": "classic",
+      "name": "scaled",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.5,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
+        255
+      ],
+      "calls": 7,
+      "triangles": 784
+    },
+    {
+      "mode": "classic",
+      "name": "native-print",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.5,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
+        255
+      ],
+      "calls": 11,
+      "triangles": 1182
+    },
+    {
+      "mode": "classic",
+      "name": "native-world",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 1,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 3840,
+        "sceneHeight": 2160,
+        "split": false
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 1,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "b75c52d3c83fcfdc558d5ccf009c1dc2997974a94cd2a5b01d16a3df96d91929",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        49,
+        77,
+        255
+      ],
+      "calls": 6,
+      "triangles": 782
+    },
+    {
+      "mode": "classic",
+      "name": "poisoned-macro",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.35,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1344,
+        "sceneHeight": 756,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 2,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "69695d1966c3349e1ba0db7ea1d2947765da6901d9514f752157e10043166484",
+      "modeledTextureWidth": 1024,
+      "solidPixel": null,
+      "ghostPixel": null,
+      "calls": 7,
+      "triangles": 414
+    },
+    {
+      "mode": "crapless",
+      "name": "scaled",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.5,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
+        255
+      ],
+      "calls": 7,
+      "triangles": 784
+    },
+    {
+      "mode": "crapless",
+      "name": "native-print",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.5,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1920,
+        "sceneHeight": 1080,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        58,
+        139,
+        255
+      ],
+      "calls": 11,
+      "triangles": 1182
+    },
+    {
+      "mode": "crapless",
+      "name": "native-world",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 1,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 3840,
+        "sceneHeight": 2160,
+        "split": false
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 3,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "15a836e357305eaca615559bd8e3f5eaef35221f766e0f266591cccfaea187fa",
+      "modeledTextureWidth": 1024,
+      "solidPixel": [
+        0,
+        113,
+        207,
+        255
+      ],
+      "ghostPixel": [
+        0,
+        49,
+        77,
+        255
+      ],
+      "calls": 6,
+      "triangles": 782
+    },
+    {
+      "mode": "crapless",
+      "name": "poisoned-macro",
+      "aa": 0,
+      "plan": {
+        "width": 3840,
+        "height": 2160,
+        "uiRatio": 1,
+        "sceneRatio": 0.35,
+        "uiWidth": 3840,
+        "uiHeight": 2160,
+        "sceneWidth": 1344,
+        "sceneHeight": 756,
+        "split": true
+      },
+      "printSource": "native-svg-geometry",
+      "width": 3840,
+      "height": 2160,
+      "samples": 4,
+      "draws": 4,
+      "estimatedBufferBytes": 165888000,
+      "buffer": {
+        "colorSamples": 4,
+        "colorFormat": 32856
+      },
+      "inkHash": "ccf7cb673fc92c84c9110c92ea6926b429836bec4ef20629811751b6dca595f5",
+      "modeledTextureWidth": 1024,
+      "solidPixel": null,
+      "ghostPixel": null,
+      "calls": 7,
+      "triangles": 414
     }
   ],
-  "lifecycle": {
-    "pendingDispose": true,
-    "initialModeChange": true,
-    "oldBitmapClosed": true,
-    "activeBitmapClosed": true,
-    "invalidSourceRejected": true
-  },
   "errors": []
 }

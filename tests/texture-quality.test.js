@@ -101,6 +101,43 @@ test("small images are never upscaled and natural dimensions beat CSS width", ()
   quality.dispose();
 });
 
+test("critical artwork keeps its declared texel floor while other materials follow the cap", () => {
+  const fake = canvasFactory();
+  const quality = createTextureQuality(1024, fake);
+  const original = { width: 4096, height: 2048 };
+  const logo = new Texture(original),
+    clay = new Texture(original);
+  logo.userData.minimumTextureSize = 2048;
+  quality.register(logo);
+  quality.register(clay);
+  assert.deepEqual([logo.image.width, logo.image.height], [2048, 1024]);
+  assert.deepEqual([clay.image.width, clay.image.height], [1024, 512]);
+  quality.setLimit(512);
+  assert.deepEqual([logo.image.width, logo.image.height], [2048, 1024]);
+  assert.deepEqual([clay.image.width, clay.image.height], [512, 256]);
+  quality.setLimit(Infinity);
+  assert.equal(logo.image, original);
+  assert.equal(clay.image, original);
+  quality.setLimit(1024);
+  // A declaration added after registration restores the original source too.
+  clay.userData.minimumTextureSize = 4096;
+  quality.setLimit(1024);
+  assert.equal(clay.image, original);
+  quality.dispose();
+});
+
+test("critical texel floors never upscale a smaller image", () => {
+  const fake = canvasFactory();
+  const quality = createTextureQuality(256, fake);
+  const image = { width: 512, height: 256 };
+  const logo = new Texture(image);
+  logo.userData.minimumTextureSize = 2048;
+  quality.register(logo);
+  assert.equal(logo.image, image);
+  assert.equal(fake.canvases.length, 0);
+  quality.dispose();
+});
+
 test("Float32 HDR keeps exact sampled values, channels and Texture interpretation", () => {
   const pixels = new Float32Array(4 * 2 * 4);
   for (let i = 0; i < pixels.length; i++) pixels[i] = i * 16.125 - 300;
