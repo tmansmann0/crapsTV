@@ -1,0 +1,144 @@
+{
+  "generated": "Scanned CC0 Poly Haven wood; original procedural other materials",
+  "woodSource": "https://polyhaven.com/a/dark_wood",
+  "woodLicense": "CC0-1.0",
+  "woodMapping": {
+    "uvChannel": 1,
+    "tileSceneUnits": 6,
+    "repeat": [
+      0.13333333333333333,
+      0.13333333333333333
+    ],
+    "albedoFormat": "JPEG quality94 subsampling0",
+    "normalScale": 1.1,
+    "clearcoat": 0.1,
+    "clearcoatRoughness": 0.5,
+    "environmentIntensity": 0.6
+  },
+  "normalConvention": "OpenGL +Y tangent-space",
+  "albedoColorSpace": "sRGB",
+  "dataColorSpace": "linear/NoColorSpace",
+  "roughnessScalar": 1,
+  "maps": {
+    "material-table-walnut-albedo": {
+      "file": "material-table-walnut-albedo.jpg",
+      "width": 2048,
+      "height": 2048,
+      "min": 0.0,
+      "max": 0.6557,
+      "mean": 0.1796
+    },
+    "material-table-walnut-normal": {
+      "file": "material-table-walnut-normal.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.4314,
+      "max": 1.0,
+      "mean": 0.6656
+    },
+    "material-table-walnut-roughness": {
+      "file": "material-table-walnut-roughness.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.4073,
+      "max": 0.5687,
+      "mean": 0.5036
+    },
+    "material-table-leather-albedo": {
+      "file": "material-table-leather-albedo.png",
+      "width": 1024,
+      "height": 512,
+      "min": 0.077,
+      "max": 0.3341,
+      "mean": 0.1749
+    },
+    "material-table-leather-normal": {
+      "file": "material-table-leather-normal.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.4165,
+      "max": 1.0,
+      "mean": 0.6664
+    },
+    "material-table-leather-roughness": {
+      "file": "material-table-leather-roughness.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.6813,
+      "max": 0.7527,
+      "mean": 0.695
+    },
+    "material-table-rubber-albedo": {
+      "file": "material-table-rubber-albedo.png",
+      "width": 256,
+      "height": 1024,
+      "min": 0.038,
+      "max": 0.1212,
+      "mean": 0.0837
+    },
+    "material-table-rubber-roughness": {
+      "file": "material-table-rubber-roughness.png",
+      "width": 256,
+      "height": 1024,
+      "min": 0.8625,
+      "max": 0.8974,
+      "mean": 0.88
+    },
+    "material-table-felt-albedo": {
+      "file": "material-table-felt-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.0637,
+      "max": 0.2626,
+      "mean": 0.1672
+    },
+    "material-table-brass-albedo": {
+      "file": "material-table-brass-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.2523,
+      "max": 0.6762,
+      "mean": 0.4741
+    },
+    "material-table-brass-normal": {
+      "file": "material-table-brass-normal.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.4869,
+      "max": 1.0,
+      "mean": 0.6667
+    },
+    "material-table-brass-roughness": {
+      "file": "material-table-brass-roughness.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.5102,
+      "max": 0.5498,
+      "mean": 0.53
+    },
+    "material-table-black-albedo": {
+      "file": "material-table-black-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.0304,
+      "max": 0.0646,
+      "mean": 0.0497
+    },
+    "material-table-black-normal": {
+      "file": "material-table-black-normal.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.4919,
+      "max": 1.0,
+      "mean": 0.6667
+    },
+    "material-table-black-roughness": {
+      "file": "material-table-black-roughness.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.7375,
+      "max": 0.7625,
+      "mean": 0.75
+    }
+  }
+}

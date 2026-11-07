@@ -1,0 +1,374 @@
+.learn-center {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0 10px 7px;
+  color: #1d2a23;
+  font-family: "DM Sans", Arial, sans-serif;
+  overflow: hidden;
+}
+.learn-center * {
+  box-sizing: border-box;
+}
+.learn-center button,
+.learn-center select {
+  font: inherit;
+  color: inherit;
+}
+.learn-center button {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.learn-center button:focus-visible,
+.learn-center select:focus-visible {
+  outline: 3px solid #a97f33;
+  outline-offset: 2px;
+}
+.lc-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.lc-top > span {
+  font-size: 12px;
+  font-weight: 700;
+}
+.lc-top > div {
+  display: flex;
+  background: #e9e0cd;
+  border-radius: 10px;
+  padding: 2px;
+}
+.lc-top button {
+  min-height: 44px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+.lc-top button[aria-pressed="true"] {
+  background: #fffaf0;
+  box-shadow: 0 1px 3px #1d2a2322;
+}
+.lc-heading {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.lc-select-label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 10px;
+  color: #6b6658;
+}
+.lc-select-label select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d8ccb1;
+  border-radius: 9px;
+  background: #fffaf0;
+  padding: 5px 9px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.lc-select-label.is-example {
+  flex: 0.82;
+}
+.lc-select-label.is-example select {
+  font-size: 12px;
+}
+.lc-summary {
+  margin: 0 !important;
+  font-size: 12px;
+  line-height: 1.4;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.lc-stage {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  min-height: 130px;
+  overflow: hidden;
+  border: 1px solid #dfd3bc;
+  background: #fffaf0;
+  border-radius: 15px;
+}
+.lc-scene {
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  overflow: visible;
+}
+.lc-felt {
+  fill: #14553e;
+}
+.lc-region {
+  fill: #ffffff04;
+  stroke: #c7d4b480;
+  stroke-width: 1.1;
+  transition:
+    fill 0.35s,
+    stroke 0.35s;
+}
+.lc-region.is-hot {
+  fill: #e4be6530;
+  stroke: #f4d688;
+  stroke-width: 2;
+}
+.lc-region.is-odds {
+  stroke-dasharray: 4 3;
+}
+.lc-label,
+.lc-number {
+  fill: #f4eddb;
+  text-anchor: middle;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.lc-number {
+  font-size: 14px;
+}
+.lc-odds-label {
+  font-size: 9px;
+}
+.lc-puck circle {
+  fill: #25352e;
+  stroke: #74857b;
+  stroke-width: 2;
+}
+.lc-puck text {
+  fill: #e3e9df;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+.lc-puck.is-on circle {
+  fill: #e0c078;
+  stroke: #a97f33;
+}
+.lc-puck.is-on text {
+  fill: #23342b;
+}
+.lc-die rect {
+  fill: #f8f0de;
+  stroke: #c7baa1;
+  stroke-width: 1;
+}
+.lc-die circle {
+  fill: #283b30;
+}
+.lc-dice-pair.is-rolling {
+  animation: lc-roll 0.62s ease-out both;
+  transform-origin: 170px 22px;
+}
+.lc-total {
+  fill: #1d2a23;
+  font-size: 17px;
+  font-weight: 800;
+  font-family: inherit;
+}
+.lc-wait {
+  fill: #81796b;
+  font-size: 11px;
+}
+.lc-chip {
+  transition:
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.4s;
+}
+.lc-chip-body {
+  fill: #a62036;
+  stroke: #641528;
+  stroke-width: 1.5;
+}
+.lc-chip.is-profit .lc-chip-body {
+  fill: #e1bf65;
+  stroke: #9a7534;
+}
+.lc-chip-dash {
+  fill: none;
+  stroke: #f8f0dc;
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+.lc-chip text {
+  fill: #fff7e5;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  text-anchor: middle;
+}
+.lc-chip.is-profit text {
+  fill: #382c13;
+}
+.lc-bank-label {
+  fill: #736a59;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-anchor: middle;
+}
+.lc-caption {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.lc-caption > span {
+  border-radius: 7px;
+  background: #e9dfca;
+  padding: 4px 7px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+}
+.lc-caption p {
+  margin: 0 !important;
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 600;
+}
+.lc-controls {
+  display: grid;
+  grid-template-columns: 44px 1fr 1fr 44px;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.lc-controls button {
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid #d8ccb1;
+  border-radius: 10px;
+  background: #fffaf0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lc-controls button:first-child,
+.lc-controls button:last-child {
+  font-size: 25px;
+  line-height: 1;
+}
+.lc-controls .lc-play {
+  background: #14553e;
+  color: #fffaf0;
+  border-color: #14553e;
+}
+.lc-controls button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.lc-demo-note {
+  margin: 0 !important;
+  text-align: center;
+  font-size: 10px;
+  color: #766c5c;
+  flex-shrink: 0;
+}
+@keyframes lc-roll {
+  0% {
+    opacity: 0.2;
+    transform: translateY(-6px) rotate(-8deg);
+  }
+  60% {
+    transform: translateY(2px) rotate(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-height: 680px) {
+  .learn-center {
+    gap: 5px;
+  }
+  .lc-top button {
+    min-height: 44px;
+  }
+  .lc-summary {
+    font-size: 11.5px;
+    min-height: 31px;
+  }
+  .lc-select-label select {
+    min-height: 44px;
+  }
+  .lc-caption {
+    min-height: 44px;
+  }
+  .lc-caption p {
+    font-size: 12px;
+  }
+  .lc-demo-note {
+    font-size: 9px;
+  }
+  .lc-scene {
+    max-height: 260px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .learn-center *,
+  .learn-center *::before,
+  .learn-center *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.lc-field-number {
+  fill: #f4eddb;
+  text-anchor: middle;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: inherit;
+}
+.lc-field-ring {
+  fill: none;
+  stroke: #f3d48f;
+  stroke-width: 1;
+}
+.lc-destination {
+  fill: #dfbf6420;
+  stroke: #c6a451;
+  stroke-width: 1;
+}
+.lc-puck {
+  transition: transform 0.7s ease-in-out;
+}
+/* SVG intrinsic sizing must not crop its bank row inside a short flex stage. */
+.lc-stage {
+  position: relative;
+}
+.lc-scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-width: 0;
+  min-height: 0;
+}
+@media (max-height: 680px) {
+  .learn-center {
+    gap: 4px;
+  }
+  .lc-stage {
+    min-height: 188px;
+  }
+  .lc-number {
+    font-size: 16px;
+  }
+  .lc-chip text {
+    font-size: 12px;
+  }
+}

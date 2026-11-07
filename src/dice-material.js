@@ -22,13 +22,21 @@ export function createDiceMaterial(
   return new THREE.MeshPhysicalMaterial({
     name: "DiceBody",
     color,
-    roughness: translucent ? 0.14 : 0.27,
+    // Three multiplies the map by this value. The authored texture is already
+    // resin roughness (~0.24); scaling it by .27 made solid dice mirror-like.
+    roughness: roughnessMap
+      ? translucent
+        ? 0.5
+        : 1
+      : translucent
+        ? 0.12
+        : 0.26,
     metalness: 0,
     normalMap,
-    normalScale: new THREE.Vector2(0.27, 0.27),
+    normalScale: new THREE.Vector2(0.2, 0.2),
     roughnessMap,
-    clearcoat: software ? 0 : 1,
-    clearcoatRoughness: 0.12,
+    clearcoat: software ? 0 : translucent ? 0.7 : 0.35,
+    clearcoatRoughness: translucent ? 0.14 : 0.2,
     transmission: translucent && !software ? 0.82 : 0,
     transparent: translucent && software,
     opacity: translucent && software ? 0.65 : 1,

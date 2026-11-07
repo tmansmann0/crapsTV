@@ -8,12 +8,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  lazy,
+  Suspense,
 } from "react";
 import {
   ArrowDown,
   ArrowUp,
   BookOpen,
-  Check,
   ChevronDown,
   CircleDot,
   Coins,
@@ -22,7 +23,6 @@ import {
   Lock,
   Plus,
   RefreshCw,
-  RotateCcw,
   Settings,
   Undo2,
   X,
@@ -37,6 +37,7 @@ import {
   MOBILE_PAYOUT_STAGGER_MS,
 } from "./mobile-settlement.js";
 import "./phone-game.css";
+const LearnCenter = lazy(() => import("./LearnCenter.jsx"));
 
 const TRAY = [100, 500, 2500, 10000];
 const THUMBNAILS = [100, 500, 2500, 10000, 50000];
@@ -51,7 +52,6 @@ const LINE_TYPES = ["pass", "dont", "come", "dontcome"];
 const BOARD_IDS = new Set(["pass", "dont", "come", "dontcome", "field"]);
 const FIELD_NUMBERS = [2, 3, 4, 9, 10, 11, 12];
 const PLACE_WORDS = { 6: "SIX", 9: "NINE" };
-const PRACTICE_BANK = 10000;
 const PRACTICE_MIN = 500;
 // Keeps previews under 10/sec and clear of the server's 90ms drop window.
 const PREVIEW_INTERVAL = 110;
@@ -1272,434 +1272,6 @@ function RollDetail({ state, player, settled, outcomes }) {
   );
 }
 
-const STEPS = [
-  { title: "Pick a chip", hint: "Tap any chip in the tray." },
-  { title: "Bundle", hint: "Tap more until you hold $10 or more." },
-  {
-    title: "Place",
-    hint: "Drag the bundle to Pass or Field, or tap one then Place.",
-  },
-  { title: "Swipe", hint: "Swipe up on the pad to throw." },
-];
-
-// Local fake chips. This component is never given `send`.
-function Practice({ mode, teach }) {
-  const [bank, setBank] = useState(PRACTICE_BANK),
-    [chips, setChips] = useState([]),
-    [bets, setBets] = useState({}),
-    [selected, setSelected] = useState(null),
-    [step, setStep] = useState(0),
-    [result, setResult] = useState(null),
-    [note, setNote] = useState(null);
-  const amount = sum(chips),
-    crapless = mode === "crapless";
-  const rows = [
-    { id: "practice-field", name: "Field", payout: "1:1", available: true },
-    { id: "practice-pass", name: "Pass line", payout: "1:1", available: true },
-  ];
-  const lay = (row) => {
-    if (amount < PRACTICE_MIN) {
-      setNote(`Practice minimum is ${money(PRACTICE_MIN)}.`);
-      return;
-    }
-    setBets((b) => ({ ...b, [row.id]: (b[row.id] || 0) + amount }));
-    setBank((n) => n - amount);
-    setChips([]);
-    setSelected(null);
-    setNote(null);
-    setStep(3);
-  };
-  const drag = useChipDrag({
-    enabled: step >= 2 && step < 4 && amount > 0,
-    ghostAmount: amount,
-    onDrop(id) {
-      const row = rows.find((r) => r.id === id);
-      if (row) lay(row);
-    },
-  });
-  const add = (value) => {
-    if (amount + value > bank) return;
-    const next = amount + value;
-    setChips((c) => [...c, value]);
-    setNote(null);
-    setStep((s) => (next >= 1000 ? Math.max(s, 2) : Math.max(s, 1)));
-  };
-  const swipe = useRef(null);
-  const throwDice = () => {
-    if (!sum(Object.values(bets))) return;
-    const dice = [1, 2].map(() => 1 + Math.floor(Math.random() * 6)),
-      total = dice[0] + dice[1];
-    let change = 0,
-      returned = 0;
-    const pass = bets["practice-pass"] || 0,
-      field = bets["practice-field"] || 0;
-    let message;
-    if (pass) {
-      const wins = total === 7 || (!crapless && total === 11),
-        loses = !crapless && [2, 3, 12].includes(total);
-      if (wins) {
-        change += pass;
-        returned += pass * 2;
-        message = `${total} wins on the come-out.`;
-      } else if (loses) {
-        change -= pass;
-        message = `${total} is craps. Pass loses.`;
-      } else {
-        returned += pass;
-        message = `${total} becomes the point. It must repeat before a 7.`;
-      }
-    } else message = `${total} on the dice.`;
-    if (field) {
-      const multiple = total === 2 ? 2 : total === 12 ? 3 : 1;
-      if (FIELD_NUMBERS.includes(total)) {
-        change += field * multiple;
-        returned += field * (multiple + 1);
-      } else change -= field;
-    }
-    setBank((n) => n + returned);
-    setBets({});
-    setResult({ dice, total, change, message });
-    setStep(4);
-  };
-  const replay = () => {
-    setBank(PRACTICE_BANK);
-    setChips([]);
-    setBets({});
-    setSelected(null);
-    setResult(null);
-    setNote(null);
-    setStep(0);
-  };
-  const selectedRow = rows.find((r) => r.id === selected);
-  const tile = (row, children, className) => (
-    <BetTile
-      key={row.id}
-      row={row}
-      className={className}
-      stake={bets[row.id] || 0}
-      selected={selected === row.id}
-      hovered={drag.hoverId === row.id}
-      eligible={amount >= PRACTICE_MIN}
-      dragging={drag.dragging}
-      teach={teach}
-      cue={step === 2 && !drag.dragging}
-      onSelect={(r) => setSelected((s) => (s === r.id ? null : r.id))}
-    >
-      {children}
-    </BetTile>
-  );
-  return (
-    <div className="pg-practice">
-      <ol className="pg-steps">
-        {STEPS.map((item, i) => (
-          <li
-            key={item.title}
-            className={i < step ? "is-done" : i === step ? "is-now" : ""}
-            aria-current={i === step ? "step" : undefined}
-          >
-            <span>{i < step ? <Check size={13} /> : i + 1}</span>
-            {item.title}
-          </li>
-        ))}
-      </ol>
-      <div className="pg-practice-status">
-        <p role="status">
-          {step < 4 ? STEPS[step].hint : "Done. That is the whole loop."}
-        </p>
-        <span>
-          Practice chips <b>{money(bank)}</b>
-        </span>
-      </div>
-      {step < 3 && (
-        <div className="pg-rack">
-          <Tray
-            amount={amount}
-            bank={bank}
-            locked={false}
-            onAdd={add}
-            cue={step < 2}
-          />
-          <BundleBar
-            chips={chips}
-            amount={amount}
-            locked={false}
-            drag={drag}
-            cue={step === 2}
-            placeLabel={
-              selectedRow && amount ? `Place ${money(amount)}` : "Choose a bet"
-            }
-            placeDetail={selectedRow?.name}
-            canPlace={!!selectedRow && amount > 0 && step >= 2}
-            onPlace={() => selectedRow && lay(selectedRow)}
-            onUndo={() => setChips((c) => c.slice(0, -1))}
-            onClear={() => setChips([])}
-            onHint={() =>
-              setNote("Drag this onto a bet, or tap a bet and press Place.")
-            }
-            quick={[]}
-          />
-          {note && <Notice notice={{ tone: "error", text: note }} />}
-        </div>
-      )}
-      <div className="pg-felt pg-practice-felt">
-        <div className="pg-board is-practice">
-          {tile(
-            rows[0],
-            <span className="pg-field">
-              <span className="pg-tile-name">Field</span>
-              <span className="pg-field-numbers" aria-hidden="true">
-                {FIELD_NUMBERS.map((n) => (
-                  <i key={n} className={n === 2 || n === 12 ? "is-ring" : ""}>
-                    {n}
-                  </i>
-                ))}
-              </span>
-            </span>,
-            "pg-tile-field",
-          )}
-          {tile(
-            rows[1],
-            <span className="pg-tile-name is-pass">Pass Line</span>,
-            "pg-tile-pass",
-          )}
-        </div>
-      </div>
-      {step >= 3 && (
-        <div className={`pg-swipe ${step === 3 ? "is-cue" : ""}`}>
-          {result ? (
-            <div className="pg-practice-result" role="status">
-              <span className="pg-strip-dice">
-                <Die value={result.dice[0]} />
-                <Die value={result.dice[1]} />
-                <b>{result.total}</b>
-              </span>
-              <span className="pg-strip-text">
-                <b>{result.message}</b>
-                <small>
-                  Practice change {signed(result.change)} · no real chips moved
-                </small>
-              </span>
-              <button type="button" className="pg-quick" onClick={replay}>
-                <RotateCcw size={14} /> Replay
-              </button>
-            </div>
-          ) : (
-            <>
-              <div
-                className="pg-swipe-pad"
-                aria-hidden="true"
-                onPointerDown={(e) => {
-                  e.currentTarget.setPointerCapture?.(e.pointerId);
-                  swipe.current = e.clientY;
-                }}
-                onPointerUp={(e) => {
-                  if (swipe.current != null && swipe.current - e.clientY > 40)
-                    throwDice();
-                  swipe.current = null;
-                }}
-                onPointerCancel={() => {
-                  swipe.current = null;
-                }}
-              >
-                <ArrowUp size={18} />
-                <Die value={5} />
-                <Die value={2} />
-              </div>
-              <button type="button" className="pg-place" onClick={throwDice}>
-                <b>Throw practice dice</b>
-              </button>
-            </>
-          )}
-        </div>
-      )}
-      {drag.ghostNode}
-    </div>
-  );
-}
-
-function NumberBall({ n, tone }) {
-  return <span className={`pg-ball is-${tone}`}>{n}</span>;
-}
-
-function Rules({ mode }) {
-  const crapless = mode === "crapless";
-  const wins = crapless ? [7] : [7, 11],
-    loses = crapless ? [] : [2, 3, 12],
-    points = crapless ? [2, 3, 4, 5, 6, 8, 9, 10, 11, 12] : [4, 5, 6, 8, 9, 10];
-  return (
-    <div className="pg-rules">
-      <section>
-        <h3>
-          <span className="pg-puck is-off">OFF</span> Come-out roll
-        </h3>
-        <div className="pg-rule-row">
-          <span>Pass wins</span>
-          <div>
-            {wins.map((n) => (
-              <NumberBall key={n} n={n} tone="win" />
-            ))}
-          </div>
-        </div>
-        {!!loses.length && (
-          <div className="pg-rule-row">
-            <span>Pass loses</span>
-            <div>
-              {loses.map((n) => (
-                <NumberBall key={n} n={n} tone="loss" />
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="pg-rule-row">
-          <span>Sets the point</span>
-          <div>
-            {points.map((n) => (
-              <NumberBall key={n} n={n} tone="neutral" />
-            ))}
-          </div>
-        </div>
-      </section>
-      <section>
-        <h3>
-          <span className="pg-puck is-on">ON</span> Point is set
-        </h3>
-        <div className="pg-rule-row">
-          <span>Pass wins</span>
-          <div>
-            <NumberBall n="Point" tone="win" />
-          </div>
-        </div>
-        <div className="pg-rule-row">
-          <span>Pass loses</span>
-          <div>
-            <NumberBall n={7} tone="loss" />
-          </div>
-        </div>
-      </section>
-      {!crapless && (
-        <section>
-          <h3>Don’t side</h3>
-          <p>
-            Come-out: 2, 3 win · 7, 11 lose · 12 pushes. Then 7 must land before
-            the point.
-          </p>
-        </section>
-      )}
-      <section>
-        <h3>Reading a payout</h3>
-        <p>
-          7:6 means $7 profit per $6 bet. Closed bets also return your stake.
-          Place, hard and big bets stay up after a win.
-        </p>
-      </section>
-    </div>
-  );
-}
-
-function Payouts({ state, player, mode }) {
-  const [active, setActive] = useState(null);
-  const rows = useMemo(
-    () =>
-      catalogue(
-        { ...state, point: null, config: { ...state.config, mode } },
-        mode === state.config.mode ? player : null,
-      ),
-    [state, player, mode],
-  );
-  const selected = rows.find((row) => row.id === active);
-  return (
-    <div className="pg-payouts">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Bet</th>
-            <th scope="col">Pays</th>
-            <th scope="col">Win</th>
-            <th scope="col">Edge</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className={active === row.id ? "is-active" : ""}>
-              <th scope="row">
-                <button
-                  type="button"
-                  aria-pressed={active === row.id}
-                  onClick={() => setActive(active === row.id ? null : row.id)}
-                >
-                  {row.name}
-                </button>
-              </th>
-              <td>{row.payout.split(" · ")[0]}</td>
-              <td>{(row.prob * 100).toFixed(1)}%</td>
-              <td>{row.edge.toFixed(2)}%</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <p className="pg-payouts-note" role="status">
-        {selected?.description || "Tap a bet to see how it works."}
-      </p>
-    </div>
-  );
-}
-
-function LearnPanel({ state, player }) {
-  const [view, setView] = useState("practice"),
-    [mode, setMode] = useState(state.config.mode);
-  return (
-    <div className="pg-learn">
-      <div className="pg-segments" role="group" aria-label="Learn sections">
-        {[
-          ["practice", "Practice"],
-          ["rules", "Rules"],
-          ["payouts", "Payouts"],
-        ].map(([id, label]) => (
-          <button
-            type="button"
-            key={id}
-            aria-pressed={view === id}
-            onClick={() => setView(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      {view !== "practice" && (
-        <div
-          className="pg-segments is-small"
-          role="group"
-          aria-label="Game type"
-        >
-          {[
-            ["craps", "Classic"],
-            ["crapless", "Crapless"],
-          ].map(([id, label]) => (
-            <button
-              type="button"
-              key={id}
-              aria-pressed={mode === id}
-              onClick={() => setMode(id)}
-            >
-              {label}
-              {state.config.mode === id && <small>This table</small>}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="pg-learn-body">
-        {view === "practice" && (
-          <Practice mode={state.config.mode} teach={state.config.teach} />
-        )}
-        {view === "rules" && <Rules mode={mode} />}
-        {view === "payouts" && (
-          <Payouts state={state} player={player} mode={mode} />
-        )}
-      </div>
-    </div>
-  );
-}
-
 function SettingsSheet({ open, onClose, children }) {
   const dialog = useRef(null);
   useEffect(() => {
@@ -2306,7 +1878,17 @@ export default function PhoneGame({
             />
           )}
           {tab === "dice" && <div className="pg-dice">{rollArea}</div>}
-          {tab === "learn" && <LearnPanel state={state} player={player} />}
+          {tab === "learn" && (
+            <Suspense
+              fallback={
+                <div className="pg-empty" role="status">
+                  Loading lessons…
+                </div>
+              }
+            >
+              <LearnCenter state={state} player={player} />
+            </Suspense>
+          )}
         </main>
         <nav className="pg-nav" role="tablist" aria-label="Game sections">
           {tabs.map(({ id, label, icon: Icon, badge, ready }) => (

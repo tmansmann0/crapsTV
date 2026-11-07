@@ -62,21 +62,66 @@ for o in list(bpy.data.objects):
 # maximum bounds and the original suede floor/slot coordinates.
 original_rounded=rounded
 original_finish=finish
-def rounded(w,d,r,n=None):return original_rounded(w,d,r,n if n else (4 if max(w,d)<2 else 16))
+def rounded(w,d,r,n=None):return original_rounded(w,d,r,n if n else (10 if max(w,d)<2 else 16))
 def finish(obj,name,mat,bevel=0):
     obj=original_finish(obj,name,mat,bevel=0)
     for p in obj.data.polygons:p.use_smooth=abs(p.normal.z)<.95
     return obj
 layout=json.loads((OUT/'table-player-rails-layout.json').read_text())
+tray_checks=[]
+def continuous_tray(number):
+    # One closed shell, with material transitions sharing the same vertices.
+    # Old base+rim objects overlapped at Y=.650..658 on their outside faces.
+    profile=[(1.596,.756,.088,.609),(1.620,.780,.100,.621),
+      (1.620,.780,.100,.722),(1.596,.756,.088,.735),
+      (1.520,.660,.090,.735),(1.510,.650,.085,.738),
+      (1.480,.620,.070,.738),(1.480,.620,.070,.728),
+      (1.480,.620,.070,.660)]
+    count=len(rounded(*profile[0][:3]));vertices=[];faces=[];material_ids=[]
+    for w,d,r,y in profile:vertices.extend((x,z,y) for x,z in rounded(w,d,r))
+    for j in range(len(profile)-1):
+        for i in range(count):
+            n=(i+1)%count;faces.append((j*count+i,j*count+n,(j+1)*count+n,(j+1)*count+i))
+            material_ids.append(1 if j in (4,5,6) else 0)
+    faces.append(tuple(range(count-1,-1,-1)));material_ids.append(2)
+    faces.append(tuple((len(profile)-1)*count+i for i in range(count)));material_ids.append(0)
+    mesh=bpy.data.meshes.new(f'Seat {number} continuous shell');mesh.from_pydata(vertices,[],faces);mesh.update()
+    shell=bpy.data.objects.new(mesh.name,mesh);bpy.context.collection.objects.link(shell)
+    finish(shell,shell.name,wood,0);mesh.materials.append(brass);mesh.materials.append(black)
+    for polygon,index in zip(mesh.polygons,material_ids):polygon.material_index=index
+    bm=bmesh.new();bm.from_mesh(mesh);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+    boundary=sum(e.is_boundary for e in bm.edges);nonmanifold=sum(not e.is_manifold for e in bm.edges)
+    assert boundary==nonmanifold==0,(number,boundary,nonmanifold)
+    bm.to_mesh(mesh);bm.free();mesh.update()
+    tray_checks.append({'seat':number-1,'boundaryEdges':boundary,'nonManifoldEdges':nonmanifold,'coplanarBaseRimOverlap':False})
+    return shell
 for s in layout['seats']:
-    i=s['seat'];center=s['bankBase'];t=s['tangent'];parts=[]
-    parts.append(slab(f'LOD seat {i+1} base',1.62,.78,.10,.609,.658,wood))
-    parts.append(ring(f'LOD seat {i+1} contoured rim',[(1.600,.760,.090,.638),(1.620,.780,.100,.650),(1.620,.780,.100,.722),(1.596,.756,.088,.735),(1.502,.642,.080,.735),(1.480,.620,.070,.723),(1.480,.620,.070,.638)],wood,0))
-    parts.append(slab(f'LOD seat {i+1} suede bed',1.479,.619,.069,.654,.675,suede))
-    parts.append(ring(f'LOD seat {i+1} brass lip',[(1.505,.645,.080,.732),(1.505,.645,.080,.738),(1.480,.620,.069,.738),(1.480,.620,.069,.732)],brass,0))
-    angle=math.atan2(-t[2],t[0])
-    for p in parts:p.rotation_euler.z=angle;p.location=(center[0],-center[2],0)
-    label=s['labelPosition'];p=cube(f'LOD seat {i+1} label plaque',(.96,.135,.014),(label[0],-label[2],.626),black,0);p.rotation_euler.z=angle
+    i=s['seat'];center=s['bankBase'];t=s['tangent']
+    shell=continuous_tray(i+1)
+    angle=math.atan2(-t[2],t[0]);shell.rotation_euler.z=angle;shell.location=(center[0],-center[2],0)
+    # Split only by material for the final global batching step. Seam vertex
+    # positions remain identical; there are no overlapping boundary faces.
+    bpy.ops.object.select_all(action='DESELECT');shell.select_set(True);bpy.context.view_layer.objects.active=shell
+    bpy.ops.object.mode_set(mode='EDIT');bpy.ops.mesh.select_all(action='SELECT');bpy.ops.mesh.separate(type='MATERIAL');bpy.ops.object.mode_set(mode='OBJECT')
+    for piece in list(bpy.context.selected_objects):
+        used={p.material_index for p in piece.data.polygons};assert len(used)==1
+        mat=piece.data.materials[next(iter(used))];piece.data.materials.clear();piece.data.materials.append(mat)
+        for face in piece.data.polygons:face.material_index=0
+    bed=slab(f'LOD seat {i+1} suede bed',1.479,.619,.069,.6601,.675,suede)
+    bed.rotation_euler.z=angle;bed.location=(center[0],-center[2],0)
+    label=s['labelPosition'];out=s['outward']
+    p=cube(f'LOD seat {i+1} label plaque',(.96,.135,.014),(label[0]+out[0]*.012,-label[2]-out[2]*.012,.626),black,0);p.rotation_euler.z=angle
+# Horizontal walnut faces need two-dimensional coordinates. Their old ring
+# height projection had constant V across shelf tops and gave unstable normals.
+for obj in bpy.data.objects:
+    if obj.type!='MESH' or not obj.data.materials or obj.data.materials[0]!=wood:continue
+    uv=obj.data.uv_layers.get('Material UV');detail=obj.data.uv_layers.get('Detail UV')
+    for face in obj.data.polygons:
+        if abs(face.normal.z)<.92:continue
+        for li in face.loop_indices:
+            co=obj.matrix_world@obj.data.vertices[obj.data.loops[li].vertex_index].co
+            uv.data[li].uv=((co.x+7.2)/35.3,(-co.y+3.5)/4)
+            detail.data[li].uv=(co.x/.8,-co.y/.8)
 # Tangent-space normal/roughness map replaces all pyramid geometry. Its three
 # rows and alternating column offset match the old molded rubber pattern.
 W,H=256,1024
@@ -138,11 +183,13 @@ for mat,objects in groups.items():
     objects[0].data.materials.clear();objects[0].data.materials.append(mat)
     for p in objects[0].data.polygons:p.material_index=0
 optimized=metrics()
-export('table-player-rails-optimized.glb')
+export('table-player-rails-optimized.pending.glb')
+(OUT/'table-player-rails-optimized.pending.glb').replace(OUT/'table-player-rails-optimized.glb')
 for im in bpy.data.images:
     if im.name.startswith('table-'):im.pack()
-bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails-optimized.blend'),compress=True)
-stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash}
+bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails-optimized.pending.blend'),compress=True)
+(SOURCE/'table-player-rails-optimized.pending.blend').replace(SOURCE/'table-player-rails-optimized.blend')
+stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10}
 (OUT/'table-player-rails-optimized-stats.json').write_text(json.dumps(stats,indent=2)+'\n')
 # Matched overview and grazing-angle proof renders. Neither lights nor board
 # plane are part of the exported optimized asset.

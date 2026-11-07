@@ -38,6 +38,7 @@ jobs:
       - run: npm run test:odds
       - run: npm run test:payout
       - run: npm run test:layout
+      - run: npm run test:learn
       - run: npm run test:graphics
       - uses: actions/upload-artifact@v4
         if: always()

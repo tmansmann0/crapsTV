@@ -4,7 +4,7 @@ The optimized files are separate variants. The previous table/variant sources an
 
 | Asset | Before | Optimized | Reduction |
 | --- | --- | --- | --- |
-| Player table triangles | 217,448 | 30,510 | 86.0% |
+| Player table triangles | 217,448 | 34,926 | 83.9% |
 | Player table mesh/material draws per pass | 102 | 7 | 93.1% |
 | Chip triangles | 10,098 | 1,984 | 80.4% |
 
@@ -37,8 +37,10 @@ Validation includes exact crown-vertex comparison, all 120 tray-floor positions,
 
 ## Measured runtime result
 
-An isolated twelve-player game at 1600×1000 on Chrome/ANGLE Metal, Apple M5 Pro, measured 15.00 FPS before changes and 60.00 FPS after. Idle draw calls fell from 544 to 97; triangles drawn per frame, including shadow work, fell from 4,637,532 to about 485,000. A separate cinematic throw run also measured 60.00 FPS. These measurements describe this machine and scene, not a guarantee for every GPU.
+An isolated twelve-player game at 1600×1000 on Chrome/ANGLE Metal, Apple M5 Pro, measured 15.00 FPS before changes and 60.00 FPS after. Idle draw calls fell from 544 to 97; triangles drawn per frame, including shadow work, fell from 4,637,532 to about 490,000. A separate cinematic throw run also measured 60.00 FPS. These measurements describe this machine and scene, not a guarantee for every GPU.
 
 The original renderer deliberately capped hardware frames at 15 FPS idle and 30 FPS during throws. Hardware now renders on every animation frame. Fixed lighting reuses its shadow map until objects move, change, or switch detail. Compatible chip materials share instances, wagers share one set of batches, and stationary banks are rebuilt only when state or visible chip transfers change. Chips switch between detailed/low-detail geometry using projected size with a 28–36 pixel hysteresis band; close views keep full geometry, textures and wear maps.
 
 Run `npm run benchmark` for the idle scene. Set `BENCH_ROLL=1` for a throw and `BENCH_LABEL=custom-name` for separate JSON/screenshot output in `artifacts/`. Each run uses its own temporary server, twelve test players, and a real WebGL browser; it does not join existing rooms.
+
+The final tray pass removes overlapping base/rim bands on all twelve trays and fixes degenerate horizontal wood UVs. Denser corner arcs preserve close-up silhouettes; the final active table has 34,926 triangles. See [table materials](table-materials.md) for the coordinated PBR finish.

@@ -5,16 +5,16 @@
     "materialPrimitives": 102
   },
   "afterRetopology": {
-    "triangles": 30510,
+    "triangles": 34926,
     "meshes": 94,
     "materialPrimitives": 94
   },
   "after": {
-    "triangles": 30510,
+    "triangles": 34926,
     "meshes": 7,
     "materialPrimitives": 7
   },
-  "triangleReductionPercent": 85.96905926934255,
+  "triangleReductionPercent": 83.9382289099003,
   "meshReductionPercent": 93.13725490196079,
   "materialDrawCalls": 7,
   "removedHiddenObjects": [
@@ -94,5 +94,80 @@
     "assets/source/table.blend": "274ea9a45126fb5156886385f895ced91770b83a67e7256809a08b40085e60d6",
     "public/assets/table-player-rails.glb": "21c060786e221e769061d6799c1590c115b2693408cd604a075d6a4c14ac4fef",
     "assets/source/table-player-rails.blend": "07f9660f1d2b89621a5164656a797e3aceeb89b4767ff10c5cde4544471ecd12"
-  }
+  },
+  "traySeamValidation": [
+    {
+      "seat": 0,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 1,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 2,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 3,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 4,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 5,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 6,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 7,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 8,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 9,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 10,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    },
+    {
+      "seat": 11,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false
+    }
+  ],
+  "trayCornerSegments": 10
 }

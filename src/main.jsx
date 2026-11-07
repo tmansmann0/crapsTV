@@ -301,7 +301,13 @@ function App() {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
   useAnnouncer(state, sound && view === "tv");
-  const send = (message) => transport.current?.send(message),
+  const send = (message) => {
+      if (message.type === "bet") {
+        clearTimeout(errorTimer.current);
+        setError("");
+      }
+      transport.current?.send(message);
+    },
     player = state?.players.find((p) => p.id === playerId),
     isAdmin = playerId && state?.adminId === playerId;
   function join(e) {

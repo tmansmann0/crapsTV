@@ -41,7 +41,7 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Classic craps or crapless craps.** Rules lock at the start; teach mode can change during play.
 - **Starting stack and table minimum.** The first player chooses both.
 - **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
-- **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The visual practice tutorial and rules/payout guide are always available.
+- **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The animated Learn lessons remain available, with simple explanations and local Classic/Crapless examples.
 - **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Taking odds lives directly below Pass Line on the main board, with current stake, legal increments, remaining capacity, and quick amounts. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
 - **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw. The authority securely randomizes the launch, simulates the dice until they settle, and reads the upper faces. Those exact physical poses remain unchanged after landing.
 - **Re-up without losing your story.** With no open bets and total chips below the minimum, refill to the starting stack. Added chips count as new buy-in, never as winnings.
@@ -59,12 +59,15 @@ npx playwright install chromium
 npm run test:e2e        # starts an isolated local server; TV + two phones
 npm run test:odds       # isolated real-rules phone odds/layout checks
 npm run test:graphics   # actual WebGL settings, calibration and persistence checks
+npm run test:learn      # animated lesson rules, controls and phone fit
+npm run test:payout     # board-to-bank payout presentation
+npm run test:layout     # stable Play layout across interaction states
 npm run test:online     # optional live PeerJS test against the published site
 npm run benchmark       # isolated twelve-player WebGL frame/draw benchmark
 npm run format          # format source, tests, and workflows
 ```
 
-CI tests and builds on Ubuntu, Windows, and macOS. The browser test covers first-player admin, a second phone, chip bundling/drag placement, practice without changing the live bank, shared swipe throws, visual roll results, a phone reload, ending the session, and a downloaded PNG. Dice/payout tests exercise both modes and wagering edge cases. Visual snapshots are saved locally to ignored `artifacts/`.
+CI tests and builds on Ubuntu, Windows, and macOS. The browser test covers first-player admin, a second phone, chip bundling/drag placement, animated lessons without changing the live bank, shared swipe throws, visual roll results, a phone reload, ending the session, and a downloaded PNG. Dice/payout tests exercise both modes and wagering edge cases. Visual snapshots are saved locally to ignored `artifacts/`.
 
 Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publish crapsTV** and select the source branch; `main` also publishes after merge. Pages must be set to **GitHub Actions**. A PR can be reviewed without merging; publishing a chosen branch does not merge it.
 
@@ -78,7 +81,8 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `server/local-discovery.js` | mDNS hostname advertisement, collision handling, and LAN-IP fallback |
 | `src/transport.js` | Local sockets or online PeerJS room transport |
 | `src/Table3D.jsx` | Blender models, finite HDR backdrop, cinematic shared dice playback |
-| `src/PhoneGame.jsx` | Compact phone board, chip bundles, results, and safe practice tutorial |
+| `src/PhoneGame.jsx` | Stable phone board, chip bundles and animated payout results |
+| `src/LearnCenter.jsx` | Short animated lessons, examples and playback controls |
 | `src/DiceThrow.jsx` | 3D phone dice, aim gestures, and shared trajectory playback |
 | `src/throw-motion.js` | Authority-generated physics timeline and stateless frame sampling |
 | `public/assets/` | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
@@ -118,6 +122,8 @@ For the requested 3D-room illusion, the HDR image is wrapped on a finite 42-unit
 
 [Phone interface and throw synchronization](docs/phone-and-throws.md).
 
-The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the display refresh rate. Close camera views retain the original detailed chips.
+The display now uses a [retopologized table and distance-based chip detail](docs/asset-optimization.md). Rubber-wall relief is normal mapped, compatible static meshes share material batches, and hardware rendering follows the selected 24/30/60 FPS limit. Close camera views retain the original detailed chips.
 
 The TV gear also opens [Graphics](docs/graphics.md): Auto/24/30/60 FPS, antialiasing, render resolution, chip detail, and 1K/2K/native texture caps. A short startup camera sequence calibrates automatic defaults; explicit choices persist. Admin phones can change TV graphics without touching the game ledger.
+
+Table finishes now use [calibrated PBR materials](docs/table-materials.md): satin walnut, textured leather, matte rubber and restrained brass, with consistent roughness and normal maps.

@@ -163,6 +163,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     ).toBeVisible();
     await phone.getByRole("button", { name: /Place \$5/ }).press("Enter");
     await expect(phone.locator(".pg-wallet")).toContainText("$23");
+    await expect(phone.locator(".toast")).toHaveCount(0);
     await phone
       .getByRole("button", { name: "Add $5 chip", exact: true })
       .click();
@@ -201,15 +202,33 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     const bankBefore = await phone.locator(".pg-wallet dd").allTextContents();
     await phone.getByRole("tab", { name: "Learn", exact: true }).click();
     await phone
-      .getByRole("button", { name: "Add $5 chip", exact: true })
-      .click();
-    await phone
-      .getByRole("button", { name: "Add $5 chip", exact: true })
-      .click();
-    await phone.locator('[data-bet-id="practice-pass"]').click();
-    await phone.getByRole("button", { name: /Place \$10/ }).click();
-    await phone.getByRole("button", { name: "Throw practice dice" }).click();
-    await expect(phone.locator(".pg-practice-result")).toBeVisible();
+      .getByRole("combobox", { name: "Choose a lesson" })
+      .selectOption("odds");
+    await phone.getByRole("button", { name: "Next step", exact: true }).click();
+    await expect(phone.locator(".learn-center")).toHaveAttribute(
+      "data-step",
+      "1",
+    );
+    await expect(phone.locator(".lc-caption")).toContainText("behind Pass");
+    await phone.setViewportSize({ width: 375, height: 640 });
+    await expect
+      .poll(() =>
+        phone.evaluate(() => {
+          const controls = document
+            .querySelector(".lc-controls")
+            ?.getBoundingClientRect();
+          const nav = document
+            .querySelector(".pg-nav")
+            ?.getBoundingClientRect();
+          return !!controls && !!nav && controls.bottom <= nav.top + 1;
+        }),
+      )
+      .toBe(true);
+    await capture(phone, {
+      path: "artifacts/learn-integrated-375.png",
+      fullPage: true,
+    });
+    await phone.setViewportSize({ width: 390, height: 844 });
     expect(await phone.locator(".pg-wallet dd").allTextContents()).toEqual(
       bankBefore,
     );

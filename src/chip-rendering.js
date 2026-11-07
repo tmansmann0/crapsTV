@@ -91,9 +91,12 @@ export async function createChipFactory(renderer) {
         material.color.set(chipDenomination(denomination).color);
       if (/^Chip(Base|Inlay)/.test(original.name)) {
         material.normalMap = normalMaps[wear];
-        material.normalScale.set(0.48, 0.48);
+        material.normalScale.set(0.28, 0.28);
         material.roughnessMap = roughnessMaps[wear];
-        material.roughness = 0.78;
+        // The texture contains the final clay roughness; do not polish it by
+        // multiplying it down a second time. Resin dice have a separate finish.
+        material.roughness = 1;
+        material.metalness = 0;
       }
       material.envMapIntensity = 0.75;
       if (opacity < 1) {

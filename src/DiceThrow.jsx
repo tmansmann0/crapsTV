@@ -65,13 +65,18 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       const room = new RoomEnvironment();
       environment = pmrem.fromScene(room, 0.04);
       scene.environment = environment.texture;
+      // The broad studio panels otherwise wash dyed resin toward pastel.
+      // Keep a reflected highlight while preserving the player's base color.
+      scene.environmentIntensity = 0.35;
       room.dispose();
     }
-    scene.add(new THREE.HemisphereLight(0xfff7e8, 0x243543, 1.2));
-    const light = new THREE.DirectionalLight(0xffedce, 2.4);
+    scene.add(
+      new THREE.HemisphereLight(0xfff7e8, 0x243543, software ? 0.9 : 0.65),
+    );
+    const light = new THREE.DirectionalLight(0xffedce, software ? 2 : 1.6);
     light.position.set(-2, 6, 4);
     scene.add(light);
-    const rim = new THREE.DirectionalLight(0x8fdaca, 1.5);
+    const rim = new THREE.DirectionalLight(0x8fdaca, software ? 1 : 0.75);
     rim.position.set(3, 2, -4);
     scene.add(rim);
     const dice = [new THREE.Group(), new THREE.Group()];
@@ -254,6 +259,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
       environment?.dispose();
       pmrem?.dispose();
       renderer.dispose();
+      renderer.forceContextLoss();
       renderer.domElement.remove();
     };
   }, []);

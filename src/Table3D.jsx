@@ -8,6 +8,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { disposeModel } from "./three-resources.js";
 import { createSceneUI } from "./scene-ui.js";
 import { createTablePieces } from "./table-pieces.js";
+import { createTableMaterials } from "./table-materials.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
 import { assetURL as asset } from "./asset-url.js";
@@ -95,6 +96,7 @@ export default function Table3D(props) {
       stageReady = false,
       warming = false,
       stageError = "";
+    let tableMaterials = null;
     const { software } = configureRenderer(renderer);
     capabilities.software = software;
     capabilities.maxTextureSize = renderer.capabilities.maxTextureSize;
@@ -173,6 +175,7 @@ export default function Table3D(props) {
       far: 30,
     });
     key.shadow.bias = -0.0002;
+    key.shadow.normalBias = 0.02;
     scene.add(key);
     const rim = new THREE.DirectionalLight(0xf3d4a3, 1.1);
     rim.position.set(7, 4, -7);
@@ -300,20 +303,27 @@ export default function Table3D(props) {
           if (value?.isTexture && value !== environmentTarget?.texture)
             textureQuality.register(value);
     }
-    loader.load(
-      asset("table-player-rails-optimized.glb"),
-      (g) => {
+    Promise.all([
+      loader.loadAsync(asset("table-player-rails-optimized.glb")),
+      createTableMaterials(renderer),
+    ])
+      .then(([g, materials]) => {
         if (alive) {
-          scene.add(addObject(g.scene));
+          tableMaterials = materials;
+          for (const texture of materials.textures)
+            textureQuality.register(texture);
+          scene.add(addObject(materials.apply(g.scene)));
           pieces.installDealerRack(g.scene);
           tableLoaded = true;
-        } else disposeModel(g.scene);
-      },
-      undefined,
-      () => {
-        stageError = "Table model could not load. Refresh to retry.";
-      },
-    );
+        } else {
+          disposeModel(g.scene);
+          materials.dispose();
+        }
+      })
+      .catch(() => {
+        stageError =
+          "Table model or materials could not load. Refresh to retry.";
+      });
     const detailLoader = new THREE.TextureLoader();
     const loadDetail = (name) =>
       detailLoader.load(
@@ -823,6 +833,7 @@ export default function Table3D(props) {
       controls.dispose();
       ui.dispose();
       pieces.dispose();
+      tableMaterials?.dispose();
       el.removeEventListener("pointerdown", pointerDown, true);
       el.removeEventListener("pointerup", pointerUp);
       el.removeEventListener("pointermove", pointerMove);

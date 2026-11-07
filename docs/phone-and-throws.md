@@ -21,3 +21,9 @@ The mobile Roll view is a dice close-up with a dark background. It uses the same
 Winning chips then appear at the matching betting area. The label separates profit from a returned stake; standing place/hardway bets show profit while the stake stays on the table. After a short explanation hold, the chips travel to Bank and its displayed amount updates on arrival. This is presentation only: the server ledger remains authoritative. Historical results and reconnect snapshots do not replay credits. Reduced-motion mode shows the explanation without the flight.
 
 The Play board now reserves one fixed feedback area for quick amounts, validation and confirmation. The compact result strip and re-up controls retain their layout space. Browser measurements at 390×844 and 375×640 found zero change in the board's top or height across 15 interaction states, compared with roughly 45–50px of movement before.
+
+## Animated Learn
+
+Learn is a separate, lazily loaded visual guide. It shows one short concept at a time: Pass line, the point, taking odds, Place bets, Field, Hardways, and Don’t Pass in classic mode. Chips, dice and the puck animate between explicit steps; the captions explain where the stake and profit go. Play/Pause, Replay and step controls keep the pace optional. A local Classic/Crapless selector changes only the examples, never the live room.
+
+The lessons use literal example IDs and read payout definitions from the same catalogue as play. They do not call game actions, create a new room, or need secure-context UUID APIs. Browser checks freeze the supplied game state and verify it remains unchanged through every lesson and mode. Reduced motion disables movement and automatic playback while retaining manual steps.

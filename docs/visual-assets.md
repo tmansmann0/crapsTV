@@ -37,3 +37,7 @@ Tool option: `transparent_background: true`.
 ## Verification
 
 All three generated images were visually inspected. The logo spells `crapsTV` correctly. Image metadata confirms alpha for the logo and chip, no alpha for the panorama, and a 2:1 aspect ratio for the panorama. No resizing, artificial HDR conversion, or image manipulation was used.
+
+## Scanned wood PBR source
+
+The darker satin wood material derives from [Poly Haven Dark Wood](https://polyhaven.com/a/dark_wood), [CC0-1.0](https://polyhaven.com/license), by Dimitrios Savva (photography), Dario Barresi (baking), and Rico Cilliers (tiling). Bundled source diffuse/normal/roughness maps and provenance live under `assets/source/materials/dark-wood/`. The runtime maps are color adjusted and resized; normals and roughness remain spatially matched. See [table materials](table-materials.md).
