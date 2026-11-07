@@ -86,3 +86,32 @@ def apply_wood_uv(objects, material):
                 detail.data[li].uv=wood_uv(co,face.normal,bounds,obj.name,face.center)
             count+=1
     return count
+
+
+def rebuild_wood_normals(objects, material):
+    """Regenerate shading only after the final UV-seam/topology operations.
+
+    BMesh dissolve/bisect changes corner indexing; copied custom split normals
+    from the earlier weighted-normal modifier no longer describe those corners.
+    Planar horizontal surfaces have exact face normals. Curved/beveled bands
+    retain smooth, face-area/angle-weighted shading instead of faceted lighting.
+    """
+    import bpy
+    results=[]
+    for obj in objects:
+        if obj.type!='MESH' or not obj.data.materials or obj.data.materials[0]!=material:
+            continue
+        bpy.ops.object.select_all(action='DESELECT')
+        obj.select_set(True);bpy.context.view_layer.objects.active=obj
+        mesh=obj.data
+        if mesh.has_custom_normals:
+            bpy.ops.mesh.customdata_custom_splitnormals_clear()
+        flat=0
+        for face in mesh.polygons:
+            if abs(face.normal.z)>.999:
+                face.use_smooth=False;flat+=1
+        modifier=obj.modifiers.new('Final topology wood normals','WEIGHTED_NORMAL')
+        modifier.mode='FACE_AREA_WITH_ANGLE';modifier.keep_sharp=True
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+        results.append({'part':obj.name,'planarHorizontalFaces':flat,'customNormalsRegenerated':True})
+    return results

@@ -367,6 +367,111 @@
     }
   ],
   "cupholderProfileVersion": 1,
+  "woodShading": {
+    "version": 1,
+    "finalTopologyNormals": [
+      {
+        "part": "Continuous player chip shelf",
+        "planarHorizontalFaces": 120,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Dealer walnut chip rack",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Player shelf supporting apron",
+        "planarHorizontalFaces": 118,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Raised walnut wall chassis",
+        "planarHorizontalFaces": 90,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 1 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 10 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 11 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 12 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 2 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 3 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 4 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 5 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 6 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 7 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 8 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 9 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Substantial walnut apron",
+        "planarHorizontalFaces": 72,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut lower plinth",
+        "planarHorizontalFaces": 97,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut trestle pedestal",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut trestle pedestal.001",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      }
+    ]
+  },
   "woodUV": {
     "version": 2,
     "faces": 8069,

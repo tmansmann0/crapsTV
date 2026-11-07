@@ -8,7 +8,7 @@ from mathutils import Vector
 ROOT=Path(__file__).resolve().parents[1];OUT=ROOT/'public/assets';SOURCE=ROOT/'assets/source'
 sys.dont_write_bytecode=True
 sys.path.insert(0,str(ROOT/'scripts'))
-from table_wood_uv import apply_wood_uv,prepare_miter_seams
+from table_wood_uv import apply_wood_uv,prepare_miter_seams,rebuild_wood_normals
 from table_cupholders import rebuild_cupholders
 preserve=[OUT/'table.glb',SOURCE/'table.blend',OUT/'table-player-rails.glb',SOURCE/'table-player-rails.blend']
 before_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}
@@ -190,6 +190,7 @@ tex=texture_node(rubber,rough,'Detail UV');rubber.node_tree.links.new(tex.output
 # collision bounds, UV0, other material maps and the seven draw batches stay put.
 prepare_miter_seams(list(bpy.data.objects),wood)
 wood_faces=apply_wood_uv(list(bpy.data.objects),wood)
+wood_normal_checks=rebuild_wood_normals(list(bpy.data.objects),wood)
 # Keep the editable source and the standalone GLB consistent with the runtime
 # PBR override. All three scan maps share the same board-local UV transform.
 nodes=wood.node_tree.nodes;nodes.clear()
@@ -231,7 +232,7 @@ for im in bpy.data.images:
     if im.name.startswith('table-'):im.pack()
 bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'table-player-rails-optimized.pending.blend'),compress=True)
 (SOURCE/'table-player-rails-optimized.pending.blend').replace(SOURCE/'table-player-rails-optimized.blend')
-stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10,'replacedLegacyCupObjects':legacy_cups,'cupholderValidation':cup_checks,'cupholderProfileVersion':1,'woodUV':{'version':2,'faces':wood_faces,'mapping':'Board-local mitered panels and upright leg grain; physical UV1'}}
+stats={'before':baseline,'afterRetopology':premerge,'after':optimized,'triangleReductionPercent':100*(1-optimized['triangles']/baseline['triangles']),'meshReductionPercent':100*(1-optimized['meshes']/baseline['meshes']),'materialDrawCalls':optimized['materialPrimitives'],'removedHiddenObjects':removed,'model':'table-player-rails-optimized.glb','layout':'table-player-rails-layout.json','preservedSha256':before_hash,'traySeamValidation':tray_checks,'trayCornerSegments':10,'replacedLegacyCupObjects':legacy_cups,'cupholderValidation':cup_checks,'cupholderProfileVersion':1,'woodShading':{'version':1,'finalTopologyNormals':wood_normal_checks},'woodUV':{'version':2,'faces':wood_faces,'mapping':'Board-local mitered panels and upright leg grain; physical UV1'}}
 (OUT/'table-player-rails-optimized-stats.json').write_text(json.dumps(stats,indent=2)+'\n')
 if '--no-preview' in sys.argv:
     after_hash={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in preserve}
