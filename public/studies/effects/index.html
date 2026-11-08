@@ -196,7 +196,7 @@
             selected effects change.
           </p>
         </div>
-        <a href="/">Back to table ↗</a>
+        <a href="../../">Back to table ↗</a>
       </header>
       <nav aria-label="Shot">
         <button data-shot="macro" aria-pressed="true">
@@ -294,6 +294,9 @@
       const before = document.querySelector("#before"),
         after = document.querySelector("#after");
       function update() {
+        document.querySelector("#on-label").textContent = held
+          ? "OFF · held"
+          : "ON";
         before.src = `${shot}-off.webp`;
         const visibleEffect =
           shot === "macro" && effect.startsWith("flares") ? "off" : effect;
