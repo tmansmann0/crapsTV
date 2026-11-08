@@ -13,7 +13,10 @@ const origin = `http://127.0.0.1:${port}`;
 const folder = process.env.AUTO_EFFECTS_OUTPUT || "artifacts/auto-effects";
 const keys = ["lensFlares", "localReflections", "contactShadows"];
 const viewport = process.env.CI
-  ? { width: 800, height: 500 }
+  // SwiftShader needs several presented frames inside a real 2.5s throw.
+  // Keep this resource-freeze proof small; native qualification retains the
+  // full viewport, and dedicated TV tests cover display resolution/readability.
+  ? { width: 480, height: 300 }
   : { width: 1280, height: 800 };
 const errors = [],
   glErrors = [],
@@ -25,7 +28,7 @@ let browser,
   ws,
   state,
   serverLog = "";
-const server = spawn(process.execPath, ["server/index.js", "--dev"], {
+const server = spawn(process.execPath, ["server/index.js"], {
   env: {
     ...process.env,
     PORT: String(port),
