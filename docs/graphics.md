@@ -44,3 +44,51 @@ measurements for this device and workload, not a performance promise for every
 GPU. Board-specific pixel tests and the retained SVG sources are documented in
 [board design](board-design.md); chip source-density and texture-cap checks are
 documented in [chips](chips.md).
+
+
+## Optional effects
+
+Open **Settings → Graphics → Effects** on the TV. Admin phones expose the same
+three switches in Graphics. Each is **Off by default**, persists with the other
+graphics choices, and stays under manual control during automatic calibration.
+
+- **Lens flares:** subtle warm glints from bright lamps in the actual HDR casino.
+  Table geometry occludes them. They appear only when a lamp is in view; top-down
+  play usually has none. Native text and the QR card render afterward.
+- **Local reflections:** a cached 256px HDR view of the nearby table in wood,
+  brass and dice gloss. Six faces update over separate frames only after the
+  dice, aiming and payouts are idle. The previous complete reflection remains
+  during play. This is raster rendering, not ray tracing, and one probe has
+  approximate parallax across the table. Unsupported devices leave it inactive.
+- **Contact shadows:** a 4096px key-light shadow where supported, with a tighter
+  contact bias, for clearer chip/dice grounding. The map changes only when play
+  is idle; turning Off restores the original 2048px shadow and bias.
+
+Enabling reflections can briefly pause the first time shaders and the prefilter
+compile. The measured Apple/Metal prototype had 122–276ms cold updates versus
+0.1–0.7ms warm staged updates. These are opt-in costs, not a universal 4K/60FPS
+guarantee. Both reflection and high-resolution shadow resources are released on
+Off; disabled flares own no GPU resources or rendering pass. A 4096px color/depth
+shadow can add roughly 128MiB while enabled, on top of the retained baseline map. None affects dice
+results, chip balances, or the configured cooldown. See
+[the lighting study](optional-lighting-survey.md) for measured evidence and the
+separate work required for genuine path-traced photographs.
+
+
+### Optional-effect measurements
+
+With all three effects explicitly enabled, full chip geometry, native surface
+maps and antialiasing, the tested Apple M5 Pro produced about **60.0 FPS**
+(**16.8ms P95**) in a twelve-player [native 3840×2160 settled table
+view](benchmarks/optional-effects-native-4k.json). A twelve-player [native
+1920×1080 automatic camera with an actual throw and
+payout](benchmarks/optional-effects-native-1080p-throw.json) produced about
+**59.3 FPS**, also **16.8ms P95**. Both actual scene and UI framebuffers were
+verified, with zero browser errors. The throw run also allocated real visible-lamp
+flare resources and refreshed a completed local probe after settlement.
+
+These six-second warm measurements exclude first-use shader compilation. The
+4K shot is a settled overhead view, where casino lamps are offscreen, so it is
+not evidence for a 4K close-up throw or continuously visible flares. The
+1080p run does include the moving-camera/throw workload. Device-specific results
+remain separate from automatic settings and the effects' Off defaults.

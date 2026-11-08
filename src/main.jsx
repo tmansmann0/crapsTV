@@ -751,12 +751,17 @@ function Phone({
                 resolution: "Resolution",
                 modelDetail: "Model detail",
                 textures: "Textures",
+                lensFlares: "Lens flares",
+                localReflections: "Local reflections",
+                contactShadows: "Contact shadows",
               }).map(([key, label]) => (
                 <label key={key}>
                   {label}
                   <select
                     aria-label={`TV graphics ${label.toLowerCase()}`}
-                    value={state.display?.graphics?.[key] ?? "auto"}
+                    value={
+                      state.display?.graphics?.[key] ?? DEFAULT_GRAPHICS[key]
+                    }
                     disabled={!connected}
                     onChange={(event) =>
                       send({

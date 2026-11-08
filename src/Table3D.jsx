@@ -12,6 +12,9 @@ import { createTableMaterials } from "./table-materials.js";
 import { createTableCompositor } from "./table-compositor.js";
 import { createBoardArtwork } from "./board-artwork.js";
 import { createBoardMaterial } from "./board-material.js";
+import { createLensFlares, findPanoramaFlareSources } from "./lens-flare.js";
+import { createLocalReflections } from "./local-reflections.js";
+import { createContactShadows } from "./contact-shadows.js";
 import { puckHome } from "./puck-layout.js";
 import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
@@ -238,6 +241,12 @@ export default function Table3D(props) {
     key.shadow.bias = -0.0002;
     key.shadow.normalBias = 0.02;
     scene.add(key);
+    const contactShadows = createContactShadows(key, {
+      maxTextureSize: renderer.capabilities.maxTextureSize,
+    });
+    const lensFlares = createLensFlares(renderer);
+    let flareImage = null,
+      flareSources = [];
     const rim = new THREE.DirectionalLight(0xf3d4a3, 1.1);
     rim.position.set(7, 4, -7);
     scene.add(rim);
@@ -444,6 +453,16 @@ export default function Table3D(props) {
       .catch(() => {
         stageError = "Table layout could not load. Refresh to retry.";
       });
+    const localReflections = createLocalReflections(renderer, {
+      scene,
+      board,
+      artwork: boardArtwork,
+    });
+    let reflectionRevision = 0;
+    let reflectionSnapshot = null,
+      reflectionLedger = null;
+    let reflectionState = null;
+    let reflectionEnvironment = null;
     const pieces = createTablePieces(scene, renderer, { software });
     pieces.ready
       .then(() => {
@@ -1250,6 +1269,8 @@ export default function Table3D(props) {
           resolution: `${compositor.plan.sceneWidth} × ${compositor.plan.sceneHeight}`,
           uiResolution: `${compositor.plan.uiWidth} × ${compositor.plan.uiHeight}`,
           device: String(deviceName),
+          reflectionsSupported: localReflections.metrics.supported,
+          contactShadowsSupported: renderer.shadowMap.enabled,
           status: testing ? "testing" : "ready",
           progress: testing
             ? Math.min(1, (time - introStart) / introDuration)
@@ -1338,7 +1359,78 @@ export default function Table3D(props) {
         el.dataset.graphicsIntro = String(testing);
         el.dataset.graphicsPage = ui.settingsPage;
         renderer.info.reset();
+        // Expensive opt-in resources and probe updates wait for quiet play.
+        // They never extend the authority's roll cooldown or alter its ledger.
+        const effectsSafe =
+          stageReady &&
+          !testing &&
+          !s?.rolling &&
+          !aiming &&
+          !pieces.animating &&
+          !s?.players?.some((p) => !p.left && p.betPreview?.amount) &&
+          time >= settlingUntil &&
+          calibrationCanHold(s, throwTime);
+        const contactChanged = contactShadows.setEnabled(
+          quality.contactShadows &&
+            renderer.shadowMap.enabled &&
+            (contactShadows.enabled || effectsSafe),
+        );
+        if (!quality.localReflections || effectsSafe)
+          localReflections.setEnabled(quality.localReflections);
+        if (localReflections.metrics.enabled) {
+          // Camera movement alone doesn't invalidate a cached reflection.
+          // Final dice/puck poses and all chip locations change with the ledger.
+          if (s !== reflectionSnapshot) {
+            reflectionSnapshot = s;
+            reflectionLedger = JSON.stringify([
+              s?.phase,
+              s?.point,
+              mode,
+              s?.lastRoll?.id,
+              s?.throw?.id,
+              s?.players?.map((p) => [
+                p.id,
+                p.seat,
+                p.left,
+                p.connected,
+                p.bank,
+                p.bets,
+                p.dice,
+              ]),
+              s?.puck,
+            ]);
+          }
+          const nextReflectionState = `${reflectionLedger}:${quality.modelDetail}:${contactShadows.enabled}`;
+          if (
+            nextReflectionState !== reflectionState ||
+            reflectionEnvironment !== environmentTarget?.texture
+          ) {
+            reflectionState = nextReflectionState;
+            reflectionEnvironment = environmentTarget?.texture;
+            reflectionRevision++;
+          }
+        }
+        const reflectionStatus = localReflections.update(camera, {
+          safe: effectsSafe,
+          revision: reflectionRevision,
+          time,
+        });
+        el.dataset.localReflections = JSON.stringify(reflectionStatus);
+        el.dataset.localReflectionRevision = String(reflectionRevision);
+        el.dataset.contactShadows = String(contactShadows.enabled);
+        el.dataset.contactShadowsSupported = String(renderer.shadowMap.enabled);
+        el.dataset.contactShadowSize = String(contactShadows.size);
+        lensFlares.setEnabled(quality.lensFlares);
+        el.dataset.lensFlares = String(lensFlares.enabled);
+        if (quality.lensFlares && readyEnvironment?.image !== flareImage) {
+          flareImage = readyEnvironment?.image;
+          flareSources =
+            readyEnvironment && environmentShell
+              ? findPanoramaFlareSources(readyEnvironment, environmentShell)
+              : [];
+        }
         renderer.shadowMap.needsUpdate =
+          contactChanged ||
           !renderedOnce ||
           lodChanged ||
           piecesChanged ||
@@ -1354,6 +1446,10 @@ export default function Table3D(props) {
           el.dataset.boardInkSamples = String(boardArtwork.metrics.samples);
         }
         compositor.render(stageReady ? scene : null, camera);
+        // Real depth occludes lamp glints; native labels and UI render afterward.
+        if (stageReady) lensFlares.render(camera, { sources: flareSources });
+        el.dataset.lensFlareSources = String(lensFlares.activeSources);
+        el.dataset.lensFlareResources = String(lensFlares.allocatedSources);
         if (stageReady && introLiveProbe)
           markLiveCalibrationPresented(liveCalibrationHold, time);
         renderer.clearDepth();
@@ -1421,6 +1517,10 @@ export default function Table3D(props) {
       window.removeEventListener("keydown", skipOpening);
       renderer.domElement.remove();
       const disposeResources = () => {
+        // Restore borrowed original materials/targets before disposing the scene.
+        localReflections.dispose();
+        contactShadows.dispose();
+        lensFlares.dispose();
         textureQuality.dispose();
         ui.dispose();
         compositor.dispose();

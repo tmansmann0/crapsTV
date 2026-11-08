@@ -5,6 +5,9 @@ export const DEFAULT_GRAPHICS = Object.freeze({
   resolution: "auto",
   modelDetail: "auto",
   textures: "auto",
+  lensFlares: "off",
+  localReflections: "off",
+  contactShadows: "off",
 });
 
 const choice = (value, label) => Object.freeze({ value, label });
@@ -39,6 +42,9 @@ export const GRAPHICS_OPTIONS = Object.freeze({
     choice("4k", "4K"),
     choice("native", "Native"),
   ]),
+  lensFlares: Object.freeze([choice("off", "Off"), choice("on", "On")]),
+  localReflections: Object.freeze([choice("off", "Off"), choice("on", "On")]),
+  contactShadows: Object.freeze([choice("off", "Off"), choice("on", "On")]),
 });
 
 function validatedPatch(input) {
@@ -60,7 +66,7 @@ function validatedPatch(input) {
   return patch;
 }
 
-/** Validate a stored/partial configuration and fill missing fields with Auto. */
+/** Fill missing quality fields with Auto and optional effects with Off. */
 export function normalizeGraphics(input = {}) {
   return { ...DEFAULT_GRAPHICS, ...validatedPatch(input) };
 }

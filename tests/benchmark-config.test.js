@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   benchmarkConfig,
   assertBenchmarkResolution,
+  benchmarkEffectsStatus,
 } from "../scripts/benchmark-config.mjs";
 test("native1080p is explicit even when CI is set", () => {
   const c = benchmarkConfig({ CI: "true" });
@@ -69,4 +70,115 @@ test("benchmarks use the Compact default unless Large is explicitly requested", 
   assert.equal(benchmarkConfig({}).uiSize, "compact");
   assert.equal(benchmarkConfig({ BENCH_UI_SIZE: "large" }).uiSize, "large");
   assert.throws(() => benchmarkConfig({ BENCH_UI_SIZE: "huge" }));
+});
+
+test("optional effects are explicitly Off unless all three are requested On", () => {
+  for (const effects of [undefined, "off", "on"]) {
+    const c = benchmarkConfig({ BENCH_EFFECTS: effects });
+    assert.equal(c.effects, effects || "off");
+    for (const key of ["lensFlares", "localReflections", "contactShadows"])
+      assert.equal(c.graphics[key], effects || "off");
+    if (effects === "on") assert.match(c.label, /effects-on$/);
+  }
+  assert.throws(
+    () => benchmarkConfig({ BENCH_EFFECTS: "auto" }),
+    /BENCH_EFFECTS/,
+  );
+});
+
+test("effects On requires actual enabled state and a supported completed probe, not just preferences", () => {
+  const c = benchmarkConfig({ BENCH_EFFECTS: "on" });
+  const effective = {
+    lensFlares: "true",
+    lensFlareSources: "0",
+    lensFlareResources: "0",
+    contactShadows: "true",
+    contactShadowSize: "4096",
+    localReflectionRevision: "2",
+    localReflections: JSON.stringify({
+      enabled: true,
+      supported: true,
+      state: "ready",
+      commits: 2,
+      revision: 2,
+      estimatedBytes: 34777771,
+    }),
+  };
+  const status = benchmarkEffectsStatus(c, effective);
+  assert.equal(status.verified, true);
+  assert.equal(
+    status.actual.lensFlares.visibleSources,
+    0,
+    "offscreen lamps are truthful zero visible flares",
+  );
+  assert.equal(
+    benchmarkEffectsStatus(c, { ...effective, contactShadows: "false" })
+      .verified,
+    false,
+  );
+  for (const patch of [
+    { state: "waiting" },
+    { commits: 0 },
+    { supported: false },
+    { enabled: false },
+    { revision: 1 },
+  ])
+    assert.equal(
+      benchmarkEffectsStatus(c, {
+        ...effective,
+        localReflections: JSON.stringify({
+          ...JSON.parse(effective.localReflections),
+          ...patch,
+        }),
+      }).verified,
+      false,
+    );
+  assert.equal(
+    benchmarkEffectsStatus(c, { graphics: JSON.stringify(c.graphics) })
+      .verified,
+    false,
+  );
+  const duringPlay = { ...effective, localReflectionRevision: "3" };
+  assert.equal(benchmarkEffectsStatus(c, duringPlay).verified, false);
+  const liveStatus = benchmarkEffectsStatus(c, duringPlay, {
+    requireCurrent: false,
+  });
+  assert.equal(
+    liveStatus.verified,
+    true,
+    "live throws retain a valid previous probe by design",
+  );
+  assert.equal(
+    liveStatus.currentProbe,
+    false,
+    "the report still identifies the cached map as stale",
+  );
+});
+
+test("effects Off verifies zero owned resources and rejects missing or malformed telemetry", () => {
+  const c = benchmarkConfig();
+  const effective = {
+    lensFlares: "false",
+    lensFlareSources: "0",
+    lensFlareResources: "0",
+    contactShadows: "false",
+    contactShadowSize: "2048",
+    localReflections: JSON.stringify({
+      enabled: false,
+      state: "off",
+      estimatedBytes: 0,
+    }),
+  };
+  assert.equal(benchmarkEffectsStatus(c, effective).verified, true);
+  assert.equal(
+    benchmarkEffectsStatus(c, { ...effective, lensFlareResources: "1" })
+      .verified,
+    false,
+  );
+  assert.equal(
+    benchmarkEffectsStatus(c, { ...effective, localReflections: "broken" })
+      .verified,
+    false,
+  );
+  assert.equal(benchmarkEffectsStatus(c, {}).verified, false);
 });

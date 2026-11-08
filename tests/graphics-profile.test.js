@@ -82,6 +82,9 @@ test("manual overrides persist even when the automatic profile was lowered", () 
     antialias: true,
     modelDetail: "full",
     textureLimit: 16384,
+    lensFlares: false,
+    localReflections: false,
+    contactShadows: false,
   });
   assert.equal(
     resolveGraphics({ textures: "1k", antialias: "off" }, auto, gpu)
@@ -158,4 +161,24 @@ test("unknown capabilities are safe and invalid manual settings still reject", (
   assert.equal(settings.textureLimit, 2048);
   assert(Number.isFinite(settings.resolutionScale));
   assert.throws(() => resolveGraphics({ fps: "60" }, undefined, gpu));
+});
+
+test("automatic recommendations never enable effects or erase explicit effect choices", () => {
+  for (const capabilities of [
+    gpu,
+    { ...gpu, software: true, deviceMemory: 2 },
+  ]) {
+    const profile = recommendGraphics(capabilities);
+    const automatic = resolveGraphics({}, profile, capabilities);
+    for (const key of ["lensFlares", "localReflections", "contactShadows"])
+      assert.equal(automatic[key], false);
+    const requested = {
+      lensFlares: "on",
+      localReflections: "on",
+      contactShadows: "on",
+    };
+    const lowered = calibrateGraphics(profile, Array(45).fill(100));
+    const manual = resolveGraphics(requested, lowered, capabilities);
+    for (const key of Object.keys(requested)) assert.equal(manual[key], true);
+  }
 });

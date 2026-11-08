@@ -293,31 +293,54 @@ export function createSceneUI(renderer, onAction) {
     finish(p);
 
     p = panels.graphics;
-    p.mesh.visible = !!settingsOpen && settingsPage === "graphics";
+    p.mesh.visible =
+      !!settingsOpen && ["graphics", "effects"].includes(settingsPage);
     c = begin(p);
-    text(c, "‹ Back", 26, 49, 36, C.gold, 600);
-    text(c, "GRAPHICS", 218, 49, 36, C.gold, 700);
+    const effectsPage = settingsPage === "effects";
+    text(
+      c,
+      effectsPage ? "‹ Graphics" : "‹ Back",
+      26,
+      49,
+      effectsPage ? 30 : 36,
+      C.gold,
+      600,
+    );
+    text(c, effectsPage ? "EFFECTS" : "GRAPHICS", 218, 49, 36, C.gold, 700);
     text(c, "×", p.w - 54, 51, 42, C.muted);
     p.mesh.userData.buttons = [
-      { x: 0, y: 0, w: 166, h: 76, action: "graphics:back" },
+      {
+        x: 0,
+        y: 0,
+        w: 166,
+        h: 76,
+        action: effectsPage ? "effects:back" : "graphics:back",
+      },
       { x: p.w - 88, y: 0, w: 88, h: 76, action: "settings" },
     ];
-    const labels = {
-      fps: "Frame rate",
-      antialias: "Antialiasing",
-      resolution: "Resolution",
-      modelDetail: "Model detail",
-      textures: "Textures",
-    };
+    const labels = effectsPage
+      ? {
+          lensFlares: "Lens flares",
+          localReflections: "Local reflections",
+          contactShadows: "Contact shadows",
+        }
+      : {
+          fps: "Frame rate",
+          antialias: "Antialiasing",
+          resolution: "Resolution",
+          modelDetail: "Model detail",
+          textures: "Textures",
+        };
     Object.entries(labels).forEach(([key, label], i) => {
-      const y = 91 + i * 72;
+      const rowHeight = effectsPage ? 110 : 64;
+      const y = 91 + i * rowHeight;
       c.strokeStyle = C.line;
       c.beginPath();
       c.moveTo(26, y - 10);
       c.lineTo(p.w - 26, y - 10);
       c.stroke();
       const option = GRAPHICS_OPTIONS[key].find(
-        (o) => o.value === (graphics[key] ?? "auto"),
+        (o) => o.value === (graphics[key] ?? DEFAULT_GRAPHICS[key]),
       );
       text(c, label, 28, y + 31, TV_TYPE.setting);
       c.textAlign = "right";
@@ -332,14 +355,52 @@ export function createSceneUI(renderer, onAction) {
         600,
       );
       c.textAlign = "left";
+      if (effectsPage)
+        text(
+          c,
+          {
+            lensFlares: "Small glints from room lights",
+            localReflections:
+              graphicsInfo.reflectionsSupported === false
+                ? "Unavailable on this renderer"
+                : "Nearby objects in glossy surfaces",
+            contactShadows:
+              graphicsInfo.contactShadowsSupported === false
+                ? "Unavailable on this renderer"
+                : "Sharper chip and dice grounding",
+          }[key],
+          28,
+          y + 68,
+          26,
+          C.muted,
+        );
       p.mesh.userData.buttons.push({
         x: 0,
         y: y - 10,
         w: p.w,
-        h: 72,
+        h: rowHeight,
         action: `graphics:${key}`,
       });
     });
+    if (effectsPage) {
+      text(c, "Off by default. Your choices are saved.", 28, 451, 28, C.muted);
+    } else {
+      c.fillStyle = "rgba(199,171,115,.12)";
+      c.beginPath();
+      c.roundRect(24, 414, p.w - 48, 56, 10);
+      c.fill();
+      text(c, "Effects", 42, 452, 36, C.gold, 600);
+      c.textAlign = "right";
+      text(c, "›", p.w - 42, 452, 36, C.gold, 600);
+      c.textAlign = "left";
+      p.mesh.userData.buttons.push({
+        x: 24,
+        y: 414,
+        w: p.w - 48,
+        h: 56,
+        action: "graphics:effects",
+      });
+    }
     const measured = Number.isFinite(graphicsInfo.fps)
       ? `${Math.round(graphicsInfo.fps)} FPS`
       : "FPS pending";
@@ -347,8 +408,8 @@ export function createSceneUI(renderer, onAction) {
       c,
       graphicsInfo.device || "This display",
       28,
-      493,
-      36,
+      508,
+      30,
       p.w - 56,
       C.muted,
     );
@@ -358,7 +419,7 @@ export function createSceneUI(renderer, onAction) {
         ? "Measuring this display…"
         : `${measured} · 3D ${graphicsInfo.resolution || "Auto"}`,
       28,
-      532,
+      548,
       36,
       p.w - 56,
     );
@@ -366,14 +427,14 @@ export function createSceneUI(renderer, onAction) {
       c,
       `UI ${graphicsInfo.uiResolution || "Native"} · Maps ${graphicsInfo.textureLabel || "Auto"}`,
       28,
-      570,
+      586,
       36,
       p.w - 56,
       C.muted,
     );
     c.fillStyle = "rgba(199,171,115,.12)";
     c.beginPath();
-    c.roundRect(24, 596, p.w - 48, 68, 10);
+    c.roundRect(24, 620, p.w - 48, 68, 10);
     c.fill();
     text(
       c,
@@ -381,14 +442,14 @@ export function createSceneUI(renderer, onAction) {
         ? "Restart graphics check"
         : "Retest automatic settings",
       42,
-      640,
+      664,
       36,
       C.gold,
       600,
     );
     p.mesh.userData.buttons.push({
       x: 24,
-      y: 596,
+      y: 620,
       w: p.w - 48,
       h: 68,
       action: "graphics:retest",
@@ -681,6 +742,8 @@ export function createSceneUI(renderer, onAction) {
       next.graphicsInfo?.resolution,
       next.graphicsInfo?.uiResolution,
       next.graphicsInfo?.device,
+      next.graphicsInfo?.reflectionsSupported,
+      next.graphicsInfo?.contactShadowsSupported,
       next.graphicsInfo?.status,
       next.graphicsInfo?.textureLabel,
       Math.round((next.graphicsInfo?.progress || 0) * 100),
@@ -829,7 +892,7 @@ export function createSceneUI(renderer, onAction) {
       return settingsPage;
     },
     setSettingsPage(page) {
-      settingsPage = page === "graphics" ? "graphics" : "main";
+      settingsPage = ["graphics", "effects"].includes(page) ? page : "main";
       redraw();
     },
     activate(action) {
@@ -856,6 +919,12 @@ export function createSceneUI(renderer, onAction) {
       } else if (action === "graphics" || action === "graphics:open") {
         settingsPage = "graphics";
         if (!current.settingsOpen) onAction("settings");
+        redraw();
+      } else if (action === "graphics:effects") {
+        settingsPage = "effects";
+        redraw();
+      } else if (action === "effects:back") {
+        settingsPage = "graphics";
         redraw();
       } else if (action === "graphics:back") {
         settingsPage = "main";

@@ -15,6 +15,9 @@ test("graphics default to Auto and advertised options round-trip as exact wire v
     resolution: "auto",
     modelDetail: "auto",
     textures: "auto",
+    lensFlares: "off",
+    localReflections: "off",
+    contactShadows: "off",
   });
   assert(Object.isFrozen(DEFAULT_GRAPHICS));
   for (const [key, options] of Object.entries(GRAPHICS_OPTIONS))
@@ -36,6 +39,9 @@ test("partial graphics updates preserve all prior choices without mutating their
     textures: "1k",
     antialias: "off",
     modelDetail: "auto",
+    lensFlares: "off",
+    localReflections: "off",
+    contactShadows: "off",
   });
   assert.deepEqual(mergeGraphics(undefined, {}), DEFAULT_GRAPHICS);
 });
@@ -62,6 +68,9 @@ test("graphics reject malformed records, unknown keys and invalid option types",
     { modelDetail: "low" },
     { textures: 1024 },
     { textures: "8k" },
+    { lensFlares: true },
+    { localReflections: "auto" },
+    { contactShadows: 1 },
     { fps: 60, unknown: "auto" },
     JSON.parse('{"__proto__":{"polluted":true}}'),
     { [Symbol("fps")]: 60 },
@@ -108,6 +117,29 @@ test("room graphics are independent, admin-only and atomic with display updates"
     assert.throws(() => game.setDisplaySettings(state, a.id, invalid));
     assert.deepEqual(state.display, before);
   }
+});
+
+test("optional lighting switches are admin-only and leave play and the roll deadline untouched", () => {
+  const state = game.createState("FXROOM");
+  const admin = game.join(state, "Admin"),
+    guest = game.join(state, "Guest");
+  const effects = {
+    lensFlares: "on",
+    localReflections: "on",
+    contactShadows: "on",
+  };
+  const before = structuredClone(state);
+  assert.throws(() =>
+    game.setDisplaySettings(state, guest.id, { graphics: effects }),
+  );
+  assert.deepEqual(state, before);
+  game.setDisplaySettings(state, admin.id, { graphics: effects });
+  const after = structuredClone(state);
+  delete before.display;
+  delete after.display;
+  assert.deepEqual(after, before);
+  for (const key of Object.keys(effects))
+    assert.equal(state.display.graphics[key], "on");
 });
 
 test("legacy display state receives automatic graphics without losing sound or camera", () => {

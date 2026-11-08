@@ -9,6 +9,7 @@ import { WebSocket } from "ws";
 import {
   benchmarkConfig,
   assertBenchmarkResolution,
+  benchmarkEffectsStatus,
 } from "./benchmark-config.mjs";
 const config = benchmarkConfig(process.env);
 const { port, label, duration } = config;
@@ -166,6 +167,46 @@ try {
   for (const ws of sockets)
     ws.send(JSON.stringify({ type: "bet", betId: "pass", amount: 2500 }));
   await page.waitForTimeout(1800);
+  const effectsWaitStarted = Date.now();
+  await page.waitForFunction(
+    (expected) => {
+      const d = document.querySelector(".table-canvas")?.dataset;
+      if (!d) return false;
+      try {
+        const requested = JSON.parse(d.graphics),
+          probe = JSON.parse(d.localReflections);
+        if (
+          !["lensFlares", "localReflections", "contactShadows"].every(
+            (key) => requested[key] === expected,
+          )
+        )
+          return false;
+        if (d.lensFlares === undefined || d.contactShadows === undefined)
+          return false;
+        return expected === "off"
+          ? probe.state === "off"
+          : ["unsupported", "error"].includes(probe.state) ||
+              (probe.state === "ready" &&
+                d.localReflectionRevision !== undefined &&
+                probe.revision === Number(d.localReflectionRevision));
+      } catch {
+        return false;
+      }
+    },
+    config.effects,
+    { timeout: 60000 },
+  );
+  const effectsBefore = benchmarkEffectsStatus(
+    config,
+    await page.evaluate(() => ({
+      ...document.querySelector(".table-canvas").dataset,
+    })),
+  );
+  if (!effectsBefore.verified)
+    throw Error(
+      `Effects benchmark mismatch before measurement: ${effectsBefore.reasons.join("; ")}`,
+    );
+  const effectsWarmupMs = Date.now() - effectsWaitStarted;
   await page.evaluate(() => {
     window.__renderBench.frames = [];
     window.__renderBench.record = true;
@@ -204,11 +245,16 @@ try {
     const shots = Object.fromEntries(
       [...shotIntervals].map(([shot, intervals]) => {
         const ordered = [...intervals].sort((a, b) => a - b);
-        return [shot, {
-          intervals: intervals.length,
-          fps: 1000 * intervals.length / intervals.reduce((sum, v) => sum + v, 0),
-          p95Ms: ordered[Math.floor(ordered.length * 0.95)],
-        }];
+        return [
+          shot,
+          {
+            intervals: intervals.length,
+            fps:
+              (1000 * intervals.length) /
+              intervals.reduce((sum, v) => sum + v, 0),
+            p95Ms: ordered[Math.floor(ordered.length * 0.95)],
+          },
+        ];
       }),
     );
     return {
@@ -253,6 +299,15 @@ try {
     sourceMode: config.dev ? "development" : "production",
     ...result,
     errors,
+    effectsBefore,
+    // Live throws intentionally retain the last complete probe while their
+    // scene changes. Only the measurement START must have a current warm map.
+    effectsAfter: benchmarkEffectsStatus(config, result.effective, {
+      requireCurrent: false,
+    }),
+    effectsWarmupMs,
+    effectsTiming:
+      "Warm scene after player/bet setup; reported wait begins after the fixed1800ms setup settle and excludes initial opt-in cold compilation.",
   };
   const dimensions = (value, fallback) => {
     const match = String(value || "").match(/^(\d+)\s*[x×]\s*(\d+)$/);
@@ -297,11 +352,18 @@ try {
       uiFramebuffer: report.uiFramebuffer,
       resolutionVerified: report.resolutionVerified,
       nativeUIVerified: report.nativeUIVerified,
+      effectsBefore: report.effectsBefore,
+      effectsAfter: report.effectsAfter,
+      effectsWarmupMs,
       errors,
       report: `artifacts/${label}.json`,
     }),
   );
   if (report.resolutionFailure) throw new Error(report.resolutionFailure);
+  if (!report.effectsAfter.verified)
+    throw Error(
+      `Effects benchmark mismatch after measurement: ${report.effectsAfter.reasons.join("; ")}`,
+    );
   if (!report.nativeUIVerified && process.env.BENCH_REQUIRE_NATIVE_UI !== "0")
     throw new Error(
       "UI framebuffer is not native. Inspect the report; set BENCH_REQUIRE_NATIVE_UI=0 only to record a known fallback.",

@@ -119,5 +119,8 @@ export function resolveGraphics(requested, profile, capabilities = {}) {
     modelDetail:
       settings.modelDetail === "auto" ? auto.modelDetail : settings.modelDetail,
     textureLimit: Math.min(wantedTexture, hardwareTextureLimit(capabilities)),
+    lensFlares: settings.lensFlares === "on",
+    localReflections: settings.localReflections === "on",
+    contactShadows: settings.contactShadows === "on",
   };
 }

@@ -280,6 +280,9 @@ test("manual FPS, resolution, AA, model and textures survive the startup ramp", 
       antialias: false,
       modelDetail: "full",
       textureLimit: 8192,
+      lensFlares: false,
+      localReflections: false,
+      contactShadows: false,
     });
   }
   const software = startupCandidates(recommended, { software: true });
