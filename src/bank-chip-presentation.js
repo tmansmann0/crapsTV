@@ -177,6 +177,81 @@ function seedFlowPlan(flow, state, wagerSources) {
   };
 }
 
+function queuedWagerSources(plan, state, plans, wagerSources) {
+  const key = routeKey(plan.flow.from);
+  const amount = plan.flow.from.bet.amount ?? plan.flow.sourceAmount;
+  const pile = wagerPileLayout(plan.flow.from, state, amount);
+  const canonical = chipPileSpecs(amount, {
+    diameter: pile.diameter,
+    seed: plan.flow.from.bet.id,
+  });
+  const existing = wagerSources?.get(key) || [];
+  if (
+    existing.length === canonical.length &&
+    existing.every(
+      (chip, index) => chip.denomination === canonical[index].denomination,
+    )
+  )
+    return wagerSources;
+  const pool = new Map(existing.map((chip) => [chip.id, chip]));
+  for (const id of plan.wagerDependencies || []) {
+    const incoming = plans.get(id);
+    if (!incoming) continue;
+    // Root reserves exact flight targets. A coarse frame can skip the arrival
+    // render, so fall back to the same bottom-to-top denomination ordering.
+    const chips = incoming.targetSpecs.length
+      ? [...incoming.targetSpecs].sort((a, b) => a.position[1] - b.position[1])
+      : [...incoming.chips].reverse();
+    for (const chip of chips) if (!pool.has(chip.id)) pool.set(chip.id, chip);
+  }
+  const available = [...pool.values()],
+    candidates = [];
+  for (const geometry of canonical) {
+    const index = available.findIndex(
+      (chip) => chip.denomination === geometry.denomination,
+    );
+    if (index < 0) {
+      const knownValue = [...pool.values()].reduce(
+        (sum, chip) => sum + chip.denomination,
+        0,
+      );
+      const canonicalValue = canonical.reduce(
+        (sum, chip) => sum + chip.denomination,
+        0,
+      );
+      if (plan.wagerDependencies.length && knownValue >= canonicalValue)
+        // A real receipt conversion needs the outgoing handful to clear and
+        // its canonical replacements to finish their short gravity drop.
+        plan.receiptExchangeDelay = 620;
+      return wagerSources;
+    }
+    const chip = available.splice(index, 1)[0];
+    candidates.push({
+      ...geometry,
+      ...chip,
+      diameter: geometry.diameter,
+      thicknessScale: geometry.thicknessScale,
+      position: geometry.position.map(
+        (value, axis) => value + pile.basePosition[axis],
+      ),
+      rotation: [...geometry.rotation],
+    });
+  }
+  return new Map(wagerSources || []).set(key, candidates);
+}
+function dependsOnWager(plan, flowId, plans) {
+  const pending = [...(plan.wagerDependencies || [])],
+    seen = new Set();
+  while (pending.length) {
+    const id = pending.pop();
+    if (id === flowId) return true;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    pending.push(...(plans.get(id)?.wagerDependencies || []));
+  }
+  return false;
+}
+
 /** Render-only event book. Financial amounts and roll timing remain authoritative. */
 export function createBankChipPresentation() {
   const inventory = createBankChipInventory();
@@ -252,14 +327,43 @@ export function createBankChipPresentation() {
       }
     for (const flow of flows)
       if (!plans.has(flow.id) && endOf(flow) > now) {
+        const wagerDependencies =
+          flow.from.kind === "bet" && flow.sourceAmount >= 100
+            ? [...plans.values()]
+                .filter(
+                  (plan) =>
+                    !plan.arrived &&
+                    plan.flow.to.kind === "bet" &&
+                    routeKey(plan.flow.to) === routeKey(flow.from),
+                )
+                .map((plan) => plan.flow.id)
+            : [];
         plans.set(flow.id, {
           flow,
           ...seedFlowPlan(flow, state, wagerSources),
           started: false,
           arrived: false,
           targetSpecs: [],
+          wagerDependencies,
         });
       }
+    const refreshBetSource = (plan) => {
+      if (plan.flow.from.kind !== "bet" || !(plan.flow.sourceAmount >= 100))
+        return;
+      const sources = queuedWagerSources(plan, state, plans, wagerSources);
+      if (plan.wagerDependencies.length)
+        plan.flow.startAt = Math.max(
+          plan.flow.startAt,
+          ...plan.wagerDependencies.map((id) =>
+            plans.has(id)
+              ? endOf(plans.get(id).flow) + (plan.receiptExchangeDelay || 20)
+              : plan.flow.startAt,
+          ),
+        );
+      Object.assign(plan, seedFlowPlan(plan.flow, state, sources));
+    };
+    for (const plan of plans.values())
+      if (!plan.started && !plan.arrived) refreshBetSource(plan);
     // A new throw/reconnect can abandon an in-flight presentation. Credit its
     // already-authoritative incoming chips exactly once before reconciling the
     // bank, rather than minting replacements then resurrecting the old flight.
@@ -303,7 +407,8 @@ export function createBankChipPresentation() {
                   !p.arrived &&
                   p.flow.to.kind === "bank" &&
                   p.flow.playerId === player.id &&
-                  p !== plan,
+                  p !== plan &&
+                  !dependsOnWager(p, plan.flow.id, plans),
               )
               .sort((a, b) => endOf(a.flow) - endOf(b.flow))[0];
             if (incoming) {
@@ -333,6 +438,9 @@ export function createBankChipPresentation() {
           plan.sourceSpecs = plan.chips.map(
             (chip) => sources.get(chip.id) || changed.get(chip.id) || chip,
           );
+        } else {
+          refreshBetSource(plan);
+          if (flow.startAt > now) continue;
         }
         plan.started = true;
       } else if (!start && !plan.arrived) {
@@ -347,6 +455,10 @@ export function createBankChipPresentation() {
         plan.arrived = true;
       }
     }
+    // Keep queued identities ready even if a new throw/reconnect cancels them
+    // before their start; retirement must credit the original physical chips.
+    for (const plan of plans.values())
+      if (!plan.started && !plan.arrived) refreshBetSource(plan);
     const banks = new Map();
     for (const player of players) {
       const target = visualChipAmount(

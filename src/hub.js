@@ -194,6 +194,7 @@ export class RoomHub {
       !this.closed &&
       this.state.status === "playing" &&
       !this.state.rolling &&
+      !this.state.aim?.active &&
       this.state.players.some((p) => !p.left && !p.bot && p.connected)
     );
   }

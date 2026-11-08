@@ -5,6 +5,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import io
 from craps_night import Night
 
 
@@ -90,6 +92,18 @@ class NightTests(unittest.IsolatedAsyncioTestCase):
         self.night.config["ref"] = "--upload-pack=unwanted"
         with self.assertRaises(ValueError):
             await self.night.release()
+
+    async def test_review_tracking_promotes_to_main_after_merge_and_survives_deleted_branch(self):
+        self.night.config.update({"preview_pr": 2, "ref": "codex/review", "stable_ref": "main"})
+        with patch("urllib.request.urlopen", return_value=io.BytesIO(b'{"merged_at":null}')):
+            self.assertEqual(await self.night.update_ref(), "refs/pull/2/head")
+        with patch("urllib.request.urlopen", side_effect=OSError("offline")):
+            with self.assertLogs(level="WARNING"):
+                self.assertEqual(await self.night.update_ref(), "refs/pull/2/head")
+        with patch("urllib.request.urlopen", return_value=io.BytesIO(b'{"merged_at":"2026-11-08T18:00:00Z"}')):
+            self.assertEqual(await self.night.update_ref(), "main")
+        with patch("urllib.request.urlopen", side_effect=AssertionError("Merged reviews do not need querying")):
+            self.assertEqual(await self.night.update_ref(), "main")
 
 
 if __name__ == "__main__":

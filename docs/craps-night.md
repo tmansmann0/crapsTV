@@ -25,8 +25,11 @@ release directories are retained; a failed build never replaces the current one.
 - Persistent browser profile: `~/.local/share/crapstv-night/data/browser-profile`.
 - Local state: `~/.local/share/crapstv-night/data/status.json`.
 - Logs: `journalctl --user -u crapstv-night.service`.
-- Default app ref is `main`; a review deployment can explicitly use
-  `codex/craps-tv-bots-and-kiosk` until its kiosk support merges.
+- Default app ref is `main`. This installed review deployment sets `preview_pr: 2`
+  and `stable_ref: "main"`: each On checks the public GitHub PR, follows
+  `refs/pull/2/head` while it is unmerged, then automatically switches to `main`
+  after merge, including squash merges and deleted review branches. A cached
+  decision and complete local release cover temporary network/API failures.
 - HA credentials remain in the existing bridge configuration/token files and
   are never sent to the game or copied into its public repository.
 

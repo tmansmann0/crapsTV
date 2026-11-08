@@ -12,3 +12,4 @@ artifacts/
 .venv*/
 
 *.blend1
+__pycache__/

@@ -21,7 +21,7 @@ import {
   visualChipAmount,
 } from "./chip-flow.js";
 import { createChipFactory, CHIP_DENOMINATIONS } from "./chip-rendering.js";
-import { chipStackPose } from "./chip-character.js";
+import { chipStackPose, chipPoseBounds } from "./chip-character.js";
 import { createWagerChipPresentation } from "./wager-chip-presentation.js";
 import {
   createBankChipPresentation,
@@ -63,13 +63,18 @@ export const SEATS = SEAT_LAYOUT.map((s) => [s.center[0], s.center[2], 0]);
 const hash = (s) =>
   [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
 
-function wagerFlightTargets(plan, state) {
+function wagerFlightTargets(plan, state, current = []) {
   if (plan.flow.to.kind !== "bet") return [];
   const pile = wagerPileLayout(plan.flow.to, state, plan.flow.to.bet.amount);
   const available = pileSpecs(plan.flow.to.bet.amount, {
     diameter: pile.diameter,
     seed: plan.flow.to.bet.id,
   });
+  const temporaryFloor = current.length
+    ? Math.max(...current.map((chip) => chipPoseBounds(chip).max[1])) -
+      pile.basePosition[1] +
+      0.0008
+    : 0;
   return plan.chips.map((chip, index) => {
     const slot = available.findLastIndex(
       (spec) => spec.denomination === chip.denomination,
@@ -89,6 +94,7 @@ function wagerFlightTargets(plan, state) {
         (v, a) =>
           v +
           pile.basePosition[a] +
+          (slot < 0 && a === 1 ? temporaryFloor : 0) +
           (slot < 0 && a === 0
             ? Math.floor(index / 10) * pile.diameter * 1.1
             : 0),
@@ -127,6 +133,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
   const wagerPresentation = createWagerChipPresentation();
   let wagerSources = new Map();
   const receivedWagerFlows = new Set(),
+    departedWagerFlows = new Set(),
     seenExchanges = new Set(),
     wagerDrops = new Map();
   let bankDisplay = {
@@ -664,19 +671,23 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
           !receivedWagerFlows.has(plan.flow.id)
         ) {
           incoming.push(
-            ...wagerFlightTargets(plan, state).sort(
-              (a, b) => a.position[1] - b.position[1],
-            ),
+            ...wagerFlightTargets(
+              plan,
+              state,
+              wagerSources.get(impactStack.id),
+            ).sort((a, b) => a.position[1] - b.position[1]),
           );
           receivedWagerFlows.add(plan.flow.id);
         }
         if (
           plan.flow.from.kind === "bet" &&
           routeKey(plan.flow.from) === impactStack.id &&
-          plan.started
+          plan.started &&
+          !departedWagerFlows.has(plan.flow.id)
         ) {
           outgoingIds.push(...plan.sourceSpecs.map((chip) => chip.id));
           sourceExchangeRemoved.push(...(plan.sourceExchange?.removed || []));
+          departedWagerFlows.add(plan.flow.id);
         }
       }
       const physical = wagerPresentation.reconcile(impactStack.id, canonical, {
@@ -721,9 +732,22 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     });
     wagerPresentation.prune(activeWagerKeys);
     wagerSources = wagerPresentation.sources();
+    for (const specs of wagerSources.values())
+      for (const spec of specs) {
+        const drop = wagerDrops.get(spec.id);
+        if (drop)
+          spec.readyAt =
+            drop.startAt +
+            Math.sqrt(
+              (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
+            ) *
+              1000;
+      }
     chips.userData.layouts = Object.fromEntries(wagerSources);
     for (const id of receivedWagerFlows)
       if (!bankDisplay.plans.has(id)) receivedWagerFlows.delete(id);
+    for (const id of departedWagerFlows)
+      if (!bankDisplay.plans.has(id)) departedWagerFlows.delete(id);
     if (wagerSpecs.length) {
       const batch = chipFactory.createBatch(wagerSpecs);
       batch.name = "Shared wager chip instances";
@@ -1000,7 +1024,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         group.name = `Chip ${flow.kind}`;
         if (bankPlan?.started && bankPlan.chips.length) {
           if (flow.to.kind === "bet")
-            bankPlan.targetSpecs = wagerFlightTargets(bankPlan, state);
+            bankPlan.targetSpecs = wagerFlightTargets(
+              bankPlan,
+              state,
+              wagerSources.get(routeKey(flow.to)),
+            );
           const specs = bankPlan.chips.map((chip, index) => {
             const pose = chipStackPose(`handful:${flow.id}`, index % 10, {
               diameter: 0.23,
@@ -1478,6 +1506,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         wagerPresentation.clear();
         wagerSources = new Map();
         receivedWagerFlows.clear();
+        departedWagerFlows.clear();
         seenExchanges.clear();
         wagerDrops.clear();
         landingPlan = null;
@@ -1536,8 +1565,14 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         wagerPresentation.clear();
         wagerSources = new Map();
         receivedWagerFlows.clear();
+        departedWagerFlows.clear();
         seenExchanges.clear();
         wagerDrops.clear();
+        for (const exchange of exchangeObjects.values()) {
+          clearGroup(exchange.group);
+          exchange.group.removeFromParent();
+        }
+        exchangeObjects.clear();
       }
       previousState = state;
       snapshotRef = state;
@@ -1562,6 +1597,23 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     for (const flow of flows)
       if (flow.presentationMode === "fit-window")
         flow.cutAt = Math.min(flow.presentationDeadline, state.nextRollAt);
+    // A take-down may arrive while the dealer's replacement chips are still
+    // dropping. Preserve their real source and wait for that visual receipt;
+    // this never changes the authority's betting window or next roll.
+    for (const flow of flows)
+      if (
+        flow.from.kind === "bet" &&
+        flow.sourceAmount > 0 &&
+        !bankDisplay.plans.get(flow.id)?.started
+      ) {
+        const readyAt = Math.max(
+          0,
+          ...(wagerSources.get(routeKey(flow.from)) || []).map(
+            (chip) => chip.readyAt || 0,
+          ),
+        );
+        flow.startAt = Math.max(flow.startAt, readyAt);
+      }
     if (chipFactory)
       bankDisplay = bankPresentation.sync(state, flows, now, {
         seats: seatLayout,
@@ -1641,6 +1693,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       wagerPresentation.clear();
       wagerSources.clear();
       receivedWagerFlows.clear();
+      departedWagerFlows.clear();
       seenExchanges.clear();
       wagerDrops.clear();
       landingPlan = null;

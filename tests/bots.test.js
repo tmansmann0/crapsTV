@@ -208,6 +208,36 @@ test("bots pause without connected humans; a spectator cannot restart them, reco
   assert.equal(hub.state.rolling, true);
 });
 
+test("a human host holding aim pauses bot autoplay and canceling aim starts a fresh bot delay", (t) => {
+  const { hub, time, human } = hubTable(t, { cooldown: 0 });
+  giveBotDice(hub);
+  time.advance(1000);
+  hub.receive("host", {
+    type: "aim",
+    aim: { active: true, x: -0.25, power: 0.6 },
+  });
+  assert.equal(hub.state.aim?.playerId, human.id);
+  assert.equal(hub.state.botRollAt, null);
+  assert.equal(time.pending, 0);
+  time.advance(6000);
+  assert.equal(
+    hub.state.rolling,
+    false,
+    "A timer must not throw while a human is holding the dice",
+  );
+  assert.equal(hub.state.aim?.active, true);
+  hub.receive("host", {
+    type: "aim",
+    aim: { active: false, x: -0.25, power: 0.6 },
+  });
+  assert.equal(hub.state.aim, null);
+  assert.equal(hub.state.botRollAt, time.now() + 5000);
+  time.advance(4999);
+  assert.equal(hub.state.rolling, false);
+  time.advance(1);
+  assert.equal(hub.state.rolling, true);
+});
+
 test("leaving/transfer never grants host to a bot; removal and session close cancel automatic work", (t) => {
   const { hub, time, human, bot } = hubTable(t);
   giveBotDice(hub);

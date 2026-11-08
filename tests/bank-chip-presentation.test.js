@@ -766,6 +766,264 @@ test("partial take-downs preserve a real matching top chip or explicitly request
   }
 });
 
+test("source dealer change removes actual wager-book identities rather than canonical fallback tokens", () => {
+  const presentation = createBankChipPresentation();
+  const bet = { id: "physical-partial", type: "field", amount: 10000 };
+  const old = state(90000, {
+    players: [{ id: "p", seat: 0, bank: 90000, bets: [bet] }],
+  });
+  presentation.sync(old, [], 1000);
+  const next = state(92500, {
+    snapshotAt: 1100,
+    players: [
+      { id: "p", seat: 0, bank: 92500, bets: [{ ...bet, amount: 7500 }] },
+    ],
+  });
+  const flows = planChipFlows(old, next, { now: 1100 });
+  const pile = wagerPileLayout(flows[0].from, old, 10000);
+  const geometry = chipPileSpecs(10000, {
+    diameter: pile.diameter,
+    seed: bet.id,
+  })[0];
+  const actual = {
+    ...geometry,
+    id: "actual-bank:black:17",
+    appearanceId: "original-black-patina",
+    wear: 2,
+    position: geometry.position.map((v, axis) => v + pile.basePosition[axis]),
+  };
+  const wagerSources = new Map([[routeKey(flows[0].from), [actual]]]);
+  const displayed = presentation.sync(next, flows, 1100, { wagerSources });
+  const plan = displayed.plans.get(flows[0].id);
+  assert(plan.sourceExchange);
+  assert.deepEqual(plan.sourceExchange.removed, [actual]);
+  assert.equal(plan.sourceExchange.removed[0].id, actual.id);
+  assert.equal(
+    plan.sourceExchange.removed[0].appearanceId,
+    actual.appearanceId,
+  );
+  assert.equal(plan.sourceExchange.removed[0].wear, actual.wear);
+  assert(
+    !plan.sourceExchange.removed.some(
+      (chip) => chip.id === `${routeKey(flows[0].from)}:0`,
+    ),
+  );
+});
+
+function rapidUndoPresentation() {
+  const presentation = createBankChipPresentation(),
+    before = state(100000);
+  const original = presentation.sync(before, [], 1000).banks.get("p");
+  const bet = { id: "rapid-field", type: "field", amount: 10000 };
+  const placed = state(90000, {
+    players: [{ id: "p", seat: 0, bank: 90000, bets: [bet] }],
+  });
+  const wager = transfer("rapid-wager", 10000, {
+    from: "bank",
+    to: "bet",
+    startAt: 1100,
+  });
+  wager.to.bet = bet;
+  const placedPlan = presentation
+    .sync(placed, [wager], 1100)
+    .plans.get(wager.id);
+  const returned = transfer("rapid-return", 10000, {
+    from: "bet",
+    to: "bank",
+    startAt: 1200,
+  });
+  returned.from.bet = bet;
+  const queued = presentation
+    .sync(before, [wager, returned], 1200, { wagerSources: new Map() })
+    .plans.get(returned.id);
+  return {
+    presentation,
+    before,
+    original,
+    wager,
+    returned,
+    placedPlan,
+    queued,
+  };
+}
+
+test("an immediate undo waits for its incoming wager and returns the same real chips even across coarse frames", () => {
+  const {
+    presentation,
+    before,
+    original,
+    wager,
+    returned,
+    placedPlan,
+    queued,
+  } = rapidUndoPresentation();
+  assert.equal(returned.startAt, wager.startAt + wager.duration + 20);
+  assert.equal(queued.started, false);
+  assert.deepEqual(queued.chips.map(ident), placedPlan.chips.map(ident));
+  assert(
+    queued.sourceSpecs.every((chip) => chip.position.every(Number.isFinite)),
+  );
+  const started = presentation.sync(
+    before,
+    [wager, returned],
+    returned.startAt,
+    { wagerSources: new Map() },
+  );
+  assert.equal(started.plans.get(returned.id).started, true);
+  assert.deepEqual(
+    started.plans.get(returned.id).chips.map(ident),
+    placedPlan.chips.map(ident),
+  );
+  const done = presentation.sync(
+    before,
+    [returned],
+    returned.startAt + returned.duration,
+  );
+  exact(done, before, [returned], returned.startAt + returned.duration);
+  assertRetained(original, done.banks.get("p"));
+  const seen = done.banks.get("p").chips.map(ident);
+  const after = presentation.sync(
+    before,
+    [],
+    returned.startAt + returned.duration + 100,
+  );
+  assert.deepEqual(
+    after.banks.get("p").chips.map(ident),
+    seen,
+    "Completed/canceled-plan cleanup cannot deposit twice",
+  );
+});
+
+test("a canceled queued undo credits its original wager identities once before the wager has landed", () => {
+  const { presentation, before, original, placedPlan, queued } =
+    rapidUndoPresentation();
+  const gone = presentation.sync(before, [], 1250);
+  assert.equal(queued.retired, true);
+  assertRetained(original, gone.banks.get("p"));
+  assert(
+    placedPlan.chips.every((chip) =>
+      gone.banks.get("p").chips.some((bank) => bank.id === chip.id),
+    ),
+  );
+  const laterState = state(100100),
+    later = presentation.sync(laterState, [], 5000);
+  exact(later, laterState, [], 5000);
+  assertRetained(original, later.banks.get("p"));
+  assert.equal(
+    value(later.banks.get("p").chips) + later.banks.get("p").reserveCents,
+    100100,
+  );
+});
+
+test("a queued undo waits for a receipt denomination exchange to clear before lifting its canonical chip", () => {
+  const presentation = createBankChipPresentation(),
+    before = state(100000);
+  presentation.sync(before, [], 1000);
+  const bet = { id: "purple-receipt", type: "field", amount: 50000 };
+  const placed = state(50000, {
+    players: [{ id: "p", seat: 0, bank: 50000, bets: [bet] }],
+  });
+  const wager = transfer("black-handful", 50000, {
+    from: "bank",
+    to: "bet",
+    startAt: 1100,
+  });
+  wager.to.bet = bet;
+  const departing = presentation
+    .sync(placed, [wager], 1100)
+    .plans.get(wager.id);
+  assert.deepEqual(
+    departing.chips.map((chip) => chip.denomination),
+    Array(5).fill(10000),
+  );
+  const undo = transfer("purple-undo", 50000, {
+    from: "bet",
+    to: "bank",
+    startAt: 1200,
+  });
+  undo.from.bet = bet;
+  const queued = presentation
+    .sync(before, [wager, undo], 1200, { wagerSources: new Map() })
+    .plans.get(undo.id);
+  const contactAt = wager.startAt + wager.duration;
+  assert.equal(undo.startAt, contactAt + 620);
+  assert.equal(queued.receiptExchangeDelay, 620);
+  const pile = wagerPileLayout(wager.to, placed, 50000),
+    geometry = chipPileSpecs(50000, {
+      diameter: pile.diameter,
+      seed: bet.id,
+    })[0];
+  const purple = {
+    ...geometry,
+    id: "dealer-issued-purple",
+    appearanceId: "purple-patina",
+    wear: 2,
+    position: geometry.position.map(
+      (value, axis) => value + pile.basePosition[axis],
+    ),
+  };
+  const wagerSources = new Map([[routeKey(wager.to), [purple]]]);
+  presentation.sync(before, [wager, undo], contactAt + 595, { wagerSources });
+  assert.equal(
+    queued.started,
+    false,
+    "Receiving replacements finish landing before the return begins",
+  );
+  presentation.sync(before, [wager, undo], undo.startAt, { wagerSources });
+  assert.equal(queued.started, true);
+  assert.deepEqual(queued.chips, [
+    {
+      id: purple.id,
+      appearanceId: purple.appearanceId,
+      denomination: 50000,
+      wear: 2,
+    },
+  ]);
+  assert.deepEqual(queued.sourceSpecs, [purple]);
+});
+
+test("a deferred incoming wager keeps its undo queued when funding delays change during a coarse event pass", () => {
+  const presentation = createBankChipPresentation();
+  const empty = state(0);
+  presentation.sync(empty, [], 1000);
+  const wager = transfer("needs-credit", 10000, {
+    from: "bank",
+    to: "bet",
+    startAt: 1500,
+    duration: 1000,
+  });
+  wager.to.bet = { id: "funded", type: "field", amount: 10000 };
+  const credit = transfer("bank-credit", 10000, {
+    from: "dealer",
+    to: "bank",
+    startAt: 1050,
+    duration: 3000,
+  });
+  const undo = transfer("queued-undo", 10000, {
+    from: "bet",
+    to: "bank",
+    startAt: 1550,
+    duration: 1000,
+  });
+  undo.from.bet = wager.to.bet;
+  const after = state(10000);
+  presentation.sync(after, [credit, wager, undo], 1100, {
+    wagerSources: new Map(),
+  });
+  const result = presentation.sync(after, [credit, wager, undo], 2530, {
+    wagerSources: new Map(),
+  });
+  assert.equal(result.plans.get(wager.id).started, false);
+  assert.equal(result.plans.get(undo.id).started, false);
+  assert(undo.startAt >= wager.startAt + wager.duration + 20);
+  assert.equal(result.plans.get(undo.id).arrived, false);
+  assert.equal(
+    wager.startAt,
+    credit.startAt + credit.duration + 20,
+    "An undo cannot be selected as funding for its own not-yet-placed wager",
+  );
+});
+
 test("the full opening preserves every departing stake's denomination, wear and geometry while issuing profits separately", () => {
   const showcase = createStartupShowcase(),
     presentation = createBankChipPresentation();

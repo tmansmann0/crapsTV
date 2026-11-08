@@ -12,6 +12,7 @@ import re
 import signal
 import subprocess
 import urllib.request
+from urllib.parse import urlparse
 
 
 class Night:
@@ -74,7 +75,7 @@ class Night:
             await process.wait()
 
     async def release(self):
-        ref = self.config.get("ref", "main")
+        ref = await self.update_ref()
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]{0,199}", ref) or ".." in ref:
             raise ValueError("Invalid update ref")
         repository = self.config.get("repository", "https://github.com/tmansmann0/crapsTV.git")
@@ -117,6 +118,41 @@ class Night:
                 logging.exception("Update failed; using the last complete local release")
                 return self.current.resolve()
             raise
+
+    async def update_ref(self):
+        """Track an explicit review, then promote to main even after branch deletion."""
+        ref = self.config.get("ref", "main")
+        review = self.config.get("preview_pr")
+        if review is None:
+            return ref
+        if not isinstance(review, int) or isinstance(review, bool) or review < 1:
+            raise ValueError("Invalid preview pull request")
+        cache_path = self.root / "update-track.json"
+        try:
+            cached = json.loads(cache_path.read_text())
+        except (OSError, ValueError):
+            cached = {}
+        if cached.get("merged"):
+            return self.config.get("stable_ref", "main")
+        repository = self.config.get("repository", "https://github.com/tmansmann0/crapsTV.git")
+        parsed = urlparse(repository)
+        slug = parsed.path.removesuffix(".git").strip("/")
+        if parsed.hostname != "github.com" or not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", slug):
+            raise ValueError("Preview tracking requires a public GitHub repository")
+        def read_review():
+            request = urllib.request.Request(f"https://api.github.com/repos/{slug}/pulls/{review}",
+                headers={"Accept": "application/vnd.github+json", "User-Agent": "crapsTV-night"})
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return json.load(response)
+        try:
+            result = await asyncio.to_thread(read_review)
+            merged = bool(result.get("merged_at"))
+            ref = self.config.get("stable_ref", "main") if merged else f"refs/pull/{review}/head"
+            cache_path.write_text(json.dumps({"ref": ref, "merged": merged}) + "\n")
+            return ref
+        except Exception:
+            logging.warning("Could not check review status; using cached update track")
+            return cached.get("ref", ref)
 
     async def xdo(self, *args, capture=False):
         return await self.run("xdotool", *args, capture=capture, timeout=4)

@@ -104,6 +104,22 @@ test("partial exact withdrawal preserves remaining real chips without a false ex
   assert.deepEqual(next.added, []);
 });
 
+test("a departed chip can return to the same wager and survive later builds when departure events are consumed once", () => {
+  const book = createWagerChipPresentation();
+  const original = book.reconcile("pass", canonical(12500));
+  const black = original.chips.find((chip) => chip.denomination === 10000);
+  book.reconcile("pass", canonical(2500), { outgoingIds: [black.id] });
+  const returned = book.reconcile("pass", canonical(12500), {
+    incoming: [black],
+  });
+  const stable = book.reconcile("pass", canonical(12500));
+  assert.equal(returned.chips[0].id, black.id);
+  assert.deepEqual(stable.chips, returned.chips);
+  assert.deepEqual(stable.added, []);
+  assert.deepEqual(stable.removed, []);
+  assert.equal(stable.exchange, null);
+});
+
 test("incoming bank geometry cannot change canonical wager dimensions or collider transforms", () => {
   const book = createWagerChipPresentation();
   const geometry = canonical(10000)[0];
