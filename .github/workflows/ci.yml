@@ -41,6 +41,7 @@ jobs:
       - run: npm run test:learn
       - run: npm run test:graphics
       - run: npm run test:effects
+      - run: npm run test:flare-hdr
       - run: npm run test:board
       - run: npm run test:surface-parity
         env:

@@ -92,3 +92,24 @@ These six-second warm measurements exclude first-use shader compilation. The
 not evidence for a 4K close-up throw or continuously visible flares. The
 1080p run does include the moving-camera/throw workload. Device-specific results
 remain separate from automatic settings and the effects' Off defaults.
+
+
+## Matched effect comparison
+
+The [4K comparison viewer](../public/studies/effects/index.html) includes a matched
+close-up of actual chip/dice/walnut assets, plus an actual HDR-lamp-facing view.
+Each pair keeps camera, exposure, lights and material parameters identical;
+selectors isolate local reflections, contact shadows or lens flares. Both images
+zoom and pan together. Lossless WebP delivery preserves native GPU pixels, and
+switching Off restores the exact original render. The preserved original-flare
+option shows the 0.14.0 optical treatment under identical lighting.
+
+The 0.14.1 flare uses a wider soft halo and visible but restrained ghosts. Its
+anchor sits slightly inside the faceted HDR shell; the previous tiny offset
+could let that shell suppress its own light marker. Actual HDR-lamp tests now
+cover native and scaled rendering, visible output beyond the white shade,
+solid/instanced-chip occlusion, exact Off restoration and GPU cleanup. A downward
+close-up still has no flare when no actual lamp is in the camera's view.
+
+Generate the comparison with `npm run study:effects` (requires the `cwebp`
+authoring CLI). This is an isolated renderer and never changes a live room.

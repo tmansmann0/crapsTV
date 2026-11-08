@@ -1,6 +1,13 @@
 import * as THREE from "three";
 import { Lensflare, LensflareElement } from "three/addons/objects/Lensflare.js";
 
+// The room's opal shades are broad luminous surfaces. A small point-source
+// halo disappears inside their already-bright pixels, so the optical spread
+// must reach beyond the shade while the displaced ghosts stay restrained.
+const HALO_SIZE = 360;
+const NEAR_GHOST_SIZE = 64;
+const FAR_GHOST_SIZE = 104;
+
 // The addon's stock r*(1-g)*b visibility gives coloured occluders a small
 // nonzero visibility. Count only its actual magenta depth-test markers, so a
 // green table or purple chip cannot leak a faint flare through solid geometry.
@@ -89,9 +96,10 @@ export function findPanoramaFlareSources(
   const separation = 0.045;
   const clusterRadius = 0.027;
   shell.updateWorldMatrix(true, false);
-  // Keep the sample just inside the shell to avoid testing against its own
-  // depth at the same location; this is less than 2cm on the 42m backdrop.
-  const radius = (shell.geometry?.parameters?.radius ?? 42) * 0.9996;
+  // The shell is faceted: a 42m sphere's triangles can lie ~3.5cm inside the
+  // mathematical sphere. Keep the whole 16px visibility sample in front of
+  // that surface, including its depth slope, rather than self-occluding it.
+  const radius = (shell.geometry?.parameters?.radius ?? 42) * 0.9975;
   for (const seed of candidates) {
     if (sources.length >= limit) break;
     if (
@@ -134,7 +142,7 @@ export function findPanoramaFlareSources(
       position,
       color,
       intensity: seed.luminance / peak,
-      size: 76,
+      size: HALO_SIZE,
       u,
       v,
     });
@@ -156,7 +164,7 @@ function radialTexture(ghost = false) {
       const fade = Math.max(0, 1 - radius);
       const alpha = ghost
         ? Math.pow(fade, 1.6) * 0.34
-        : Math.exp(-radius * radius * 7) * fade * 0.65;
+        : Math.exp(-radius * radius * 2) * Math.pow(fade, 0.7) * 0.65;
       const i = (y * edge + x) * 4;
       pixels[i] = pixels[i + 1] = pixels[i + 2] = 255;
       pixels[i + 3] = Math.round(alpha * 255);
@@ -211,9 +219,17 @@ export function createLensFlares(renderer, { maxSources = 6 } = {}) {
   function createEntry() {
     const flare = createOccludingFlare();
     flare.name = "Casino lamp lens flare";
-    const halo = new LensflareElement(radialTexture(), 76, 0);
-    const nearGhost = new LensflareElement(radialTexture(true), 22, 0.48);
-    const farGhost = new LensflareElement(radialTexture(true), 42, 0.78);
+    const halo = new LensflareElement(radialTexture(), HALO_SIZE, 0);
+    const nearGhost = new LensflareElement(
+      radialTexture(true),
+      NEAR_GHOST_SIZE,
+      0.48,
+    );
+    const farGhost = new LensflareElement(
+      radialTexture(true),
+      FAR_GHOST_SIZE,
+      0.78,
+    );
     flare.addElement(halo);
     flare.addElement(nearGhost);
     flare.addElement(farGhost);
@@ -274,15 +290,17 @@ export function createLensFlares(renderer, { maxSources = 6 } = {}) {
             2 -
           1;
         entry.flare.position.copy(projected).unproject(camera);
-        const size = THREE.MathUtils.clamp(source.size ?? 76, 24, 160);
+        const size = THREE.MathUtils.clamp(source.size ?? HALO_SIZE, 24, 480);
         entry.halo.size = size * resolutionScale;
-        entry.nearGhost.size = size * (22 / 76) * resolutionScale;
-        entry.farGhost.size = size * (42 / 76) * resolutionScale;
+        entry.nearGhost.size =
+          size * (NEAR_GHOST_SIZE / HALO_SIZE) * resolutionScale;
+        entry.farGhost.size =
+          size * (FAR_GHOST_SIZE / HALO_SIZE) * resolutionScale;
         entry.halo.color
           .set(source.color ?? 0xffdcaa)
-          .multiplyScalar(0.18 * intensity);
-        entry.nearGhost.color.set(0xd5e7d8).multiplyScalar(0.045 * intensity);
-        entry.farGhost.color.set(0xeed0a5).multiplyScalar(0.035 * intensity);
+          .multiplyScalar(0.22 * intensity);
+        entry.nearGhost.color.set(0xd5e7d8).multiplyScalar(0.14 * intensity);
+        entry.farGhost.color.set(0xeed0a5).multiplyScalar(0.1 * intensity);
         activeSources++;
       }
       if (!activeSources) return;

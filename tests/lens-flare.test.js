@@ -148,7 +148,7 @@ test("HDR emitter discovery follows the finite shell's exact UVs and transform",
   assert.equal(sources.length, 1);
   const u = 16.5 / width,
     v = 21.5 / height;
-  const radius = 42 * 0.9996;
+  const radius = 42 * 0.9975;
   const expected = new THREE.Vector3(
     -radius * Math.cos(u * Math.PI * 2) * Math.sin(v * Math.PI),
     -radius * Math.cos(v * Math.PI),
