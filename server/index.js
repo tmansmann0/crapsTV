@@ -8,6 +8,7 @@ import { WebSocketServer } from "ws";
 import { RoomHub } from "../src/hub.js";
 import { createLocalDiscovery } from "./local-discovery.js";
 import { runtimeOptions } from "./runtime-options.js";
+import { serveBuiltApp } from "./static-app.js";
 const { kiosk } = runtimeOptions();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.PORT || 3000),
@@ -129,8 +130,7 @@ try {
     devServer = vite;
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(root, "dist")));
-    app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
+    serveBuiltApp(app, root);
   }
   resolveAppReady();
   if (!shuttingDown) {

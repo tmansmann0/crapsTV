@@ -31,6 +31,7 @@
     "test:bank-chips": "node tests/bank-chips.browser.mjs",
     "test:admin-ui": "node tests/admin-panel.browser.mjs",
     "test:bots": "node tests/bots.browser.mjs",
+    "test:graphics-persistence": "node tests/graphics-persistence.browser.mjs",
     "test:startup": "node tests/startup.browser.mjs",
     "test:startup-retest": "node tests/startup-retest.browser.mjs",
     "test:effects": "node tests/optional-effects.browser.mjs",
