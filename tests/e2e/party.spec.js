@@ -279,7 +279,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "2",
     );
     await phone.getByRole("button", { name: "Open settings" }).click();
-    await openAdminSection(phone, "Table");
+    await openAdminSection(phone, "TV");
     await phone.getByLabel("TV camera").selectOption("room");
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-camera",
@@ -367,6 +367,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
     await phone.getByRole("button", { name: "Open settings" }).click();
     await openAdminSection(phone, "Table");
+    await phone.locator(".ha-management > summary").click();
     await phone
       .getByRole("button", { name: "Close table for everyone" })
       .click();
