@@ -15,9 +15,9 @@ test("graphics default to Auto and advertised options round-trip as exact wire v
     resolution: "auto",
     modelDetail: "auto",
     textures: "auto",
-    lensFlares: "off",
-    localReflections: "off",
-    contactShadows: "off",
+    lensFlares: "auto",
+    localReflections: "auto",
+    contactShadows: "auto",
   });
   assert(Object.isFrozen(DEFAULT_GRAPHICS));
   for (const [key, options] of Object.entries(GRAPHICS_OPTIONS))
@@ -39,9 +39,9 @@ test("partial graphics updates preserve all prior choices without mutating their
     textures: "1k",
     antialias: "off",
     modelDetail: "auto",
-    lensFlares: "off",
-    localReflections: "off",
-    contactShadows: "off",
+    lensFlares: "auto",
+    localReflections: "auto",
+    contactShadows: "auto",
   });
   assert.deepEqual(mergeGraphics(undefined, {}), DEFAULT_GRAPHICS);
 });
@@ -69,7 +69,7 @@ test("graphics reject malformed records, unknown keys and invalid option types",
     { textures: 1024 },
     { textures: "8k" },
     { lensFlares: true },
-    { localReflections: "auto" },
+    { localReflections: "balanced" },
     { contactShadows: 1 },
     { fps: 60, unknown: "auto" },
     JSON.parse('{"__proto__":{"polluted":true}}'),
@@ -174,4 +174,16 @@ test("graphics revision tracks successful graphics intent independently of sound
     game.setDisplaySettings(state, admin.id, { graphics: { fps: 120 } }),
   );
   assert.deepEqual(state.display, before);
+});
+
+test("legacy saved effect On/Off preferences survive the new Auto defaults", () => {
+  const legacy = {
+    lensFlares: "off",
+    localReflections: "on",
+    contactShadows: "off",
+  };
+  assert.deepEqual(normalizeGraphics(legacy), {
+    ...DEFAULT_GRAPHICS,
+    ...legacy,
+  });
 });

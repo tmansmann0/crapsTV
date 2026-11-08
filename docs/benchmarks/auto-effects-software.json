@@ -1,0 +1,125 @@
+{
+  "version": "0.15.0",
+  "ok": true,
+  "viewport": {
+    "width": 800,
+    "height": 500
+  },
+  "software": true,
+  "checks": [
+    "actual software renderer declines heavy Auto effects without allocating them",
+    "TV Effects UI displays the resolved Auto On/Off result",
+    "actual held aim and moving physics flight freeze automatic effects and resource changes during Retest",
+    "explicit manual Off remains saved and allocation-free through Retest"
+  ],
+  "flightFrames": 30,
+  "flightSpanMs": 2449.9000000000005,
+  "snapshots": [
+    {
+      "label": "actual-device-qualification",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "eligibility": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [],
+      "resources": {
+        "reflections": "off",
+        "contactShadows": false,
+        "lensFlares": false
+      },
+      "lampVisible": false
+    },
+    {
+      "label": "held-aim-before-retest",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "eligibility": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [],
+      "resources": {
+        "reflections": "off",
+        "contactShadows": false,
+        "lensFlares": false
+      },
+      "lampVisible": false
+    },
+    {
+      "label": "safe-after-real-roll",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "eligibility": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [],
+      "resources": {
+        "reflections": "off",
+        "contactShadows": false,
+        "lensFlares": false
+      },
+      "lampVisible": false
+    },
+    {
+      "label": "manual-off-preserved-after-retest",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "eligibility": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [],
+      "resources": {
+        "reflections": "off",
+        "contactShadows": false,
+        "lensFlares": false
+      },
+      "lampVisible": false
+    }
+  ],
+  "errors": [],
+  "glErrors": []
+}

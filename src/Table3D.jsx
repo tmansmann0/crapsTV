@@ -15,6 +15,7 @@ import { createBoardMaterial } from "./board-material.js";
 import { createLensFlares, findPanoramaFlareSources } from "./lens-flare.js";
 import { createLocalReflections } from "./local-reflections.js";
 import { createContactShadows } from "./contact-shadows.js";
+import { createAutoEffects } from "./auto-effects.js";
 import { puckHome } from "./puck-layout.js";
 import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
@@ -458,6 +459,13 @@ export default function Table3D(props) {
       board,
       artwork: boardArtwork,
     });
+    const autoEffects = createAutoEffects({ choices: graphics });
+    let autoEffectsState = autoEffects.describe();
+    let appliedEffectFlags = { ...autoEffectsState.flags };
+    let previousEffectFrame = null;
+    let automaticReflectionUnavailable = false;
+    const refreshSamples = [];
+    const projectedLamp = new THREE.Vector3();
     let reflectionRevision = 0;
     let reflectionSnapshot = null,
       reflectionLedger = null;
@@ -557,6 +565,8 @@ export default function Table3D(props) {
     function handleGraphics(action) {
       const key = action.slice("graphics:".length);
       if (key === "retest") {
+        automaticReflectionUnavailable = false;
+        autoEffects.retest();
         introDone.current = false;
         introStart = null;
         introPreviousFrame = null;
@@ -731,6 +741,21 @@ export default function Table3D(props) {
       const animationGap =
         previousAnimationAt === null ? 1000 / 60 : time - previousAnimationAt;
       previousAnimationAt = time;
+      // Learn the actual RAF cadence instead of assuming every display is60Hz.
+      if (
+        !capabilities.refreshRate &&
+        animationGap >= 4 &&
+        animationGap <= 50 &&
+        !document.hidden
+      ) {
+        refreshSamples.push(animationGap);
+        if (refreshSamples.length >= 60) {
+          const ordered = [...refreshSamples].sort((a, b) => a - b);
+          capabilities.refreshRate = Math.round(
+            1000 / ordered[Math.floor(ordered.length / 2)],
+          );
+        }
+      }
       if (pendingQualityFrame) {
         if (!document.hidden && introPaused === null) {
           // Expensive texture uploads, shader variants and queued GPU work can
@@ -758,6 +783,12 @@ export default function Table3D(props) {
         pendingQualityFrame = null;
       }
       if (document.hidden) {
+        previousEffectFrame = null;
+        autoEffectsState = autoEffects.update({
+          time,
+          visible: false,
+          safe: false,
+        });
         if (introPaused === null) introPaused = time;
         introPreviousFrame = null;
       } else {
@@ -1271,6 +1302,10 @@ export default function Table3D(props) {
           device: String(deviceName),
           reflectionsSupported: localReflections.metrics.supported,
           contactShadowsSupported: renderer.shadowMap.enabled,
+          autoEffects: {
+            phase: autoEffectsState.phase,
+            flags: appliedEffectFlags,
+          },
           status: testing ? "testing" : "ready",
           progress: testing
             ? Math.min(1, (time - introStart) / introDuration)
@@ -1370,6 +1405,61 @@ export default function Table3D(props) {
           !s?.players?.some((p) => !p.left && p.betPreview?.amount) &&
           time >= settlingUntil &&
           calibrationCanHold(s, throwTime);
+        autoEffects.configure({
+          choices: graphics,
+          capabilities: {
+            ...capabilities,
+            maxCubemapSize: renderer.capabilities.maxCubemapSize,
+            refreshRate: Math.max(quality.fps, capabilities.refreshRate || 60),
+          },
+          supported: {
+            lensFlares: !!readyEnvironment?.image?.data,
+            localReflections:
+              localReflections.metrics.supported &&
+              !automaticReflectionUnavailable,
+            contactShadows: renderer.shadowMap.enabled,
+          },
+          targetFps: quality.fps,
+          qualificationKey: [
+            quality.antialias,
+            quality.modelDetail,
+            quality.textureLimit,
+            compositor.plan.sceneWidth,
+            compositor.plan.sceneHeight,
+          ].join(":"),
+        });
+        const desiredEffectFlags = autoEffects.flags;
+        for (const key of [
+          "lensFlares",
+          "localReflections",
+          "contactShadows",
+        ]) {
+          // A room can begin a throw between a decision and the next draw.
+          // Recheck safety when applying Auto; manual intent stays immediate.
+          if (graphics[key] !== "auto" || effectsSafe)
+            appliedEffectFlags[key] = desiredEffectFlags[key];
+          quality[key] = appliedEffectFlags[key];
+        }
+        if (
+          (quality.lensFlares || graphics.lensFlares === "auto") &&
+          effectsSafe &&
+          readyEnvironment?.image !== flareImage
+        ) {
+          flareImage = readyEnvironment?.image;
+          flareSources =
+            readyEnvironment && environmentShell
+              ? findPanoramaFlareSources(readyEnvironment, environmentShell)
+              : [];
+        }
+        const lampVisible = flareSources.some((source) => {
+          projectedLamp.copy(source.position).project(camera);
+          return (
+            Math.abs(projectedLamp.x) < 0.96 &&
+            Math.abs(projectedLamp.y) < 0.96 &&
+            projectedLamp.z > -1 &&
+            projectedLamp.z < 1
+          );
+        });
         const contactChanged = contactShadows.setEnabled(
           quality.contactShadows &&
             renderer.shadowMap.enabled &&
@@ -1415,6 +1505,9 @@ export default function Table3D(props) {
           revision: reflectionRevision,
           time,
         });
+        // A failed probe must not leave Auto waiting indefinitely or retrying
+        // allocations repeatedly. Manual intent and an explicit Retest remain.
+        if (reflectionStatus.error) automaticReflectionUnavailable = true;
         el.dataset.localReflections = JSON.stringify(reflectionStatus);
         el.dataset.localReflectionRevision = String(reflectionRevision);
         el.dataset.contactShadows = String(contactShadows.enabled);
@@ -1422,13 +1515,6 @@ export default function Table3D(props) {
         el.dataset.contactShadowSize = String(contactShadows.size);
         lensFlares.setEnabled(quality.lensFlares);
         el.dataset.lensFlares = String(lensFlares.enabled);
-        if (quality.lensFlares && readyEnvironment?.image !== flareImage) {
-          flareImage = readyEnvironment?.image;
-          flareSources =
-            readyEnvironment && environmentShell
-              ? findPanoramaFlareSources(readyEnvironment, environmentShell)
-              : [];
-        }
         renderer.shadowMap.needsUpdate =
           contactChanged ||
           !renderedOnce ||
@@ -1476,6 +1562,36 @@ export default function Table3D(props) {
           renderer.clearDepth();
           renderer.render(fadeScene, fadeCamera);
         }
+        autoEffectsState = autoEffects.update({
+          time,
+          frameMs:
+            previousEffectFrame === null ? null : time - previousEffectFrame,
+          safe: effectsSafe,
+          visible: true,
+          ready: stageReady && sceneOpacity === 1,
+          testing,
+          resourcesReady:
+            (!quality.localReflections ||
+              !reflectionStatus.supported ||
+              !!reflectionStatus.error ||
+              reflectionStatus.hasProbe) &&
+            (!quality.contactShadows ||
+              !renderer.shadowMap.enabled ||
+              !!key.shadow.map),
+          warming: contactChanged,
+          lampVisible,
+        });
+        previousEffectFrame = stageReady ? time : null;
+        el.dataset.autoEffects = JSON.stringify({
+          ...autoEffectsState,
+          appliedFlags: appliedEffectFlags,
+          resources: {
+            reflections: reflectionStatus.state,
+            contactShadows: contactShadows.enabled,
+            lensFlares: lensFlares.enabled,
+          },
+          lampVisible,
+        });
         if (
           testing &&
           introCandidate >= 0 &&

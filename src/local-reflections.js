@@ -264,6 +264,7 @@ export function createLocalReflections(
     return {
       enabled,
       finishProfile: current ? finishProfile : "current",
+      hasProbe: Boolean(current),
       supported,
       state,
       size: cube ? edge : 0,

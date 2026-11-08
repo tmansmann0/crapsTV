@@ -273,6 +273,7 @@ test("six staged safe views atomically publish a cached probe without touching n
     }
   }
   assert.equal(f.control.metrics.commits, 1);
+  assert.equal(f.control.metrics.hasProbe, true);
   assert.deepEqual(
     f.frames.map((f) => f.face),
     [0, 1, 2, 3, 4, 5],
@@ -343,6 +344,7 @@ test("disable restores original maps/rotation, removes all targets and can enabl
   const version = f.wood.version;
   const off = f.control.setEnabled(false);
   assert.equal(off.estimatedBytes, 0);
+  assert.equal(off.hasProbe, false);
   assert.equal(off.materials, 0);
   assert.equal(f.wood.envMap, f.originalEnv);
   assert.deepEqual(finishValues(f.wood), f.baseline.wood);
@@ -358,6 +360,12 @@ test("disable restores original maps/rotation, removes all targets and can enabl
   assert.equal(f.frames.length, 6);
   f.control.setEnabled(true);
   assert.equal(f.generators, 2);
+  assert.equal(f.control.metrics.commits, 1);
+  assert.equal(
+    f.control.metrics.hasProbe,
+    false,
+    "a past commit cannot qualify a new cold probe",
+  );
   f.control.dispose();
   f.control.dispose();
   assert.equal(f.generatorDisposals, 2);

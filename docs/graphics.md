@@ -49,8 +49,9 @@ documented in [chips](chips.md).
 ## Optional effects
 
 Open **Settings → Graphics → Effects** on the TV. Admin phones expose the same
-three switches in Graphics. Each is **Off by default**, persists with the other
-graphics choices, and stays under manual control during automatic calibration.
+three controls in Graphics. Each offers **Auto / On / Off**. Fresh preferences
+use Auto. Existing saved On/Off choices remain explicit overrides; select Auto
+or reset graphics to Auto to opt an older browser into the new behaviour.
 
 - **Lens flares:** subtle warm glints from bright lamps in the actual HDR casino.
   Table geometry occludes them. They appear only when a lamp is in view; top-down
@@ -66,8 +67,8 @@ graphics choices, and stays under manual control during automatic calibration.
 
 Enabling reflections can briefly pause the first time shaders and the prefilter
 compile. The measured Apple/Metal prototype had 122–276ms cold updates versus
-0.1–0.7ms warm staged updates. These are opt-in costs, not a universal 4K/60FPS
-guarantee. Both reflection and high-resolution shadow resources are released on
+0.1–0.7ms warm staged updates. These are first-use costs, not a universal 4K/60FPS
+guarantee; automatic qualification excludes warm-up frames. Both reflection and high-resolution shadow resources are released on
 Off; disabled flares own no GPU resources or rendering pass. A 4096px color/depth
 shadow can add roughly 128MiB while enabled, on top of the retained baseline map. None affects dice
 results, chip balances, or the configured cooldown. See
@@ -137,3 +138,35 @@ changes or feeding a completed local reflection back into itself. It adds no
 textures, geometry, draw passes or per-frame scene traversals. These remain
 approximate cached raster reflections, with the existing 256px fixed probe;
 this change does not claim per-object parallax or ray-traced mirror images.
+
+
+## Measured automatic effects
+
+After the base opening/calibration completes, Auto waits for a visible, safe
+idle table. It records 45 actual rendered-frame intervals, tries eligible
+reflections/contact shadows, waits for real GPU resources and a further 750ms
+warm recovery, then measures 60 trial frames. A candidate must fit both the
+frame budget and a 15% allowance against its baseline. Automatic effect tests
+never lower the selected base resolution, frame rate, texture or model settings.
+The TV menu shows the resolved **Auto · On/Off** result and a checking status.
+
+A failed full candidate retries reflections without the large shadow map.
+Flares receive their own incremental trial when a real HDR lamp is visible;
+a top-down view leaves that trial deferred. Software renderers decline Auto
+effects; low-memory devices decline heavy effects. Unknown memory permits a
+reflection trial but conservatively declines the roughly128MiB shadow upgrade.
+Explicit On remains available on supported rendering hardware.
+
+Accepted automatic effects continue watching gameplay, including rolling and
+payout frames. Two consecutive bad 60-frame windows queue a fallback, applied
+only at the next safe idle. It does not retry repeatedly; **Retest automatic
+settings**, a preference change or a new renderer starts fresh qualification.
+Hidden tabs, loading, base calibration and resource warm-up never contribute
+performance samples. Changing Auto resources rechecks safety at the actual draw,
+so a throw beginning between a decision and the next frame cannot trigger an
+allocation or cleanup mid-flight. Manual On/Off intent is always honoured.
+
+Qualification remains device-local. The shared room stores only Auto/On/Off
+preferences, and no diagnostic changes the authority's balances, cooldown or dice.
+The isolated Auto browser proof validates real45/60 timings, actual probe/shadow
+readiness, preserved aim/throw resources, unchanged ledger and manual persistence.

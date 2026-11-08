@@ -346,7 +346,7 @@ export function createSceneUI(renderer, onAction) {
       c.textAlign = "right";
       fittedText(
         c,
-        `${option?.label || "Auto"}  ›`,
+        `${effectsPage && graphics[key] === "auto" ? `Auto · ${graphicsInfo.autoEffects?.flags?.[key] ? "On" : "Off"}` : option?.label || "Auto"}  ›`,
         p.w - 28,
         y + 31,
         38,
@@ -383,7 +383,24 @@ export function createSceneUI(renderer, onAction) {
       });
     });
     if (effectsPage) {
-      text(c, "Off by default. Your choices are saved.", 28, 451, 28, C.muted);
+      fittedText(
+        c,
+        [
+          "baseline",
+          "warming",
+          "trial",
+          "lens-baseline",
+          "lens-warming",
+          "lens-trial",
+        ].includes(graphicsInfo.autoEffects?.phase)
+          ? "Checking effects on this display…"
+          : "Auto checks performance. On/Off stay fixed.",
+        28,
+        451,
+        26,
+        p.w - 56,
+        C.muted,
+      );
     } else {
       c.fillStyle = "rgba(199,171,115,.12)";
       c.beginPath();
@@ -742,6 +759,8 @@ export function createSceneUI(renderer, onAction) {
       next.graphicsInfo?.resolution,
       next.graphicsInfo?.uiResolution,
       next.graphicsInfo?.device,
+      next.graphicsInfo?.autoEffects?.phase,
+      next.graphicsInfo?.autoEffects?.flags,
       next.graphicsInfo?.reflectionsSupported,
       next.graphicsInfo?.contactShadowsSupported,
       next.graphicsInfo?.status,

@@ -743,7 +743,9 @@ function Phone({
               <h3>Graphics</h3>
               <p style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 15 }}>
                 Auto checks the TV and chooses settings for that display. Manual
-                choices override its recommendation.
+                choices override its recommendation. Effects in Auto are
+                measured on the TV after the opening; saved On/Off choices stay
+                fixed.
               </p>
               {Object.entries({
                 fps: "Frame rate",

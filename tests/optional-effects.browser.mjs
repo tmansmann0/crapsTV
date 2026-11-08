@@ -98,6 +98,15 @@ try {
       await clickTV(tv, "graphics:effects");
     await expect(table).toHaveAttribute("data-graphics-page", "effects");
   }
+  async function chooseEffect(key, value) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if ((await graphics())[key] === value) return;
+      const previous = (await graphics())[key];
+      await clickTV(tv, `graphics:${key}`);
+      await expect.poll(async () => (await graphics())[key]).not.toBe(previous);
+    }
+    await requested(key, value);
+  }
   async function offResources() {
     await expect(table).toHaveAttribute("data-lens-flares", "false");
     await expect(table).toHaveAttribute("data-lens-flare-resources", "0");
@@ -148,10 +157,14 @@ try {
   }
   await tv.goto(origin);
   await ready();
-  for (const key of keys) assert.equal((await graphics())[key], "off");
+  for (const key of keys) assert.equal((await graphics())[key], "auto");
+  await openEffects();
+  for (const key of keys) await chooseEffect(key, "off");
   await offResources();
-  await snapshot("defaults-off");
-  checks.push("all optional effects default Off with no effect resources");
+  await snapshot("explicit-manual-off");
+  checks.push(
+    "all optional effects default Auto; explicit Off owns no effect resources",
+  );
 
   const phone = await browser.newPage({
     viewport: { width: 390, height: 844 },
@@ -164,7 +177,7 @@ try {
   await phone.getByText("Table setup", { exact: true }).waitFor();
   await phone.getByText("Host controls", { exact: true }).click();
   for (const label of labels)
-    await expect(phone.getByLabel(`TV graphics ${label}`)).toHaveValue("off");
+    await expect(phone.getByLabel(`TV graphics ${label}`)).toHaveValue("auto");
   await openEffects();
   const uiBefore = await table.evaluate(
     (element) => JSON.parse(element.dataset.uiTextMetrics).join,
@@ -174,8 +187,7 @@ try {
     await table.getAttribute("data-contact-shadow-size"),
   );
   for (const key of keys) {
-    await clickTV(tv, `graphics:${key}`);
-    await requested(key, "on");
+    await chooseEffect(key, "on");
   }
   await expect(table).toHaveAttribute(
     "data-contact-shadows-supported",
@@ -239,8 +251,7 @@ try {
   );
 
   for (const key of keys) {
-    await clickTV(tv, `graphics:${key}`);
-    await requested(key, "off");
+    await chooseEffect(key, "off");
   }
   await offResources();
   assert.equal(
@@ -249,8 +260,7 @@ try {
   );
   await snapshot("tv-all-off-restored");
   for (const key of keys) {
-    await clickTV(tv, `graphics:${key}`);
-    await requested(key, "on");
+    await chooseEffect(key, "on");
   }
   await tv.reload();
   await ready();
@@ -261,10 +271,10 @@ try {
 
   await openEffects();
   for (let i = 0; i < keys.length; i++) {
-    await phone.getByLabel(`TV graphics ${labels[i]}`).selectOption("on");
-    await requested(keys[i], "on");
-    await phone.getByLabel(`TV graphics ${labels[i]}`).selectOption("off");
-    await requested(keys[i], "off");
+    for (const value of ["auto", "on", "off"]) {
+      await phone.getByLabel(`TV graphics ${labels[i]}`).selectOption(value);
+      await requested(keys[i], value);
+    }
   }
   await offResources();
   for (const mode of ["off", "on", "off"]) {

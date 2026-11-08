@@ -3,11 +3,11 @@
 Research checkpoint: 2026-11-07. This document separates candidate architecture
 from the local-probe implementation evidence below. The game uses Three r180 WebGL,
 custom physical-material shader hooks, instanced chips and a native-resolution
-vector-ink pass. Keep any additional effect off by default and keep native UI
+vector-ink pass. Keep additional effects under measured Auto or explicit On/Off control and keep native UI
 and printed betting information outside low-resolution postprocessing.
 
 The TV Graphics **Effects** submenu now offers three independent manual options,
-all Off by default: lens flares, local reflections and contact shadows. They
+now offered as Auto/On/Off: lens flares, local reflections and contact shadows. Fresh preferences use measured Auto; existing explicit On/Off values remain unchanged. They
 retain the current WebGL renderer and shader materials. No setting here enables
 path tracing or changes game physics, roll deadlines or the ledger.
 
