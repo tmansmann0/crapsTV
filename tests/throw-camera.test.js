@@ -9,6 +9,7 @@ import {
 } from "../src/round-presentation.js";
 import { SEAT_LAYOUT, arcPosition } from "../src/chip-flow.js";
 import { wagerStackLayout, wagerPosition } from "../src/wager-layout.js";
+import { chipStackPose } from "../src/chip-character.js";
 import { createThrowTimeline, sampleThrow } from "../src/throw-motion.js";
 import {
   THROW_CAMERA_RIGS,
@@ -876,4 +877,77 @@ test("finite detail visits vary low, overhead and bank angles and elevate for ta
         roundId: `empty${i}`,
       }).shotVariant.startsWith("bank-"),
     );
+});
+
+test("actual persistent bank bounds lift the lens and stay framed across every bank angle", () => {
+  const camera = new PerspectiveCamera();
+  for (const aspect of [16 / 9, 4 / 3, 9 / 16])
+    for (let seat = 0; seat < 12; seat++) {
+      const player = {
+        id: `actual-bank-${seat}`,
+        seat,
+        bank: 100000,
+        bets: [],
+      };
+      const area = SEAT_LAYOUT[seat];
+      const specs = Array.from({ length: 20 }, (_, level) => {
+        const pose = chipStackPose(`physical-${seat}`, level, {
+          diameter: 0.23,
+          thicknessScale: 1.15,
+        });
+        return {
+          ...pose,
+          id: `chip-${level}`,
+          slot: 0,
+          diameter: 0.23,
+          thicknessScale: 1.15,
+          position: pose.position.map(
+            (value, axis) => value + area.center[axis],
+          ),
+        };
+      });
+      const state = {
+        players: [player],
+        config: { mode: "craps" },
+        bankLayouts: { [player.id]: specs },
+      };
+      for (let i = 0; i < 6; i++)
+        for (const now of [1000, 2500, 3999]) {
+          const options = {
+            player,
+            state,
+            slot: { startAt: 1000, endAt: 4000 },
+            now,
+            roundId: `actual-${i}`,
+            aspect,
+          };
+          const shot = samplePlayerAreaCamera(options);
+          const short = samplePlayerAreaCamera({
+            ...options,
+            state: {
+              ...state,
+              bankLayouts: { [player.id]: specs.slice(0, 1) },
+            },
+          });
+          assert(shot.subjectHeight > short.subjectHeight + 0.6);
+          assert(shot.position[1] > short.position[1]);
+          if (!shot.shotVariant.endsWith("overhead"))
+            assert(shot.pitch > short.pitch);
+          camera.fov = shot.fov;
+          camera.aspect = aspect;
+          camera.position.fromArray(shot.position);
+          camera.lookAt(new Vector3(...shot.target));
+          camera.updateProjectionMatrix();
+          camera.updateMatrixWorld();
+          for (const point of shot.focusPoints) {
+            const projected = new Vector3(...point).project(camera);
+            assert(
+              Math.abs(projected.x) < 0.9 &&
+                Math.abs(projected.y) < 0.8 &&
+                projected.z < 1,
+              `seat${seat} ${shot.shotVariant} ${aspect}: ${projected.toArray()}`,
+            );
+          }
+        }
+    }
 });

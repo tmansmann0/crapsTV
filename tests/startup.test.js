@@ -20,12 +20,46 @@ import {
   CALIBRATION_HOLD_MS,
 } from "../src/startup-calibration.js";
 import { resolveGraphics } from "../src/graphics-profile.js";
+import { PerspectiveCamera, Vector3 } from "three";
+import { createBankChipInventory } from "../src/bank-chip-inventory.js";
+import { bankPhysicalSpecs } from "../src/bank-chip-presentation.js";
+import { SEAT_LAYOUT } from "../src/chip-flow.js";
 
 const showcase = createStartupShowcase();
 const rollingStages = showcase.stages.filter(({ state }) => state.rolling);
 const rounded = (n) => Math.round(n * 100000) / 100000;
 const ledger = (state) =>
   state.players.map(({ id, bank, bets, stats }) => ({ id, bank, bets, stats }));
+
+test("opening detail pass fits the real rack and adapts to taller stack positions", () => {
+  const player = showcase.stages[0].state.players[0];
+  const inventory = createBankChipInventory({ perStack: 20 });
+  const specs = bankPhysicalSpecs(
+    inventory.update(player.id, player.bank),
+    SEAT_LAYOUT[player.seat],
+  );
+  const camera = new PerspectiveCamera();
+  for (const aspect of [16 / 9, 4 / 3, 9 / 16])
+    for (const time of [0, 500, 1100, 1700, 2199]) {
+      const before = JSON.stringify(showcase.stages);
+      const sample = sampleStartup(showcase, time, {
+        aspect,
+        bankLayouts: { [player.id]: specs },
+      });
+      assert.equal(JSON.stringify(showcase.stages), before);
+      assert(sample.camera.subjectHeight > 0.2);
+      camera.aspect = aspect;
+      camera.fov = sample.camera.fov;
+      camera.position.fromArray(sample.camera.position);
+      camera.lookAt(new Vector3(...sample.camera.target));
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+      for (const point of sample.camera.focusPoints) {
+        const p = new Vector3(...point).project(camera);
+        assert(Math.abs(p.x) < 0.9 && Math.abs(p.y) < 0.8 && p.z < 1);
+      }
+    }
+});
 
 function freeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {

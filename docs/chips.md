@@ -84,3 +84,30 @@ independently of lighting. These are rendering/texel proofs, not FPS guarantees.
 
 The [upright orange high/LOD macro](screenshots/chip-detail-upright-4k.png) is a
 native 4K capture with the ordinary material-texture cap set to 1K.
+
+## Persistent banks and arrivals
+
+Banks keep individual chip identities, denomination, wear and tray positions.
+A normal $1,000 bank with a $5 minimum starts with 10 whites, 18 reds, 16 greens
+and five blacks: 49 actual chips, rather than repeatedly choosing a new colour
+from the total balance. Stacks stop at ten chips. As trays fill, explicit
+value-conserving dealer exchanges introduce larger denominations; unchanged
+chips retain their appearance. The bounded ten-slot tray can hold 100 chips.
+Unusually large bankrolls show excess value as a labelled reserve.
+
+Incoming winnings reserve real stack positions, fly there with their identities
+intact, and finish with a 15 cm gravity drop, millimetre rebound and controlled
+movement in the top three supporting chips. Cached Cannon contact responses
+are prepared behind the black asset gate; live frames update shared instance
+matrices rather than starting new simulations or rebuilding meshes per frame.
+Dealer-change chips clear before their replacements drop. Real dice impacts
+take priority over a simultaneous settling animation. These are presentation
+effects; balances, authoritative wager colliders and roll deadlines are unchanged.
+
+The opening and live automatic cameras use actual chip bounds, with a higher
+eye position and steeper downward angle for taller stacks. Run
+`npm run test:bank-chips` for the isolated real-renderer proof: stable identities
+across $800 → $795, a naturally rolled winning payout, physical landing and
+100 successive small awards with bounded stacks and exact totals. CPU tests
+also cover fractional cents, overlapping transfers, interrupted flows, capacity
+exchanges and camera framing across all twelve seats.

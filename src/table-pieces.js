@@ -19,10 +19,19 @@ import {
   sampleChipFlow,
   arcPosition,
   visualChipAmount,
-  bankChipStacks,
 } from "./chip-flow.js";
 import { createChipFactory, CHIP_DENOMINATIONS } from "./chip-rendering.js";
 import { chipStackPose } from "./chip-character.js";
+import {
+  createBankChipPresentation,
+  bankPhysicalSpecs,
+} from "./bank-chip-presentation.js";
+import {
+  createChipLandingPlan,
+  writeChipLandingPoses,
+  prewarmChipLandingResponses,
+  CHIP_LANDING_LIMITS,
+} from "./chip-landing.js";
 import { assetURL as asset } from "./asset-url.js";
 import { createDiceMaterial, diceWearIndex } from "./dice-material.js";
 import {
@@ -77,6 +86,17 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
   const impactBindings = new Map();
   const dirtyImpactChips = new Set();
   const flightObjects = new Map();
+  const exchangeObjects = new Map();
+  const bankPresentation = createBankChipPresentation();
+  let bankDisplay = {
+    banks: new Map(),
+    mutations: new Map(),
+    plans: new Map(),
+  };
+  let landingPlan = null,
+    bankStacks = [],
+    bankSpecs = [],
+    bankLayoutCache = {};
   let labelLayoutKey = "",
     wagerLabels = [],
     lastLabelPlacements = [],
@@ -206,6 +226,8 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       return;
     }
     chipFactory = factory;
+    // Cache the tiny collision response while the asset gate is still black.
+    prewarmChipLandingResponses([{ diameter: 0.23, thicknessScale: 1.15 }]);
     buildDealerRack();
   });
   const ready = Promise.all([
@@ -281,7 +303,8 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     const stake = player.bets.reduce((sum, bet) => sum + bet.amount, 0);
-    canvas.height = stake ? 294 : 210;
+    const reserve = bankDisplay.banks.get(player.id)?.reserveCents || 0;
+    canvas.height = (stake ? 294 : 210) + (reserve ? 84 : 0);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "rgba(7,18,13,.96)";
     ctx.beginPath();
@@ -304,6 +327,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       player.id === previousState?.shooterId ? "#e5ca83" : "#f5ecdc";
     ctx.fillText(`Bank ${money(amount)}`, 256, 147, 460);
     if (stake) ctx.fillText(`In play ${money(stake)}`, 256, 236, 460);
+    if (reserve) {
+      ctx.font = "600 60px Manrope,Arial";
+      ctx.fillText(`Reserve ${money(reserve)}`, 256, stake ? 320 : 236, 460);
+    }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(
@@ -318,7 +345,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     sprite.name = `${player.name}: ${money(amount)}`;
     sprite.layers.set(1);
     sprite.userData.fullLabel = `${sprite.name}; in play ${money(stake)}`;
-    sprite.userData.labelHeight = stake ? 126 : 90;
+    sprite.userData.labelHeight = (stake ? 126 : 90) + (reserve ? 36 : 0);
     return sprite;
   }
   function layout(player) {
@@ -413,7 +440,12 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     }));
     const key = JSON.stringify([
       layoutRevision,
-      players.map((p, i) => [p.id, p.seat, bankAmounts[i]]),
+      players.map((p, i) => [
+        p.id,
+        p.seat,
+        bankAmounts[i],
+        bankDisplay.banks.get(p.id)?.revision,
+      ]),
       wagers.map((w) => [routeKey(w.route), w.visible]),
     ]);
     if (key === lastStatic) return;
@@ -422,45 +454,147 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     clearGroup(chips);
     wagerLabels = [];
     labelLayoutKey = "";
+    const previousBankSpecs = new Map(bankSpecs.map((spec) => [spec.id, spec]));
     const specs = [];
     impactStacks = [];
     impactBindings.clear();
     dirtyImpactChips.clear();
     players.forEach((player, i) => {
       const seat = layout(player);
-      bankChipStacks(bankAmounts[i], {
-        maxVisible: software ? 18 : 30,
-      }).forEach((stack, slot) => {
-        const center = seatStackSlot(seat, slot);
+      const inventory = bankDisplay.banks.get(player.id);
+      if (!inventory) return;
+      const physical = bankPhysicalSpecs(inventory, seat);
+      inventory.stacks.forEach((stack) => {
+        const center = seatStackSlot(seat, stack.slot);
         const impactStack = {
-          id: `bank:${player.id}:${slot}`,
+          id: `bank:${player.id}:${stack.slot}`,
           floorY: center[1],
           chips: [],
         };
         impactStacks.push(impactStack);
-        for (let n = 0; n < stack.visibleCount; n++) {
-          const pose = chipStackPose(impactStack.id, n, {
-            diameter: 0.23,
-            thicknessScale: 1.15,
-          });
-          const spec = {
-            id: `${impactStack.id}:${n}`,
-            denomination: stack.denomination,
-            wear: (hash(player.id) + n) % 3,
-            diameter: 0.23,
-            thicknessScale: 1.15,
-            position: pose.position.map((value, axis) => value + center[axis]),
-            rotation: pose.rotation,
-          };
+        for (const spec of physical
+          .filter((s) => s.slot === stack.slot)
+          .sort((a, b) => a.level - b.level)) {
           specs.push(spec);
           impactStack.chips.push(spec);
         }
       });
     });
+    bankSpecs = specs;
+    bankStacks = impactStacks.slice();
+    bankLayoutCache = Object.fromEntries(
+      players.map((p) => [
+        p.id,
+        specs.filter((spec) => spec.playerId === p.id),
+      ]),
+    );
+    banks.userData.layouts = bankLayoutCache;
     if (specs.length) {
       const batch = chipFactory.createBatch(specs);
       banks.add(batch);
       bindImpactBatch(batch, specs);
+    }
+    const changedIds = new Set();
+    for (const event of bankDisplay.mutations.values())
+      for (const exchange of event.exchanges) {
+        if (exchange.kind !== "color-up" && exchange.kind !== "make-change")
+          continue;
+        const removed = exchange.removed
+          .map((chip) => previousBankSpecs.get(chip.id))
+          .filter(Boolean);
+        const present = new Set(specs.map((chip) => chip.id));
+        exchange.added.forEach((chip) => {
+          if (present.has(chip.id)) changedIds.add(chip.id);
+        });
+        if (!removed.length || exchangeObjects.has(exchange.id)) continue;
+        const group = chipFactory.createBatch(removed);
+        group.name = "Dealer makes change";
+        group.traverse((o) => {
+          if (o.isInstancedMesh) o.frustumCulled = false;
+        });
+        const caption = textLabel("CHANGE", "#e5ca83", 0.4);
+        caption.position.fromArray(removed[0].position);
+        caption.position.y += 0.35;
+        group.add(caption);
+        transfers.add(group);
+        exchangeObjects.set(exchange.id, {
+          group,
+          chips: removed,
+          startAt: now,
+          endAt: now + 420,
+        });
+      }
+    const addedIds = [...bankDisplay.mutations.values()].flatMap((event) => [
+      ...event.added.map((chip) => chip.id),
+      ...event.moved.map((chip) => chip.id),
+      ...event.exchanges.flatMap((exchange) =>
+        exchange.added.map((chip) => chip.id),
+      ),
+    ]);
+    // A capacity exchange may reuse a slot while an earlier arrival is still
+    // settling. Its saved target is no longer the physical rack's target.
+    if (
+      landingPlan &&
+      [...bankDisplay.mutations.values()].some(
+        (event) =>
+          event.moved.length ||
+          event.removed.some((chip) => landingPlan.chipIds.includes(chip.id)) ||
+          event.exchanges.some((exchange) =>
+            exchange.removed.some((chip) =>
+              landingPlan.chipIds.includes(chip.id),
+            ),
+          ),
+      )
+    )
+      landingPlan = null;
+    if (addedIds.length && state.status === "playing") {
+      const completed = [...bankDisplay.plans.values()].filter(
+        (p) =>
+          p.arrived &&
+          p.flow.to.kind === "bank" &&
+          now -
+            Math.min(
+              p.flow.startAt + p.flow.duration,
+              p.flow.cutAt ?? Infinity,
+            ) <
+            250,
+      );
+      const completedIds = new Set(
+        completed.flatMap((plan) => plan.chips.map((chip) => chip.id)),
+      );
+      const contactAt = changedIds.size
+        ? now +
+          420 +
+          Math.sqrt(
+            (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
+          ) *
+            1000
+        : completed.length && addedIds.every((id) => completedIds.has(id))
+          ? Math.max(
+              ...completed.map((p) =>
+                Math.min(
+                  p.flow.startAt + p.flow.duration,
+                  p.flow.cutAt ?? Infinity,
+                ),
+              ),
+            )
+          : now +
+            Math.sqrt(
+              (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
+            ) *
+              1000;
+      landingPlan = createChipLandingPlan({
+        stacks: bankStacks,
+        addedIds,
+        startAt:
+          contactAt -
+          Math.sqrt(
+            (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
+          ) *
+            1000,
+        staggerMs: 0,
+        previousPlan: landingPlan,
+      });
     }
     const wagerSpecs = [];
     wagers.forEach(({ route, player, visible }) => {
@@ -522,6 +656,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     }
   }
   const impactPosition = new THREE.Vector3(),
+    impactEuler = new THREE.Euler(),
     impactQuaternion = new THREE.Quaternion(),
     impactScale = new THREE.Vector3(),
     impactMatrix = new THREE.Matrix4();
@@ -530,7 +665,6 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     if (!instances) return;
     for (const [index, spec] of specs.entries()) {
       if (!spec.id) continue;
-      const base = instances.getMatrixAt(index, new THREE.Matrix4());
       const scale = new THREE.Vector3(
         spec.diameter,
         spec.diameter * (spec.thicknessScale ?? 1.3),
@@ -541,6 +675,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rotation)),
         scale,
       );
+      // A bank can rebuild while its top chips are still settling. The stable
+      // target, rather than the currently animated instance, is its rest pose.
+      const base = original.clone();
       const binding = {
         instances,
         index,
@@ -552,7 +689,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       impactBindings.get(spec.id).push(binding);
     }
     instances.expandBounds(
-      CHIP_IMPACT_LIMITS.maxDisplacement + CHIP_IMPACT_LIMITS.maxLift,
+      Math.max(
+        CHIP_IMPACT_LIMITS.maxDisplacement + CHIP_IMPACT_LIMITS.maxLift,
+        CHIP_LANDING_LIMITS.drop + 0.015,
+      ),
     );
   }
   function updateImpacts(state, now, mayPlan) {
@@ -597,6 +737,52 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       (track) => now < track.startAt + track.physicsMs + track.recoveryMs,
     );
     impactStatus.active = active;
+  }
+  function updateLandings(now) {
+    if (!landingPlan) return;
+    const active = writeChipLandingPoses(landingPlan, now, (id, pose) => {
+      if (dirtyImpactChips.has(id)) return;
+      impactPosition.fromArray(pose.position);
+      impactQuaternion.fromArray(pose.quaternion);
+      for (const binding of impactBindings.get(id) || []) {
+        impactScale.copy(binding.scale);
+        if (!pose.visible) impactScale.setScalar(0);
+        impactMatrix
+          .compose(impactPosition, impactQuaternion, impactScale)
+          .multiply(binding.local);
+        binding.instances.setMatrixAt(binding.index, impactMatrix);
+      }
+    });
+    if (!active && now >= landingPlan.settlingUntil) landingPlan = null;
+  }
+  function updateExchanges(now) {
+    for (const [id, exchange] of exchangeObjects) {
+      if (now >= exchange.endAt) {
+        clearGroup(exchange.group);
+        exchange.group.removeFromParent();
+        exchangeObjects.delete(id);
+        continue;
+      }
+      const t = Math.max(
+        0,
+        (now - exchange.startAt) / (exchange.endAt - exchange.startAt),
+      );
+      const instances = exchange.group.userData.chipBatch;
+      exchange.chips.forEach((spec, index) => {
+        impactPosition.fromArray(spec.position);
+        // Lift the outgoing chips together into the dealer's hand; their old
+        // denominations remain visible while the replacement chips arrive.
+        impactPosition.y += Math.sin((t * Math.PI) / 2) * 0.32;
+        impactQuaternion.setFromEuler(impactEuler.set(...spec.rotation));
+        const size =
+          spec.diameter * Math.max(0.001, 1 - Math.max(0, t - 0.65) / 0.35);
+        impactScale.set(size, size * spec.thicknessScale, size);
+        instances.setMatrixAt(
+          index,
+          impactMatrix.compose(impactPosition, impactQuaternion, impactScale),
+        );
+      });
+    }
   }
   function updatePreviews(state, players) {
     const key = JSON.stringify([
@@ -682,14 +868,41 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       }
     for (const flow of flows) {
       let group = flightObjects.get(flow.id);
+      const bankPlan = bankDisplay.plans.get(flow.id);
       if (!group) {
         group = new THREE.Group();
         group.name = `Chip ${flow.kind}`;
-        group.add(
-          chipFactory.createBatch(
-            pileSpecs(flow.amount, { diameter: 0.28, max: 6, seed: flow.id }),
-          ),
-        );
+        if (bankPlan?.started && bankPlan.chips.length) {
+          const specs = bankPlan.chips.map((chip, index) => {
+            const pose = chipStackPose(`handful:${flow.id}`, index % 10, {
+              diameter: 0.23,
+              thicknessScale: 1.15,
+            });
+            return {
+              ...chip,
+              diameter: 0.23,
+              thicknessScale: 1.15,
+              position: [
+                pose.position[0] + Math.floor(index / 10) * 0.25,
+                ...pose.position.slice(1),
+              ],
+              rotation: pose.rotation,
+            };
+          });
+          const batch = chipFactory.createBatch(specs);
+          group.add(batch);
+          group.userData.flightBatch = batch.userData.chipBatch;
+          group.userData.flightSpecs = specs;
+          batch.traverse((o) => {
+            if (o.isInstancedMesh) o.frustumCulled = false;
+          });
+        } else if (!bankPlan || bankPlan.started)
+          group.add(
+            chipFactory.createBatch(
+              pileSpecs(flow.amount, { diameter: 0.28, max: 6, seed: flow.id }),
+            ),
+          );
+        else continue;
         group.userData.flow = flow;
         transfers.add(group);
         flightObjects.set(flow.id, group);
@@ -697,14 +910,87 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       const sample = sampleChipFlow(flow, now);
       group.visible = sample.active;
       if (sample.active) {
-        group.position.fromArray(
-          arcPosition(
-            routePosition(flow.from, state),
-            routePosition(flow.to, state),
-            sample.progress,
-          ),
-        );
-        group.rotation.y = Math.sin(sample.progress * Math.PI) * 0.32;
+        const instances = group.userData.flightBatch;
+        if (instances && bankPlan) {
+          group.position.set(0, 0, 0);
+          group.rotation.set(0, 0, 0);
+          for (const name of ["source", "target"]) {
+            const specs = bankPlan[`${name}Specs`];
+            if (group.userData[`${name}Specs`] !== specs) {
+              group.userData[`${name}Specs`] = specs;
+              group.userData[`${name}Map`] = new Map(
+                specs.map((spec) => [spec.id, spec]),
+              );
+            }
+          }
+          const source = group.userData.sourceMap,
+            target = group.userData.targetMap;
+          const fromBase = routePosition(flow.from, state),
+            toBase = routePosition(flow.to, state);
+          const fallMs =
+            Math.sqrt(
+              (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
+            ) * 1000;
+          const endAt = Math.min(
+            flow.startAt + flow.duration,
+            flow.cutAt ?? Infinity,
+          );
+          const releaseAt = endAt - Math.min(fallMs, flow.duration * 0.4);
+          group.userData.flightSpecs.forEach((spec, index) => {
+            const from =
+              source.get(spec.id)?.position ||
+              fromBase.map((v, a) => v + spec.position[a]);
+            const final = target.get(spec.id);
+            const to =
+              final?.position || toBase.map((v, a) => v + spec.position[a]);
+            let position;
+            if (final) {
+              if (now < releaseAt)
+                position = arcPosition(
+                  from,
+                  to.map(
+                    (v, a) => v + (a === 1 ? CHIP_LANDING_LIMITS.drop : 0),
+                  ),
+                  (now - flow.startAt) / Math.max(1, releaseAt - flow.startAt),
+                  0.65,
+                );
+              else {
+                const t = (now - releaseAt) / 1000;
+                position = to.map(
+                  (v, a) =>
+                    v +
+                    (a === 1
+                      ? Math.max(
+                          0,
+                          CHIP_LANDING_LIMITS.drop -
+                            0.5 * CHIP_LANDING_LIMITS.gravity * t * t,
+                        )
+                      : 0),
+                );
+              }
+            } else position = arcPosition(from, to, sample.progress, 0.9);
+            const rotation = final?.rotation ||
+              source.get(spec.id)?.rotation || [0, 0, 0];
+            impactPosition.fromArray(position);
+            impactQuaternion.setFromEuler(impactEuler.set(...rotation));
+            impactScale.set(
+              spec.diameter,
+              spec.diameter * spec.thicknessScale,
+              spec.diameter,
+            );
+            impactMatrix.compose(impactPosition, impactQuaternion, impactScale);
+            instances.setMatrixAt(index, impactMatrix);
+          });
+        } else {
+          group.position.fromArray(
+            arcPosition(
+              routePosition(flow.from, state),
+              routePosition(flow.to, state),
+              sample.progress,
+            ),
+          );
+          group.rotation.y = Math.sin(sample.progress * Math.PI) * 0.32;
+        }
       }
     }
   }
@@ -725,6 +1011,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         p.bets.map((bet) => [bet.id, bet.amount]),
         p.color,
         p.seat,
+        bankDisplay.banks.get(p.id)?.reserveCents,
         p.id === state.shooterId,
       ]),
     ]);
@@ -1032,9 +1319,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         impactThrowId = null;
         impactBindings.clear();
         dirtyImpactChips.clear();
+        bankPresentation.clear();
+        landingPlan = null;
+        bankStacks = [];
+        bankSpecs = [];
+        bankLayoutCache = {};
         for (const group of [chips, banks, labels, previews, transfers])
           clearGroup(group);
         flightObjects.clear();
+        exchangeObjects.clear();
         lastStatic = lastLabels = lastPreview = "";
         wagerLabels = [];
         labelLayoutKey = "";
@@ -1104,6 +1397,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     for (const flow of flows)
       if (flow.presentationMode === "fit-window")
         flow.cutAt = Math.min(flow.presentationDeadline, state.nextRollAt);
+    if (chipFactory)
+      bankDisplay = bankPresentation.sync(state, flows, now, {
+        seats: seatLayout,
+      });
     flows = flows.filter(
       (f) => now < Math.min(f.startAt + f.duration, f.cutAt ?? Infinity),
     );
@@ -1116,8 +1413,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         now,
         connected && !waitingForFresh && state.status === "playing",
       );
+      updateLandings(now);
+      updateExchanges(now);
     }
-    if (!state.rolling && !flows.length && !impacts.length)
+    if (!state.rolling && !flows.length && !impacts.length && !landingPlan)
       updateLabels(state, players, now);
   }
   return {
@@ -1132,7 +1431,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       return !!chipFactory && dice[0].children.length > 0;
     },
     get animating() {
-      return flows.length > 0 || impacts.length > 0;
+      return (
+        flows.length > 0 ||
+        impacts.length > 0 ||
+        !!landingPlan ||
+        exchangeObjects.size > 0
+      );
+    },
+    get bankLayouts() {
+      return bankLayoutCache;
     },
     get financialLabelsVisible() {
       return financialLabelsVisible;
@@ -1162,6 +1469,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     update,
     dispose() {
       alive = false;
+      bankPresentation.clear();
+      landingPlan = null;
+      exchangeObjects.clear();
       for (const group of [chips, banks, labels, previews, transfers]) {
         clearGroup(group);
         scene.remove(group);

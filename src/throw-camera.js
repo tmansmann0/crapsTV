@@ -1,11 +1,7 @@
-import {
-  SEAT_LAYOUT,
-  arcPosition,
-  bankChipStacks,
-  seatStackSlot,
-  betRoute,
-} from "./chip-flow.js";
-import { chipStackPose, chipPoseBounds } from "./chip-character.js";
+import { SEAT_LAYOUT, arcPosition, betRoute } from "./chip-flow.js";
+import { chipPoseBounds } from "./chip-character.js";
+import { createBankChipInventory } from "./bank-chip-inventory.js";
+import { bankPhysicalSpecs } from "./bank-chip-presentation.js";
 import { BOARD_BET_SHIFT_Z } from "./board-layout.js";
 import { wagerPosition, wagerPileLayout } from "./wager-layout.js";
 import { planOutcomeTour, sampleOutcomeTour } from "./round-presentation.js";
@@ -169,35 +165,49 @@ const boundsOf = (points) => ({
 });
 const mix = (a, b, t) => a.map((value, axis) => value + (b[axis] - value) * t);
 
-function bankSubject(player, macro = false) {
+const estimatedBankLayouts = new Map();
+const bankSubjectCache = new WeakMap();
+function bankSubject(player, macro = false, state = null) {
   const area = SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0];
-  let stacks = bankChipStacks(player?.bank ?? 100000, { maxVisible: 30 });
-  if (macro && stacks.length) {
-    const tallest = stacks.reduce(
-      (best, stack, index) =>
-        stack.visibleCount > stacks[best].visibleCount ? index : best,
-      0,
-    );
-    stacks = [{ ...stacks[tallest], slot: tallest }];
+  let specs = state?.bankLayouts?.[player?.id];
+  if (!specs) {
+    // Headless callers and the very first opening frame use the same mixed
+    // inventory policy as the renderer, not the old six-chip money tokens.
+    const key = `${player?.id}:${player?.seat ?? 0}:${player?.bank ?? 100000}:${state?.config?.startingBank}:${state?.config?.minBet}`;
+    specs = estimatedBankLayouts.get(key);
+    if (!specs) {
+      const inventory = createBankChipInventory();
+      const snapshot = inventory.update(
+        player?.id || "opening",
+        player?.bank ?? 100000,
+        {
+          startingBank: state?.config?.startingBank,
+          minBet: state?.config?.minBet,
+        },
+      );
+      specs = bankPhysicalSpecs(snapshot, area);
+      estimatedBankLayouts.set(key, specs);
+      if (estimatedBankLayouts.size > 96)
+        estimatedBankLayouts.delete(estimatedBankLayouts.keys().next().value);
+    }
   }
-  const points = stacks.flatMap((stack, index) => {
-    const center = seatStackSlot(area, stack.slot ?? index);
-    return Array.from({ length: stack.visibleCount }, (_, n) => {
-      const pose = chipStackPose(
-        `bank:${player.id}:${stack.slot ?? index}`,
-        n,
-        { diameter: 0.23, thicknessScale: 1.15 },
-      );
-      const bounds = chipPoseBounds({
-        ...pose,
-        diameter: 0.23,
-        thicknessScale: 1.15,
-      });
-      return corners(
-        bounds.min.map((v, axis) => v + center[axis]),
-        bounds.max.map((v, axis) => v + center[axis]),
-      );
-    }).flat();
+  const allSpecs = specs;
+  let cache = bankSubjectCache.get(allSpecs);
+  if (!cache) {
+    cache = {};
+    bankSubjectCache.set(allSpecs, cache);
+  }
+  const cacheKey = macro ? "macro" : "rack";
+  if (cache[cacheKey]) return cache[cacheKey];
+  if (macro && specs.length) {
+    const tallest = specs.reduce((best, spec) =>
+      chipPoseBounds(spec).max[1] > chipPoseBounds(best).max[1] ? spec : best,
+    );
+    specs = specs.filter((spec) => spec.slot === tallest.slot);
+  }
+  const points = specs.flatMap((spec) => {
+    const bounds = chipPoseBounds(spec);
+    return corners(bounds.min, bounds.max);
   });
   if (!points.length)
     points.push(
@@ -207,7 +217,12 @@ function bankSubject(player, macro = false) {
       ),
     );
   const bounds = boundsOf(points);
-  return { points, height: bounds.max[1] - bounds.min[1], kind: "bank", area };
+  return (cache[cacheKey] = {
+    points,
+    height: bounds.max[1] - bounds.min[1],
+    kind: "bank",
+    area,
+  });
 }
 function wagerSubject(route, state) {
   const pile = wagerPileLayout(route, state, route.bet.amount || 500);
@@ -290,38 +305,39 @@ function fitChipCamera({
   pitch += clamp(height - 0.09, 0, 0.45) * (overhead ? 0.13 : 1.45);
   pitch = Math.min(1.49, pitch);
   const horizontal = Math.cos(pitch);
-  const direction = [
+  let direction = [
     (base[0] * Math.cos(yaw) + base[2] * Math.sin(yaw)) * horizontal,
     Math.sin(pitch),
     (base[2] * Math.cos(yaw) - base[0] * Math.sin(yaw)) * horizontal,
   ];
-  const right = [direction[2] / horizontal, 0, -direction[0] / horizontal];
-  const up = [
-    -right[2] * direction[1],
-    right[2] * direction[0] - right[0] * direction[2],
-    right[0] * direction[1],
-  ];
   const fov = overhead ? 38 - phase : 43 - phase * 2;
   const tangent = Math.tan(radians(fov / 2));
   const safeY = safeVerticalFraction(viewportHeight, hudRects);
-  let distance = variant === "bank-macro" ? 0.96 : 1.18;
-  for (const point of points) {
-    const q = point.map((v, axis) => v - target[axis]);
-    const depth = q.reduce((sum, v, axis) => sum + v * direction[axis], 0);
-    const x =
-      Math.abs(q.reduce((sum, v, axis) => sum + v * right[axis], 0)) + 0.07;
-    const y =
-      Math.abs(q.reduce((sum, v, axis) => sum + v * up[axis], 0)) + 0.08;
-    distance = Math.max(
-      distance,
-      depth +
-        Math.max(
-          x / (tangent * Math.max(0.2, aspect) * 0.9),
-          y / (tangent * safeY),
-        ),
-    );
-  }
-  const position = target.map(
+  const fitDistance = (direction, minimum) => {
+    const length = Math.hypot(direction[0], direction[2]);
+    const right = [direction[2] / length, 0, -direction[0] / length];
+    const up = [-right[2] * direction[1], -length, right[0] * direction[1]];
+    let distance = minimum;
+    for (const point of points) {
+      const q = point.map((v, axis) => v - target[axis]);
+      const depth = q.reduce((sum, v, axis) => sum + v * direction[axis], 0);
+      const x =
+        Math.abs(q.reduce((sum, v, axis) => sum + v * right[axis], 0)) + 0.07;
+      const y =
+        Math.abs(q.reduce((sum, v, axis) => sum + v * up[axis], 0)) + 0.08;
+      distance = Math.max(
+        distance,
+        depth +
+          Math.max(
+            x / (tangent * Math.max(0.2, aspect) * 0.9),
+            y / (tangent * safeY),
+          ),
+      );
+    }
+    return distance;
+  };
+  let distance = fitDistance(direction, variant === "bank-macro" ? 0.96 : 1.18);
+  let position = target.map(
     (value, axis) => value + direction[axis] * distance,
   );
   // The camera may follow flying payouts across the rail. Clear its top rather
@@ -329,6 +345,14 @@ function fitChipCamera({
   if (!bet || railClearance > 0) {
     const floor = 1.32 + height * 0.45;
     position[1] += Math.max(0, floor - position[1]) * (bet ? railClearance : 1);
+    // Clearing the cushion changes the viewing angle. Refit along that new
+    // direction so the old low-angle projection cannot clip a taller rack.
+    const delta = position.map((value, axis) => value - target[axis]);
+    const length = Math.hypot(...delta);
+    direction = delta.map((value) => value / length);
+    distance = fitDistance(direction, length);
+    position = target.map((value, axis) => value + direction[axis] * distance);
+    pitch = Math.asin(direction[1]);
   }
   return {
     position,
@@ -340,6 +364,23 @@ function fitChipCamera({
     pitch,
     subjectKind: transfer ? "transfer" : bet ? "bet" : "bank",
   };
+}
+
+/** Opening detail pass uses the same real stack fit as live player shots. */
+export function sampleBankDetailCamera({
+  player,
+  state,
+  progress = 0,
+  aspect = 16 / 9,
+}) {
+  const subject = bankSubject(player, false, state);
+  return fitChipCamera({
+    ...subject,
+    seed: hash(`opening:${player?.seat ?? 0}`),
+    progress,
+    aspect,
+    variant: "bank-sweep",
+  });
 }
 
 /** Prep holds the actual bet. The lens then follows the synchronized chips. */
@@ -416,7 +457,7 @@ export function sampleOutcomeCamera({
       routeFocus(flow.to, state),
       p,
     );
-    const flying = corners(
+    let flying = corners(
       [center[0] - 0.2, center[1] - 0.13, center[2] - 0.2],
       [
         center[0] + 0.2,
@@ -424,6 +465,19 @@ export function sampleOutcomeCamera({
         center[2] + 0.2,
       ],
     );
+    if (flow.to.kind === "bank" && p > 0.78) {
+      const receiver = state.players?.find((p) => p.id === flow.playerId);
+      if (receiver) {
+        const rack = bankSubject(receiver, false, state);
+        const rackBounds = boundsOf(rack.points);
+        const destination = corners(rackBounds.min, rackBounds.max);
+        const landing = smooth(clamp((p - 0.78) / 0.22, 0, 1));
+        flying = flying.map((point, index) =>
+          mix(point, destination[index], landing),
+        );
+        height = Math.max(height, rack.height * landing);
+      }
+    }
     const lift = smooth(clamp(p / 0.12, 0, 1));
     points.push(
       ...subject.points.map((point, index) => mix(point, flying[index], lift)),
@@ -489,7 +543,7 @@ export function samplePlayerAreaCamera({
     variant = ["bank-macro", "bank-overhead", "bank-sweep"][seed % 3];
   const subject = variant.startsWith("bet-")
     ? wagerSubject(betRoute(player.id, bets[seed % bets.length], bets), state)
-    : bankSubject(player, variant === "bank-macro");
+    : bankSubject(player, variant === "bank-macro", state);
   const shot = fitChipCamera({
     ...subject,
     area,

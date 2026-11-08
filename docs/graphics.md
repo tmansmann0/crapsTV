@@ -170,3 +170,15 @@ Qualification remains device-local. The shared room stores only Auto/On/Off
 preferences, and no diagnostic changes the authority's balances, cooldown or dice.
 The isolated Auto browser proof validates real45/60 timings, actual probe/shadow
 readiness, preserved aim/throw resources, unchanged ledger and manual persistence.
+
+## Persistent-rack workload (0.16.0)
+
+With twelve players, mixed physical banks, automatic chip detail, native textures,
+AA and all optional effect switches enabled, a warm six-second throw/payout run
+measured 60.0 FPS at both native 1920×1080 and 3840×2160 on the tested Apple M5 Pro.
+P95 intervals were 16.8/16.7 ms respectively, with zero browser errors and verified
+scene/UI framebuffer dimensions. These measurements include the larger chip
+inventory and automatic camera; they exclude cold shader compilation and are not
+a guarantee for other devices. Actual HDR flare visibility depends on the shot.
+Full reports: [1080p](benchmarks/bank-racks-1080p.json) and
+[4K](benchmarks/bank-racks-4k.json).

@@ -888,6 +888,7 @@ export default function Table3D(props) {
               hold = sampleStartup(introShowcase, elapsed, {
                 aspect: camera.aspect,
                 reducedMotion: reduced.matches,
+                bankLayouts: pieces.bankLayouts,
               }).calibrationHold;
             const holdNow = introLiveProbe ? time : elapsed;
             const probe =
@@ -965,6 +966,7 @@ export default function Table3D(props) {
               {
                 aspect: camera.aspect,
                 reducedMotion: reduced.matches,
+                bankLayouts: pieces.bankLayouts,
               },
             )
           : null;
@@ -1013,7 +1015,7 @@ export default function Table3D(props) {
       const autoView =
         automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
           ? sampleTableCamera({
-              state: s,
+              state: s ? { ...s, bankLayouts: pieces.bankLayouts } : s,
               now: throwTime,
               aspect: camera.aspect,
               viewportWidth: el.clientWidth,

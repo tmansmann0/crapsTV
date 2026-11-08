@@ -8,6 +8,8 @@ A personal, open-source living-room casino for 1–12 players. Built with React,
 
 ![The crapsTV living-room casino](docs/screenshots/table.png)
 
+Player banks use persistent mixed-denomination chips: spending removes real chips, and winnings land in the existing stacks with a small physical settling motion. Racks cap stacks at ten chips and make visible denomination exchanges as they fill. Intro and automatic close-ups frame the actual rack height. Extremely large banks keep any value beyond the bounded tray capacity in a clearly labelled reserve.
+
 ## Start a local game
 
 Install [Node.js 22 or later](https://nodejs.org/), then:

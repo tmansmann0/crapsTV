@@ -16,6 +16,7 @@ import "../../src/style.css";
 // Read actual scene resources from the fixture, without adding a product debug
 // API or replacing any geometry, rendering, camera or material behavior.
 let renderedWagers,
+  renderedBanks,
   joinPanel,
   uploadedJoinVersion = -1,
   expectedQR;
@@ -23,6 +24,7 @@ const addToScene = Scene.prototype.add;
 Scene.prototype.add = function (...objects) {
   for (const object of objects) {
     if (object.name === "Live wagers") renderedWagers = object;
+    if (object.name === "Player bankrolls") renderedBanks = object;
     if (object.userData?.id === "join") {
       joinPanel = object;
       const texture = object.material.map;
@@ -151,7 +153,11 @@ const metadata = () => ({
       .map((child) => ({ ...child.userData })),
   },
   plan: structuredClone(state.lastRoll?.presentation || null),
-  expectedCamera: sampleTableCamera({ state, now: clock, ...cameraOptions() }),
+  expectedCamera: sampleTableCamera({
+    state: { ...state, bankLayouts: renderedBanks?.userData.layouts || {} },
+    now: clock,
+    ...cameraOptions(),
+  }),
 });
 window.tourQA = {
   metadata,

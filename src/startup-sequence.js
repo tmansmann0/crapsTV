@@ -1,6 +1,10 @@
 import * as game from "./game.js";
 import { createThrowTimeline, sampleThrow } from "./throw-motion.js";
-import { sampleThrowCamera, sampleTableCamera } from "./throw-camera.js";
+import {
+  sampleThrowCamera,
+  sampleTableCamera,
+  sampleBankDetailCamera,
+} from "./throw-camera.js";
 import { planOutcomeTour } from "./round-presentation.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import { puckHome } from "./puck-layout.js";
@@ -134,13 +138,13 @@ export function createStartupShowcase() {
 export function sampleStartup(
   showcase,
   elapsed,
-  { aspect = 16 / 9, reducedMotion = false } = {},
+  { aspect = 16 / 9, reducedMotion = false, bankLayouts = null } = {},
 ) {
   const time = clamp(elapsed, 0, STARTUP_DURATION_MS);
   const entry =
     [...showcase.stages].reverse().find((stage) => time >= stage.at) ||
     showcase.stages[0];
-  const state = entry.state;
+  const state = bankLayouts ? { ...entry.state, bankLayouts } : entry.state;
   const pose = state.throw ? sampleThrow(state.throw, time) : null;
   const calibrationHold =
     showcase.calibrationHolds.find(
@@ -174,17 +178,24 @@ export function sampleStartup(
     });
   } else if (time < 2200) {
     const t = smooth(time / 2200);
-    camera = {
-      position: mix([-4.8, 1.15, 5.2], [-3.0, 1.45, 5.0], t),
-      target: mix([-3.6, 0.82, 3.95], [-2.7, 0.82, 3.91], t),
-      fov: 48 - t * 5,
-    };
+    camera = sampleBankDetailCamera({
+      player: state.players[0],
+      state,
+      progress: t,
+      aspect,
+    });
   } else if (time < 3800) {
     const t = smooth((time - 2200) / 1600);
+    const detail = sampleBankDetailCamera({
+      player: state.players[0],
+      state,
+      progress: 1,
+      aspect,
+    });
     camera = {
-      position: mix([-3.0, 1.45, 5.0], [-3.8, 3.1, 5.0], t),
-      target: mix([-2.7, 0.82, 3.91], [-1.8, 0.8, 2.4], t),
-      fov: 43 + t * 4,
+      position: mix(detail.position, [-3.8, 3.1, 5.0], t),
+      target: mix(detail.target, [-1.8, 0.8, 2.4], t),
+      fov: detail.fov + (47 - detail.fov) * t,
     };
   } else if (time < 6200) {
     const t = smooth((time - 3800) / 2400);
