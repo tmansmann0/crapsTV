@@ -4,9 +4,11 @@ import { chipHash, chipStackPose } from "./chip-character.js";
 import {
   visualChipAmount,
   bankRoute,
+  routeKey,
   seatStackSlot,
   SEAT_LAYOUT,
 } from "./chip-flow.js";
+import { chipPileSpecs, wagerPileLayout } from "./wager-layout.js";
 
 const endOf = (flow) =>
   Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity);
@@ -55,6 +57,126 @@ export function bankPhysicalSpecs(snapshot, seat) {
   });
 }
 
+function wagerSourceSpecs(flow, state, wagerSources) {
+  const amount = Math.max(
+    0,
+    Math.min(flow.amount, flow.sourceAmount ?? flow.amount),
+  );
+  if (amount < 100 || !flow.from.bet)
+    return { chips: [], specs: [], exchange: null };
+  const route = flow.from,
+    wholeAmount = route.bet.amount ?? amount;
+  const pile = wagerPileLayout(route, state, wholeAmount);
+  const canonical = chipPileSpecs(wholeAmount, {
+    diameter: pile.diameter,
+    seed: route.bet.id,
+  });
+  const candidates = wagerSources?.get(routeKey(route));
+  const actual =
+    candidates?.length === canonical.length &&
+    candidates.every(
+      (chip, index) =>
+        chip.denomination === canonical[index].denomination &&
+        typeof chip.id === "string" &&
+        chip.position?.length === 3,
+    )
+      ? candidates
+      : null;
+  const whole = actual || canonical;
+  const requested = chipPileSpecs(amount, {
+    diameter: pile.diameter,
+    seed: route.bet.id,
+  });
+  const selected = new Set();
+  let needsChange = false;
+  const specs = requested.map((desired, index) => {
+    // Full settlements lift exactly the original stack. Partial take-downs
+    // preferentially remove matching top chips without changing those below.
+    const originalIndex =
+      amount === wholeAmount
+        ? index
+        : whole.findLastIndex(
+            (chip, n) =>
+              !selected.has(n) && chip.denomination === desired.denomination,
+          );
+    const source = originalIndex >= 0 ? whole[originalIndex] : desired;
+    if (originalIndex >= 0) selected.add(originalIndex);
+    else needsChange = true;
+    const appearanceId =
+      originalIndex >= 0
+        ? `${routeKey(route)}:${originalIndex}`
+        : `change:${flow.id}:${index}`;
+    const physicalSource = actual && originalIndex >= 0;
+    return {
+      ...source,
+      ...(physicalSource
+        ? {}
+        : { id: `stake:${flow.id}:${index}`, appearanceId }),
+      position: physicalSource
+        ? [...source.position]
+        : source.position.map((value, axis) => value + pile.basePosition[axis]),
+    };
+  });
+  const chips = specs.map(({ id, appearanceId, denomination, wear }) => ({
+    id,
+    appearanceId,
+    denomination,
+    wear,
+  }));
+  return {
+    chips,
+    specs,
+    exchange: needsChange
+      ? {
+          kind: "make-change",
+          amount,
+          beforeAmount: wholeAmount,
+          afterAmount: Math.max(0, wholeAmount - amount),
+          removed: whole.map((chip, index) => ({
+            ...chip,
+            id: actual ? chip.id : `${routeKey(route)}:${index}`,
+            position: actual
+              ? [...chip.position]
+              : chip.position.map(
+                  (value, axis) => value + pile.basePosition[axis],
+                ),
+          })),
+          outgoing: specs,
+        }
+      : null,
+  };
+}
+
+function seedFlowPlan(flow, state, wagerSources) {
+  if (flow.from.kind === "bank")
+    return {
+      chips: [],
+      sourceSpecs: [],
+      profitChipIds: [],
+      sourceExchange: null,
+    };
+  const stake =
+    flow.from.kind === "bet"
+      ? wagerSourceSpecs(flow, state, wagerSources)
+      : { chips: [], specs: [], exchange: null };
+  const stakeAmount =
+    flow.from.kind === "bet"
+      ? Math.max(0, Math.min(flow.amount, flow.sourceAmount ?? flow.amount))
+      : 0;
+  // Returning $100 is still the black chip that was wagered. Only the house's
+  // new profit is issued as practical payout denominations, never the stake.
+  const profit = payoutChipSpecs(
+    flow.amount - stakeAmount,
+    `${flow.id}:profit`,
+  );
+  return {
+    chips: [...stake.chips, ...profit],
+    sourceSpecs: stake.specs,
+    profitChipIds: profit.map((chip) => chip.id),
+    sourceExchange: stake.exchange,
+  };
+}
+
 /** Render-only event book. Financial amounts and roll timing remain authoritative. */
 export function createBankChipPresentation() {
   const inventory = createBankChipInventory();
@@ -73,7 +195,7 @@ export function createBankChipPresentation() {
     state,
     flows,
     now,
-    { baseline = false, seats = SEAT_LAYOUT } = {},
+    { baseline = false, seats = SEAT_LAYOUT, wagerSources = null } = {},
   ) {
     const nextRoom = `${state.code}:${state.createdAt}`;
     if (baseline || room !== nextRoom) {
@@ -132,13 +254,9 @@ export function createBankChipPresentation() {
       if (!plans.has(flow.id) && endOf(flow) > now) {
         plans.set(flow.id, {
           flow,
-          chips:
-            flow.from.kind === "bank"
-              ? []
-              : payoutChipSpecs(flow.amount, flow.id),
+          ...seedFlowPlan(flow, state, wagerSources),
           started: false,
           arrived: false,
-          sourceSpecs: [],
           targetSpecs: [],
         });
       }

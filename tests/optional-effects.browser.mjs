@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { pngDifference } from "../scripts/png-difference.mjs";
 import { clickTV } from "./helpers/tv-actions.mjs";
+import { openAdminSection } from "./helpers/admin-controls.mjs";
 
 const port = 4453;
 const origin = `http://127.0.0.1:${port}`;
@@ -175,7 +176,7 @@ try {
   await phone.getByLabel("Your name").fill("Effects QA host");
   await phone.getByRole("button", { name: "Join", exact: true }).click();
   await phone.getByText("Table setup", { exact: true }).waitFor();
-  await phone.getByText("Host controls", { exact: true }).click();
+  await openAdminSection(phone, "TV", { graphics: true });
   for (const label of labels)
     await expect(phone.getByLabel(`TV graphics ${label}`)).toHaveValue("auto");
   await openEffects();

@@ -111,3 +111,11 @@ across $800 → $795, a naturally rolled winning payout, physical landing and
 100 successive small awards with bounded stacks and exact totals. CPU tests
 also cover fractional cents, overlapping transfers, interrupted flows, capacity
 exchanges and camera framing across all twelve seats.
+
+Settlement flights retain the actual stake separately from the house's profit.
+A $100 black stake remains black on a win, loss or push; a win adds new profit
+chips alongside it. The bank, felt, transfer and returning inventory preserve
+physical identity, wear and patina. Size and rotation blend during travel rather
+than snapping to the receiving pile. Wager denomination changes use explicit
+dealer exchanges with replacement drops; the canonical collider geometry and
+financial ledger are unchanged.

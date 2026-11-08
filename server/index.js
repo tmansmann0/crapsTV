@@ -7,6 +7,8 @@ import path from "node:path";
 import { WebSocketServer } from "ws";
 import { RoomHub } from "../src/hub.js";
 import { createLocalDiscovery } from "./local-discovery.js";
+import { runtimeOptions } from "./runtime-options.js";
+const { kiosk } = runtimeOptions();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.PORT || 3000),
   app = express(),
@@ -38,7 +40,7 @@ const discovery = createLocalDiscovery({
 });
 app.get("/api/config", async (_req, res) => {
   await appReady;
-  res.json({ local: true, code, ...discovery.config() });
+  res.json({ local: true, code, kiosk, ...discovery.config() });
 });
 const wss = new WebSocketServer({ server, path: "/socket", maxPayload: 8192 });
 wss.on("connection", (ws, req) => {
@@ -133,6 +135,7 @@ try {
   resolveAppReady();
   if (!shuttingDown) {
     console.log(`\n  crapsTV · room ${code}\n  TV: http://localhost:${port}\n`);
+    if (kiosk) console.log("  TV kiosk mode: on-screen settings are hidden.");
     if (local.localOrigin) console.log(`  Local: ${local.localOrigin}`);
     if (local.joinOrigin)
       console.log(`  Join: ${local.joinOrigin}/join?code=${code}`);

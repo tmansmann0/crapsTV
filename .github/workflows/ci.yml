@@ -39,6 +39,8 @@ jobs:
       - run: npm run test:payout
       - run: npm run test:layout
       - run: npm run test:learn
+      - run: npm run test:admin-ui
+      - run: npm run test:bots
       - run: npm run test:graphics
       - run: npm run test:effects
       - run: npm run test:auto-effects

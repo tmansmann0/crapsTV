@@ -10,7 +10,11 @@ import {
   visualChipAmount,
   bankRoute,
   SEAT_LAYOUT,
+  routeKey,
 } from "../src/chip-flow.js";
+import { chipPileSpecs, wagerPileLayout } from "../src/wager-layout.js";
+import { createStartupShowcase } from "../src/startup-sequence.js";
+import { chipPatinaParameters } from "../src/chip-character.js";
 
 const value = (chips) => chips.reduce((n, c) => n + c.denomination, 0);
 const ident = (c) => ({ id: c.id, denomination: c.denomination, wear: c.wear });
@@ -416,4 +420,410 @@ test("real closed wins, standing wins, losses and pushes conserve the authoritat
         chip,
       );
   }
+});
+
+test("a closed $100 win returns its original black stake and mints only four green profit chips", () => {
+  const presentation = createBankChipPresentation();
+  const bet = { id: "black-pass", type: "pass", amount: 10000 };
+  const old = state(90000, {
+    nextRollAt: 0,
+    players: [{ id: "p", seat: 0, bank: 90000, bets: [bet] }],
+  });
+  presentation.sync(old, [], 1000);
+  const next = state(110000, {
+    nextRollAt: 0,
+    lastRoll: {
+      id: "black-wins",
+      at: 1100,
+      events: [
+        {
+          playerId: "p",
+          bets: [{ betId: bet.id, amount: 10000, result: "win", delta: 10000 }],
+        },
+      ],
+    },
+  });
+  const flows = planChipFlows(old, next, { now: 1100 });
+  const active = presentation.sync(next, flows, 1200),
+    plan = active.plans.get(flows[0].id);
+  assert.deepEqual(
+    plan.chips.map((chip) => chip.denomination),
+    [10000, 2500, 2500, 2500, 2500],
+  );
+  assert.equal(plan.profitChipIds.length, 4);
+  assert.equal(plan.sourceSpecs.length, 1);
+  const source = plan.sourceSpecs[0],
+    layout = wagerPileLayout(plan.flow.from, next, 10000);
+  const canonical = chipPileSpecs(10000, {
+    diameter: layout.diameter,
+    seed: bet.id,
+  })[0];
+  assert.equal(source.wear, canonical.wear);
+  assert.equal(source.appearanceId, `${routeKey(plan.flow.from)}:0`);
+  assert.deepEqual(
+    chipPatinaParameters(source),
+    chipPatinaParameters({ ...canonical, id: source.appearanceId }),
+    "The wager's patina coordinates survive its flow-specific identity",
+  );
+  assert.deepEqual(source.rotation, canonical.rotation);
+  assert.deepEqual(
+    source.position,
+    canonical.position.map((value, axis) => value + layout.basePosition[axis]),
+  );
+  assert.equal(source.diameter, layout.diameter);
+  assert.equal(source.thicknessScale, 1.3);
+  assert.equal(plan.sourceExchange, null);
+  const done = presentation.sync(
+    next,
+    flows,
+    flows[0].startAt + flows[0].duration,
+  );
+  exact(done, next, flows, flows[0].startAt + flows[0].duration);
+  const landed = done.banks
+    .get("p")
+    .chips.filter((chip) => plan.chips.some((flying) => flying.id === chip.id));
+  assert.deepEqual(landed.map(ident), plan.chips.map(ident));
+  const returned = landed.find((chip) => chip.id === source.id);
+  assert.equal(returned.appearanceId, source.appearanceId);
+  assert.deepEqual(
+    chipPatinaParameters(returned),
+    chipPatinaParameters(source),
+  );
+});
+
+test("wager source bookkeeping returns the actual spent bank chip ID, wear and patina unchanged", () => {
+  const presentation = createBankChipPresentation();
+  const initial = state(10000, {
+    config: { startingBank: 10000, minBet: 500 },
+  });
+  presentation.sync(initial, [], 1000);
+  // An explicit physical bank fixture: after spending it, the wager's model
+  // carries this identity rather than a replacement generated from its value.
+  const physical = {
+    id: "persistent-bank-black",
+    appearanceId: "original-handling-patina",
+    denomination: 10000,
+    wear: 2,
+  };
+  presentation.inventory.update("p", 0);
+  presentation.inventory.deposit("p", [physical]);
+  const bet = { id: "physical-black-pass", type: "pass", amount: 10000 };
+  const wager = state(0, {
+    snapshotAt: 1100,
+    config: initial.config,
+    players: [{ id: "p", seat: 0, bank: 0, bets: [bet] }],
+  });
+  const spending = planChipFlows(initial, wager, { now: 1100 });
+  const sent = presentation
+    .sync(wager, spending, 1100)
+    .plans.get(spending[0].id).chips;
+  assert.deepEqual(sent.map(ident), [ident(physical)]);
+  presentation.sync(
+    wager,
+    spending,
+    spending[0].startAt + spending[0].duration,
+  );
+  assert(
+    !presentation.inventory
+      .snapshot("p")
+      .chips.some((chip) => chip.id === physical.id),
+  );
+
+  const next = state(20000, {
+    config: initial.config,
+    nextRollAt: 0,
+    lastRoll: {
+      id: "physical-black-wins",
+      at: 3100,
+      events: [
+        {
+          playerId: "p",
+          bets: [{ betId: bet.id, amount: 10000, result: "win", delta: 10000 }],
+        },
+      ],
+    },
+  });
+  const flows = planChipFlows(wager, next, { now: 3100 }),
+    flow = flows[0];
+  const layout = wagerPileLayout(flow.from, next, 10000);
+  const canonical = chipPileSpecs(10000, {
+    diameter: layout.diameter,
+    seed: bet.id,
+  })[0];
+  const actual = {
+    ...canonical,
+    ...physical,
+    position: canonical.position.map(
+      (value, axis) => value + layout.basePosition[axis],
+    ),
+  };
+  const wagerSources = new Map([[routeKey(flow.from), [actual]]]),
+    untouched = structuredClone(actual);
+  const active = presentation.sync(next, flows, 3200, { wagerSources }),
+    plan = active.plans.get(flow.id);
+  assert.deepEqual(plan.sourceSpecs, [actual]);
+  assert.equal(plan.chips[0].id, physical.id);
+  assert.equal(plan.chips[0].appearanceId, physical.appearanceId);
+  assert.equal(plan.chips[0].wear, physical.wear);
+  assert.deepEqual(
+    chipPatinaParameters(plan.chips[0]),
+    chipPatinaParameters(physical),
+  );
+  assert.deepEqual(wagerSources.get(routeKey(flow.from)), [untouched]);
+  const end = flow.startAt + flow.duration;
+  const done = presentation.sync(next, flows, end, { wagerSources });
+  exact(done, next, flows, end);
+  const returned = done.banks
+    .get("p")
+    .chips.find((chip) => chip.id === physical.id);
+  assert(returned);
+  assert.equal(returned.appearanceId, physical.appearanceId);
+  assert.equal(returned.wear, physical.wear);
+  assert.equal(
+    done.banks.get("p").chips.filter((chip) => chip.id === physical.id).length,
+    1,
+  );
+  assert.deepEqual(
+    chipPatinaParameters(returned),
+    chipPatinaParameters(physical),
+  );
+});
+
+test("partial matching source chips retain their physical identities and mismatched bookkeeping falls back safely", () => {
+  const source = { id: "physical-partial", type: "field", amount: 20000 };
+  const old = state(80000, {
+    players: [{ id: "p", seat: 0, bank: 80000, bets: [source] }],
+  });
+  const next = state(90000, {
+    snapshotAt: 1100,
+    players: [
+      { id: "p", seat: 0, bank: 90000, bets: [{ ...source, amount: 10000 }] },
+    ],
+  });
+  for (const mismatch of [false, true]) {
+    const presentation = createBankChipPresentation();
+    presentation.sync(old, [], 1000);
+    const flows = planChipFlows(old, next, { now: 1100 }),
+      flow = flows[0];
+    const pile = wagerPileLayout(flow.from, next, 20000);
+    const actual = chipPileSpecs(20000, {
+      diameter: pile.diameter,
+      seed: source.id,
+    }).map((chip, index) => ({
+      ...chip,
+      id: `bank-origin-${index}`,
+      appearanceId: `bank-skin-${index}`,
+      wear: index,
+      denomination: mismatch ? 2500 : chip.denomination,
+      position: chip.position.map(
+        (value, axis) => value + pile.basePosition[axis],
+      ),
+    }));
+    const active = presentation.sync(next, flows, 1100, {
+      wagerSources: new Map([[routeKey(flow.from), actual]]),
+    });
+    const plan = active.plans.get(flow.id);
+    if (!mismatch) assert.deepEqual(plan.sourceSpecs, [actual[1]]);
+    else
+      assert(
+        plan.sourceSpecs.every((chip) => !chip.id.startsWith("bank-origin")),
+      );
+  }
+});
+
+test("losing or pushing a black stake never converts it into green payout denominations", () => {
+  for (const result of ["lose", "push"]) {
+    const presentation = createBankChipPresentation();
+    const bet = { id: `black-${result}`, type: "dont", amount: 10000 };
+    const old = state(90000, {
+      nextRollAt: 0,
+      players: [{ id: "p", seat: 0, bank: 90000, bets: [bet] }],
+    });
+    const initial = presentation.sync(old, [], 1000).banks.get("p");
+    const next = state(result === "push" ? 100000 : 90000, {
+      nextRollAt: 0,
+      lastRoll: {
+        id: `roll-${result}`,
+        at: 1100,
+        events: [
+          {
+            playerId: "p",
+            bets: [
+              {
+                betId: bet.id,
+                amount: 10000,
+                result,
+                delta: result === "push" ? 0 : -10000,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const flows = planChipFlows(old, next, { now: 1100 });
+    const active = presentation.sync(next, flows, 1200),
+      plan = active.plans.get(flows[0].id);
+    assert.deepEqual(
+      plan.chips.map((chip) => chip.denomination),
+      [10000],
+    );
+    assert.equal(plan.profitChipIds.length, 0);
+    assert.equal(plan.sourceSpecs.length, 1);
+    assert.equal(
+      plan.sourceSpecs[0].appearanceId,
+      `${routeKey(plan.flow.from)}:0`,
+    );
+    const done = presentation.sync(
+      next,
+      flows,
+      flows[0].startAt + flows[0].duration,
+    );
+    exact(done, next, flows, flows[0].startAt + flows[0].duration);
+    assertRetained(initial, done.banks.get("p"));
+    if (result === "lose")
+      assert.deepEqual(done.banks.get("p").chips, initial.chips);
+  }
+});
+
+test("standing profits never lift, recolour, or take credit for the wager that remains on the felt", () => {
+  const presentation = createBankChipPresentation(),
+    bet = { id: "standing-black", type: "place-5", amount: 10000 };
+  const old = state(90000, {
+    nextRollAt: 0,
+    point: 6,
+    players: [{ id: "p", seat: 0, bank: 90000, bets: [bet] }],
+  });
+  presentation.sync(old, [], 1000);
+  const next = state(104000, {
+    nextRollAt: 0,
+    point: 6,
+    players: [{ id: "p", seat: 0, bank: 104000, bets: [structuredClone(bet)] }],
+    lastRoll: {
+      id: "standing-win",
+      at: 1100,
+      events: [
+        {
+          playerId: "p",
+          bets: [{ betId: bet.id, amount: 10000, result: "win", delta: 14000 }],
+        },
+      ],
+    },
+  });
+  const flows = planChipFlows(old, next, { now: 1100 }),
+    untouched = JSON.stringify(next.players[0].bets);
+  const active = presentation.sync(next, flows, 1200),
+    plan = active.plans.get(flows[0].id);
+  assert.equal(plan.flow.sourceAmount, 0);
+  assert.deepEqual(plan.sourceSpecs, []);
+  assert.equal(value(plan.chips), 14000);
+  assert.deepEqual(
+    plan.profitChipIds,
+    plan.chips.map((chip) => chip.id),
+  );
+  assert.equal(visualChipAmount(10000, plan.flow.from, flows, 1200), 10000);
+  presentation.sync(next, flows, flows[0].startAt + flows[0].duration);
+  assert.equal(JSON.stringify(next.players[0].bets), untouched);
+});
+
+test("partial take-downs preserve a real matching top chip or explicitly request source dealer change", () => {
+  for (const [before, returned, expectedIndex, needsChange] of [
+    [20000, 10000, 1, false],
+    [10000, 2500, null, true],
+  ]) {
+    const presentation = createBankChipPresentation();
+    const bet = { id: "partial", type: "field", amount: before };
+    const old = state(100000 - before, {
+      players: [{ id: "p", seat: 0, bank: 100000 - before, bets: [bet] }],
+    });
+    presentation.sync(old, [], 1000);
+    const next = state(100000 - before + returned, {
+      snapshotAt: 1100,
+      players: [
+        {
+          id: "p",
+          seat: 0,
+          bank: 100000 - before + returned,
+          bets: [{ ...bet, amount: before - returned }],
+        },
+      ],
+    });
+    const flows = planChipFlows(old, next, { now: 1100 }),
+      active = presentation.sync(next, flows, 1100);
+    const plan = active.plans.get(flows[0].id);
+    assert.equal(value(plan.chips), returned);
+    assert.equal(!!plan.sourceExchange, needsChange);
+    if (!needsChange)
+      assert.equal(
+        plan.sourceSpecs[0].appearanceId,
+        `${routeKey(plan.flow.from)}:${expectedIndex}`,
+      );
+    else {
+      assert.equal(plan.sourceExchange.kind, "make-change");
+      assert.equal(value(plan.sourceExchange.removed), before);
+      assert.equal(plan.sourceExchange.afterAmount, before - returned);
+      assert.equal(value(plan.sourceExchange.outgoing), returned);
+    }
+  }
+});
+
+test("the full opening preserves every departing stake's denomination, wear and geometry while issuing profits separately", () => {
+  const showcase = createStartupShowcase(),
+    presentation = createBankChipPresentation();
+  let previous = null,
+    flows = [],
+    checked = 0;
+  for (let now = 0; now <= 30000; now += 50) {
+    const current = [...showcase.stages]
+      .reverse()
+      .find((stage) => stage.at <= now).state;
+    if (current !== previous) {
+      if (current.rolling && current.throw?.id !== previous?.throw?.id)
+        flows = [];
+      if (previous) flows.push(...planChipFlows(previous, current, { now }));
+      previous = current;
+    }
+    const untouched = JSON.stringify(current);
+    const displayed = presentation.sync(current, flows, now);
+    exact(displayed, current, flows, now);
+    assert.equal(JSON.stringify(current), untouched);
+    for (const flow of flows) {
+      const plan = displayed.plans.get(flow.id);
+      if (!plan || flow.from.kind !== "bet") continue;
+      const stake = plan.chips.filter(
+        (chip) => !plan.profitChipIds.includes(chip.id),
+      );
+      if (flow.sourceAmount > 0) {
+        const layout = wagerPileLayout(flow.from, current, flow.sourceAmount);
+        const canonical = chipPileSpecs(flow.sourceAmount, {
+          diameter: layout.diameter,
+          seed: flow.from.bet.id,
+        });
+        assert.deepEqual(
+          stake.map((chip) => [chip.denomination, chip.wear]),
+          canonical.map((chip) => [chip.denomination, chip.wear]),
+        );
+        assert.deepEqual(
+          plan.sourceSpecs.map((chip) => chip.rotation),
+          canonical.map((chip) => chip.rotation),
+        );
+        assert.equal(value(stake), flow.sourceAmount);
+        checked++;
+      } else assert.equal(plan.sourceSpecs.length, 0);
+      assert.equal(value(plan.chips), flow.amount);
+      assert.equal(
+        value(
+          plan.chips.filter((chip) => plan.profitChipIds.includes(chip.id)),
+        ),
+        Math.max(0, flow.amount - flow.sourceAmount),
+      );
+    }
+    flows = flows.filter(
+      (flow) =>
+        now < Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity),
+    );
+  }
+  assert(
+    checked > 50,
+    "Both physical throws and settlement cohorts were exercised over time",
+  );
 });

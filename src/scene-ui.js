@@ -2,7 +2,10 @@ import { assetURL } from "./asset-url.js";
 import * as THREE from "three";
 import QRCode from "qrcode";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
-import { bettingSecondsRemaining } from "./betting-window.js";
+import {
+  bettingSecondsRemaining,
+  botRollSecondsRemaining,
+} from "./betting-window.js";
 import { money } from "./game.js";
 import {
   createTVLayout,
@@ -252,6 +255,7 @@ export function createSceneUI(renderer, onAction) {
     }
     finish(p);
     p = panels.settingsButton;
+    p.mesh.visible = !current.hideSettings;
     c = begin(p);
     gear(c, 44, 44, 25);
     p.mesh.userData.buttons = [
@@ -744,7 +748,13 @@ export function createSceneUI(renderer, onAction) {
   }
   function update(next) {
     if (!next.settingsOpen && current.settingsOpen) settingsPage = "main";
-    current = { ...next, bettingSeconds: bettingSecondsRemaining(next.state) };
+    current = {
+      ...next,
+      bettingSeconds: Math.max(
+        bettingSecondsRemaining(next.state),
+        botRollSecondsRemaining(next.state),
+      ),
+    };
     const key = JSON.stringify([
       next.code,
       next.joinURL,
@@ -753,6 +763,7 @@ export function createSceneUI(renderer, onAction) {
       next.error,
       next.cameraMode,
       next.settingsOpen,
+      next.hideSettings,
       next.sceneLoading,
       next.graphics,
       Math.round(next.graphicsInfo?.fps || 0),

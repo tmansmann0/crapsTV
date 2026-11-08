@@ -459,6 +459,9 @@ export function createBankChipInventory({
           id: source.id,
           denomination: source.denomination,
           wear: source.wear,
+          ...(typeof source.appearanceId === "string"
+            ? { appearanceId: source.appearanceId }
+            : {}),
           slot: null,
           stackIndex: null,
           level: null,
