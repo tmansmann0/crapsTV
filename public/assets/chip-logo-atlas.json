@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "source": "brand-logo.png",
+  "sourceSha256": "e76a3ac9bdc42e820ba25753402e7a0ba41948d4c4491208025ebf213848361e",
+  "sourceCrop": [
+    16,
+    15,
+    1906,
+    805
+  ],
+  "maskMethod": "Exact original alpha/gold luminance; sharp source albedo, independently rounded recessed bevel",
+  "generatedArtwork": false,
+  "atlasSize": [
+    2048,
+    2048
+  ],
+  "mapSizes": {
+    "albedo": [
+      2048,
+      2048
+    ],
+    "normal": [
+      2048,
+      2048
+    ],
+    "roughness": [
+      1024,
+      1024
+    ],
+    "height": [
+      2048,
+      2048
+    ]
+  },
+  "mapping": "One full-face dedicated medallion map, shared by front and back through UV1; original UV0 preserved for clay wear",
+  "uvChannel": 1,
+  "tileSceneWidth": 0.626,
+  "effectiveLogoPixels": 1832.08,
+  "previousEffectiveLogoPixels": 516.0960000000001,
+  "linearDetailGain": 3.5499,
+  "bevelBlurPixels": 8.519701810436635,
+  "bevelSceneWidth": 0.0026041666666666665,
+  "albedoBlurPixels": 0,
+  "logoSceneWidth": 0.56,
+  "logoSceneHeight": 0.2340740740740741,
+  "cutDepth": 0.0032,
+  "sourceBlenderUV": {
+    "front": [
+      0.5,
+      0.5
+    ],
+    "back": [
+      0.5,
+      0.5
+    ],
+    "radius": 0.5
+  },
+  "pngCenters": {
+    "front": [
+      0.5,
+      0.5
+    ],
+    "back": [
+      0.5,
+      0.5
+    ]
+  },
+  "backUV": "Back local Y reflected before export; original UV0 remains unchanged for all patina/scuff channels",
+  "normalConvention": "OpenGL +Y",
+  "mapFiles": {
+    "albedo": "chip-logo-albedo.png",
+    "normal": "chip-logo-normal.png",
+    "roughness": "chip-logo-roughness.png",
+    "height": "chip-logo-height.png",
+    "mark": "chip-logo-mark.png"
+  }
+}

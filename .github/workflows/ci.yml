@@ -1,0 +1,63 @@
+name: Verify crapsTV
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: verify-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  portable:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+  browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: npm run test:odds
+      - run: npm run test:payout
+      - run: npm run test:layout
+      - run: npm run test:learn
+      - run: npm run test:graphics
+      - run: npm run test:effects
+      - run: npm run test:auto-effects
+      - run: npm run test:flare-hdr
+      - run: npm run test:board
+      - run: npm run test:surface-parity
+        env:
+          SURFACE_PARITY_WIDTH: "960"
+          SURFACE_PARITY_HEIGHT: "540"
+      - run: npm run test:tv
+      - run: npm run test:startup
+      - run: npm run test:startup-retest
+      - run: npm run test:tour
+      - run: npm run test:bank-chips
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: |
+            artifacts/
+            test-results/
+          if-no-files-found: ignore

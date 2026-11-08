@@ -1,0 +1,29 @@
+{
+  "size": [
+    1024,
+    1024
+  ],
+  "seed": 20261107,
+  "colorSpace": "linear",
+  "channels": {
+    "R": "periodic handled grime",
+    "G": "periodic fine scuff traces",
+    "B": "burnished patches"
+  },
+  "source": "Original deterministic procedural material data; no logo pixels or original model assets modified",
+  "sha256": "660b25b1f1359d97cd4a62c80158e01dca22fd01fc6b93839b554608f24b2be7",
+  "channelRange": [
+    [
+      0,
+      156
+    ],
+    [
+      0,
+      174
+    ],
+    [
+      3,
+      176
+    ]
+  ]
+}

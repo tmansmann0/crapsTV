@@ -1,0 +1,35 @@
+{
+  "version": "0.16.1",
+  "width": 3840,
+  "height": 2160,
+  "renderer": "Native Metal",
+  "cameraAndLights": "Identical production asset study, macro camera",
+  "before": {
+    "roughness": 0.7,
+    "coat": 0.6,
+    "coatRoughness": 0.18,
+    "environment": 1.25
+  },
+  "after": {
+    "roughness": 0.9,
+    "coat": 0.44,
+    "coatRoughness": 0.42,
+    "environment": 1.08,
+    "grainNormal": 1.75,
+    "grainOcclusion": 1.3,
+    "coatGrain": 0.45
+  },
+  "newTextures": 0,
+  "newGeometry": 0,
+  "offDifference": {
+    "meanAbsoluteDifference": 0,
+    "maxChannelDifference": 0,
+    "changedPixels": 0
+  },
+  "enabledDifference": {
+    "meanAbsoluteDifference": 1.15073543595679,
+    "maxChannelDifference": 59,
+    "changedPixels": 2427913
+  },
+  "errors": []
+}

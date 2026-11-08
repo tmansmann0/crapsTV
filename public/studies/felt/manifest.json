@@ -1,0 +1,233 @@
+{
+  "results": [
+    {
+      "id": "fine",
+      "shot": "hero",
+      "settings": {
+        "label": "Fine casino baize",
+        "relief": 0.55,
+        "tile": 0.34,
+        "sheen": 0.55,
+        "sheenRoughness": 0.92,
+        "sheenColor": "#47775a",
+        "nap": 0.018,
+        "colour": 0.028,
+        "fibre": 0.02
+      },
+      "camera": {
+        "position": [
+          -0.12,
+          0.26,
+          1.92
+        ],
+        "target": [
+          -0.05,
+          0.035,
+          1.29
+        ],
+        "fov": 43
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 24,
+      "triangles": 118614,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 0,
+      "fuzzTriangles": 0,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/hero-fine.jpg"
+    },
+    {
+      "id": "fine",
+      "shot": "wide",
+      "settings": {
+        "label": "Fine casino baize",
+        "relief": 0.55,
+        "tile": 0.34,
+        "sheen": 0.55,
+        "sheenRoughness": 0.92,
+        "sheenColor": "#47775a",
+        "nap": 0.018,
+        "colour": 0.028,
+        "fibre": 0.02
+      },
+      "camera": {
+        "position": [
+          -0.5,
+          3.8,
+          6.2
+        ],
+        "target": [
+          -0.25,
+          0.2,
+          1.1
+        ],
+        "fov": 42
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 27,
+      "triangles": 199686,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 0,
+      "fuzzTriangles": 0,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/wide-fine.jpg"
+    },
+    {
+      "id": "plush",
+      "shot": "hero",
+      "settings": {
+        "label": "Soft wool felt",
+        "relief": 0.7,
+        "tile": 0.43,
+        "sheen": 0.75,
+        "sheenRoughness": 0.69,
+        "sheenColor": "#47775a",
+        "nap": 0.035,
+        "colour": 0.035,
+        "fibre": 0.09
+      },
+      "camera": {
+        "position": [
+          -0.12,
+          0.26,
+          1.92
+        ],
+        "target": [
+          -0.05,
+          0.035,
+          1.29
+        ],
+        "fov": 43
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 24,
+      "triangles": 118614,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 0,
+      "fuzzTriangles": 0,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/hero-plush.jpg"
+    },
+    {
+      "id": "plush",
+      "shot": "wide",
+      "settings": {
+        "label": "Soft wool felt",
+        "relief": 0.7,
+        "tile": 0.43,
+        "sheen": 0.75,
+        "sheenRoughness": 0.69,
+        "sheenColor": "#47775a",
+        "nap": 0.035,
+        "colour": 0.035,
+        "fibre": 0.09
+      },
+      "camera": {
+        "position": [
+          -0.5,
+          3.8,
+          6.2
+        ],
+        "target": [
+          -0.25,
+          0.2,
+          1.1
+        ],
+        "fov": 42
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 27,
+      "triangles": 199686,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 0,
+      "fuzzTriangles": 0,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/wide-plush.jpg"
+    },
+    {
+      "id": "nap",
+      "shot": "hero",
+      "settings": {
+        "label": "Deep brushed nap",
+        "relief": 0.65,
+        "tile": 0.48,
+        "sheen": 0.86,
+        "sheenRoughness": 0.55,
+        "sheenColor": "#3d6c48",
+        "nap": 0.05,
+        "colour": 0.031,
+        "fibre": 0.11
+      },
+      "camera": {
+        "position": [
+          -0.12,
+          0.26,
+          1.92
+        ],
+        "target": [
+          -0.05,
+          0.035,
+          1.29
+        ],
+        "fov": 43
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 25,
+      "triangles": 218614,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 100000,
+      "fuzzTriangles": 100000,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/hero-nap.jpg"
+    },
+    {
+      "id": "nap",
+      "shot": "wide",
+      "settings": {
+        "label": "Deep brushed nap",
+        "relief": 0.65,
+        "tile": 0.48,
+        "sheen": 0.86,
+        "sheenRoughness": 0.55,
+        "sheenColor": "#3d6c48",
+        "nap": 0.05,
+        "colour": 0.031,
+        "fibre": 0.11
+      },
+      "camera": {
+        "position": [
+          -0.5,
+          3.8,
+          6.2
+        ],
+        "target": [
+          -0.25,
+          0.2,
+          1.1
+        ],
+        "fov": 42
+      },
+      "width": 3840,
+      "height": 2160,
+      "calls": 27,
+      "triangles": 199686,
+      "hatchPathsRemoved": 12,
+      "geometryAdded": 0,
+      "fuzzTriangles": 0,
+      "atlasBytes": 4194304,
+      "file": "public/studies/felt/wide-nap.jpg"
+    }
+  ],
+  "errors": [],
+  "sources": [
+    "https://threejs.org/docs/pages/MeshPhysicalMaterial.html",
+    "https://google.github.io/filament/Filament.md.html",
+    "https://eheitzresearch.wordpress.com/738-2/"
+  ],
+  "note": "Actual Three.js 4K captures; same table/chips/camera/lighting; selected B has material only, unselected C has bounded macro fibres. No generated or retouched images."
+}

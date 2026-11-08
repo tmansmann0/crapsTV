@@ -1,0 +1,112 @@
+.dice-throw {
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0b1113;
+  color: #f6eddb;
+  box-shadow: 0 8px 30px #09251d22;
+  margin: 8px 0;
+}
+.dice-throw-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+.dice-throw-top strong {
+  font-size: 15px;
+}
+.dice-throw-top span {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #aac9c2;
+}
+.dice-throw-view {
+  height: clamp(260px, 44dvh, 390px);
+  position: relative;
+  touch-action: none;
+  cursor: grab;
+  overflow: hidden;
+}
+.dice-throw-view canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.dice-swipe-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  padding: 9px 15px;
+  border: 1px solid #ffffff1b;
+  border-radius: 999px;
+  background: #0b1113bb;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+  color: #d6e5df;
+}
+.dice-power {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #ffffff20;
+}
+.dice-power i {
+  height: 100%;
+  display: block;
+  background: #e7c378;
+}
+.dice-throw-bottom {
+  padding: 10px 14px 14px;
+  display: grid;
+  gap: 12px;
+}
+.dice-appearance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dice-appearance > button {
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 8px;
+  background: var(--die);
+  border: 2px solid transparent;
+  padding: 0;
+}
+.dice-appearance > button[aria-pressed="true"] {
+  outline: 2px solid #f2d89e;
+  outline-offset: 2px;
+}
+.dice-appearance > button.dice-glass {
+  width: auto;
+  padding: 0 10px;
+  background: #ffffff12;
+  color: #f6eddb;
+  font-size: 11px;
+}
+.dice-throw .dice-roll-button {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1d495;
+  color: #163b2d;
+  font-weight: 800;
+  font-size: 14px;
+}
+.dice-throw .dice-roll-button:disabled {
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dice-throw * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

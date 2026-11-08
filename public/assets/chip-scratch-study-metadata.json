@@ -1,0 +1,20 @@
+{
+  "productionEnabled": true,
+  "seed": 83756,
+  "width": 1024,
+  "height": 1024,
+  "channels": [
+    "Tangent normal X",
+    "Tangent normal Y",
+    "Exposed clay scratch / rub mask",
+    "Abraded roughness mask"
+  ],
+  "normalConvention": "OpenGL tangent +Y",
+  "grooveDepthSceneUnits": 0.00048,
+  "worldTileSceneUnits": 0.69,
+  "directionalScores": 310,
+  "abrasionClusters": 38,
+  "coverageAboveQuarter": 0.03075,
+  "sharedTextureCount": 1,
+  "productionMapsChanged": false
+}

@@ -1,0 +1,164 @@
+{
+  "configuration": {
+    "width": 1920,
+    "height": 1080,
+    "dpr": 1,
+    "port": 4398,
+    "label": "selected-native-1080p",
+    "duration": 12000,
+    "players": 12,
+    "uiSize": "compact",
+    "dev": false,
+    "roll": true,
+    "camera": "auto",
+    "angle": "metal",
+    "graphics": {
+      "fps": 60,
+      "resolution": "100",
+      "antialias": "on",
+      "modelDetail": "auto",
+      "textures": "native"
+    },
+    "expected": {
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "applicationVersion": "0.12.0",
+  "sourceMode": "production",
+  "frames": 720,
+  "fps": 60.002670494375266,
+  "p50Ms": 16.69999999999891,
+  "p95Ms": 16.799999999999272,
+  "meanDraws": 79.83472222222223,
+  "meanTriangles": 426676.31111111114,
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+  "width": 1920,
+  "height": 1080,
+  "rollingFps": 51.03946221834931,
+  "shots": {
+    "bet-cross-sweep": {
+      "intervals": 181,
+      "fps": 60.001325996154605,
+      "p95Ms": 16.799999999999272
+    },
+    "throw": {
+      "intervals": 131,
+      "fps": 60.00366434591426,
+      "p95Ms": 16.799999999999272
+    },
+    "result": {
+      "intervals": 95,
+      "fps": 60.00126318448805,
+      "p95Ms": 16.700000000000728
+    },
+    "betting": {
+      "intervals": 307,
+      "fps": 60.001954461057345,
+      "p95Ms": 16.799999999999272
+    }
+  },
+  "devicePixelRatio": 1,
+  "viewport": {
+    "width": 1920,
+    "height": 1080
+  },
+  "modules": [
+    "/assets/Table3D-B8j2Ml0i.js",
+    "/assets/index-DKBsyg2d.js"
+  ],
+  "canvases": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "cssWidth": 1920,
+      "cssHeight": 1080
+    }
+  ],
+  "effective": {
+    "renderQuality": "full",
+    "sceneResolution": "1920x1080",
+    "uiResolution": "1920x1080",
+    "splitResolution": "false",
+    "cameraPosition": "[-0.00006384271154279311,8.40791757076436,1.6198374026132634]",
+    "cameraTarget": "[-0.000010182576076912829,0.39999820393440777,0.40955810865719583]",
+    "cameraFov": "42.99999999796886",
+    "cameraManual": "false",
+    "cameraShot": "betting",
+    "cameraRig": "",
+    "cameraPlayer": "",
+    "cameraShotKey": "",
+    "cameraVariant": "",
+    "cameraArrivalAt": "",
+    "cameraTransferAt": "",
+    "cameraSubjectHeight": "",
+    "settingsOpen": "false",
+    "playerLabels": "12",
+    "banks": "1",
+    "previews": "0",
+    "transfers": "0",
+    "activeTransfers": "[]",
+    "sceneReady": "true",
+    "chips": "13",
+    "chipImpacts": "0",
+    "activeChipImpacts": "0",
+    "diceColor": "red",
+    "diceFinish": "solid",
+    "throwId": "547ff2cd-5ecb-4813-8967-97a83cae29d7",
+    "pose": "[{\"position\":[0.71187,0.10999,0.08881],\"quaternion\":[0.3924768497972076,0.3924768497972076,0.5881852789498051,0.5881852789498051]},{\"position\":[2.20783,0.10999,-2.00361],\"quaternion\":[-0.37530052763538274,-0.5992908425435878,-0.5992908425435878,0.37530052763538274]}]",
+    "throwSettled": "true",
+    "cinematic": "false",
+    "wallHits": "4",
+    "puckPose": "{\"position\":[-2.10130859375,0.04450000000000002,-1.62],\"quaternion\":[0,0,0,1]}",
+    "propHits": "0",
+    "startupPhase": "live",
+    "startupElapsed": "15316.100000000002",
+    "startupFade": "1",
+    "startupUiOpacity": "1",
+    "demoActive": "false",
+    "startupProbe": "0",
+    "startupUploadPausedMs": "0",
+    "startupQualityChanges": "[]",
+    "startupCalibrationHold": "false",
+    "startupRolling": "false",
+    "startupDiceDone": "true",
+    "startupDicePose": "[{\"position\":[0.71187,0.10999,0.08881],\"quaternion\":[0.3924768497972076,0.3924768497972076,0.5881852789498051,0.5881852789498051]},{\"position\":[2.20783,0.10999,-2.00361],\"quaternion\":[-0.37530052763538274,-0.5992908425435878,-0.5992908425435878,0.37530052763538274]}]",
+    "startupEffectiveFps": "59.99999999999999",
+    "uiActions": "{\"settings\":{\"x\":109.48,\"y\":89.48,\"left\":80,\"top\":60,\"width\":58.96,\"height\":58.96,\"panel\":\"settingsButton\"},\"join\":{\"x\":1639,\"y\":130.35000000000002,\"left\":1438,\"top\":60,\"width\":402,\"height\":140.70000000000002,\"panel\":\"join\"}}",
+    "uiTextMetrics": "{\"settingsButton\":{\"visible\":true,\"x\":80,\"y\":60,\"width\":58.96,\"height\":58.96,\"scale\":0.67,\"logicalWidth\":88,\"logicalHeight\":88,\"backingScale\":0.67,\"backingWidth\":59,\"backingHeight\":59,\"lines\":[]},\"brand\":{\"visible\":true,\"x\":152.36,\"y\":60,\"width\":171.52,\"height\":64.32000000000001,\"scale\":0.67,\"logicalWidth\":256,\"logicalHeight\":96,\"backingScale\":0.67,\"backingWidth\":172,\"backingHeight\":65,\"lines\":[]},\"join\":{\"visible\":true,\"x\":1438,\"y\":60,\"width\":402,\"height\":140.70000000000002,\"scale\":0.67,\"logicalWidth\":600,\"logicalHeight\":210,\"backingScale\":0.67,\"backingWidth\":402,\"backingHeight\":141,\"lines\":[{\"text\":\"JOIN TABLE\",\"importance\":\"secondary\",\"fontSize\":22,\"x\":46,\"y\":38,\"align\":\"start\",\"ascent\":16.170000076293945,\"descent\":0.3300018310546875,\"left\":0,\"right\":118.90992736816406,\"glyphHeight\":16.500001907348633,\"glyphWidth\":118.90992736816406,\"cssGlyphHeight\":11.055001277923585,\"backingGlyphHeight\":11.055001277923585},{\"text\":\"C9URQX\",\"importance\":\"primary\",\"fontSize\":72,\"x\":22,\"y\":105,\"align\":\"start\",\"ascent\":52.92000198364258,\"descent\":1.0800056457519531,\"left\":-2.1599998474121094,\"right\":295.5599670410156,\"glyphHeight\":54.00000762939453,\"glyphWidth\":293.3999671936035,\"cssGlyphHeight\":36.180005111694335,\"backingGlyphHeight\":36.180005111694335},{\"text\":\"192.168.1.154:4398\",\"importance\":\"primary\",\"fontSize\":36,\"x\":26,\"y\":148,\"align\":\"start\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.1599998474121094,\"right\":303.49786376953125,\"glyphHeight\":27.000003814697266,\"glyphWidth\":301.33786392211914,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"/join\",\"importance\":\"primary\",\"fontSize\":36,\"x\":26,\"y\":183,\"align\":\"start\",\"ascent\":26.280000686645508,\"descent\":8.64000129699707,\"left\":-2.1599998474121094,\"right\":76.3919677734375,\"glyphHeight\":34.92000198364258,\"glyphWidth\":74.23196792602539,\"cssGlyphHeight\":23.39640132904053,\"backingGlyphHeight\":23.39640132904053},{\"text\":\"SCAN TO JOIN\",\"importance\":\"secondary\",\"fontSize\":16,\"x\":502,\"y\":183,\"align\":\"center\",\"ascent\":11.760000228881836,\"descent\":0.24000072479248047,\"left\":53.535953521728516,\"right\":53.031959533691406,\"glyphHeight\":12.000000953674316,\"glyphWidth\":106.56791305541992,\"cssGlyphHeight\":8.040000638961793,\"backingGlyphHeight\":8.040000638961793}],\"address\":{\"address\":\"192.168.1.154:4398/join\",\"lines\":[\"192.168.1.154:4398\",\"/join\"],\"size\":36},\"qr\":{\"x\":434,\"y\":27,\"size\":136}},\"settings\":{\"visible\":false,\"x\":80,\"y\":133.7,\"width\":361.8,\"height\":483.74,\"scale\":0.67,\"logicalWidth\":540,\"logicalHeight\":722,\"backingScale\":0.67,\"backingWidth\":362,\"backingHeight\":484,\"lines\":[{\"text\":\"TABLE SETTINGS\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":49,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400009155273438,\"left\":-0.35999998450279236,\"right\":290.5739440917969,\"glyphHeight\":27.000001907348633,\"glyphWidth\":290.2139441072941,\"cssGlyphHeight\":18.090001277923584,\"backingGlyphHeight\":18.090001277923584},{\"text\":\"×\",\"importance\":\"primary\",\"fontSize\":42,\"x\":486,\"y\":51,\"align\":\"left\",\"ascent\":22.9739990234375,\"descent\":-7.265999794006348,\"left\":-2.5199999809265137,\"right\":18.227998733520508,\"glyphHeight\":15.707999229431152,\"glyphWidth\":15.707998752593994,\"cssGlyphHeight\":10.524359483718873,\"backingGlyphHeight\":10.524359483718873},{\"text\":\"Announcer\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":124,\"align\":\"left\",\"ascent\":25.920001983642578,\"descent\":0.5400028228759766,\"left\":-0.7199999690055847,\"right\":185.02198791503906,\"glyphHeight\":26.460004806518555,\"glyphWidth\":184.30198794603348,\"cssGlyphHeight\":17.728203220367433,\"backingGlyphHeight\":17.728203220367433},{\"text\":\"OFF\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":124,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":66.25299072265625,\"right\":-0.7600021362304688,\"glyphHeight\":28.500001907348633,\"glyphWidth\":65.49298858642578,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586},{\"text\":\"Camera\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":200,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-1.0799999237060547,\"right\":129.40199279785156,\"glyphHeight\":27.000003814697266,\"glyphWidth\":128.3219928741455,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"AUTO\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":200,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":101.70697784423828,\"right\":-1.1399917602539062,\"glyphHeight\":28.500001907348633,\"glyphWidth\":100.56698608398438,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586},{\"text\":\"Copy invite\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":276,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":8.639997482299805,\"left\":-1.0799999237060547,\"right\":187.54193115234375,\"glyphHeight\":35.099998474121094,\"glyphWidth\":186.4619312286377,\"cssGlyphHeight\":23.516998977661135,\"backingGlyphHeight\":23.516998977661135},{\"text\":\"↗\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":276,\"align\":\"right\",\"ascent\":30.780000686645508,\"descent\":2.9640026092529297,\"left\":36.25199890136719,\"right\":-2.6599998474121094,\"glyphHeight\":33.74400329589844,\"glyphWidth\":33.59199905395508,\"cssGlyphHeight\":22.608482208251953,\"backingGlyphHeight\":22.608482208251953},{\"text\":\"Phone controller\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":352,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":279.86395263671875,\"glyphHeight\":27.000003814697266,\"glyphWidth\":277.34395265579224,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"↗\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":352,\"align\":\"right\",\"ascent\":30.780000686645508,\"descent\":2.9640026092529297,\"left\":36.25199890136719,\"right\":-2.6599998474121094,\"glyphHeight\":33.74400329589844,\"glyphWidth\":33.59199905395508,\"cssGlyphHeight\":22.608482208251953,\"backingGlyphHeight\":22.608482208251953},{\"text\":\"Fullscreen\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":428,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":172.00796508789062,\"glyphHeight\":27.000003814697266,\"glyphWidth\":169.4879651069641,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"⛶\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":428,\"align\":\"right\",\"ascent\":25.559749603271484,\"descent\":0.59375,\"left\":28.59973907470703,\"right\":-2.446239471435547,\"glyphHeight\":26.153499603271484,\"glyphWidth\":26.153499603271484,\"cssGlyphHeight\":17.522844734191896,\"backingGlyphHeight\":17.522844734191896},{\"text\":\"Graphics\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":504,\"align\":\"left\",\"ascent\":26.441999435424805,\"descent\":8.64000129699707,\"left\":-1.0799999237060547,\"right\":148.9319610595703,\"glyphHeight\":35.082000732421875,\"glyphWidth\":147.85196113586426,\"cssGlyphHeight\":23.504940490722657,\"backingGlyphHeight\":23.504940490722657},{\"text\":\"›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":504,\"align\":\"right\",\"ascent\":21.03299903869629,\"descent\":-2.9069976806640625,\"left\":16.852989196777344,\"right\":-5.319990158081055,\"glyphHeight\":18.126001358032227,\"glyphWidth\":11.532999038696289,\"cssGlyphHeight\":12.144420909881593,\"backingGlyphHeight\":12.144420909881593},{\"text\":\"UI size\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":580,\"align\":\"left\",\"ascent\":26.190000534057617,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":107.31594848632812,\"glyphHeight\":26.730003356933594,\"glyphWidth\":104.79594850540161,\"cssGlyphHeight\":17.90910224914551,\"backingGlyphHeight\":17.90910224914551},{\"text\":\"COMPACT\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":580,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":183.9579620361328,\"right\":-0.3799896240234375,\"glyphHeight\":28.500001907348633,\"glyphWidth\":183.57797241210938,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586},{\"text\":\"Labels\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":656,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.879999876022339,\"right\":108.35997009277344,\"glyphHeight\":27.000003814697266,\"glyphWidth\":105.4799702167511,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"SMOOTH\",\"importance\":\"primary\",\"fontSize\":38,\"x\":510,\"y\":656,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":160.79698181152344,\"right\":-2.6599884033203125,\"glyphHeight\":28.500001907348633,\"glyphWidth\":158.13699340820312,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586}]},\"graphics\":{\"visible\":false,\"x\":80,\"y\":133.7,\"width\":428.8,\"height\":475.70000000000005,\"scale\":0.67,\"logicalWidth\":640,\"logicalHeight\":710,\"backingScale\":0.67,\"backingWidth\":429,\"backingHeight\":476,\"lines\":[{\"text\":\"‹ Back\",\"importance\":\"primary\",\"fontSize\":36,\"x\":26,\"y\":49,\"align\":\"left\",\"ascent\":25.920001983642578,\"descent\":0.5400028228759766,\"left\":-5.039999961853027,\"right\":112.91397094726562,\"glyphHeight\":26.460004806518555,\"glyphWidth\":107.8739709854126,\"cssGlyphHeight\":17.728203220367433,\"backingGlyphHeight\":17.728203220367433},{\"text\":\"GRAPHICS\",\"importance\":\"primary\",\"fontSize\":36,\"x\":218,\"y\":49,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400009155273438,\"left\":-1.0799999237060547,\"right\":183.25796508789062,\"glyphHeight\":27.000001907348633,\"glyphWidth\":182.17796516418457,\"cssGlyphHeight\":18.090001277923584,\"backingGlyphHeight\":18.090001277923584},{\"text\":\"×\",\"importance\":\"primary\",\"fontSize\":42,\"x\":586,\"y\":51,\"align\":\"left\",\"ascent\":22.9739990234375,\"descent\":-7.265999794006348,\"left\":-2.5199999809265137,\"right\":18.227998733520508,\"glyphHeight\":15.707999229431152,\"glyphWidth\":15.707998752593994,\"cssGlyphHeight\":10.524359483718873,\"backingGlyphHeight\":10.524359483718873},{\"text\":\"Frame rate\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":122,\"align\":\"left\",\"ascent\":25.920001983642578,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":177.83998107910156,\"glyphHeight\":26.460004806518555,\"glyphWidth\":175.31998109817505,\"cssGlyphHeight\":17.728203220367433,\"backingGlyphHeight\":17.728203220367433},{\"text\":\"60 FPS  ›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":612,\"y\":122,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":159.97991943359375,\"right\":-5.3199920654296875,\"glyphHeight\":28.500001907348633,\"glyphWidth\":154.65992736816406,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586},{\"text\":\"Antialiasing\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":194,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":9.179998397827148,\"left\":-0.7199999690055847,\"right\":196.1279296875,\"glyphHeight\":35.63999938964844,\"glyphWidth\":195.40792971849442,\"cssGlyphHeight\":23.878799591064453,\"backingGlyphHeight\":23.878799591064453},{\"text\":\"On  ›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":612,\"y\":194,\"align\":\"right\",\"ascent\":27.93000030517578,\"descent\":0.5700016021728516,\"left\":89.48995971679688,\"right\":-5.3199920654296875,\"glyphHeight\":28.500001907348633,\"glyphWidth\":84.16996765136719,\"cssGlyphHeight\":19.095001277923586,\"backingGlyphHeight\":19.095001277923586},{\"text\":\"Resolution\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":266,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":180.75595092773438,\"glyphHeight\":27.000003814697266,\"glyphWidth\":178.23595094680786,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"100% (native)  ›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":612,\"y\":266,\"align\":\"right\",\"ascent\":32.16699981689453,\"descent\":7.087001800537109,\"left\":289.17987060546875,\"right\":-5.32000732421875,\"glyphHeight\":39.25400161743164,\"glyphWidth\":283.85986328125,\"cssGlyphHeight\":26.300181083679202,\"backingGlyphHeight\":26.300181083679202},{\"text\":\"Model detail\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":338,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400028228759766,\"left\":-2.5199999809265137,\"right\":204.0839385986328,\"glyphHeight\":27.000003814697266,\"glyphWidth\":201.5639386177063,\"cssGlyphHeight\":18.090002555847168,\"backingGlyphHeight\":18.090002555847168},{\"text\":\"Auto  ›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":612,\"y\":338,\"align\":\"right\",\"ascent\":27.360000610351562,\"descent\":0.5700016021728516,\"left\":125.01995086669922,\"right\":-5.3199920654296875,\"glyphHeight\":27.930002212524414,\"glyphWidth\":119.69995880126953,\"cssGlyphHeight\":18.71310148239136,\"backingGlyphHeight\":18.71310148239136},{\"text\":\"Textures\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":410,\"align\":\"left\",\"ascent\":25.920001983642578,\"descent\":0.5400028228759766,\"left\":-0.35999998450279236,\"right\":147.11395263671875,\"glyphHeight\":26.460004806518555,\"glyphWidth\":146.75395265221596,\"cssGlyphHeight\":17.728203220367433,\"backingGlyphHeight\":17.728203220367433},{\"text\":\"Native  ›\",\"importance\":\"primary\",\"fontSize\":38,\"x\":612,\"y\":410,\"align\":\"right\",\"ascent\":27.740001678466797,\"descent\":0.5700016021728516,\"left\":153.40594482421875,\"right\":-5.3199920654296875,\"glyphHeight\":28.31000328063965,\"glyphWidth\":148.08595275878906,\"cssGlyphHeight\":18.967702198028565,\"backingGlyphHeight\":18.967702198028565},{\"text\":\"ANGLE (Apple, ANGLE Metal Rend…\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":493,\"align\":\"left\",\"ascent\":30.347999572753906,\"descent\":8.639999389648438,\"left\":-0.7199999690055847,\"right\":580.6258544921875,\"glyphHeight\":38.987998962402344,\"glyphWidth\":579.9058545231819,\"cssGlyphHeight\":26.12195930480957,\"backingGlyphHeight\":26.12195930480957},{\"text\":\"60 FPS · 3D 1920 × 1080\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":532,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":0.5400009155273438,\"left\":-2.5199999809265137,\"right\":381.25787353515625,\"glyphHeight\":27.000001907348633,\"glyphWidth\":378.73787355422974,\"cssGlyphHeight\":18.090001277923584,\"backingGlyphHeight\":18.090001277923584},{\"text\":\"UI 1920 × 1080 · Maps 8192px\",\"importance\":\"primary\",\"fontSize\":36,\"x\":28,\"y\":570,\"align\":\"left\",\"ascent\":26.46000099182129,\"descent\":8.64000129699707,\"left\":-2.5199999809265137,\"right\":475.64984130859375,\"glyphHeight\":35.10000228881836,\"glyphWidth\":473.12984132766724,\"cssGlyphHeight\":23.517001533508303,\"backingGlyphHeight\":23.517001533508303},{\"text\":\"Retest automatic settings\",\"importance\":\"primary\",\"fontSize\":36,\"x\":42,\"y\":640,\"align\":\"left\",\"ascent\":26.280000686645508,\"descent\":9.179998397827148,\"left\":-2.5199999809265137,\"right\":446.327880859375,\"glyphHeight\":35.459999084472656,\"glyphWidth\":443.8078808784485,\"cssGlyphHeight\":23.75819938659668,\"backingGlyphHeight\":23.75819938659668}]},\"status\":{\"visible\":true,\"x\":591.5,\"y\":912.8,\"width\":737,\"height\":107.2,\"scale\":0.67,\"logicalWidth\":1100,\"logicalHeight\":160,\"backingScale\":0.67,\"backingWidth\":737,\"backingHeight\":108,\"lines\":[{\"text\":\"5 · POINT 5\",\"importance\":\"primary\",\"fontSize\":54,\"x\":550,\"y\":70,\"align\":\"center\",\"ascent\":39.69000244140625,\"descent\":0.8100051879882812,\"left\":133.15045166015625,\"right\":133.1504364013672,\"glyphHeight\":40.50000762939453,\"glyphWidth\":266.30088806152344,\"cssGlyphHeight\":27.135005111694337,\"backingGlyphHeight\":27.135005111694337},{\"text\":\"Player 1 to roll · Betting open\",\"importance\":\"primary\",\"fontSize\":38,\"x\":550,\"y\":123,\"align\":\"center\",\"ascent\":27.93000030517578,\"descent\":9.689998626708984,\"left\":249.0424041748047,\"right\":249.4224090576172,\"glyphHeight\":37.619998931884766,\"glyphWidth\":498.4648132324219,\"cssGlyphHeight\":25.205399284362795,\"backingGlyphHeight\":25.205399284362795}]},\"intro\":{\"visible\":false,\"x\":705.4,\"y\":436.15,\"width\":509.20000000000005,\"height\":207.70000000000002,\"scale\":0.67,\"logicalWidth\":760,\"logicalHeight\":310,\"backingScale\":0.67,\"backingWidth\":510,\"backingHeight\":208,\"lines\":[{\"text\":\"CRAPSTV\",\"importance\":\"primary\",\"fontSize\":36,\"x\":30,\"y\":47,\"align\":\"start\",\"ascent\":26.46000099182129,\"descent\":0.5400009155273438,\"left\":-1.0799999237060547,\"right\":165.8519744873047,\"glyphHeight\":27.000001907348633,\"glyphWidth\":164.77197456359863,\"cssGlyphHeight\":18.090001277923584,\"backingGlyphHeight\":18.090001277923584},{\"text\":\"Your table is ready\",\"importance\":\"primary\",\"fontSize\":40,\"x\":30,\"y\":100,\"align\":\"start\",\"ascent\":29.400001525878906,\"descent\":9.60000228881836,\"left\":0,\"right\":353.29986572265625,\"glyphHeight\":39.000003814697266,\"glyphWidth\":353.29986572265625,\"cssGlyphHeight\":26.13000255584717,\"backingGlyphHeight\":26.13000255584717},{\"text\":\"60 FPS · 1920 × 1080\",\"importance\":\"primary\",\"fontSize\":36,\"x\":30,\"y\":145,\"align\":\"start\",\"ascent\":26.46000099182129,\"descent\":0.5400009155273438,\"left\":-2.5199999809265137,\"right\":329.2919006347656,\"glyphHeight\":27.000001907348633,\"glyphWidth\":326.7719006538391,\"cssGlyphHeight\":18.090001277923584,\"backingGlyphHeight\":18.090001277923584},{\"text\":\"You can change graphics in Settings.\",\"importance\":\"primary\",\"fontSize\":36,\"x\":30,\"y\":224,\"align\":\"start\",\"ascent\":26.46000099182129,\"descent\":9.180002212524414,\"left\":0,\"right\":612.5037841796875,\"glyphHeight\":35.6400032043457,\"glyphWidth\":612.5037841796875,\"cssGlyphHeight\":23.87880214691162,\"backingGlyphHeight\":23.87880214691162},{\"text\":\"Graphics settings  ›\",\"importance\":\"primary\",\"fontSize\":36,\"x\":30,\"y\":279,\"align\":\"start\",\"ascent\":26.441999435424805,\"descent\":9.179998397827148,\"left\":-1.0799999237060547,\"right\":334.29595947265625,\"glyphHeight\":35.62199783325195,\"glyphWidth\":333.2159595489502,\"cssGlyphHeight\":23.86673854827881,\"backingGlyphHeight\":23.86673854827881}]}}",
+    "uiLayout": "{\"width\":1920,\"height\":1080,\"compact\":false,\"uiSize\":\"compact\",\"uiScale\":0.67,\"labelScale\":0.67,\"labelMotion\":\"smooth\",\"scale\":0.67,\"safeArea\":{\"x\":80,\"y\":60},\"panels\":{\"settingsButton\":{\"x\":80,\"y\":60,\"width\":58.96,\"height\":58.96,\"scale\":0.67,\"logicalWidth\":88,\"logicalHeight\":88,\"backingScale\":0.67,\"backingWidth\":59,\"backingHeight\":59},\"brand\":{\"x\":152.36,\"y\":60,\"width\":171.52,\"height\":64.32000000000001,\"scale\":0.67,\"logicalWidth\":256,\"logicalHeight\":96,\"backingScale\":0.67,\"backingWidth\":172,\"backingHeight\":65},\"join\":{\"x\":1438,\"y\":60,\"width\":402,\"height\":140.70000000000002,\"scale\":0.67,\"logicalWidth\":600,\"logicalHeight\":210,\"backingScale\":0.67,\"backingWidth\":402,\"backingHeight\":141},\"settings\":{\"x\":80,\"y\":133.7,\"width\":361.8,\"height\":483.74,\"scale\":0.67,\"logicalWidth\":540,\"logicalHeight\":722,\"backingScale\":0.67,\"backingWidth\":362,\"backingHeight\":484},\"graphics\":{\"x\":80,\"y\":133.7,\"width\":428.8,\"height\":475.70000000000005,\"scale\":0.67,\"logicalWidth\":640,\"logicalHeight\":710,\"backingScale\":0.67,\"backingWidth\":429,\"backingHeight\":476},\"status\":{\"x\":591.5,\"y\":912.8,\"width\":737,\"height\":107.2,\"scale\":0.67,\"logicalWidth\":1100,\"logicalHeight\":160,\"backingScale\":0.67,\"backingWidth\":737,\"backingHeight\":108},\"intro\":{\"x\":705.4,\"y\":436.15,\"width\":509.20000000000005,\"height\":207.70000000000002,\"scale\":0.67,\"logicalWidth\":760,\"logicalHeight\":310,\"backingScale\":0.67,\"backingWidth\":510,\"backingHeight\":208}},\"type\":{\"code\":78,\"result\":54,\"status\":38,\"setting\":36,\"label\":36}}",
+    "amountLabelsVisible": "true",
+    "graphics": "{\"fps\":60,\"antialias\":\"on\",\"resolution\":\"100\",\"modelDetail\":\"auto\",\"textures\":\"native\"}",
+    "graphicsFps": "60",
+    "graphicsModel": "optimized",
+    "graphicsTextures": "16384",
+    "graphicsIntro": "false",
+    "graphicsPage": "main",
+    "boardPrintResolution": "8192",
+    "boardPrintSource": "svg",
+    "camera": "auto",
+    "environment": "casino-room.exr",
+    "renderFps": "60.0",
+    "drawCalls": "57",
+    "triangles": "324582"
+  },
+  "limits": {
+    "maxTextureSize": 16384,
+    "maxRenderbufferSize": 16384,
+    "maxViewportDims": [
+      16384,
+      16384
+    ]
+  },
+  "errors": [],
+  "sceneFramebuffer": {
+    "width": 1920,
+    "height": 1080
+  },
+  "uiFramebuffer": {
+    "width": 1920,
+    "height": 1080
+  },
+  "nativeUIVerified": true,
+  "resolutionVerified": true
+}

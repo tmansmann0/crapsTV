@@ -1,0 +1,553 @@
+{
+  "results": [
+    {
+      "id": "mixed",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "production": false,
+      "profile": {
+        "id": "mixed",
+        "label": "Your mix",
+        "subtitle": "C felt · B padding · restrained grime",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 0,
+            "roughness": 0,
+            "albedo": 0,
+            "edge": 0,
+            "centerGroove": 0
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-mixed.jpg",
+      "bytes": 2245576
+    },
+    {
+      "id": "mixed",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "production": false,
+      "profile": {
+        "id": "mixed",
+        "label": "Your mix",
+        "subtitle": "C felt · B padding · restrained grime",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 0,
+            "roughness": 0,
+            "albedo": 0,
+            "edge": 0,
+            "centerGroove": 0
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-mixed.jpg",
+      "bytes": 2092999
+    },
+    {
+      "id": "refined",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "production": false,
+      "profile": {
+        "id": "refined",
+        "label": "Balanced scratches",
+        "subtitle": "Your mix with directional scoring and edge rubs",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 1,
+            "roughness": 0.7,
+            "albedo": 0.4,
+            "edge": 0.5,
+            "centerGroove": 0.1
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-refined.jpg",
+      "bytes": 2289740
+    },
+    {
+      "id": "refined",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "production": false,
+      "profile": {
+        "id": "refined",
+        "label": "Balanced scratches",
+        "subtitle": "Your mix with directional scoring and edge rubs",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 1,
+            "roughness": 0.7,
+            "albedo": 0.4,
+            "edge": 0.5,
+            "centerGroove": 0.1
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-refined.jpg",
+      "bytes": 2102333
+    },
+    {
+      "id": "scratch-forward",
+      "shot": "hero",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.1,
+          2.8,
+          5.05
+        ],
+        "target": [
+          -0.9,
+          0.5,
+          2.8
+        ],
+        "fov": 34
+      },
+      "production": false,
+      "profile": {
+        "id": "scratch-forward",
+        "label": "Stronger scratches",
+        "subtitle": "Same clean mix, more visible scored clay",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 1.7,
+            "roughness": 1,
+            "albedo": 0.68,
+            "edge": 1,
+            "centerGroove": 0.18
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 36,
+      "triangles": 2921494,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/hero-scratch-forward.jpg",
+      "bytes": 2321778
+    },
+    {
+      "id": "scratch-forward",
+      "shot": "wide",
+      "width": 3840,
+      "height": 2160,
+      "camera": {
+        "position": [
+          0.15,
+          4.7,
+          7.3
+        ],
+        "target": [
+          -0.8,
+          0.3,
+          2.3
+        ],
+        "fov": 38
+      },
+      "production": false,
+      "profile": {
+        "id": "scratch-forward",
+        "label": "Stronger scratches",
+        "subtitle": "Same clean mix, more visible scored clay",
+        "chip": {
+          "normal": 2.3,
+          "engraving": 2,
+          "grime": 1.8,
+          "centerGrime": 1.25,
+          "macroGrime": 0.16,
+          "scuff": 0.13,
+          "contrast": 1.55,
+          "scratch": {
+            "relief": 1.7,
+            "roughness": 1,
+            "albedo": 0.68,
+            "edge": 1,
+            "centerGroove": 0.18
+          },
+          "dirtScale": 0.87
+        },
+        "wood": {
+          "normal": 1,
+          "coatNormal": 1,
+          "occlusion": 1,
+          "contrast": 1,
+          "colorContrast": 1
+        },
+        "padding": {
+          "normal": 2,
+          "occlusion": 1.5,
+          "contrast": 1.5
+        },
+        "felt": {
+          "normal": 3.6,
+          "sheen": 1.9,
+          "contrast": 1.7
+        },
+        "dice": {
+          "normal": 2.2,
+          "coatNormal": 2,
+          "contrast": 1.5
+        }
+      },
+      "woodLook": {
+        "label": "Dark American walnut",
+        "sourceAsset": "american_walnut_veneer",
+        "normal": 0.34,
+        "clearcoat": 0.4,
+        "coatRoughness": 0.3,
+        "id": "american",
+        "physicalTileWorldUnits": 3.6,
+        "source": "https://polyhaven.com/a/american_walnut_veneer",
+        "license": "CC0-1.0"
+      },
+      "chips": 337,
+      "sharedStudyMaterials": 29,
+      "calls": 53,
+      "triangles": 2771134,
+      "drawBuffers": [
+        3840,
+        2160
+      ],
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "exposure": 0.9,
+      "environmentIntensity": 1.2,
+      "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+      "model": "table-player-rails-optimized.glb",
+      "geometryUnchanged": true,
+      "file": "public/studies/materials/wide-scratch-forward.jpg",
+      "bytes": 2113466
+    }
+  ],
+  "errors": [],
+  "modelSha256": "20c30f65a6ffa7b93f49952439b03f50e1b94ac37a3d2f95df9e8b3c3876b26b",
+  "note": "Actual native-4K WebGL material variants; fixed camera, geometry, lighting, textures and scene. No image-generation/postprocessing; JPEG encoding only."
+}

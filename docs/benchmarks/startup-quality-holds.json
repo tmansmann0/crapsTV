@@ -1,0 +1,218 @@
+{
+  "materialProfile": "refined",
+  "woodLook": "american",
+  "actualDuration": 33682,
+  "contentDuration": 30015.80000000001,
+  "uploadPausedMs": 3666.1999999999916,
+  "blackPixels": 1,
+  "wearBlackPixels": 1,
+  "scratchBlackPixels": 1,
+  "qualityChanges": [
+    {
+      "elapsed": 9516.400000000001,
+      "observedAt": 16221.199999988079,
+      "rafAt": 13993.1,
+      "hold": "true",
+      "rolling": "false",
+      "diceDone": "true",
+      "transfers": 0,
+      "sceneResolution": "1049x656",
+      "effectiveFps": 59.99999999999999,
+      "textureLimit": 2048,
+      "modelDetail": "auto",
+      "cameraPosition": [
+        -1.1892399999999999,
+        3.159566535489391,
+        -0.2275249999999592
+      ],
+      "cameraTarget": [
+        -1.1892399999999999,
+        0.10999,
+        -0.23152500000000004
+      ],
+      "dicePose": [
+        {
+          "position": [
+            -1.05086,
+            0.10999,
+            -0.5675
+          ],
+          "quaternion": [
+            0.7911070513517381,
+            0,
+            -0.6116777201284666,
+            0
+          ]
+        },
+        {
+          "position": [
+            -1.32762,
+            0.10999,
+            0.10445
+          ],
+          "quaternion": [
+            0.9134375547309389,
+            0,
+            0.40697891051891477,
+            0
+          ]
+        }
+      ],
+      "change": {
+        "elapsed": 9516.400000000001,
+        "probe": 1,
+        "phase": "result",
+        "rolling": false,
+        "holdAge": 316.40000000000146,
+        "quality": {
+          "fps": 60,
+          "pixelRatio": 0.82,
+          "resolutionScale": 0.82,
+          "antialias": true,
+          "modelDetail": "auto",
+          "textureLimit": 2048
+        }
+      }
+    },
+    {
+      "elapsed": 21916.100000000002,
+      "observedAt": 30077.5,
+      "rafAt": 28592.5,
+      "hold": "true",
+      "rolling": "false",
+      "diceDone": "true",
+      "transfers": 0,
+      "sceneResolution": "1280x800",
+      "effectiveFps": 59.99999999999999,
+      "textureLimit": 2048,
+      "modelDetail": "auto",
+      "cameraPosition": [
+        0.84815,
+        3.5817381276180718,
+        -2.2393599999998943
+      ],
+      "cameraTarget": [
+        0.84815,
+        0.10999,
+        -2.24336
+      ],
+      "dicePose": [
+        {
+          "position": [
+            0.55758,
+            0.10999,
+            -2.59733
+          ],
+          "quaternion": [
+            0.502309639090654,
+            0.4976796424173054,
+            -0.4976796424173054,
+            0.502309639090654
+          ]
+        },
+        {
+          "position": [
+            1.13872,
+            0.10999,
+            -1.88939
+          ],
+          "quaternion": [
+            0.2608193577983269,
+            0,
+            -0.9653876229772517,
+            0
+          ]
+        }
+      ],
+      "change": {
+        "elapsed": 21916.100000000002,
+        "probe": 2,
+        "phase": "result",
+        "rolling": false,
+        "holdAge": 316.1000000000022,
+        "quality": {
+          "fps": 60,
+          "pixelRatio": 1,
+          "resolutionScale": 1,
+          "antialias": true,
+          "modelDetail": "auto",
+          "textureLimit": 2048
+        }
+      }
+    },
+    {
+      "elapsed": 28666.000000000004,
+      "observedAt": 36813.19999998808,
+      "rafAt": 36808.8,
+      "hold": "true",
+      "rolling": "false",
+      "diceDone": "true",
+      "transfers": 0,
+      "sceneResolution": "1280x800",
+      "effectiveFps": 59.99999999999999,
+      "textureLimit": 2048,
+      "modelDetail": "auto",
+      "cameraPosition": [
+        0.84815,
+        3.5817381276180718,
+        -2.2393599999998943
+      ],
+      "cameraTarget": [
+        0.84815,
+        0.10999,
+        -2.24336
+      ],
+      "dicePose": [
+        {
+          "position": [
+            0.55758,
+            0.10999,
+            -2.59733
+          ],
+          "quaternion": [
+            0.502309639090654,
+            0.4976796424173054,
+            -0.4976796424173054,
+            0.502309639090654
+          ]
+        },
+        {
+          "position": [
+            1.13872,
+            0.10999,
+            -1.88939
+          ],
+          "quaternion": [
+            0.2608193577983269,
+            0,
+            -0.9653876229772517,
+            0
+          ]
+        }
+      ],
+      "change": {
+        "elapsed": 28666.000000000004,
+        "probe": 3,
+        "phase": "result",
+        "rolling": false,
+        "holdAge": 306.00000000000364,
+        "quality": {
+          "fps": 60,
+          "pixelRatio": 1,
+          "resolutionScale": 1,
+          "antialias": true,
+          "modelDetail": "auto",
+          "textureLimit": 2048
+        }
+      }
+    }
+  ],
+  "retest": {
+    "airborneFrames": 150,
+    "probe": 0,
+    "holdAge": 300,
+    "errors": []
+  },
+  "errors": [],
+  "glErrors": []
+}

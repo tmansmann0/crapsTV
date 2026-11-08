@@ -1,0 +1,379 @@
+{
+  "shots": {
+    "hero": {
+      "reference": {
+        "id": "refined",
+        "shot": "hero",
+        "width": 3840,
+        "height": 2160,
+        "camera": {
+          "position": [
+            0.1,
+            2.8,
+            5.05
+          ],
+          "target": [
+            -0.9,
+            0.5,
+            2.8
+          ],
+          "fov": 34
+        },
+        "production": false,
+        "profile": {
+          "id": "refined",
+          "label": "Balanced scratches",
+          "subtitle": "Your mix with directional scoring and edge rubs",
+          "chip": {
+            "normal": 2.3,
+            "engraving": 2,
+            "grime": 1.8,
+            "centerGrime": 1.25,
+            "macroGrime": 0.16,
+            "scuff": 0.13,
+            "contrast": 1.55,
+            "scratch": {
+              "relief": 1,
+              "roughness": 0.7,
+              "albedo": 0.4,
+              "edge": 0.5,
+              "centerGroove": 0.1
+            },
+            "dirtScale": 0.87
+          },
+          "wood": {
+            "normal": 1,
+            "coatNormal": 1,
+            "occlusion": 1,
+            "contrast": 1,
+            "colorContrast": 1
+          },
+          "padding": {
+            "normal": 2,
+            "occlusion": 1.5,
+            "contrast": 1.5
+          },
+          "felt": {
+            "normal": 3.6,
+            "sheen": 1.9,
+            "contrast": 1.7
+          },
+          "dice": {
+            "normal": 2.2,
+            "coatNormal": 2,
+            "contrast": 1.5
+          }
+        },
+        "woodLook": {
+          "label": "Dark American walnut",
+          "sourceAsset": "american_walnut_veneer",
+          "normal": 0.34,
+          "clearcoat": 0.4,
+          "coatRoughness": 0.3,
+          "id": "american",
+          "physicalTileWorldUnits": 3.6,
+          "source": "https://polyhaven.com/a/american_walnut_veneer",
+          "license": "CC0-1.0"
+        },
+        "chips": 337,
+        "sharedStudyMaterials": 26,
+        "calls": 36,
+        "triangles": 2921494,
+        "drawBuffers": [
+          3840,
+          2160
+        ],
+        "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+        "exposure": 0.9,
+        "environmentIntensity": 1.2,
+        "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+        "model": "table-player-rails-optimized.glb",
+        "geometryUnchanged": true,
+        "file": "artifacts/surface-reference-hero.png"
+      },
+      "production": {
+        "id": "refined",
+        "shot": "hero",
+        "width": 3840,
+        "height": 2160,
+        "camera": {
+          "position": [
+            0.1,
+            2.8,
+            5.05
+          ],
+          "target": [
+            -0.9,
+            0.5,
+            2.8
+          ],
+          "fov": 34
+        },
+        "production": true,
+        "profile": {
+          "id": "refined",
+          "label": "Balanced scratches",
+          "subtitle": "Your mix with directional scoring and edge rubs",
+          "chip": {
+            "normal": 2.3,
+            "engraving": 2,
+            "grime": 1.8,
+            "centerGrime": 1.25,
+            "macroGrime": 0.16,
+            "scuff": 0.13,
+            "contrast": 1.55,
+            "scratch": {
+              "relief": 1,
+              "roughness": 0.7,
+              "albedo": 0.4,
+              "edge": 0.5,
+              "centerGroove": 0.1
+            },
+            "dirtScale": 0.87
+          },
+          "wood": {
+            "normal": 1,
+            "coatNormal": 1,
+            "occlusion": 1,
+            "contrast": 1,
+            "colorContrast": 1
+          },
+          "padding": {
+            "normal": 2,
+            "occlusion": 1.5,
+            "contrast": 1.5
+          },
+          "felt": {
+            "normal": 3.6,
+            "sheen": 1.9,
+            "contrast": 1.7
+          },
+          "dice": {
+            "normal": 2.2,
+            "coatNormal": 2,
+            "contrast": 1.5
+          }
+        },
+        "woodLook": {
+          "label": "Dark American walnut",
+          "production": true
+        },
+        "chips": 337,
+        "sharedStudyMaterials": 0,
+        "calls": 36,
+        "triangles": 2921494,
+        "drawBuffers": [
+          3840,
+          2160
+        ],
+        "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+        "exposure": 0.9,
+        "environmentIntensity": 1.2,
+        "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+        "model": "table-player-rails-optimized.glb",
+        "geometryUnchanged": true,
+        "file": "artifacts/surface-production-hero.png"
+      },
+      "comparison": {
+        "exactPng": false,
+        "meanAbsoluteDifference": 0.00013334297839506172,
+        "maxChannelDifference": 14,
+        "changedPixels": 2837
+      }
+    },
+    "wide": {
+      "reference": {
+        "id": "refined",
+        "shot": "wide",
+        "width": 3840,
+        "height": 2160,
+        "camera": {
+          "position": [
+            0.15,
+            4.7,
+            7.3
+          ],
+          "target": [
+            -0.8,
+            0.3,
+            2.3
+          ],
+          "fov": 38
+        },
+        "production": false,
+        "profile": {
+          "id": "refined",
+          "label": "Balanced scratches",
+          "subtitle": "Your mix with directional scoring and edge rubs",
+          "chip": {
+            "normal": 2.3,
+            "engraving": 2,
+            "grime": 1.8,
+            "centerGrime": 1.25,
+            "macroGrime": 0.16,
+            "scuff": 0.13,
+            "contrast": 1.55,
+            "scratch": {
+              "relief": 1,
+              "roughness": 0.7,
+              "albedo": 0.4,
+              "edge": 0.5,
+              "centerGroove": 0.1
+            },
+            "dirtScale": 0.87
+          },
+          "wood": {
+            "normal": 1,
+            "coatNormal": 1,
+            "occlusion": 1,
+            "contrast": 1,
+            "colorContrast": 1
+          },
+          "padding": {
+            "normal": 2,
+            "occlusion": 1.5,
+            "contrast": 1.5
+          },
+          "felt": {
+            "normal": 3.6,
+            "sheen": 1.9,
+            "contrast": 1.7
+          },
+          "dice": {
+            "normal": 2.2,
+            "coatNormal": 2,
+            "contrast": 1.5
+          }
+        },
+        "woodLook": {
+          "label": "Dark American walnut",
+          "sourceAsset": "american_walnut_veneer",
+          "normal": 0.34,
+          "clearcoat": 0.4,
+          "coatRoughness": 0.3,
+          "id": "american",
+          "physicalTileWorldUnits": 3.6,
+          "source": "https://polyhaven.com/a/american_walnut_veneer",
+          "license": "CC0-1.0"
+        },
+        "chips": 337,
+        "sharedStudyMaterials": 26,
+        "calls": 53,
+        "triangles": 2771134,
+        "drawBuffers": [
+          3840,
+          2160
+        ],
+        "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+        "exposure": 0.9,
+        "environmentIntensity": 1.2,
+        "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+        "model": "table-player-rails-optimized.glb",
+        "geometryUnchanged": true,
+        "file": "artifacts/surface-reference-wide.png"
+      },
+      "production": {
+        "id": "refined",
+        "shot": "wide",
+        "width": 3840,
+        "height": 2160,
+        "camera": {
+          "position": [
+            0.15,
+            4.7,
+            7.3
+          ],
+          "target": [
+            -0.8,
+            0.3,
+            2.3
+          ],
+          "fov": 38
+        },
+        "production": true,
+        "profile": {
+          "id": "refined",
+          "label": "Balanced scratches",
+          "subtitle": "Your mix with directional scoring and edge rubs",
+          "chip": {
+            "normal": 2.3,
+            "engraving": 2,
+            "grime": 1.8,
+            "centerGrime": 1.25,
+            "macroGrime": 0.16,
+            "scuff": 0.13,
+            "contrast": 1.55,
+            "scratch": {
+              "relief": 1,
+              "roughness": 0.7,
+              "albedo": 0.4,
+              "edge": 0.5,
+              "centerGroove": 0.1
+            },
+            "dirtScale": 0.87
+          },
+          "wood": {
+            "normal": 1,
+            "coatNormal": 1,
+            "occlusion": 1,
+            "contrast": 1,
+            "colorContrast": 1
+          },
+          "padding": {
+            "normal": 2,
+            "occlusion": 1.5,
+            "contrast": 1.5
+          },
+          "felt": {
+            "normal": 3.6,
+            "sheen": 1.9,
+            "contrast": 1.7
+          },
+          "dice": {
+            "normal": 2.2,
+            "coatNormal": 2,
+            "contrast": 1.5
+          }
+        },
+        "woodLook": {
+          "label": "Dark American walnut",
+          "production": true
+        },
+        "chips": 337,
+        "sharedStudyMaterials": 0,
+        "calls": 53,
+        "triangles": 2771134,
+        "drawBuffers": [
+          3840,
+          2160
+        ],
+        "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+        "exposure": 0.9,
+        "environmentIntensity": 1.2,
+        "lighting": "Unchanged game casino EXR, hemisphere .38, key 2.5, rim 1.1",
+        "model": "table-player-rails-optimized.glb",
+        "geometryUnchanged": true,
+        "file": "artifacts/surface-production-wide.png"
+      },
+      "comparison": {
+        "exactPng": false,
+        "meanAbsoluteDifference": 0.00014202353395061727,
+        "maxChannelDifference": 13,
+        "changedPixels": 3111
+      }
+    }
+  },
+  "errors": [],
+  "shaderVariants": [
+    {
+      "detail": "full",
+      "cases": 36,
+      "activeDraws": 46
+    },
+    {
+      "detail": "optimized",
+      "cases": 36,
+      "activeDraws": 46
+    }
+  ]
+}

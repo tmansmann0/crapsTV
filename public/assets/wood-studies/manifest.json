@@ -1,0 +1,280 @@
+{
+  "license": "CC0-1.0",
+  "licenseUrl": "https://polyhaven.com/license",
+  "date": "2026-11-07",
+  "sceneUnitsPerMetre": 3.6,
+  "modelAndUVUnchanged": true,
+  "candidates": {
+    "american": {
+      "asset": "american_walnut_veneer",
+      "source": "https://polyhaven.com/a/american_walnut_veneer",
+      "name": "American Walnut Veneer",
+      "authors": {
+        "Jenelle van Heerden": "All"
+      },
+      "scanDimensionsMillimetres": [
+        1000,
+        1000
+      ],
+      "physicalTileWorldUnits": 3.6,
+      "stainLinearTransmittance": [
+        0.4,
+        0.18,
+        0.09
+      ],
+      "substrateRoughnessTransform": [
+        0.26,
+        0.25
+      ],
+      "files": {
+        "albedo": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/american_walnut_veneer/american_walnut_veneer_diff_2k.jpg",
+          "file": "assets/source/materials/wood-studies/american/albedo-2k.jpg",
+          "sha256": "278ed3382b3a28a95861a84ccf4f3b591abf96a203698152064d65fcc6425271",
+          "runtime": "public/assets/wood-studies/american/albedo.jpg",
+          "runtimeSha256": "2ca3e84d9636967639dbdbfc1b0504a3816e7d1afc5fb7f1773822927f50fecf",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.28882600932423014,
+            0.1835065578678007,
+            0.1165815613026604
+          ],
+          "min": 0.050002369001904,
+          "max": 0.41622230098371144
+        },
+        "normal": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/american_walnut_veneer/american_walnut_veneer_nor_gl_2k.png",
+          "file": "assets/source/materials/wood-studies/american/normal-2k.png",
+          "sha256": "494271740e2dde93d81c25216e5592be549ef165977738936865ff869d0e2b1e",
+          "runtime": "public/assets/wood-studies/american/normal.png",
+          "runtimeSha256": "e84707106a729a1a2dd3266df65617fb7aafec37de71f50606751e43b0feb810",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.4959505183850867,
+            0.49557180776911314,
+            0.999795760357754
+          ],
+          "min": 0.3686274509803922,
+          "max": 1.0
+        },
+        "roughness": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/american_walnut_veneer/american_walnut_veneer_rough_1k.png",
+          "file": "assets/source/materials/wood-studies/american/roughness-1k.png",
+          "sha256": "189fe09d21018a7550c9205890b8e12c7d3f616ed3e90d9b0c5538ef726f5325",
+          "runtime": "public/assets/wood-studies/american/roughness.png",
+          "runtimeSha256": "ce34778ccd29aa89d0df0690932cc75e1cd03f205b1839ff4d5a169861278b35",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.3990942590367768,
+            0.3990942590367768,
+            0.3990942590367768
+          ],
+          "min": 0.3748050659952697,
+          "max": 0.47337071793698027
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/american_walnut_veneer/american_walnut_veneer_ao_1k.png",
+          "file": "assets/source/materials/wood-studies/american/ao-1k.png",
+          "sha256": "93bcbc916b53c6cbfd37d0b7eb6e402d8f5fad3d9a54b2540e47be51815b1aca",
+          "runtime": "public/assets/wood-studies/american/ao.png",
+          "runtimeSha256": "9f044a12c1d9a823f00b72fd564919bcbbedcc7300df184d799e4f1867630dff",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.954638716965376,
+            0.954638716965376,
+            0.954638716965376
+          ],
+          "min": 0.537422751201648,
+          "max": 0.9990844586861982
+        }
+      }
+    },
+    "smoked": {
+      "asset": "smoked_walnut_veneer",
+      "source": "https://polyhaven.com/a/smoked_walnut_veneer",
+      "name": "Smoked Walnut Veneer",
+      "authors": {
+        "Jenelle van Heerden": "All"
+      },
+      "scanDimensionsMillimetres": [
+        1000,
+        1000
+      ],
+      "physicalTileWorldUnits": 3.6,
+      "stainLinearTransmittance": [
+        0.16,
+        0.105,
+        0.065
+      ],
+      "substrateRoughnessTransform": [
+        0.25,
+        0.23
+      ],
+      "files": {
+        "albedo": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/smoked_walnut_veneer/smoked_walnut_veneer_diff_2k.jpg",
+          "file": "assets/source/materials/wood-studies/smoked/albedo-2k.jpg",
+          "sha256": "9b2fa1de2705058cc82d012d74ecb483597a2e90b0287a9f0254d8e2a931c036",
+          "runtime": "public/assets/wood-studies/smoked/albedo.jpg",
+          "runtimeSha256": "ca4e48cbbc3c3fc8e7e5c02203cf253579e604baa3f391019e057abc1488e620",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.31131636209384506,
+            0.2021095095197849,
+            0.12055790770273518
+          ],
+          "min": 0.05175470516212632,
+          "max": 0.40921546622266647
+        },
+        "normal": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/smoked_walnut_veneer/smoked_walnut_veneer_nor_gl_2k.png",
+          "file": "assets/source/materials/wood-studies/smoked/normal-2k.png",
+          "sha256": "5fa1b15db50636d7555edec22251eb3214c9d8cc11f91b339c8a195468f1c1b0",
+          "runtime": "public/assets/wood-studies/smoked/normal.png",
+          "runtimeSha256": "db1598af6f776f7dd73280aa110a1c19a71e91f55eca949cfb46e773f7675b0b",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.4956492180688204,
+            0.4959427272383939,
+            0.9999079984757898
+          ],
+          "min": 0.2549019607843137,
+          "max": 1.0
+        },
+        "roughness": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/smoked_walnut_veneer/smoked_walnut_veneer_rough_1k.png",
+          "file": "assets/source/materials/wood-studies/smoked/roughness-1k.png",
+          "sha256": "4bd9dd0c5b909be7f97b1f56cfbf7b70d6062ecd2cc041b9a89c7e6808aeb017",
+          "runtime": "public/assets/wood-studies/smoked/roughness.png",
+          "runtimeSha256": "2179c80d9ed8e5e22eb386c358148a86b14ee9d69ef523371d49afd5d724b653",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.41246695116960846,
+            0.41246695116960846,
+            0.41246695116960846
+          ],
+          "min": 0.40437567711909667,
+          "max": 0.45068802929732205
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/smoked_walnut_veneer/smoked_walnut_veneer_ao_1k.png",
+          "file": "assets/source/materials/wood-studies/smoked/ao-1k.png",
+          "sha256": "30b1ab39a684f75a00e969685251c360d37dbf64eb07626033d1b2cfaac28f01",
+          "runtime": "public/assets/wood-studies/smoked/ao.png",
+          "runtimeSha256": "d5266e2db9c934edcb66c1f951f96632b942ead777c90b32f1b1d36efcbc7284",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.8971084235968277,
+            0.8971084235968277,
+            0.8971084235968277
+          ],
+          "min": 0.4149233234149691,
+          "max": 0.999145494773785
+        }
+      }
+    },
+    "natural": {
+      "asset": "natural_walnut_veneer",
+      "source": "https://polyhaven.com/a/natural_walnut_veneer",
+      "name": "Natural Walnut Veneer",
+      "authors": {
+        "Jenelle van Heerden": "All"
+      },
+      "scanDimensionsMillimetres": [
+        1000,
+        1000
+      ],
+      "physicalTileWorldUnits": 3.6,
+      "stainLinearTransmittance": [
+        0.23,
+        0.13,
+        0.075
+      ],
+      "substrateRoughnessTransform": [
+        0.27,
+        0.24
+      ],
+      "files": {
+        "albedo": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/natural_walnut_veneer/natural_walnut_veneer_diff_2k.jpg",
+          "file": "assets/source/materials/wood-studies/natural/albedo-2k.jpg",
+          "sha256": "4a1a84e9537b291ac0cce1e2b8908fb9b5d1057a246ee0b3c25345565ac9686d",
+          "runtime": "public/assets/wood-studies/natural/albedo.jpg",
+          "runtimeSha256": "2fb5558ff78d478c05b1581b3a2fd6925535644e0e10e67342b8f5555099c34c",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.2649632177400701,
+            0.1794901351085849,
+            0.11545778648325158
+          ],
+          "min": 0.02864057257023673,
+          "max": 0.37870703936078504
+        },
+        "normal": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/2k/natural_walnut_veneer/natural_walnut_veneer_nor_gl_2k.png",
+          "file": "assets/source/materials/wood-studies/natural/normal-2k.png",
+          "sha256": "182d447283b43fb9f001557d6d853aa4bab47895ffa95a3fc4a7de4a32b87ebb",
+          "runtime": "public/assets/wood-studies/natural/normal.png",
+          "runtimeSha256": "47c72e394916271ebe917be49faa22f735cb0cdc8b00cb90f6502100b99561fc",
+          "width": 2048,
+          "height": 2048,
+          "meanRGB": [
+            0.49594903925636896,
+            0.4959209750531762,
+            0.9999911065192554
+          ],
+          "min": 0.36470588235294116,
+          "max": 1.0
+        },
+        "roughness": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/natural_walnut_veneer/natural_walnut_veneer_rough_1k.png",
+          "file": "assets/source/materials/wood-studies/natural/roughness-1k.png",
+          "sha256": "1e32235f1d6e08f2e4bfffcfbb8cd1e92137327db50a1789c6ba1b0c54890a5c",
+          "runtime": "public/assets/wood-studies/natural/roughness.png",
+          "runtimeSha256": "e9b7364f994b2c0b7a2fa8bf3eb36382e99baf89e118881683e31e3a93c8c625",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.4353236071376528,
+            0.4353236071376528,
+            0.4353236071376528
+          ],
+          "min": 0.41313572899977113,
+          "max": 0.4825191119249256
+        },
+        "ao": {
+          "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/natural_walnut_veneer/natural_walnut_veneer_ao_1k.png",
+          "file": "assets/source/materials/wood-studies/natural/ao-1k.png",
+          "sha256": "1156eeb0e8728818391748155c0553cb072f232cfd40fbf5568bc32a0f2d1c0a",
+          "runtime": "public/assets/wood-studies/natural/ao.png",
+          "runtimeSha256": "38c466efc392809e1adf79482d37eab2759c480b291179a2773efe8a7076af84",
+          "width": 1024,
+          "height": 1024,
+          "meanRGB": [
+            0.9522516876290381,
+            0.9522516876290381,
+            0.9522516876290381
+          ],
+          "min": 0.5327840085450523,
+          "max": 0.998443579766537
+        }
+      }
+    }
+  },
+  "preservedRuntimeWoodSha256": {
+    "public/assets/material-table-walnut-albedo.jpg": "06f89130929513beab39392fb99b54f4a4a600ddf4966f7dcef7d0eb23eab175",
+    "public/assets/material-table-walnut-closeup.png": "c86dd55caa255cd3c5e6f16628ca2d9d1902e2b7fe925d50889b09f2a95ac253",
+    "public/assets/material-table-walnut-normal.png": "f0553a002683e42783d38568eda6744a7e8762bbd383a3ef1226964117b24280",
+    "public/assets/material-table-walnut-occlusion.png": "6f9b2ad27053c3607ab54adf47c688f0cedb220fbc556d09e66cf5f5a5bce3cc",
+    "public/assets/material-table-walnut-roughness.png": "e640aa7daa4ad51e537a5f28f06bb96858b0b80e84179912399bbdb3f613e558"
+  }
+}

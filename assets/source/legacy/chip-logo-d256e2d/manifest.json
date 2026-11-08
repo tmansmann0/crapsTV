@@ -1,0 +1,29 @@
+{
+  "revision": "d256e2d",
+  "reason": "Recoverable two-face atlas before dedicated medallion UV/detail maps",
+  "files": {
+    "chip-logo.glb": "10da98cd6cc6706fb118f7b6971ce4a076022245a617f7dbb6945d774351327e",
+    "chip-logo-lod.glb": "1a4b059597b80a4aeea5346db4592606fd6b498e1c1d4e1ee7f7193c7fc46790",
+    "chip-logo-atlas.json": "35e69a04c353cb7b4fc404d22348157f562de7bf1bb41a52eb476ada60733319",
+    "chip-logo-stats.json": "a6ddf9760c9619a15b030299e86dbd00f46fbe5de66f85dd9ba9bb84f01324e4",
+    "chip-logo-albedo.png": "913005fd9675cb3ed2d477cc5384c905c8e3804d8ecc21c664af816070c3b046",
+    "chip-logo-normal.png": "f18f5d9af4e5066144ddaf2de04dce56c440ca8df418a45f0d38e3bd106b6fe5",
+    "chip-logo-roughness.png": "79ef3c8f04f91f2ab78a5cad442c0e26a2dfdeec09100f3a4e91ca246b7a1e0a",
+    "chip-logo-height.png": "806d93b4535854b7186b3158de02a21ea466ebfa647cdd959b5e3973bae8ffa4",
+    "chip-logo-mark.png": "904e6af98d607918c82f12b4a8915ff8275296e6772bfe87b0bedcae0936193a",
+    "chip-color.png": "aa07855f63ce8c7bc72b7af0bff25d777bbe42586a1a5f2a3bf303d0f37e3f7c",
+    "chip-normal-1.png": "6b9cf5be38a80ef20313aab665f891402f0065586a54a7b41e274ccc6c3a54fc",
+    "chip-normal-2.png": "a91002e9a38673a4c867c6ab6938351b7e97d5f32a8692622f46f573deae2f45",
+    "chip-normal-3.png": "24e69f30875aec677032beeaeff53f9b19c661fe3c3cd5f2c75398f16802aaac",
+    "chip-roughness-1.png": "0d7b802f81ee18d419a42e7c1bf8df432bfeb112491e79b4da792beefb1d1046",
+    "chip-roughness-2.png": "4a1828223a2534cd1d322c804cf23ae2d5df2404bdbefbf6971f24ea91f6d45d",
+    "chip-roughness-3.png": "61a86a69b9fa28c4097e02f237c3b76e5e00da57d5e41685ad537841bc085c6c",
+    "chip-wear-1.png": "e1c5b5920f0bf8b8366c87dfb3454ee020888e5b07a4c2e3a657ba0a312180bf",
+    "chip-wear-2.png": "4df709001505e3e4c8ce43ec72715f41549554e99881d4ba196aecdaf207e5ff",
+    "chip-wear-3.png": "c9d7b0b388382c1efa806fcaceeb2174e32fc813828eb63b1d162c0d5043c9e5"
+  },
+  "editableSourceAtRevision": {
+    "assets/source/chip-logo.blend": "ef839a245ca5348c99f037ce2d4f21f794e264021a2f244f9828da4c4fcd99a8",
+    "assets/source/chip-logo-lod.blend": "c6adb1b63fdd11b51116fd8787b17b77a148e76728306bec3741e81a28c3aa80"
+  }
+}

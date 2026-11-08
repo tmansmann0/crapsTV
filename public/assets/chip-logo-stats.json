@@ -1,0 +1,47 @@
+{
+  "version": 2,
+  "high": {
+    "file": "chip-logo.glb",
+    "triangles": 8440,
+    "meshCount": 1,
+    "materialPrimitives": 4,
+    "radialSegments": 96,
+    "bounds": {
+      "diameter": 1,
+      "height": 0.13
+    },
+    "bytes": 302276
+  },
+  "low": {
+    "file": "chip-logo-lod.glb",
+    "triangles": 1280,
+    "meshCount": 1,
+    "materialPrimitives": 4,
+    "radialSegments": 32,
+    "bounds": {
+      "diameter": 1,
+      "height": 0.13
+    },
+    "bytes": 46976
+  },
+  "materials": [
+    "ChipBase",
+    "ChipInlay",
+    "ChipEngraving",
+    "ChipMetal"
+  ],
+  "engraving": "Direct original brand-logo.png luminance/alpha mask; recessed .0032 scene-unit normal relief; no letter/pip boolean geometry",
+  "atlas": "chip-logo-atlas.json",
+  "medallionUV": {
+    "channel": 1,
+    "fullFace": true,
+    "originalWearUV0Preserved": true
+  },
+  "preservedSha256": {
+    "public/assets/chip.glb": "04c4a96926e074d3f1e3596ae6c53dc9842d76a5f70302464dd82728bb1b7dee",
+    "public/assets/chip-lod.glb": "20ca4f9e2f5b9ee56ded0290267e429c2312aa3da4494c68f15b0544f15f4b28",
+    "assets/source/chip.blend": "04903dd2e718f3aacabf43bdb9e27aec0e535c95b0376a9dd81e461e61c51f96",
+    "assets/source/chip-lod.blend": "52e8dfa6e519baf12713da59a3c824bcd157c517d39dfe6c732984005ed3fcd5"
+  },
+  "brandLogoSha256": "e76a3ac9bdc42e820ba25753402e7a0ba41948d4c4491208025ebf213848361e"
+}

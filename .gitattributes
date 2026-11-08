@@ -1,0 +1,4 @@
+# Rollback manifests promise the original bytes, including JSON line endings.
+assets/source/legacy/** -text
+# Vector-bake provenance hashes refer to canonical authoring bytes on every OS.
+public/assets/board-*.svg text eol=lf

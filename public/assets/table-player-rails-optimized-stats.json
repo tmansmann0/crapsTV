@@ -1,0 +1,604 @@
+{
+  "before": {
+    "triangles": 217448,
+    "meshes": 102,
+    "materialPrimitives": 102
+  },
+  "afterRetopology": {
+    "triangles": 40684,
+    "meshes": 94,
+    "materialPrimitives": 94
+  },
+  "after": {
+    "triangles": 40684,
+    "meshes": 7,
+    "materialPrimitives": 7
+  },
+  "triangleReductionPercent": 81.29023950553696,
+  "meshReductionPercent": 93.13725490196079,
+  "materialDrawCalls": 7,
+  "removedHiddenObjects": [
+    "Continuous player table stitching",
+    "Dealer chip stack 1",
+    "Dealer chip stack 2",
+    "Dealer chip stack 3",
+    "Dealer chip stack 4",
+    "Dealer chip stack 5",
+    "Dealer chip stack 6",
+    "Molded rubber pyramids",
+    "Seat 01 label plaque",
+    "Seat 01 raised tray rim",
+    "Seat 01 solid tray base",
+    "Seat 01 suede chip bed",
+    "Seat 01 tray brass lip",
+    "Seat 02 label plaque",
+    "Seat 02 raised tray rim",
+    "Seat 02 solid tray base",
+    "Seat 02 suede chip bed",
+    "Seat 02 tray brass lip",
+    "Seat 03 label plaque",
+    "Seat 03 raised tray rim",
+    "Seat 03 solid tray base",
+    "Seat 03 suede chip bed",
+    "Seat 03 tray brass lip",
+    "Seat 04 label plaque",
+    "Seat 04 raised tray rim",
+    "Seat 04 solid tray base",
+    "Seat 04 suede chip bed",
+    "Seat 04 tray brass lip",
+    "Seat 05 label plaque",
+    "Seat 05 raised tray rim",
+    "Seat 05 solid tray base",
+    "Seat 05 suede chip bed",
+    "Seat 05 tray brass lip",
+    "Seat 06 label plaque",
+    "Seat 06 raised tray rim",
+    "Seat 06 solid tray base",
+    "Seat 06 suede chip bed",
+    "Seat 06 tray brass lip",
+    "Seat 07 label plaque",
+    "Seat 07 raised tray rim",
+    "Seat 07 solid tray base",
+    "Seat 07 suede chip bed",
+    "Seat 07 tray brass lip",
+    "Seat 08 label plaque",
+    "Seat 08 raised tray rim",
+    "Seat 08 solid tray base",
+    "Seat 08 suede chip bed",
+    "Seat 08 tray brass lip",
+    "Seat 09 label plaque",
+    "Seat 09 raised tray rim",
+    "Seat 09 solid tray base",
+    "Seat 09 suede chip bed",
+    "Seat 09 tray brass lip",
+    "Seat 10 label plaque",
+    "Seat 10 raised tray rim",
+    "Seat 10 solid tray base",
+    "Seat 10 suede chip bed",
+    "Seat 10 tray brass lip",
+    "Seat 11 label plaque",
+    "Seat 11 raised tray rim",
+    "Seat 11 solid tray base",
+    "Seat 11 suede chip bed",
+    "Seat 11 tray brass lip",
+    "Seat 12 label plaque",
+    "Seat 12 raised tray rim",
+    "Seat 12 solid tray base",
+    "Seat 12 suede chip bed",
+    "Seat 12 tray brass lip"
+  ],
+  "model": "table-player-rails-optimized.glb",
+  "layout": "table-player-rails-layout.json",
+  "preservedSha256": {
+    "public/assets/table.glb": "7657b4e5ee8b3070a397fc85431a966b9f36edb163ac6549b639218570f0c8a7",
+    "assets/source/table.blend": "274ea9a45126fb5156886385f895ced91770b83a67e7256809a08b40085e60d6",
+    "public/assets/table-player-rails.glb": "21c060786e221e769061d6799c1590c115b2693408cd604a075d6a4c14ac4fef",
+    "assets/source/table-player-rails.blend": "07f9660f1d2b89621a5164656a797e3aceeb89b4767ff10c5cde4544471ecd12"
+  },
+  "traySeamValidation": [
+    {
+      "seat": 0,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 1,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 2,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 3,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 4,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 5,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 6,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 7,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 8,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 9,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 10,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    },
+    {
+      "seat": 11,
+      "boundaryEdges": 0,
+      "nonManifoldEdges": 0,
+      "coplanarBaseRimOverlap": false,
+      "occludedBedSupportCapOmitted": true
+    }
+  ],
+  "trayCornerSegments": 10,
+  "replacedLegacyCupObjects": [
+    "Brass cup lip",
+    "Brass cup lip.001",
+    "Brass cup lip.002",
+    "Brass cup lip.003",
+    "Cup well floor",
+    "Cup well floor.001",
+    "Cup well floor.002",
+    "Cup well floor.003",
+    "Recessed cup well",
+    "Recessed cup well.001",
+    "Recessed cup well.002",
+    "Recessed cup well.003"
+  ],
+  "cupholderValidation": [
+    {
+      "cup": 0,
+      "blenderCenter": [
+        -4.0,
+        -3.055
+      ],
+      "worldCenter": [
+        -4.0,
+        0.92,
+        3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862881548,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186685686,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 1,
+      "blenderCenter": [
+        -4.0,
+        3.055
+      ],
+      "worldCenter": [
+        -4.0,
+        0.92,
+        -3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862876087,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186678195,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 2,
+      "blenderCenter": [
+        4.0,
+        -3.055
+      ],
+      "worldCenter": [
+        4.0,
+        0.92,
+        3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862876086,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186678261,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    },
+    {
+      "cup": 3,
+      "blenderCenter": [
+        4.0,
+        3.055
+      ],
+      "worldCenter": [
+        4.0,
+        0.92,
+        -3.055
+      ],
+      "rim": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004487005862881524,
+        "degenerateFaces": 0,
+        "triangles": 1152,
+        "radialSegments": 96,
+        "goldBands": [
+          1,
+          2,
+          3
+        ],
+        "darkMountingBands": [
+          0,
+          4,
+          5
+        ]
+      },
+      "bowl": {
+        "boundaryEdges": 0,
+        "nonManifoldEdges": 0,
+        "volume": 0.004885841186685746,
+        "degenerateFaces": 0,
+        "triangles": 960,
+        "radialSegments": 96
+      },
+      "crownCrest": 0.92,
+      "rimTop": 0.942,
+      "skirtBottom": 0.835,
+      "wellFloor": 0.656
+    }
+  ],
+  "cupholderProfileVersion": 1,
+  "woodShading": {
+    "version": 1,
+    "finalTopologyNormals": [
+      {
+        "part": "Continuous player chip shelf",
+        "planarHorizontalFaces": 120,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Dealer walnut chip rack",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Player shelf supporting apron",
+        "planarHorizontalFaces": 118,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Raised walnut wall chassis",
+        "planarHorizontalFaces": 90,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 1 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 10 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 11 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 12 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 2 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 3 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 4 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 5 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 6 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 7 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 8 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Seat 9 continuous shell.001",
+        "planarHorizontalFaces": 44,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Substantial walnut apron",
+        "planarHorizontalFaces": 72,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut lower plinth",
+        "planarHorizontalFaces": 97,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut trestle pedestal",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      },
+      {
+        "part": "Walnut trestle pedestal.001",
+        "planarHorizontalFaces": 2,
+        "customNormalsRegenerated": true
+      }
+    ]
+  },
+  "woodUV": {
+    "version": 2,
+    "faces": 8069,
+    "mapping": "Board-local mitered panels and upright leg grain; physical UV1"
+  },
+  "paddedCrown": {
+    "version": 1,
+    "visibleCurveSegments": 18,
+    "profileRows": 21,
+    "cornerSegments": 28,
+    "triangles": 6008,
+    "analyticCornerNormals": true,
+    "cupCutFaces": 208,
+    "boundaryEdges": 0,
+    "nonManifoldEdges": 0,
+    "maxProfileTurnDegrees": 14,
+    "profile": [
+      [
+        0.595,
+        0.64
+      ],
+      [
+        0.6,
+        0.74
+      ],
+      [
+        0.5955458965589351,
+        0.7752786786466203
+      ],
+      [
+        0.5808823127018501,
+        0.8135623541548025
+      ],
+      [
+        0.5578218535214808,
+        0.8469268949514004
+      ],
+      [
+        0.5343045669439939,
+        0.867498585476654
+      ],
+      [
+        0.48985311160275313,
+        0.8895570420825535
+      ],
+      [
+        0.40798672605057207,
+        0.9122413918377162
+      ],
+      [
+        0.32355386777722983,
+        0.9196690076972311
+      ],
+      [
+        0.29,
+        0.92
+      ],
+      [
+        0.259969398918097,
+        0.9165182505309662
+      ],
+      [
+        0.18151576354830656,
+        0.8851936364542516
+      ],
+      [
+        0.10607100502124173,
+        0.8461993287814118
+      ],
+      [
+        0.03170780761070449,
+        0.8055051601970246
+      ],
+      [
+        0.010267554137880507,
+        0.7963292981998166
+      ],
+      [
+        0.004974297220476716,
+        0.7920739796481894
+      ],
+      [
+        0.002228491062450634,
+        0.7884699400791106
+      ],
+      [
+        0.0007047968471596335,
+        0.7849662607244079
+      ],
+      [
+        2.644929959124106e-05,
+        0.7810043151757788
+      ],
+      [
+        0.0,
+        0.78
+      ],
+      [
+        0.0,
+        0.74
+      ]
+    ],
+    "bounds": [
+      [
+        -6.050000190734863,
+        6.050000190734863
+      ],
+      [
+        -3.3399999141693115,
+        3.3399999141693115
+      ],
+      [
+        0.6399999856948853,
+        0.9200000166893005
+      ]
+    ],
+    "previousTriangles": 3176,
+    "triangleDelta": 2832,
+    "triangleBudget": 42000,
+    "rollback": "assets/source/legacy/0.11.0",
+    "unchangedNonCrownBlenderSha256": {
+      "Optimized Aged champagne brass": "1d4756cc3411708287911e6b33a488de46e1f8c5635916503edadb15f9da4913",
+      "Optimized Dark pine pyramid bounce rubber": "12c80b881c82bda486616e26c86eac683dc79dbd0eefc3e1bdeae0b5d48de683",
+      "Optimized Dark recessed cup wells": "9d9279d6457b12d2563ac049cbfe133cbe031a126e5a71dc942e82a1e7d2e329",
+      "Optimized Deep pine baize": "f4033ddd2c543618b0d64c639c661448f41c6e0e810c4fa52dae39c1a34d7737",
+      "Optimized Hand-polished dark walnut": "6678c262862a38fb315daa7b1735ebd7b228613193fb0b916fa14d9e9172ebfd",
+      "Optimized Player tray suede": "6c142a2b452bf1f14e07f55e7137d59b55cffab178ab032c3fa7b9bd80c24ad9"
+    }
+  }
+}

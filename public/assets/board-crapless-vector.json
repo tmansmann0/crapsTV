@@ -1,0 +1,241 @@
+{
+  "width": 2048,
+  "height": 1024,
+  "vertices": 52134,
+  "triangles": 51428,
+  "filled": 470,
+  "stroked": 68,
+  "removedHatchPaths": 14,
+  "paintCount": 555,
+  "logoPaint": 45,
+  "logoRect": {
+    "x": 879,
+    "y": 9.1484375,
+    "w": 290,
+    "h": 123.703125
+  },
+  "maskedGroups": [
+    {
+      "id": "mask-0",
+      "opacity": 0.8,
+      "emptyObjectBox": false,
+      "paint": 20
+    },
+    {
+      "id": "mask-1",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 24
+    },
+    {
+      "id": "mask-2",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 26
+    },
+    {
+      "id": "mask-3",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 28
+    },
+    {
+      "id": "mask-4",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 30
+    },
+    {
+      "id": "mask-5",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 32
+    },
+    {
+      "id": "mask-6",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 34
+    },
+    {
+      "id": "mask-7",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 36
+    },
+    {
+      "id": "mask-8",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 38
+    },
+    {
+      "id": "mask-9",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 40
+    },
+    {
+      "id": "mask-10",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 42
+    },
+    {
+      "id": "mask-11",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 44
+    },
+    {
+      "id": "mask-13",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 47
+    },
+    {
+      "id": "mask-14",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 121
+    },
+    {
+      "id": "mask-15",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 135
+    },
+    {
+      "id": "mask-16",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 149
+    },
+    {
+      "id": "mask-17",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 162
+    },
+    {
+      "id": "mask-18",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 175
+    },
+    {
+      "id": "mask-19",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 188
+    },
+    {
+      "id": "mask-20",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 201
+    },
+    {
+      "id": "mask-21",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 214
+    },
+    {
+      "id": "mask-22",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 229
+    },
+    {
+      "id": "mask-23",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 245
+    },
+    {
+      "id": "mask-24",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 261
+    },
+    {
+      "id": "mask-25",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 276
+    },
+    {
+      "id": "mask-26",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 347
+    },
+    {
+      "id": "mask-27",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 369
+    },
+    {
+      "id": "mask-28",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 384
+    },
+    {
+      "id": "mask-29",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 401
+    },
+    {
+      "id": "mask-30",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 420
+    },
+    {
+      "id": "mask-31",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 444
+    },
+    {
+      "id": "mask-32",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 464
+    },
+    {
+      "id": "mask-33",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 472
+    },
+    {
+      "id": "mask-34",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 484
+    },
+    {
+      "id": "mask-35",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 497
+    }
+  ],
+  "clipPaints": 35,
+  "colorEncoding": "sRGB; premultiplied once in native ink shader",
+  "curveToleranceSvgPixels": 0.02,
+  "sourceSHA256": "edfa62390a8795fb6eaa1ad9360c5c884c3ac8959de882707e7f7a503f643294",
+  "binarySHA256": "5d672a3ff646cd54a910e0ea67bccf50ae032fcb5b1c41f87895baf1cc5d3eb6",
+  "bytes": 1659848,
+  "minificationFallback": {
+    "width": 2048,
+    "height": 1024,
+    "file": "board-crapless-minified.png",
+    "sha256": "16b3b1185e1b204ab3c3d60b903082e7b34d2c709bdca1abe4b51a74194f328f"
+  }
+}

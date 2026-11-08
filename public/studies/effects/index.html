@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>crapsTV · Effects comparison</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #0c1412;
+        color: #f3efdf;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 2400px;
+        margin: auto;
+        padding: 28px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      h1 {
+        font-size: 28px;
+        letter-spacing: -1px;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #abbab0;
+        line-height: 1.5;
+        margin: 8px 0;
+        font-size: 15px;
+      }
+      a {
+        color: #ddc78f;
+      }
+      nav,
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 22px 0 14px;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+        background: #17241e;
+        border: 1px solid #3d4c40;
+        border-radius: 8px;
+        padding: 10px 15px;
+        cursor: pointer;
+      }
+      button[aria-pressed="true"] {
+        background: #d4bf88;
+        color: #162018;
+        border-color: #d4bf88;
+      }
+      select {
+        margin-left: auto;
+      }
+      .pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .card {
+        margin: 0;
+        background: #142019;
+        border: 1px solid #344137;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .label {
+        padding: 12px 16px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+      }
+      .label strong {
+        font-size: 16px;
+      }
+      .viewport {
+        aspect-ratio: 16/9;
+        overflow: hidden;
+        position: relative;
+        background: #080e0b;
+        cursor: crosshair;
+      }
+      .viewport img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        transform-origin: var(--x, 50%) var(--y, 50%);
+        transform: scale(var(--zoom, 1));
+      }
+      .foot {
+        display: flex;
+        gap: 20px;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-top: 16px;
+      }
+      .foot p {
+        max-width: 1000px;
+      }
+      .tag {
+        font-size: 12px;
+        color: #cbb887;
+        white-space: nowrap;
+      }
+      .controls {
+        margin: 12px 0;
+      }
+      .controls span {
+        font-size: 13px;
+        color: #a9b4a8;
+        margin-right: 8px;
+      }
+      details {
+        margin-top: 22px;
+        color: #a9b4a8;
+        font-size: 14px;
+      }
+      summary {
+        cursor: pointer;
+      }
+      details p {
+        max-width: 1000px;
+      }
+      kbd {
+        padding: 2px 5px;
+        border: 1px solid #4a564b;
+        border-radius: 4px;
+      }
+      button:focus-visible,
+      select:focus-visible {
+        outline: 3px solid #e7cb8b;
+        outline-offset: 3px;
+      }
+      @media (max-width: 700px) {
+        main {
+          padding: 16px;
+        }
+        header {
+          display: block;
+        }
+        h1 {
+          font-size: 24px;
+        }
+        .pair {
+          gap: 6px;
+        }
+        .label {
+          padding: 9px;
+          display: block;
+        }
+        .label span {
+          display: block;
+          font-size: 11px;
+          margin-top: 3px;
+        }
+        select {
+          margin-left: 0;
+          width: 100%;
+        }
+        .foot {
+          display: block;
+        }
+        button {
+          padding: 9px 12px;
+        }
+        p {
+          font-size: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>Effects, compared.</h1>
+          <p>
+            Captured in 0.14.1 ·
+            <a href="../reflections/index.html"
+              >See the stronger reflection comparison ↗</a
+            >
+          </p>
+          <p>
+            The same 4K render, camera, lighting and materials. Only the
+            selected effects change.
+          </p>
+        </div>
+        <a href="../../">Back to table ↗</a>
+      </header>
+      <nav aria-label="Shot">
+        <button data-shot="macro" aria-pressed="true">
+          Chips · dice · walnut</button
+        ><button data-shot="lamp" aria-pressed="false">
+          Lamp-facing close-up</button
+        ><select aria-label="Effects to compare" id="effect">
+          <option value="on">All effects</option>
+          <option value="reflections">Local reflections only</option>
+          <option value="shadows">Contact shadows only</option>
+          <option value="flares">Lens flares · clearer</option>
+          <option value="flares-original">Lens flares · original</option>
+        </select>
+      </nav>
+      <div class="pair">
+        <figure class="card">
+          <figcaption class="label">
+            <strong>OFF</strong><span>Original HDR lighting</span>
+          </figcaption>
+          <div class="viewport">
+            <img
+              id="before"
+              alt="Matched close-up with optional effects off"
+              src="macro-off.webp"
+            />
+          </div>
+        </figure>
+        <figure class="card">
+          <figcaption class="label">
+            <strong id="on-label">ON</strong
+            ><span id="on-description">All three optional effects</span>
+          </figcaption>
+          <div class="viewport">
+            <img
+              id="after"
+              alt="The identical close-up with optional effects on"
+              src="macro-on.webp"
+            />
+          </div>
+        </figure>
+      </div>
+      <div class="controls" aria-label="Matched zoom">
+        <span>Inspect together</span
+        ><button data-zoom="1" aria-pressed="true">Full frame</button
+        ><button data-zoom="2" aria-pressed="false">2×</button
+        ><button data-zoom="3" aria-pressed="false">3×</button
+        ><span
+          >Move over either image to pan both. Hold <kbd>Space</kbd> to compare
+          Off.</span
+        >
+      </div>
+      <div class="foot">
+        <p id="caption">
+          Look at the blue die's gloss, the walnut and brass reflection colours,
+          and the shadows where chips meet their tray. Clay scratches, grime,
+          felt and padding are unchanged.
+        </p>
+        <span class="tag">Real game assets · Native 3840 × 2160</span>
+      </div>
+      <p>
+        <a id="off-download" href="macro-off.webp" target="_blank"
+          >Open Off at 4K ↗</a
+        >
+        &nbsp;
+        <a id="on-download" href="macro-on.webp" target="_blank"
+          >Open On at 4K ↗</a
+        >
+      </p>
+      <details>
+        <summary>What these switches actually do</summary>
+        <p>
+          Off already has the casino HDR lighting, worn materials and soft
+          shadows. Local reflections add a cached view of the table to walnut,
+          dice and metal; they do not add new chip scratches. Contact shadows
+          tighten the existing shadow map. Lens flares need an actual casino
+          lamp in view. The downward material shot has none; the lamp-facing
+          shot has one. No extra light, exposure boost or edited material is
+          added to the On image.
+        </p>
+        <p id="flare-note">
+          The lamp pair uses a clearer optical halo and ghosts, still attached
+          to the actual HDR lamp and blocked by geometry. All optional effects
+          now offer measured Auto and explicit On/Off in the game.
+        </p>
+        <p>
+          <a href="manifest.json">Capture settings and restoration checks ↗</a>
+        </p>
+      </details>
+    </main>
+    <script>
+      let shot = "macro",
+        effect = "on",
+        zoom = 1,
+        held = false;
+      const before = document.querySelector("#before"),
+        after = document.querySelector("#after");
+      function update() {
+        document.querySelector("#on-label").textContent = held
+          ? "OFF · held"
+          : "ON";
+        before.src = `${shot}-off.webp`;
+        const visibleEffect =
+          shot === "macro" && effect.startsWith("flares") ? "off" : effect;
+        after.src = `${shot}-${held ? "off" : visibleEffect}.webp`;
+        document.querySelector("#off-download").href = before.src;
+        document.querySelector("#on-download").href =
+          `${shot}-${visibleEffect}.webp`;
+        document.querySelector("#on-description").textContent = {
+          on: "All three optional effects",
+          reflections: "Local reflections",
+          shadows: "Contact shadows",
+          flares: "Lens flares · clearer",
+          "flares-original": "Lens flares · original",
+        }[effect];
+        document.querySelector("#caption").textContent =
+          shot === "macro"
+            ? "Look at the blue die's gloss, the walnut and brass reflection colours, and the shadows where chips meet their tray. Clay scratches, grime, felt and padding are unchanged."
+            : "The real casino lamp is in the upper centre. Look for its warm halo and the faint optical ghosts extending toward the middle of the image. Its visibility is tested against scene depth.";
+        document
+          .querySelectorAll("[data-shot]")
+          .forEach((b) =>
+            b.setAttribute("aria-pressed", b.dataset.shot === shot),
+          );
+      }
+      document.querySelectorAll("[data-shot]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            shot = b.dataset.shot;
+            update();
+          }),
+      );
+      document.querySelector("#effect").onchange = (e) => {
+        effect = e.target.value;
+        update();
+      };
+      document.querySelectorAll("[data-zoom]").forEach(
+        (b) =>
+          (b.onclick = () => {
+            zoom = Number(b.dataset.zoom);
+            document.documentElement.style.setProperty("--zoom", zoom);
+            document
+              .querySelectorAll("[data-zoom]")
+              .forEach((c) =>
+                c.setAttribute("aria-pressed", Number(c.dataset.zoom) === zoom),
+              );
+          }),
+      );
+      document.querySelectorAll(".viewport").forEach(
+        (v) =>
+          (v.onpointermove = (e) => {
+            const r = v.getBoundingClientRect();
+            document.documentElement.style.setProperty(
+              "--x",
+              `${((e.clientX - r.left) / r.width) * 100}%`,
+            );
+            document.documentElement.style.setProperty(
+              "--y",
+              `${((e.clientY - r.top) / r.height) * 100}%`,
+            );
+          }),
+      );
+      window.onkeydown = (e) => {
+        if (
+          e.code === "Space" &&
+          !["SELECT", "BUTTON"].includes(document.activeElement.tagName)
+        ) {
+          e.preventDefault();
+          held = true;
+          update();
+        }
+      };
+      window.onkeyup = (e) => {
+        if (e.code === "Space") {
+          held = false;
+          update();
+        }
+      };
+      window.onblur = () => {
+        held = false;
+        update();
+      };
+    </script>
+  </body>
+</html>

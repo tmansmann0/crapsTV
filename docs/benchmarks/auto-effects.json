@@ -1,0 +1,219 @@
+{
+  "version": "0.15.0",
+  "ok": true,
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "software": false,
+  "checks": [
+    "actual hardware Auto accepts only after 45 baseline and 60 warmed resource-ready trial frames within the measured budget",
+    "TV Effects UI displays the resolved Auto On/Off result",
+    "Auto flares allocate nothing while lamps are hidden, then independently measure 45/60 real frames and accept actual HDR lamps in the room camera",
+    "actual held aim and moving physics flight freeze automatic effects and resource changes during Retest",
+    "explicit manual Off remains saved and allocation-free through Retest"
+  ],
+  "flightFrames": 150,
+  "flightSpanMs": 2483.199999999999,
+  "snapshots": [
+    {
+      "label": "actual-device-qualification",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "eligibility": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [
+        {
+          "kind": "heavy",
+          "candidate": 0,
+          "baselineP80": 16.700000000000273,
+          "p80": 16.699999999999818,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        }
+      ],
+      "resources": {
+        "reflections": "ready",
+        "contactShadows": true,
+        "lensFlares": false
+      },
+      "lampVisible": false
+    },
+    {
+      "label": "visible-real-lamp-qualified",
+      "flags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "appliedFlags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "eligibility": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [
+        {
+          "kind": "heavy",
+          "candidate": 0,
+          "baselineP80": 16.700000000000273,
+          "p80": 16.699999999999818,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        },
+        {
+          "kind": "lens",
+          "candidate": 0,
+          "baselineP80": 16.699999999999818,
+          "p80": 16.700000000000728,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        }
+      ],
+      "resources": {
+        "reflections": "ready",
+        "contactShadows": true,
+        "lensFlares": true
+      },
+      "lampVisible": true
+    },
+    {
+      "label": "held-aim-before-retest",
+      "flags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "appliedFlags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "eligibility": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [
+        {
+          "kind": "heavy",
+          "candidate": 0,
+          "baselineP80": 16.700000000000273,
+          "p80": 16.699999999999818,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        },
+        {
+          "kind": "lens",
+          "candidate": 0,
+          "baselineP80": 16.699999999999818,
+          "p80": 16.700000000000728,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        }
+      ],
+      "resources": {
+        "reflections": "ready",
+        "contactShadows": true,
+        "lensFlares": true
+      },
+      "lampVisible": true
+    },
+    {
+      "label": "safe-after-real-roll",
+      "flags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "appliedFlags": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "eligibility": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [
+        {
+          "kind": "heavy",
+          "candidate": 0,
+          "baselineP80": 16.700000000000728,
+          "p80": 16.700000000000728,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        },
+        {
+          "kind": "lens",
+          "candidate": 0,
+          "baselineP80": 16.700000000000728,
+          "p80": 16.700000000000728,
+          "accepted": true,
+          "baselineSamples": 45,
+          "trialSamples": 60
+        }
+      ],
+      "resources": {
+        "reflections": "ready",
+        "contactShadows": true,
+        "lensFlares": true
+      },
+      "lampVisible": true
+    },
+    {
+      "label": "manual-off-preserved-after-retest",
+      "flags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "appliedFlags": {
+        "lensFlares": false,
+        "localReflections": false,
+        "contactShadows": false
+      },
+      "eligibility": {
+        "lensFlares": true,
+        "localReflections": true,
+        "contactShadows": true
+      },
+      "budgetMs": 16.666666666666668,
+      "reports": [],
+      "resources": {
+        "reflections": "off",
+        "contactShadows": false,
+        "lensFlares": false
+      },
+      "lampVisible": true
+    }
+  ],
+  "errors": [],
+  "glErrors": []
+}

@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "size": [
+    512,
+    512
+  ],
+  "seeds": [
+    801,
+    913,
+    721,
+    406
+  ],
+  "removed": [
+    "Painted radial guide circles .75/.82",
+    "Circular sin(radius*340) normal/roughness machining ripple"
+  ],
+  "preserved": [
+    "Geometry profiles and real brass rings",
+    "Directional handling scuffs",
+    "Clay grain",
+    "Side wear",
+    "Selected dirt .87 / clear scratches strength2"
+  ]
+}

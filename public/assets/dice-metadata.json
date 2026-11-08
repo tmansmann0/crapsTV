@@ -1,0 +1,25 @@
+{
+  "unitCube": true,
+  "coordinates": "glTF Y-up",
+  "faceValues": {
+    "+Y": 1,
+    "-Y": 6,
+    "+Z": 2,
+    "-Z": 5,
+    "+X": 3,
+    "-X": 4
+  },
+  "bodyMaterial": "DiceBody",
+  "pipMaterial": "DicePips",
+  "triangles": 16280,
+  "pipCount": 21,
+  "pipDepth": 0.065,
+  "paintRecess": 0.032,
+  "edgeRadius": 0.045,
+  "normalMaps": [
+    "dice-wear-1.png",
+    "dice-wear-2.png",
+    "dice-wear-3.png"
+  ],
+  "roughnessMap": "dice-roughness.png"
+}

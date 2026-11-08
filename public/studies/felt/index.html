@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>crapsTV · Felt study</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #0d1513;
+        color: #f2ecdd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+      }
+      header {
+        max-width: 1800px;
+        margin: auto;
+        padding: 32px 30px 22px;
+      }
+      .eyebrow {
+        color: #c9ae77;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        font-size: 12px;
+        font-weight: 750;
+      }
+      h1 {
+        margin: 9px 0 12px;
+        font-size: clamp(25px, 3vw, 42px);
+        letter-spacing: -0.04em;
+        font-weight: 650;
+      }
+      p {
+        max-width: 850px;
+        line-height: 1.5;
+        color: #aebeb4;
+        margin: 8px 0;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 22px;
+      }
+      nav {
+        display: flex;
+        gap: 5px;
+        padding: 4px;
+        background: #17221e;
+        border-radius: 12px;
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border: 1px solid #35473d;
+        color: inherit;
+        background: #19271f;
+        border-radius: 8px;
+        padding: 10px 16px;
+      }
+      nav button {
+        border: 0;
+        background: transparent;
+        color: #b6c4ba;
+      }
+      nav button[aria-pressed="true"] {
+        background: #ebdfc2;
+        color: #16261d;
+      }
+      .note {
+        font-size: 13px;
+        color: #92a89a;
+      }
+      main {
+        max-width: 1800px;
+        padding: 0 24px 32px;
+        margin: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      article {
+        border: 1px solid #34463a;
+        background: #14211a;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .caption {
+        padding: 16px 18px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+      }
+      h2 {
+        margin: 0;
+        font-size: 19px;
+        letter-spacing: -0.02em;
+      }
+      .letter {
+        color: #cdb581;
+        margin-right: 9px;
+        font-size: 13px;
+      }
+      .description {
+        font-size: 13px;
+        margin: 7px 0 0;
+        color: #b3c0b5;
+      }
+      .image {
+        display: block;
+        border: 0;
+        padding: 0;
+        width: 100%;
+        position: relative;
+        border-radius: 0;
+        background: #111b16;
+        overflow: hidden;
+      }
+      .image img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+      }
+      .image::after {
+        content: "Inspect at full resolution ↗";
+        position: absolute;
+        bottom: 12px;
+        right: 12px;
+        font-size: 12px;
+        background: #0c1514de;
+        padding: 8px 12px;
+        border-radius: 7px;
+        border: 1px solid #9e997350;
+      }
+      article:has(button:focus-visible) {
+        outline: 2px solid #d4b66b;
+      }
+      a {
+        color: #d6c38e;
+      }
+      dialog {
+        padding: 0;
+        border: 1px solid #425345;
+        border-radius: 14px;
+        width: 96vw;
+        max-width: none;
+        background: #0c1511;
+        color: inherit;
+      }
+      dialog::backdrop {
+        background: #050b09ed;
+      }
+      .dialogbar {
+        padding: 12px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+      }
+      .dialogtools {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .viewport {
+        overflow: auto;
+        max-height: 82vh;
+        background: #080e0b;
+      }
+      .viewport img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .viewport.native img {
+        width: 3840px;
+        max-width: none;
+      }
+      footer {
+        padding: 0 30px 32px;
+        max-width: 1800px;
+        margin: auto;
+        font-size: 13px;
+        color: #92a89a;
+        line-height: 1.6;
+      }
+      @media (max-width: 750px) {
+        header {
+          padding: 24px 18px 18px;
+        }
+        main {
+          padding: 0 12px 24px;
+          gap: 12px;
+          grid-template-columns: 1fr;
+        }
+        .caption {
+          padding: 14px;
+        }
+        .dialogtools a {
+          display: none;
+        }
+      }
+      article.selected {
+        border-color: #d4b66b;
+        box-shadow: 0 0 0 1px #d4b66b;
+      }
+      .collections {
+        max-width: 1752px;
+        margin: 0 auto 18px;
+        padding: 5px;
+        width: fit-content;
+      }
+      @media (min-width: 1400px) {
+        main.revised {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+    </style>
+    <style>
+      main {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      @media (max-width: 1100px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="eyebrow">crapsTV / felt material study</div>
+      <h1>Felt treatments</h1>
+      <p>
+        Three fibre treatments with the same artwork, camera and lighting. The
+        repetitive engraving hatch is removed in every option. B is the selected
+        soft surface, revised to remove raised fibre strands.
+      </p>
+      <div class="toolbar">
+        <nav aria-label="Camera shot">
+          <button type="button" data-shot="hero" aria-pressed="true">
+            Close fibres</button
+          ><button type="button" data-shot="wide" aria-pressed="false">
+            Table distance
+          </button>
+        </nav>
+        <span class="note"
+          >Native 4K captures · Click to inspect full resolution</span
+        >
+      </div>
+    </header>
+    <main></main>
+    <footer>
+      The fibre pattern, grazing sheen and nap vary between options; printed
+      regions and game coordinates stay fixed.
+      <a
+        href="https://threejs.org/docs/pages/MeshPhysicalMaterial.html"
+        target="_blank"
+        rel="noopener"
+        >Three.js cloth sheen</a
+      >
+      ·
+      <a
+        href="https://google.github.io/filament/Filament.md.html"
+        target="_blank"
+        rel="noopener"
+        >Cloth shading reference</a
+      >
+    </footer>
+    <dialog>
+      <div class="dialogbar">
+        <strong id="detail-title"></strong>
+        <div class="dialogtools">
+          <button type="button" id="zoom">View 1:1 pixels</button
+          ><a id="original" target="_blank" rel="noopener">Open 4K image</a
+          ><button type="button" id="close" aria-label="Close image">
+            Close
+          </button>
+        </div>
+      </div>
+      <div class="viewport"><img alt="" /></div>
+    </dialog>
+    <script type="module">
+      const looks = [
+        {
+          id: "fine",
+          letter: "A",
+          label: "Fine baize",
+          description:
+            "Short, densely matted fibres with a restrained soft sheen.",
+        },
+        {
+          id: "plush",
+          letter: "B",
+          label: "Soft fibres",
+          description:
+            "Selected: soft wool shading, with no raised or loose fibre strands.",
+        },
+        {
+          id: "nap",
+          letter: "C",
+          label: "Directional nap",
+          description:
+            "Deeper fibre response with a brushed, velvet-like direction.",
+        },
+      ];
+      const main = document.querySelector("main"),
+        dialog = document.querySelector("dialog"),
+        viewport = document.querySelector(".viewport"),
+        detail = viewport.querySelector("img");
+      let shot = "hero";
+      const source = (look) => `./${shot}-${look.id}.jpg`;
+      function render() {
+        main.replaceChildren(
+          ...looks.map((look) => {
+            const article = document.createElement("article"),
+              caption = document.createElement("div"),
+              text = document.createElement("div"),
+              title = document.createElement("h2"),
+              letter = document.createElement("span"),
+              description = document.createElement("p"),
+              button = document.createElement("button"),
+              image = document.createElement("img");
+            caption.className = "caption";
+            letter.className = "letter";
+            letter.textContent = look.letter;
+            title.append(letter, document.createTextNode(look.label));
+            description.className = "description";
+            description.textContent = look.description;
+            text.append(title, description);
+            caption.append(text);
+            button.className = "image";
+            button.type = "button";
+            button.setAttribute(
+              "aria-label",
+              `Inspect ${look.label} at full resolution`,
+            );
+            image.src = source(look);
+            image.alt = `${look.label}, ${shot === "hero" ? "close fibres" : "table distance"}`;
+            image.width = 3840;
+            image.height = 2160;
+            button.append(image);
+            button.addEventListener("click", () => {
+              detail.src = source(look);
+              detail.alt = image.alt;
+              document.querySelector("#detail-title").textContent =
+                `${look.letter} · ${look.label}`;
+              document.querySelector("#original").href = source(look);
+              viewport.classList.remove("native");
+              document.querySelector("#zoom").textContent = "View 1:1 pixels";
+              dialog.showModal();
+            });
+            article.append(caption, button);
+            return article;
+          }),
+        );
+      }
+      document.querySelectorAll("[data-shot]").forEach((button) =>
+        button.addEventListener("click", () => {
+          shot = button.dataset.shot;
+          document
+            .querySelectorAll("[data-shot]")
+            .forEach((b) =>
+              b.setAttribute("aria-pressed", String(b === button)),
+            );
+          render();
+        }),
+      );
+      document
+        .querySelector("#close")
+        .addEventListener("click", () => dialog.close());
+      document.querySelector("#zoom").addEventListener("click", (event) => {
+        const native = viewport.classList.toggle("native");
+        event.currentTarget.textContent = native
+          ? "Fit image"
+          : "View 1:1 pixels";
+      });
+      render();
+    </script>
+  </body>
+</html>

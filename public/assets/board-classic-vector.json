@@ -1,0 +1,211 @@
+{
+  "width": 2048,
+  "height": 1024,
+  "vertices": 49154,
+  "triangles": 48462,
+  "filled": 466,
+  "stroked": 55,
+  "removedHatchPaths": 12,
+  "paintCount": 544,
+  "logoPaint": 45,
+  "logoRect": {
+    "x": 879,
+    "y": 9.1484375,
+    "w": 290,
+    "h": 123.703125
+  },
+  "maskedGroups": [
+    {
+      "id": "mask-0",
+      "opacity": 0.8,
+      "emptyObjectBox": false,
+      "paint": 19
+    },
+    {
+      "id": "mask-1",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 23
+    },
+    {
+      "id": "mask-2",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 34
+    },
+    {
+      "id": "mask-3",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 36
+    },
+    {
+      "id": "mask-4",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 38
+    },
+    {
+      "id": "mask-5",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 40
+    },
+    {
+      "id": "mask-6",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 42
+    },
+    {
+      "id": "mask-7",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 44
+    },
+    {
+      "id": "mask-9",
+      "opacity": 0.7,
+      "emptyObjectBox": false,
+      "paint": 47
+    },
+    {
+      "id": "mask-10",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 134
+    },
+    {
+      "id": "mask-11",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 147
+    },
+    {
+      "id": "mask-12",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 160
+    },
+    {
+      "id": "mask-13",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 173
+    },
+    {
+      "id": "mask-14",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 186
+    },
+    {
+      "id": "mask-15",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 199
+    },
+    {
+      "id": "mask-16",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 214
+    },
+    {
+      "id": "mask-17",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 245
+    },
+    {
+      "id": "mask-18",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 260
+    },
+    {
+      "id": "mask-19",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 331
+    },
+    {
+      "id": "mask-20",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 340
+    },
+    {
+      "id": "mask-21",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 357
+    },
+    {
+      "id": "mask-22",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 358
+    },
+    {
+      "id": "mask-23",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 377
+    },
+    {
+      "id": "mask-24",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 398
+    },
+    {
+      "id": "mask-25",
+      "opacity": 0.7,
+      "emptyObjectBox": true,
+      "paint": 399
+    },
+    {
+      "id": "mask-26",
+      "opacity": 0.75,
+      "emptyObjectBox": false,
+      "paint": 425
+    },
+    {
+      "id": "mask-27",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 457
+    },
+    {
+      "id": "mask-28",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 465
+    },
+    {
+      "id": "mask-29",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 477
+    },
+    {
+      "id": "mask-30",
+      "opacity": 0.8,
+      "emptyObjectBox": true,
+      "paint": 490
+    }
+  ],
+  "clipPaints": 30,
+  "colorEncoding": "sRGB; premultiplied once in native ink shader",
+  "curveToleranceSvgPixels": 0.02,
+  "sourceSHA256": "01fa18cefd6e922c35264964de0c1f9ef678caab84cf3eb75dcc76e834ffb05a",
+  "binarySHA256": "e982a4cf4443c6d0dae7777bc83c450b43c9453d349308e645624b07fb792055",
+  "bytes": 1564656,
+  "minificationFallback": {
+    "width": 2048,
+    "height": 1024,
+    "file": "board-classic-minified.png",
+    "sha256": "7931ff0100a4a272a5c857267e1071f7506c0b04f501245f2cafcb69fae24ca9"
+  }
+}

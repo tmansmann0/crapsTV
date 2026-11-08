@@ -1,0 +1,504 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import * as THREE from "three";
+import { createTableMaterials } from "../src/table-materials.js";
+const names = [
+  "Hand-polished dark walnut",
+  "Deep oxblood leather",
+  "Dark pine pyramid bounce rubber",
+  "Aged champagne brass",
+  "Dark recessed cup wells",
+  "Deep pine baize",
+  "Player tray suede",
+];
+const setup = (surfaceProfile = true) =>
+  createTableMaterials(
+    { capabilities: { getMaxAnisotropy: () => 4 } },
+    {
+      resolveAsset: (n) => n,
+      surfaceProfile,
+      loadTexture: async (name) => {
+        const t = new THREE.Texture({ width: 32, height: 32 });
+        t.name = name;
+        return t;
+      },
+    },
+  );
+
+test("table overrides keep material identities and UVs with true map-encoded roughness", async () => {
+  const c = await setup(),
+    root = new THREE.Group();
+  for (const name of names) {
+    const m = new THREE.MeshPhysicalMaterial({
+      roughness: 0.25,
+      clearcoat: 0.32,
+    });
+    m.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), m));
+  }
+  const g = root.children[0].geometry,
+    uv = g.attributes.uv.array.slice();
+  c.apply(root);
+  for (const object of root.children) {
+    assert(names.includes(object.material.name));
+    assert.equal(object.material.roughness, 1);
+    if (object.material.userData.feltLook === "soft-wool") {
+      assert.equal(object.material.roughnessMap, null);
+      assert.equal(
+        object.material.normalMap.name,
+        "felt-studies/wool-fibres.png",
+      );
+    } else {
+      assert(object.material.roughnessMap);
+      assert.equal(object.material.roughnessMap.colorSpace, THREE.NoColorSpace);
+    }
+    assert.equal(object.material.normalMap.channel, 1);
+    assert.equal(object.material.normalMap.flipY, false);
+    assert.equal(object.material.map.colorSpace, THREE.SRGBColorSpace);
+  }
+  assert.deepEqual(g.attributes.uv.array, uv);
+  const wood = root.children[0].material;
+  assert.equal(wood.clearcoat, 0.4);
+  assert.equal(wood.clearcoatRoughness, 0.3);
+  assert.equal(wood.map.repeat.x, 0.8 / 3.6);
+  assert.equal(wood.normalMap.repeat.x, 0.8 / 3.6);
+  assert.equal(wood.map.channel, 1);
+  assert.equal(wood.normalScale.x, 0.34);
+  assert.equal(wood.envMapIntensity, 0.85);
+  assert.equal(wood.normalMap.channel, 1);
+  assert.equal(
+    root.children[2].material.normalMap.name,
+    "table-rubber-normal.png",
+  );
+  const same = wood;
+  c.apply(root);
+  assert.equal(root.children[0].material, same);
+  c.dispose();
+  assert.throws(() => c.apply(root), /disposed/);
+});
+
+test("only known table materials change and all maps are registered/disposed once", async () => {
+  const c = await setup();
+  const other = new THREE.MeshStandardMaterial();
+  other.name = "DiceBody";
+  const root = new THREE.Group();
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), other));
+  c.apply(root);
+  assert.equal(root.children[0].material, other);
+  assert.equal(c.textures.size, 19);
+  let count = 0;
+  for (const t of c.textures) {
+    t.addEventListener("dispose", () => count++);
+    assert.equal(t.anisotropy, 4);
+  }
+  c.dispose();
+  c.dispose();
+  assert.equal(count, 19);
+});
+
+test("production loads only selected American maps and applies the chosen padding/felt profile once", async () => {
+  const c = await setup(),
+    root = new THREE.Group();
+  for (const name of names) {
+    const m = new THREE.MeshPhysicalMaterial();
+    m.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), m));
+  }
+  c.apply(root);
+  const [wood, padding, , , , felt, tray] = root.children.map(
+    (o) => o.material,
+  );
+  assert.equal(wood.userData.woodLook, "american");
+  assert.deepEqual(
+    [...c.textures]
+      .filter((t) => t.name.startsWith("wood-"))
+      .map((t) => t.name)
+      .sort(),
+    ["albedo.jpg", "normal.png", "roughness.png", "ao.png"]
+      .map((f) => "wood-studies/american/" + f)
+      .sort(),
+  );
+  assert(
+    ![...c.textures].some((t) =>
+      /smoked|natural|material-table-walnut/.test(t.name),
+    ),
+  );
+  assert.equal(wood.normalScale.x, 0.34);
+  assert.equal(wood.clearcoatNormalMap, null);
+  for (const [m, kind, normal, contrast] of [[padding, "padding", 2, 1.5]]) {
+    assert.equal(m.normalScale.x, normal);
+    assert.equal(m.userData.surfaceProfile, "refined");
+    const shader = {
+      uniforms: {},
+      fragmentShader: "#include <common>\n#include <roughnessmap_fragment>",
+    };
+    m.onBeforeCompile(shader, {});
+    assert.equal(shader.uniforms.lookRoughnessContrast.value, contrast);
+    assert.equal(m.userData.materialLookKind, kind);
+  }
+  for (const m of [felt, tray]) {
+    assert.equal(m.userData.feltLook, "soft-wool");
+    assert.equal(m.normalMap.name, "felt-studies/wool-fibres.png");
+    assert.equal(m.roughnessMap, null);
+    assert.equal(m.sheen, 0.75);
+  }
+  const previous = padding.normalScale.x;
+  c.apply(root);
+  assert.equal(root.children[1].material, padding);
+  assert.equal(padding.normalScale.x, previous);
+  c.dispose();
+});
+
+test("explicit legacy opt-out reproduces original wood and unamplified padding/felt", async () => {
+  const c = await setup(false),
+    root = new THREE.Group();
+  for (const name of [names[0], names[1], names[5]]) {
+    const m = new THREE.MeshPhysicalMaterial();
+    m.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), m));
+  }
+  c.apply(root);
+  const [wood, padding, felt] = root.children.map((m) => m.material);
+  assert.equal(wood.map.name, "material-table-walnut-albedo.jpg");
+  assert.equal(wood.map.repeat.x, 0.8 / 4);
+  assert.equal(wood.normalScale.x, 0.82);
+  assert.equal(wood.clearcoat, 0.16);
+  assert.equal(wood.clearcoatRoughness, 0.38);
+  assert.equal(wood.clearcoatNormalMap, wood.normalMap);
+  assert.equal(wood.clearcoatNormalScale.x, 0.28);
+  assert.equal(wood.aoMapIntensity, 0.5);
+  assert.equal(padding.normalScale.x, 1);
+  assert.equal(padding.aoMapIntensity, 0.55);
+  assert.equal(felt.normalScale.x, 0.6);
+  assert.equal(felt.sheen, 0.28);
+  for (const m of [wood, padding, felt])
+    assert.equal(m.userData.surfaceProfile, undefined);
+  assert(![...c.textures].some((t) => t.name.startsWith("wood-studies/")));
+  c.dispose();
+});
+
+test("a selected American texture failure rejects the startup asset gate and disposes all successful maps", async () => {
+  const disposed = [];
+  await assert.rejects(
+    createTableMaterials(null, {
+      resolveAsset: (name) => name,
+      loadTexture: async (name) => {
+        if (name === "wood-studies/american/normal.png")
+          throw Error("selected normal unavailable");
+        const t = new THREE.Texture();
+        t.addEventListener("dispose", () => disposed.push(name));
+        return t;
+      },
+    }),
+    /selected normal unavailable/,
+  );
+  assert.equal(disposed.length, 18);
+  assert.equal(new Set(disposed).size, 18);
+});
+
+test("encoded roughness stays in the matte/satin palette and texture budgets remain bounded", async () => {
+  const data = JSON.parse(
+    await readFile(
+      new URL("../public/assets/material-table-metadata.json", import.meta.url),
+    ),
+  );
+  const wood = data.maps["material-table-walnut-roughness"];
+  assert(wood.min >= 0.4 && wood.max <= 0.6);
+  const leather = data.maps["material-table-leather-roughness"];
+  assert(leather.min >= 0.6 && leather.max <= 0.8);
+  assert.equal(data.roughnessScalar, 1);
+  for (const map of Object.values(data.maps)) {
+    assert(map.width <= 2048);
+    assert(map.height <= 2048);
+  }
+});
+
+test("standard glTF wood upgrades to physical satin while leather retains its type", async () => {
+  const c = await setup();
+  const root = new THREE.Group();
+  const wood = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide });
+  wood.name = names[0];
+  const leather = new THREE.MeshStandardMaterial();
+  leather.name = names[1];
+  root.add(
+    new THREE.Mesh(new THREE.BoxGeometry(), wood),
+    new THREE.Mesh(new THREE.BoxGeometry(), leather),
+  );
+  c.apply(root);
+  assert.equal(root.children[0].material.isMeshPhysicalMaterial, true);
+  assert.equal(root.children[0].material.clearcoat, 0.4);
+  assert.equal(root.children[0].material.side, THREE.DoubleSide);
+  assert.equal(root.children[1].material.isMeshPhysicalMaterial, undefined);
+  c.dispose();
+});
+
+test("baize and trays share fibre maps with a soft physical grazing sheen", async () => {
+  const c = await setup();
+  const root = new THREE.Group();
+  for (const name of names.slice(-2)) {
+    const material = new THREE.MeshStandardMaterial();
+    material.name = name;
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), material));
+  }
+  c.apply(root);
+  const [baize, tray] = root.children.map((mesh) => mesh.material);
+  assert(baize.isMeshPhysicalMaterial && tray.isMeshPhysicalMaterial);
+  assert.equal(baize.normalMap, tray.normalMap);
+  assert.equal(baize.roughnessMap, tray.roughnessMap);
+  assert.equal(baize.normalScale.x, 1);
+  assert.equal(tray.normalScale.x, 1);
+  assert.equal(baize.sheen, 0.75);
+  assert.equal(baize.sheenRoughness, 0.69);
+  assert.equal(baize.normalMap.repeat.x, 1);
+  assert.equal(baize.normalMap.name, "felt-studies/wool-fibres.png");
+  assert.equal(baize.roughnessMap, null);
+  assert.equal(baize.clearcoat, 0);
+  c.dispose();
+});
+
+test("selected scanned pores stay shared and aligned beneath smooth varnish across all table parts", async () => {
+  const c = await setup();
+  const root = new THREE.Group();
+  for (let i = 0; i < 12; i++) {
+    const original = new THREE.MeshStandardMaterial();
+    original.name = names[0];
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), original));
+  }
+  const original = new THREE.MeshStandardMaterial();
+  original.name = names[1];
+  root.add(new THREE.Mesh(new THREE.BoxGeometry(), original));
+  c.apply(root);
+  const wood = root.children[0].material;
+  assert(root.children.slice(0, 12).every((m) => m.material === wood));
+  assert.equal(wood.clearcoatNormalMap, null);
+  assert.equal(wood.clearcoatNormalScale.x, 0);
+  assert.equal(wood.aoMapIntensity, 0.24);
+  for (const material of [wood, root.children[12].material]) {
+    assert(c.textures.has(material.aoMap));
+    assert.equal(material.aoMap.colorSpace, THREE.NoColorSpace);
+    assert.equal(material.aoMap.userData.role, "occlusion");
+    assert.equal(material.aoMap.channel, material.normalMap.channel);
+    assert.deepEqual(material.aoMap.repeat, material.normalMap.repeat);
+  }
+  assert.equal(root.children[12].material.aoMapIntensity, 0.55 * 1.5);
+  c.dispose();
+});
+
+test("close-view depth uses real 2K scan and preserves the dark albedo", async () => {
+  const { createHash } = await import("node:crypto");
+  const data = JSON.parse(
+    await readFile(
+      new URL("../public/assets/material-table-metadata.json", import.meta.url),
+    ),
+  );
+  for (const name of ["walnut", "leather"]) {
+    const normal = data.maps[`material-table-${name}-normal`];
+    assert.equal(normal.width, 2048);
+    assert.equal(normal.height, 2048);
+    const ao = data.maps[`material-table-${name}-occlusion`];
+    assert(ao.min >= 0.85 && ao.max <= 1);
+    assert(ao.mean > 0.95);
+  }
+  const provenance = JSON.parse(
+    await readFile(
+      new URL(
+        "../assets/source/materials/dark-wood/provenance.json",
+        import.meta.url,
+      ),
+    ),
+  );
+  const scan = await readFile(
+    new URL(
+      "../assets/source/materials/dark-wood/dark_wood_nor_gl_2k.png",
+      import.meta.url,
+    ),
+  );
+  assert.equal(
+    createHash("sha256").update(scan).digest("hex"),
+    provenance.files["dark_wood_nor_gl_2k.png"].sha256,
+  );
+  // These are the existing dark-stain and oxblood files, not relit substitutes.
+  for (const [name, expected] of Object.entries({
+    "material-table-walnut-albedo.jpg":
+      "06f89130929513beab39392fb99b54f4a4a600ddf4966f7dcef7d0eb23eab175",
+    "material-table-leather-albedo.png":
+      "a61f05c18a5d4140152c02b79bf4d426f13532823403cb08e75081009fe76296",
+  })) {
+    const bytes = await readFile(
+      new URL(`../public/assets/${name}`, import.meta.url),
+    );
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), expected);
+  }
+});
+
+async function exportedWood() {
+  const bytes = await readFile(
+    new URL(
+      "../public/assets/table-player-rails-optimized.glb",
+      import.meta.url,
+    ),
+  );
+  const jsonLength = bytes.readUInt32LE(12),
+    gltf = JSON.parse(bytes.toString("utf8", 20, 20 + jsonLength));
+  const binStart = 20 + jsonLength + 8;
+  function values(index) {
+    const a = gltf.accessors[index],
+      v = gltf.bufferViews[a.bufferView],
+      width = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 }[a.type];
+    const size = { 5123: 2, 5125: 4, 5126: 4 }[a.componentType];
+    const read = {
+      5123: "readUInt16LE",
+      5125: "readUInt32LE",
+      5126: "readFloatLE",
+    }[a.componentType];
+    return Array.from({ length: a.count }, (_, i) =>
+      Array.from({ length: width }, (_, j) =>
+        bytes[read](
+          binStart +
+            (v.byteOffset || 0) +
+            (a.byteOffset || 0) +
+            i * (v.byteStride || width * size) +
+            j * size,
+        ),
+      ),
+    );
+  }
+  const p = gltf.meshes
+    .flatMap((m) => m.primitives)
+    .find(
+      (p) => gltf.materials[p.material].name === "Hand-polished dark walnut",
+    );
+  const pos = values(p.attributes.POSITION),
+    uv = values(p.attributes.TEXCOORD_1),
+    indices = values(p.indices).flat();
+  return { pos, uv, indices };
+}
+
+test("exported wood grain follows straight shelf boards and upright legs", async () => {
+  const { pos, uv, indices } = await exportedWood();
+  const counts = { front: 0, side: 0, leg: 0 };
+  for (let i = 0; i < indices.length; i += 3) {
+    for (const [j, k] of [
+      [0, 1],
+      [1, 2],
+      [2, 0],
+    ]) {
+      const a = indices[i + j],
+        b = indices[i + k],
+        p = pos[a],
+        q = pos[b],
+        d = q.map((v, n) => v - p[n]);
+      let kind, along;
+      if (
+        p[1] < -1.05 &&
+        q[1] < -1.05 &&
+        Math.abs(d[0]) + Math.abs(d[2]) < 1e-5 &&
+        Math.abs(d[1]) > 0.15
+      ) {
+        kind = "leg";
+        along = d[1];
+      } else if (Math.abs(d[1]) < 1e-5 && p[1] > -1 && p[1] < 0.75) {
+        if (
+          p[2] > 3 &&
+          q[2] > 3 &&
+          Math.abs(p[0]) < 6 &&
+          Math.abs(q[0]) < 6 &&
+          Math.abs(d[2]) < 1e-5 &&
+          Math.abs(d[0]) > 0.2
+        ) {
+          kind = "front";
+          along = d[0];
+        } else if (
+          Math.abs(p[0]) > 5.5 &&
+          Math.abs(q[0]) > 5.5 &&
+          Math.abs(p[2]) < 3.5 &&
+          Math.abs(q[2]) < 3.5 &&
+          Math.abs(d[0]) < 1e-5 &&
+          Math.abs(d[2]) > 0.2
+        ) {
+          kind = "side";
+          along = d[2];
+        }
+      }
+      if (!kind) continue;
+      assert(
+        Math.abs(Math.abs((uv[b][0] - uv[a][0]) / along) - 1.25) < 1e-4,
+        kind + " grain direction/scale",
+      );
+      assert(Math.abs(uv[b][1] - uv[a][1]) < 1e-4, kind + " cross-grain scale");
+      counts[kind]++;
+    }
+  }
+  for (const [kind, count] of Object.entries(counts))
+    assert(count > 0, "inspected " + kind);
+});
+
+test("active wood UV1 has no stretched or collapsed triangles; protected sources retain hashes", async () => {
+  const { createHash } = await import("node:crypto");
+  const { pos, uv, indices } = await exportedWood();
+  let checked = 0;
+  for (let i = 0; i < indices.length; i += 3) {
+    const [a, b, c] = indices.slice(i, i + 3),
+      ab = pos[b].map((v, j) => v - pos[a][j]),
+      ac = pos[c].map((v, j) => v - pos[a][j]);
+    const area = Math.hypot(
+      ab[1] * ac[2] - ab[2] * ac[1],
+      ab[2] * ac[0] - ab[0] * ac[2],
+      ab[0] * ac[1] - ab[1] * ac[0],
+    );
+    // Miter intersections can triangulate nearly collinear n-gon vertices.
+    // Float32 roundoff dominates UV/position area ratios below 1e-6 units².
+    if (area < 1e-6) continue;
+    const u = uv[b].map((v, j) => v - uv[a][j]),
+      v = uv[c].map((v, j) => v - uv[a][j]);
+    const ratio = Math.abs(u[0] * v[1] - u[1] * v[0]) / area;
+    assert(
+      ratio > 0.35 && ratio < 1.7,
+      `wood triangle ${i / 3} UV density ${ratio}`,
+    );
+    checked++;
+  }
+  assert(checked > 1000);
+  const stats = JSON.parse(
+    await readFile(
+      new URL(
+        "../public/assets/table-player-rails-optimized-stats.json",
+        import.meta.url,
+      ),
+    ),
+  );
+  assert.equal(stats.woodUV.version, 2);
+  assert.equal(stats.after.triangles, 40684);
+  assert.equal(stats.after.materialPrimitives, 7);
+  for (const [name, hash] of Object.entries(stats.preservedSha256)) {
+    assert.equal(
+      createHash("sha256")
+        .update(await readFile(new URL("../" + name, import.meta.url)))
+        .digest("hex"),
+      hash,
+      name,
+    );
+  }
+});
+
+test("selected wool atlas participates in the all-assets startup gate and failed loads release successful resources", async () => {
+  const disposed = [];
+  await assert.rejects(
+    createTableMaterials(null, {
+      resolveAsset: (name) => name,
+      loadTexture: async (name) => {
+        if (name === "felt-studies/wool-fibres.png")
+          throw Error("wool atlas unavailable");
+        const texture = new THREE.Texture();
+        texture.addEventListener("dispose", () => disposed.push(name));
+        return texture;
+      },
+    }),
+    /wool atlas unavailable/,
+  );
+  assert.equal(disposed.length, 18);
+  assert.equal(new Set(disposed).size, disposed.length);
+  assert(!disposed.includes("felt-normal.png"));
+  assert(!disposed.includes("felt-roughness.png"));
+});

@@ -1,0 +1,190 @@
+{
+  "generated": "Scanned CC0 Poly Haven wood; original procedural other materials",
+  "woodSource": "https://polyhaven.com/a/dark_wood",
+  "woodLicense": "CC0-1.0",
+  "woodMapping": {
+    "uvChannel": 1,
+    "mappingVersion": 2,
+    "projection": "Board-local mitered panels; upright leg grain",
+    "tileSceneUnits": 4,
+    "repeat": [
+      0.2,
+      0.2
+    ],
+    "albedoFormat": "JPEG quality94 subsampling0",
+    "normalScale": 0.82,
+    "clearcoat": 0.16,
+    "clearcoatRoughness": 0.38,
+    "environmentIntensity": 0.8,
+    "clearcoatNormalScale": 0.28,
+    "occlusionIntensity": 0.5,
+    "normalResolution": 2048
+  },
+  "normalConvention": "OpenGL +Y tangent-space",
+  "albedoColorSpace": "sRGB",
+  "dataColorSpace": "linear/NoColorSpace",
+  "roughnessScalar": 1,
+  "maps": {
+    "material-table-walnut-albedo": {
+      "file": "material-table-walnut-albedo.jpg",
+      "width": 2048,
+      "height": 2048,
+      "min": 0.0,
+      "max": 0.6039,
+      "mean": 0.1633
+    },
+    "material-table-walnut-normal": {
+      "file": "material-table-walnut-normal.png",
+      "width": 2048,
+      "height": 2048,
+      "min": 0.3882,
+      "max": 1.0,
+      "mean": 0.6656
+    },
+    "material-table-walnut-roughness": {
+      "file": "material-table-walnut-roughness.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.4073,
+      "max": 0.5687,
+      "mean": 0.5036
+    },
+    "material-table-leather-albedo": {
+      "file": "material-table-leather-albedo.png",
+      "width": 1024,
+      "height": 512,
+      "min": 0.077,
+      "max": 0.3341,
+      "mean": 0.1749
+    },
+    "material-table-leather-normal": {
+      "file": "material-table-leather-normal.png",
+      "width": 2048,
+      "height": 2048,
+      "min": 0.3608,
+      "max": 1.0,
+      "mean": 0.6663
+    },
+    "material-table-leather-roughness": {
+      "file": "material-table-leather-roughness.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.6667,
+      "max": 0.7922,
+      "mean": 0.6904
+    },
+    "material-table-rubber-albedo": {
+      "file": "material-table-rubber-albedo.png",
+      "width": 256,
+      "height": 1024,
+      "min": 0.038,
+      "max": 0.1212,
+      "mean": 0.0837
+    },
+    "material-table-rubber-roughness": {
+      "file": "material-table-rubber-roughness.png",
+      "width": 256,
+      "height": 1024,
+      "min": 0.8625,
+      "max": 0.8974,
+      "mean": 0.88
+    },
+    "material-table-felt-albedo": {
+      "file": "material-table-felt-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.0637,
+      "max": 0.2626,
+      "mean": 0.1672
+    },
+    "material-table-brass-albedo": {
+      "file": "material-table-brass-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.2523,
+      "max": 0.6762,
+      "mean": 0.4741
+    },
+    "material-table-brass-normal": {
+      "file": "material-table-brass-normal.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.4869,
+      "max": 1.0,
+      "mean": 0.6667
+    },
+    "material-table-brass-roughness": {
+      "file": "material-table-brass-roughness.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.5102,
+      "max": 0.5498,
+      "mean": 0.53
+    },
+    "material-table-black-albedo": {
+      "file": "material-table-black-albedo.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.0304,
+      "max": 0.0646,
+      "mean": 0.0497
+    },
+    "material-table-black-normal": {
+      "file": "material-table-black-normal.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.4919,
+      "max": 1.0,
+      "mean": 0.6667
+    },
+    "material-table-black-roughness": {
+      "file": "material-table-black-roughness.png",
+      "width": 512,
+      "height": 512,
+      "min": 0.7375,
+      "max": 0.7625,
+      "mean": 0.75
+    },
+    "material-table-walnut-occlusion": {
+      "file": "material-table-walnut-occlusion.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.8784,
+      "max": 1.0,
+      "mean": 0.9695
+    },
+    "material-table-leather-occlusion": {
+      "file": "material-table-leather-occlusion.png",
+      "width": 1024,
+      "height": 1024,
+      "min": 0.8941,
+      "max": 1.0,
+      "mean": 0.9901
+    }
+  },
+  "materialDepth": {
+    "version": 1,
+    "geometryChanged": false,
+    "additionalSharedTextures": 2,
+    "wood": {
+      "normalSource": "dark_wood_nor_gl_2k.png",
+      "normalResolution": 2048,
+      "albedoChanged": false,
+      "clearcoatUsesMatchedGrain": true,
+      "occlusion": "High-pass microcavity estimate from matched OpenGL normal; not displacement",
+      "occlusionIntensity": 0.5,
+      "normalScale": 0.82,
+      "clearcoatNormalScale": 0.28
+    },
+    "padding": {
+      "tileSceneUnits": 0.8,
+      "normalResolution": 2048,
+      "albedoChanged": false,
+      "normalScale": 1,
+      "relief": "Rounded pebble grain, recessed pores and broad soft compression",
+      "maximumHeightRangeSceneUnits": 0.0008534,
+      "occlusionIntensity": 0.55
+    },
+    "runtime": "Tangent normal, roughness and subtle occlusion maps; no parallax, displacement, extra geometry or material batches"
+  }
+}
