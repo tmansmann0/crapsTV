@@ -60,17 +60,21 @@ try {
   const viewport = process.env.CI
     ? { width: 960, height: 600 }
     : { width: 1280, height: 800 };
-  page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("crash", () => errors.push("Browser renderer crashed"));
-  page.on("requestfailed", (request) => {
-    browserLog.push({ url: request.url(), failure: request.failure() });
-  });
-  page.on("console", (message) => {
-    if (message.type() === "error") browserLog.push(message.text());
-    if (/GL_INVALID|INVALID_OPERATION/.test(message.text()))
-      errors.push(message.text());
-  });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+  page = await context.newPage();
+  function trackPage(target) {
+    target.on("pageerror", (error) => errors.push(error.message));
+    target.on("crash", () => errors.push("Browser renderer crashed"));
+    target.on("requestfailed", (request) => {
+      browserLog.push({ url: request.url(), failure: request.failure() });
+    });
+    target.on("console", (message) => {
+      if (message.type() === "error") browserLog.push(message.text());
+      if (/GL_INVALID|INVALID_OPERATION/.test(message.text()))
+        errors.push(message.text());
+    });
+  }
+  trackPage(page);
   await page.addInitScript(() => {
     if (!localStorage.getItem("crapstv-graphics-v1"))
       localStorage.setItem(
@@ -105,7 +109,7 @@ try {
     }
     requestAnimationFrame(sample);
   });
-  const table = page.locator(".table-canvas");
+  let table = page.locator(".table-canvas");
   const cache = () =>
     page.evaluate(
       (key) => JSON.parse(localStorage.getItem(key) || "null"),
@@ -245,11 +249,27 @@ try {
     manual,
   );
   checkpoint("kiosk navigation");
+  // Kiosk startup is a new window using the same persistent browser profile.
+  // The reload cases above cover the existing document; close that target so
+  // SwiftShader can retire its table before opening the kiosk target.
+  await page.close();
+  page = await context.newPage();
+  trackPage(page);
+  table = page.locator(".table-canvas");
   await page.goto(`${origin}/?kiosk=1`, navigation);
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 90000,
   });
   await page.keyboard.press("Escape");
+  await expect(table).toHaveAttribute("data-graphics-profile-source", "saved");
+  assert.deepEqual((await cache()).profile, retested.profile);
+  assert.deepEqual(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("crapstv-graphics-v1")),
+    ),
+    manual,
+    "Kiosk relaunch retains the same profile and manual preferences",
+  );
   await expect
     .poll(async () =>
       Number(await table.getAttribute("data-startup-ui-opacity")),

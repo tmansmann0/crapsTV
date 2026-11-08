@@ -1676,9 +1676,20 @@ export default function Table3D(props) {
       }
     }
     frame = requestAnimationFrame(animate);
+    // Full-page navigation does not run React effect cleanup. Release the GPU
+    // context explicitly instead of retaining another table until browser GC.
+    // A back/forward-cache entry keeps its live context for restoration.
+    const releasePageContext = (event) => {
+      if (event.persisted) return;
+      alive = false;
+      cancelAnimationFrame(frame);
+      renderer.forceContextLoss();
+    };
+    window.addEventListener("pagehide", releasePageContext);
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
+      window.removeEventListener("pagehide", releasePageContext);
       observer.disconnect();
       controls.dispose();
       el.removeEventListener("pointerdown", pointerDown, true);
