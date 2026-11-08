@@ -833,9 +833,15 @@ export default function Table3D(props) {
               if (!introLiveProbe) introShowcase ||= createStartupShowcase();
             }
             let elapsed = time - introStart;
-            if (!introLiveProbe && calibrating) {
+            if (!introLiveProbe) {
               introCheckpointClock ||= createStartupClock(
-                introShowcase.calibrationHolds,
+                calibrating ? introShowcase.calibrationHolds : [],
+                introShowcase.stages
+                  .filter(({ state }) => state.rolling)
+                  .map(({ at, state }) => ({
+                    startAt: at,
+                    endAt: at + state.throw.duration,
+                  })),
               );
               const adjusted = introCheckpointClock.advance({
                 elapsed,

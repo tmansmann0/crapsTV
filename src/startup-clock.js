@@ -4,15 +4,16 @@
  * its camera lead before stopping at the switch until the caller applies it.
  * Returned pauses belong to the demo clock only, never a room/game deadline.
  */
-export function createStartupClock(holds) {
+export function createStartupClock(holds, motionWindows = []) {
   const checkpoints = holds.map(({ probe, startAt, switchAt }) => ({
     probe,
     startAt,
     switchAt,
   }));
   let entered = null,
-    recovery = null;
-  return {
+    recovery = null,
+    lastElapsed = 0;
+  const checkpointClock = {
     advance({ elapsed, now, completedProbe }) {
       if (recovery && completedProbe >= recovery.probe) {
         // A quick first post-upload RAF must not release the result: a later
@@ -43,6 +44,34 @@ export function createStartupClock(holds) {
       if (adjusted >= next.switchAt && !recovery)
         recovery = { probe: next.probe, switchAt: next.switchAt, at: now };
       return { elapsed: adjusted, pausedMs: Math.max(0, elapsed - adjusted) };
+    },
+  };
+  return {
+    advance({ elapsed, now, completedProbe }) {
+      // First-use shader work can stall even before a quality switch. Never
+      // jump over an entire throw: show its launch, then advance visible motion
+      // by at most 250ms per frame. This affects only the isolated demo clock.
+      const motion = motionWindows.find(
+        ({ startAt, endAt }) => lastElapsed < endAt && elapsed >= startAt,
+      );
+      const visibleElapsed = motion
+        ? Math.min(
+            elapsed,
+            lastElapsed < motion.startAt
+              ? motion.startAt
+              : Math.min(motion.endAt, lastElapsed + 250),
+          )
+        : elapsed;
+      const result = checkpointClock.advance({
+        elapsed: visibleElapsed,
+        now,
+        completedProbe,
+      });
+      lastElapsed = result.elapsed;
+      return {
+        elapsed: result.elapsed,
+        pausedMs: Math.max(0, elapsed - result.elapsed),
+      };
     },
   };
 }

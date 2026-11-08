@@ -8,6 +8,48 @@ const holds = [
   { probe: 3, startAt: 28360, switchAt: 28660 },
 ];
 
+test("first-use shader stalls cannot skip either physical intro throw", () => {
+  const windows = [
+    { startAt: 6200, endAt: 9200 },
+    { startAt: 18600, endAt: 21600 },
+  ];
+  // Cached openings also need motion protection, without calibration holds.
+  for (const checkpoints of [[], holds]) {
+    const clock = createStartupClock(checkpoints, windows);
+    let now = 0,
+      paused = 0,
+      completedProbe = 0;
+    const visible = [];
+    for (let i = 0; i < 150; i++) {
+      now += 1100;
+      const result = clock.advance({
+        elapsed: now - paused,
+        now,
+        completedProbe,
+      });
+      paused += result.pausedMs;
+      assert.equal(result.elapsed, now - paused);
+      visible.push(result.elapsed);
+      const hold = checkpoints.find(({ probe }) => probe > completedProbe);
+      if (hold && result.elapsed >= hold.switchAt) completedProbe = hold.probe;
+      if (result.elapsed >= 30000) break;
+    }
+    for (const { startAt, endAt } of windows) {
+      const frames = visible.filter(
+        (elapsed) => elapsed >= startAt && elapsed <= endAt,
+      );
+      assert.equal(frames[0], startAt, "launch is presented before advancing");
+      assert(
+        frames.length >= 13,
+        "the throw has visible motion, not only a landed result",
+      );
+      for (let i = 1; i < frames.length; i++)
+        assert(frames[i] - frames[i - 1] <= 250);
+    }
+    assert(visible.at(-1) >= 30000);
+  }
+});
+
 test("a skipped result shot receives its full real camera lead before calibration", () => {
   const clock = createStartupClock(holds);
   assert.deepEqual(
