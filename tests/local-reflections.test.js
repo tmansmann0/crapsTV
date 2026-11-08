@@ -2,19 +2,36 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { createLocalReflections } from "../src/local-reflections.js";
+const finishValues = (m) => ({
+  roughness: m.roughness,
+  clearcoat: m.clearcoat,
+  clearcoatRoughness: m.clearcoatRoughness,
+  envMapIntensity: m.envMapIntensity,
+});
 
 function fixture({
   supported = true,
   failRender = false,
   failFilter = false,
+  finishProfile = "medium",
 } = {}) {
   const scene = new THREE.Scene(),
     originalEnv = new THREE.Texture(),
     wood = new THREE.MeshPhysicalMaterial({
       name: "Hand-polished dark walnut",
       envMap: originalEnv,
+      roughness: 1,
+      clearcoat: 0.4,
+      clearcoatRoughness: 0.3,
+      envMapIntensity: 0.85,
     }),
-    dice = new THREE.MeshPhysicalMaterial({ name: "DiceBody" }),
+    dice = new THREE.MeshPhysicalMaterial({
+      name: "DiceBody",
+      roughness: 1,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.2,
+      envMapIntensity: 1.1,
+    }),
     clay = new THREE.MeshPhysicalMaterial({ name: "ChipBase" }),
     ghost = new THREE.Mesh(
       new THREE.BoxGeometry(),
@@ -39,6 +56,11 @@ function fixture({
   let oldBoardCallbacks = 0,
     generatorCount = 0,
     generatorDisposals = 0;
+  const baseline = {
+    wood: finishValues(wood),
+    dice: finishValues(dice),
+    clay: finishValues(clay),
+  };
   board.material.onBeforeCompile = () => {
     oldBoardCallbacks++;
   };
@@ -97,6 +119,16 @@ function fixture({
         "capture never samples previous local probe",
       );
       assert.equal(dice.envMap, null);
+      assert.deepEqual(
+        finishValues(wood),
+        baseline.wood,
+        "probe captures original wood finish, avoiding material feedback",
+      );
+      assert.deepEqual(
+        finishValues(dice),
+        baseline.dice,
+        "probe captures original resin finish",
+      );
       assert.notEqual(board.material, originalBoard);
       assert.equal(board.material.map.colorSpace, THREE.SRGBColorSpace);
       assert.equal(board.material.map.premultiplyAlpha, false);
@@ -120,7 +152,8 @@ function fixture({
         print: board.material.map,
         material: board.material,
       });
-      if (failRender) throw Error("capture failed");
+      if (typeof failRender === "function" ? failRender(frames) : failRender)
+        throw Error("capture failed");
     },
   };
   const createPMREM = () => {
@@ -154,6 +187,7 @@ function fixture({
     board,
     artwork,
     createPMREM,
+    finishProfile,
   });
   function restored() {
     assert.equal(board.material, originalBoard);
@@ -190,6 +224,7 @@ function fixture({
     fallback,
     artwork,
     scene,
+    baseline,
     get generators() {
       return generatorCount;
     },
@@ -219,6 +254,8 @@ test("six staged safe views atomically publish a cached probe without touching n
   f.control.setEnabled(true);
   assert.equal(f.update(0).state, "waiting");
   assert.equal(f.update(599).captureDraws, 0);
+  assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+  assert.deepEqual(finishValues(f.dice), f.baseline.dice);
   for (let face = 0; face < 6; face++) {
     const result = f.update(600 + face * 20);
     assert.equal(result.captureDraws, face + 1);
@@ -226,6 +263,14 @@ test("six staged safe views atomically publish a cached probe without touching n
       f.wood.envMap,
       face < 5 ? f.originalEnv : f.filtered[0].texture,
     );
+    if (face < 5) {
+      assert.deepEqual(
+        finishValues(f.wood),
+        f.baseline.wood,
+        "partial cubes cannot enable a new finish",
+      );
+      assert.deepEqual(finishValues(f.dice), f.baseline.dice);
+    }
   }
   assert.equal(f.control.metrics.commits, 1);
   assert.deepEqual(
@@ -236,6 +281,19 @@ test("six staged safe views atomically publish a cached probe without touching n
   assert.equal(f.clay.envMap, null, "clay keeps global casino lighting");
   assert.deepEqual(f.wood.envMapRotation.toArray(), [0, 0, 0, "XYZ"]);
   assert.equal(f.fallback.colorSpace, THREE.NoColorSpace);
+  assert.deepEqual(finishValues(f.wood), {
+    roughness: 0.7,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.18,
+    envMapIntensity: 0.85 * 1.25,
+  });
+  assert.deepEqual(finishValues(f.dice), {
+    roughness: 0.7,
+    clearcoat: 0.65,
+    clearcoatRoughness: 0.11,
+    envMapIntensity: 1.1 * 1.15,
+  });
+  assert.deepEqual(finishValues(f.clay), f.baseline.clay);
   f.update(5000);
   assert.equal(f.frames.length, 6, "camera frames alone never recapture");
   f.control.dispose();
@@ -261,6 +319,11 @@ test("unsafe movement and changed revisions discard partial cubes, retaining onl
   f.update(3600, 3);
   f.update(3620, 3, false);
   assert.equal(f.wood.envMap, previous);
+  assert.equal(
+    f.wood.roughness,
+    0.7,
+    "previous complete probe keeps its finish after partial recapture cancellation",
+  );
   f.control.dispose();
 });
 
@@ -282,6 +345,8 @@ test("disable restores original maps/rotation, removes all targets and can enabl
   assert.equal(off.estimatedBytes, 0);
   assert.equal(off.materials, 0);
   assert.equal(f.wood.envMap, f.originalEnv);
+  assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+  assert.deepEqual(finishValues(f.dice), f.baseline.dice);
   assert.deepEqual(f.wood.envMapRotation.toArray(), [0.1, 0.2, 0.3, "XYZ"]);
   assert(f.wood.version > version, "restored shaders are invalidated");
   assert.deepEqual(
@@ -305,13 +370,45 @@ test("late materials register explicitly, use the complete probe, and external d
   for (let i = 0; i < 6; i++) f.update(600 + i * 20);
   const late = new THREE.MeshPhysicalMaterial({ name: "DiceBody" }),
     root = new THREE.Group();
+  const lateBaseline = finishValues(late);
   root.add(new THREE.Mesh(new THREE.BoxGeometry(), late));
   assert.equal(f.control.register(root), 1);
   assert.equal(late.envMap, f.filtered[0].texture);
+  assert.equal(late.roughness, lateBaseline.roughness * 0.7);
   const count = f.control.metrics.materials;
   late.dispose();
   assert.equal(f.control.metrics.materials, count - 1);
   f.control.dispose();
+});
+
+test("late resin finish restores on Off and reference Current never changes original scalars", () => {
+  for (const finishProfile of ["medium", "current"]) {
+    const f = fixture({ finishProfile });
+    f.control.setEnabled(true);
+    f.update(0);
+    for (let i = 0; i < 6; i++) f.update(600 + i * 20);
+    const late = new THREE.MeshPhysicalMaterial({
+      name: "DiceBody",
+      roughness: 0.8,
+      clearcoat: 0.2,
+      clearcoatRoughness: 0.3,
+      envMapIntensity: 0.9,
+    });
+    const baseline = finishValues(late),
+      root = new THREE.Group();
+    root.add(new THREE.Mesh(new THREE.BoxGeometry(), late));
+    f.control.register(root);
+    if (finishProfile === "current") {
+      assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+      assert.deepEqual(finishValues(f.dice), f.baseline.dice);
+      assert.deepEqual(finishValues(late), baseline);
+    } else assert.equal(late.roughness, 0.8 * 0.7);
+    f.control.setEnabled(false);
+    assert.deepEqual(finishValues(late), baseline);
+    assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+    assert.deepEqual(finishValues(f.dice), f.baseline.dice);
+    f.control.dispose();
+  }
 });
 
 test("capture and filter failures restore renderer/material state before releasing all resources", () => {
@@ -326,7 +423,28 @@ test("capture and filter failures restore renderer/material state before releasi
     assert.match(f.control.metrics.error, /failed/);
     assert.equal(f.wood.envMap, f.originalEnv);
     assert.equal(f.dice.envMap, null);
+    assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+    assert.deepEqual(finishValues(f.dice), f.baseline.dice);
     assert.equal(f.generatorDisposals, 1);
     f.control.dispose();
   }
+});
+
+test("failure during a later recapture removes the completed probe and restores its richer finish exactly", () => {
+  const f = fixture({ failRender: (frames) => frames.length > 6 });
+  f.control.setEnabled(true);
+  f.update(0);
+  for (let i = 0; i < 6; i++) f.update(600 + i * 20);
+  assert.equal(f.control.metrics.commits, 1);
+  assert.equal(f.wood.roughness, 0.7);
+  f.update(1000, 2);
+  const failed = f.update(1600, 2);
+  assert.equal(failed.state, "error");
+  assert.equal(failed.estimatedBytes, 0);
+  assert.equal(failed.finishProfile, "current");
+  assert.deepEqual(finishValues(f.wood), f.baseline.wood);
+  assert.deepEqual(finishValues(f.dice), f.baseline.dice);
+  assert.equal(f.wood.envMap, f.originalEnv);
+  assert.equal(f.dice.envMap, null);
+  f.control.dispose();
 });

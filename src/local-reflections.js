@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { createReflectionFinish } from "./reflection-finish.js";
 
 const eligible = (m) =>
   (m?.isMeshStandardMaterial || m?.isMeshPhysicalMaterial) &&
@@ -22,6 +23,7 @@ export function createLocalReflections(
     artwork,
     size = 256,
     stableMs = 600,
+    finishProfile = "medium",
     createPMREM = (r) => new THREE.PMREMGenerator(r),
   } = {},
 ) {
@@ -37,6 +39,7 @@ export function createLocalReflections(
   );
   const originals = new Map();
   let enabled = false,
+    finish = null,
     disposed = false,
     cube = null,
     cubeCamera = null,
@@ -66,15 +69,18 @@ export function createLocalReflections(
     else m.envMapRotation.set(0, 0, 0);
   }
   function restoreMaterials() {
+    finish?.restore();
     for (const [m, original] of originals)
       assign(m, original.map, original.rotation);
   }
   function applyCurrent() {
     if (!current) return;
     for (const m of originals.keys()) assign(m, current.texture, null);
+    finish?.apply();
   }
   function register(root = scene) {
     if (!enabled || disposed) return 0;
+    finish?.register(root);
     let added = 0;
     root?.traverse((o) => {
       for (const m of o.material
@@ -100,6 +106,8 @@ export function createLocalReflections(
   }
   function release() {
     restoreMaterials();
+    finish?.dispose();
+    finish = null;
     for (const [m, original] of originals)
       m.removeEventListener("dispose", original.onDispose);
     originals.clear();
@@ -117,6 +125,7 @@ export function createLocalReflections(
     cancel();
   }
   function prepare() {
+    finish = createReflectionFinish({ profile: finishProfile });
     cube = new THREE.WebGLCubeRenderTarget(edge, {
       type: THREE.HalfFloatType,
       format: THREE.RGBAFormat,
@@ -254,6 +263,7 @@ export function createLocalReflections(
     const image = probePrint?.image;
     return {
       enabled,
+      finishProfile: current ? finishProfile : "current",
       supported,
       state,
       size: cube ? edge : 0,

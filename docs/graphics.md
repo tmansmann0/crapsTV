@@ -113,3 +113,27 @@ close-up still has no flare when no actual lamp is in the camera's view.
 
 Generate the comparison with `npm run study:effects` (requires the `cwebp`
 authoring CLI). This is an isolated renderer and never changes a live room.
+
+
+### Clearer wood and dice reflections
+
+The [reflection-strength viewer](../public/studies/reflections/index.html) compares
+0.14.1's previous On finish against a richer 0.14.2 finish, plus a high-polish
+preview. It includes the exact same chip/dice/walnut shot and a tighter dice shot,
+with current-On or Off baselines, shared zoom/pan and native lossless captures.
+Camera, lighting, exposure, probe origin/resolution, wear and colour maps stay
+fixed. Flares and contact-shadow upgrades are disabled in every strength capture.
+
+Local reflections now apply the richer finish only after a completed probe is
+available. Wood retains its grain/pores with a clearer varnish; dice retain the
+same handling scratches with a clearer resin coating. Their roughness multiplier,
+coating spread and reflection gain change; the actual normal, colour and
+roughness images remain intact. High polish is a comparison-only alternative.
+
+The finish controller snapshots shared-material values once, handles late dice
+materials and restores them exactly on Off, canceled startup, disposal or errors.
+Probe capture temporarily uses the baseline finish to prevent accumulating
+changes or feeding a completed local reflection back into itself. It adds no
+textures, geometry, draw passes or per-frame scene traversals. These remain
+approximate cached raster reflections, with the existing 256px fixed probe;
+this change does not claim per-object parallax or ray-traced mirror images.

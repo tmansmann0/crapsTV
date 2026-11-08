@@ -154,7 +154,7 @@ for (const [i, [x, z, color]] of [
   die.position.y = 0.615 - new THREE.Box3().setFromObject(die).min.y;
   props.add(die);
 }
-const local = createLocalReflections(renderer, { scene, board, artwork });
+let local = createLocalReflections(renderer, { scene, board, artwork });
 const contact = createContactShadows(key, {
   maxTextureSize: renderer.capabilities.maxTextureSize,
 });
@@ -184,6 +184,57 @@ function draw() {
 }
 window.effectsStudy = {
   ready: true,
+  async captureStrength(shot, profile) {
+    local.dispose();
+    local = createLocalReflections(renderer, {
+      scene,
+      board,
+      artwork,
+      finishProfile: profile === "off" ? "current" : profile,
+    });
+    contact.setEnabled(false);
+    flare.setEnabled(false);
+    pose("macro");
+    if (shot === "dice") {
+      camera.position.set(0.04, 1.02, 4.85);
+      camera.lookAt(0.59, 0.79, 3.99);
+      camera.fov = 31;
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld(true);
+    }
+    local.setEnabled(profile !== "off");
+    renderer.shadowMap.needsUpdate = true;
+    draw();
+    if (profile !== "off") {
+      local.update(camera, {
+        safe: true,
+        revision: `${shot}:${profile}`,
+        time: 0,
+      });
+      for (let i = 0; i < 6; i++) {
+        local.update(camera, {
+          safe: true,
+          revision: `${shot}:${profile}`,
+          time: 700 + i * 20,
+        });
+        await new Promise(requestAnimationFrame);
+      }
+    }
+    draw();
+    draw();
+    const result = {
+      shot,
+      profile,
+      image: renderer.domElement.toDataURL("image/png"),
+      camera: camera.position.toArray(),
+      fov: camera.fov,
+      reflections: local.metrics,
+      width,
+      height,
+    };
+    local.setEnabled(false);
+    return result;
+  },
   async capture(shot, mode) {
     pose(shot);
     const localOn = ["on", "reflections"].includes(mode);

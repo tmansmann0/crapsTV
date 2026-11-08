@@ -1,0 +1,351 @@
+{
+  "comparisons": [
+    {
+      "shot": "macro",
+      "profile": "medium",
+      "difference": {
+        "meanAbsoluteDifference": 2.204866958429784,
+        "maxChannelDifference": 118,
+        "changedPixels": 2713316
+      }
+    },
+    {
+      "shot": "macro",
+      "profile": "polished",
+      "difference": {
+        "meanAbsoluteDifference": 4.540286488474151,
+        "maxChannelDifference": 219,
+        "changedPixels": 2733496
+      }
+    },
+    {
+      "shot": "dice",
+      "profile": "medium",
+      "difference": {
+        "meanAbsoluteDifference": 1.9878533106674383,
+        "maxChannelDifference": 134,
+        "changedPixels": 2913568
+      }
+    },
+    {
+      "shot": "dice",
+      "profile": "polished",
+      "difference": {
+        "meanAbsoluteDifference": 3.040216953607253,
+        "maxChannelDifference": 193,
+        "changedPixels": 2999891
+      }
+    }
+  ],
+  "captures": [
+    {
+      "shot": "macro",
+      "profile": "off",
+      "camera": [
+        -0.7,
+        1.45,
+        5.25
+      ],
+      "fov": 39,
+      "reflections": {
+        "enabled": false,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "off",
+        "size": 0,
+        "faces": 0,
+        "commits": 0,
+        "cancellations": 0,
+        "captureDraws": 0,
+        "materials": 0,
+        "revision": null,
+        "error": null,
+        "estimatedBytes": 0
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "macro",
+      "profile": "current",
+      "camera": [
+        -0.7,
+        1.45,
+        5.25
+      ],
+      "fov": 39,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "macro:current",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "macro",
+      "profile": "medium",
+      "camera": [
+        -0.7,
+        1.45,
+        5.25
+      ],
+      "fov": 39,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "medium",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "macro:medium",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "macro",
+      "profile": "polished",
+      "camera": [
+        -0.7,
+        1.45,
+        5.25
+      ],
+      "fov": 39,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "polished",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "macro:polished",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "macro",
+      "profile": "off",
+      "camera": [
+        -0.7,
+        1.45,
+        5.25
+      ],
+      "fov": 39,
+      "reflections": {
+        "enabled": false,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "off",
+        "size": 0,
+        "faces": 0,
+        "commits": 0,
+        "cancellations": 0,
+        "captureDraws": 0,
+        "materials": 0,
+        "revision": null,
+        "error": null,
+        "estimatedBytes": 0
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "dice",
+      "profile": "off",
+      "camera": [
+        0.04,
+        1.02,
+        4.85
+      ],
+      "fov": 31,
+      "reflections": {
+        "enabled": false,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "off",
+        "size": 0,
+        "faces": 0,
+        "commits": 0,
+        "cancellations": 0,
+        "captureDraws": 0,
+        "materials": 0,
+        "revision": null,
+        "error": null,
+        "estimatedBytes": 0
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "dice",
+      "profile": "current",
+      "camera": [
+        0.04,
+        1.02,
+        4.85
+      ],
+      "fov": 31,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "dice:current",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "dice",
+      "profile": "medium",
+      "camera": [
+        0.04,
+        1.02,
+        4.85
+      ],
+      "fov": 31,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "medium",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "dice:medium",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "dice",
+      "profile": "polished",
+      "camera": [
+        0.04,
+        1.02,
+        4.85
+      ],
+      "fov": 31,
+      "reflections": {
+        "enabled": true,
+        "finishProfile": "polished",
+        "supported": true,
+        "state": "ready",
+        "size": 256,
+        "faces": 0,
+        "commits": 1,
+        "cancellations": 0,
+        "captureDraws": 6,
+        "materials": 5,
+        "revision": "dice:polished",
+        "error": null,
+        "estimatedBytes": 28486314.666666664
+      },
+      "width": 3840,
+      "height": 2160
+    },
+    {
+      "shot": "dice",
+      "profile": "off",
+      "camera": [
+        0.04,
+        1.02,
+        4.85
+      ],
+      "fov": 31,
+      "reflections": {
+        "enabled": false,
+        "finishProfile": "current",
+        "supported": true,
+        "state": "off",
+        "size": 0,
+        "faces": 0,
+        "commits": 0,
+        "cancellations": 0,
+        "captureDraws": 0,
+        "materials": 0,
+        "revision": null,
+        "error": null,
+        "estimatedBytes": 0
+      },
+      "width": 3840,
+      "height": 2160
+    }
+  ],
+  "errors": [],
+  "delivery": "Native3840×2160 lossless GPU captures; identical camera, lights, exposure and wear maps. Contact shadows and lens flares disabled.",
+  "finishes": {
+    "current": {
+      "label": "Current",
+      "wood": null,
+      "dice": null
+    },
+    "medium": {
+      "label": "Richer reflections",
+      "wood": {
+        "roughness": 0.7,
+        "coat": 0.6,
+        "coatRoughness": 0.18,
+        "environment": 1.25
+      },
+      "dice": {
+        "roughness": 0.7,
+        "coat": 0.65,
+        "coatRoughness": 0.11,
+        "environment": 1.15
+      }
+    },
+    "polished": {
+      "label": "Polished reflections",
+      "wood": {
+        "roughness": 0.5,
+        "coat": 0.78,
+        "coatRoughness": 0.11,
+        "environment": 1.45
+      },
+      "dice": {
+        "roughness": 0.48,
+        "coat": 0.85,
+        "coatRoughness": 0.065,
+        "environment": 1.3
+      }
+    }
+  }
+}
