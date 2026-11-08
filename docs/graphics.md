@@ -61,6 +61,12 @@ or reset graphics to Auto to opt an older browser into the new behaviour.
   dice, aiming and payouts are idle. The previous complete reflection remains
   during play. This is raster rendering, not ray tracing, and one probe has
   approximate parallax across the table. Unsupported devices leave it inactive.
+  With reflections active, walnut uses a satin finish with softer highlights,
+  stronger grain relief and grain-aligned varnish variation from its existing
+  scan maps. Turning reflections Off restores the original wood exactly.
+  See the [matched wood close-up](screenshots/wood-satin-before-after.png)
+  (previous finish on the left, satin finish on the right) and
+  [native 4K comparison data](benchmarks/wood-satin.json).
 - **Contact shadows:** a 4096px key-light shadow where supported, with a tighter
   contact bias, for clearer chip/dice grounding. The map changes only when play
   is idle; turning Off restores the original 2048px shadow and bias.

@@ -1,13 +1,16 @@
-/** Optical finish controls only; albedo, wear maps and shader hooks stay intact. */
+/** Reversible optical finishes; the wood's existing scan also shapes its varnish. */
 export const REFLECTION_FINISHES = Object.freeze({
   current: Object.freeze({ label: "Current", wood: null, dice: null }),
   medium: Object.freeze({
     label: "Richer reflections",
     wood: Object.freeze({
-      roughness: 0.7,
-      coat: 0.6,
-      coatRoughness: 0.18,
-      environment: 1.25,
+      roughness: 0.9,
+      coat: 0.44,
+      coatRoughness: 0.42,
+      environment: 1.08,
+      grainNormal: 1.75,
+      grainOcclusion: 1.3,
+      coatGrain: 0.45,
     }),
     dice: Object.freeze({
       roughness: 0.7,
@@ -38,6 +41,7 @@ const keys = [
   "clearcoat",
   "clearcoatRoughness",
   "envMapIntensity",
+  "aoMapIntensity",
 ];
 const kind = (m) => {
   if (!m?.isMeshPhysicalMaterial) return null;
@@ -66,18 +70,43 @@ export function createReflectionFinish(rootOrOptions, options = {}) {
   let profile = "current",
     disposed = false;
   function set(record) {
-    const { material, baseline, type } = record;
+    const { material, baseline, grainBaseline, type } = record;
+    const oldCoatNormal = material.clearcoatNormalMap;
+    const oldCoatRoughness = material.clearcoatRoughnessMap;
+    material.normalScale.copy(grainBaseline.normalScale);
+    material.clearcoatNormalScale.copy(grainBaseline.coatNormalScale);
+    material.clearcoatNormalMap = grainBaseline.coatNormalMap;
+    material.clearcoatRoughnessMap = grainBaseline.coatRoughnessMap;
     const spec = REFLECTION_FINISHES[profile][type];
     if (!spec) Object.assign(material, baseline);
     else {
       material.roughness = Math.max(0.055, baseline.roughness * spec.roughness);
       material.clearcoat = Math.max(baseline.clearcoat, spec.coat);
-      material.clearcoatRoughness = Math.min(
-        baseline.clearcoatRoughness,
-        spec.coatRoughness,
-      );
+      // A mapped varnish needs its own scalar; existing resin/polished profiles
+      // retain their authored upper bound on roughness.
+      material.clearcoatRoughness = spec.coatGrain
+        ? spec.coatRoughness
+        : Math.min(baseline.clearcoatRoughness, spec.coatRoughness);
       material.envMapIntensity = baseline.envMapIntensity * spec.environment;
+      material.normalScale.multiplyScalar(spec.grainNormal ?? 1);
+      material.aoMapIntensity = spec.grainOcclusion
+        ? Math.min(1, baseline.aoMapIntensity * spec.grainOcclusion)
+        : baseline.aoMapIntensity;
+      if (spec.coatGrain && material.normalMap) {
+        material.clearcoatNormalMap = material.normalMap;
+        material.clearcoatNormalScale
+          .copy(grainBaseline.normalScale)
+          .multiplyScalar(spec.coatGrain);
+        material.clearcoatRoughnessMap = material.roughnessMap;
+      }
     }
+    // Reuse the already-loaded scan. Only map-presence changes require a new
+    // shader variant; repeated application does not recompile or compound grain.
+    if (
+      !!oldCoatNormal !== !!material.clearcoatNormalMap ||
+      !!oldCoatRoughness !== !!material.clearcoatRoughnessMap
+    )
+      material.needsUpdate = true;
     // Three's physical clearcoat setter invalidates the program exactly when
     // coat presence changes; ordinary strength edits keep shared programs.
   }
@@ -99,6 +128,12 @@ export function createReflectionFinish(rootOrOptions, options = {}) {
           material,
           type,
           baseline: Object.fromEntries(keys.map((key) => [key, material[key]])),
+          grainBaseline: {
+            normalScale: material.normalScale.clone(),
+            coatNormalScale: material.clearcoatNormalScale.clone(),
+            coatNormalMap: material.clearcoatNormalMap,
+            coatRoughnessMap: material.clearcoatRoughnessMap,
+          },
         };
         record.onDispose = () => records.delete(material);
         material.addEventListener("dispose", record.onDispose);

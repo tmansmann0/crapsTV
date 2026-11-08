@@ -62,10 +62,10 @@ test("Current is exact; richer finish affects only wood/resin without changing s
   assert.equal(controller.materialCount, 2);
   controller.apply("medium");
   assert.deepEqual(properties(f.wood), {
-    roughness: 0.7,
-    coat: 0.6,
-    coatRough: 0.18,
-    environment: 0.85 * 1.25,
+    roughness: 0.9,
+    coat: 0.44,
+    coatRough: 0.42,
+    environment: 0.85 * 1.08,
   });
   assert.deepEqual(properties(f.dice), {
     roughness: 0.7,
@@ -105,6 +105,50 @@ test("repeated and switched profiles always derive from the captured baseline", 
   assert.throws(() => controller.apply("medium"), /disposed/);
 });
 
+test("enhanced wood has satin reflections and scan-aligned grain, with exact Off restoration", () => {
+  const f = fixture();
+  f.wood.normalScale.set(0.34, 0.28);
+  f.wood.clearcoatNormalScale.set(0.12, 0.09);
+  f.wood.aoMapIntensity = 0.24;
+  const normal = f.wood.normalScale.clone(),
+    coatNormal = f.wood.clearcoatNormalScale.clone();
+  const shader = f.wood.onBeforeCompile,
+    albedo = f.wood.map;
+  const controller = createReflectionFinish(f.root);
+  controller.apply();
+  assert(
+    f.wood.roughness > 0.7 &&
+      f.wood.clearcoat < 0.6 &&
+      f.wood.clearcoatRoughness > 0.18,
+  );
+  assert(f.wood.normalScale.equals(normal.clone().multiplyScalar(1.75)));
+  assert.equal(f.wood.clearcoatNormalMap, f.normal);
+  assert.equal(f.wood.clearcoatRoughnessMap, f.rough);
+  assert(
+    f.wood.clearcoatNormalScale.equals(normal.clone().multiplyScalar(0.45)),
+  );
+  assert.equal(f.wood.aoMapIntensity, 0.24 * 1.3);
+  assert.equal(f.wood.onBeforeCompile, shader);
+  assert.equal(f.wood.map, albedo);
+  const version = f.wood.version;
+  controller.apply();
+  assert.equal(
+    f.wood.version,
+    version,
+    "stable finish does not recompile each frame",
+  );
+  controller.restore();
+  assert(f.wood.normalScale.equals(normal));
+  assert(f.wood.clearcoatNormalScale.equals(coatNormal));
+  assert.equal(f.wood.clearcoatNormalMap, null);
+  assert.equal(f.wood.clearcoatRoughnessMap, null);
+  assert.equal(f.wood.aoMapIntensity, 0.24);
+  controller.apply();
+  assert(f.wood.normalScale.equals(normal.clone().multiplyScalar(1.75)));
+  controller.dispose();
+  assert(f.wood.normalScale.equals(normal));
+});
+
 test("late dice get the active finish and restore independently; disposed materials unregister", () => {
   const f = fixture(),
     controller = createReflectionFinish(f.root);
@@ -140,7 +184,7 @@ test("preview convenience changes are reversible and never compound across captu
   a.dispose();
   const c = applyReflectionStrength(f.root, "medium");
   assert.notEqual(c, a);
-  assert.equal(f.wood.roughness, 0.7);
+  assert.equal(f.wood.roughness, 0.9);
   c.dispose();
 });
 

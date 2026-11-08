@@ -283,10 +283,10 @@ test("six staged safe views atomically publish a cached probe without touching n
   assert.deepEqual(f.wood.envMapRotation.toArray(), [0, 0, 0, "XYZ"]);
   assert.equal(f.fallback.colorSpace, THREE.NoColorSpace);
   assert.deepEqual(finishValues(f.wood), {
-    roughness: 0.7,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.18,
-    envMapIntensity: 0.85 * 1.25,
+    roughness: 0.9,
+    clearcoat: 0.44,
+    clearcoatRoughness: 0.42,
+    envMapIntensity: 0.85 * 1.08,
   });
   assert.deepEqual(finishValues(f.dice), {
     roughness: 0.7,
@@ -322,7 +322,7 @@ test("unsafe movement and changed revisions discard partial cubes, retaining onl
   assert.equal(f.wood.envMap, previous);
   assert.equal(
     f.wood.roughness,
-    0.7,
+    0.9,
     "previous complete probe keeps its finish after partial recapture cancellation",
   );
   f.control.dispose();
@@ -444,7 +444,7 @@ test("failure during a later recapture removes the completed probe and restores 
   f.update(0);
   for (let i = 0; i < 6; i++) f.update(600 + i * 20);
   assert.equal(f.control.metrics.commits, 1);
-  assert.equal(f.wood.roughness, 0.7);
+  assert.equal(f.wood.roughness, 0.9);
   f.update(1000, 2);
   const failed = f.update(1600, 2);
   assert.equal(failed.state, "error");
