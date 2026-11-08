@@ -49,7 +49,7 @@ export function createStartupClock(holds, motionWindows = []) {
   return {
     advance({ elapsed, now, completedProbe }) {
       // First-use shader work can stall even before a quality switch. Never
-      // jump over an entire throw: show its launch, then advance visible motion
+      // jump over a throw or the UI fade: show its start, then advance motion
       // by at most 250ms per frame. This affects only the isolated demo clock.
       const motion = motionWindows.find(
         ({ startAt, endAt }) => lastElapsed < endAt && elapsed >= startAt,

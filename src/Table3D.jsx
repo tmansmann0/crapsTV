@@ -38,6 +38,7 @@ import {
   createStartupShowcase,
   sampleStartup,
   STARTUP_DURATION_MS,
+  STARTUP_UI_AT,
 } from "./startup-sequence.js";
 import { createStartupClock } from "./startup-clock.js";
 import {
@@ -836,12 +837,15 @@ export default function Table3D(props) {
             if (!introLiveProbe) {
               introCheckpointClock ||= createStartupClock(
                 calibrating ? introShowcase.calibrationHolds : [],
-                introShowcase.stages
-                  .filter(({ state }) => state.rolling)
-                  .map(({ at, state }) => ({
-                    startAt: at,
-                    endAt: at + state.throw.duration,
-                  })),
+                [
+                  ...introShowcase.stages
+                    .filter(({ state }) => state.rolling)
+                    .map(({ at, state }) => ({
+                      startAt: at,
+                      endAt: at + state.throw.duration,
+                    })),
+                  { startAt: STARTUP_UI_AT, endAt: STARTUP_DURATION_MS },
+                ],
               );
               const adjusted = introCheckpointClock.advance({
                 elapsed,
