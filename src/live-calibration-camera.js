@@ -1,4 +1,8 @@
-import { calibrationCanHold } from "./startup-calibration.js";
+import {
+  calibrationCanHold,
+  CALIBRATION_CAMERA_LEAD_MS,
+  CALIBRATION_HOLD_MS,
+} from "./startup-calibration.js";
 
 /** Local camera ownership only; room timestamps and physics are never changed. */
 export function retainLiveCalibrationCamera(hold, { now, roomNow, state }) {
@@ -24,7 +28,20 @@ export function retainLiveCalibrationCamera(hold, { now, roomNow, state }) {
 }
 
 /** Call only after the actual world draw, never from a skipped/throttled RAF. */
-export function markLiveCalibrationPresented(hold, now) {
+export function markLiveCalibrationPresented(hold, now, presentedAt = now) {
+  if (hold && hold.presentedAt == null && hold.switchedAt == null) {
+    // Creating a hold on a throttled RAF does not put its camera on screen.
+    // Start the lead after the actual world draw (including cold draw work).
+    hold.presentedAt = presentedAt;
+    hold.switchAt = Math.max(
+      hold.switchAt,
+      presentedAt + CALIBRATION_CAMERA_LEAD_MS,
+    );
+    hold.endAt = Math.max(
+      hold.endAt,
+      hold.switchAt + CALIBRATION_HOLD_MS - CALIBRATION_CAMERA_LEAD_MS,
+    );
+  }
   if (hold?.switchedAt != null && now - hold.switchedAt >= 150)
     hold.recoveryPresented = true;
 }

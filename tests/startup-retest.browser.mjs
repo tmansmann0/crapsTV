@@ -6,25 +6,42 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 import { WebSocket } from "ws";
 import { clickTV } from "./helpers/tv-actions.mjs";
+import { sampleThrow } from "../src/throw-motion.js";
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 const listener = createServer();
 await new Promise((r) => listener.listen(0, "127.0.0.1", r));
 const port = listener.address().port;
 await new Promise((r) => listener.close(r));
-const server = spawn(process.execPath, ["server/index.js"], {
-  env: {
-    ...process.env,
-    PORT: String(port),
-    CRAPSTV_MDNS: "0",
-    CRAPSTV_JOIN_MODE: "ip",
+const server = spawn(
+  process.execPath,
+  ["tests/helpers/live-retest-server.mjs"],
+  {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      CRAPSTV_MDNS: "0",
+      CRAPSTV_JOIN_MODE: "ip",
+    },
+    stdio: ["ignore", "pipe", "pipe"],
   },
-  stdio: "ignore",
+);
+let serverLog = "";
+server.stdout.on("data", (chunk) => {
+  serverLog += chunk;
 });
-let browser, ws, state, page;
+server.stderr.on("data", (chunk) => {
+  serverLog += chunk;
+});
+server.on("exit", (code, signal) => {
+  serverLog += `\nAuthority process exited: code=${code} signal=${signal}\n`;
+});
+let browser, ws, state, page, authorityFlight;
+const authorityTimings = new Map();
 const errors = [];
 const send = (message) => ws.send(JSON.stringify(message));
 async function waitState(predicate) {
-  for (let i = 0; i < 300; i++) {
+  const deadline = performance.now() + 15000;
+  while (performance.now() < deadline) {
     if (state && predicate(state)) return structuredClone(state);
     await pause(25);
   }
@@ -43,10 +60,21 @@ try {
     }
   }
   assert(config);
+  assert.deepEqual(config.testAuthority, {
+    implementation: "RoomHub",
+    throwDurationMs: 8000,
+  });
   ws = new WebSocket(`ws://127.0.0.1:${port}/socket`);
   ws.on("message", (raw) => {
     const m = JSON.parse(raw);
-    if (m.type === "state") state = m.state;
+    if (m.type === "state") {
+      state = m.state;
+      const id = state.throw?.id;
+      if (id && state.rolling && !authorityTimings.has(id))
+        authorityTimings.set(id, { rollingAt: performance.now() });
+      if (id && !state.rolling && authorityTimings.has(id))
+        authorityTimings.get(id).settledAt ??= performance.now();
+    }
     if (m.type === "error") errors.push(m.message);
   });
   await new Promise((resolve, reject) => {
@@ -73,16 +101,36 @@ try {
       : { width: 1280, height: 800 },
   });
   page.on("pageerror", (e) => errors.push(e.stack || e.message));
+  page.on("crash", () => errors.push("Browser renderer crashed"));
+  page.on("console", (message) => {
+    if (
+      message.type() === "error" ||
+      /GL_INVALID|INVALID_OPERATION/.test(message.text())
+    )
+      errors.push(message.text());
+  });
   await page.addInitScript(() => {
     window.retestFrames = [];
+    let previousWorldFrame;
     const requestFrame = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (callback) =>
       requestFrame((at) => {
         callback(at);
         const d = document.querySelector(".table-canvas")?.dataset;
         if (!d?.startupQualityChanges) return;
-        window.retestFrames.push({
+        const worldFrame = Number(d.worldFrame);
+        if (
+          !Number.isInteger(worldFrame) ||
+          worldFrame < 1 ||
+          worldFrame === previousWorldFrame
+        )
+          return;
+        previousWorldFrame = worldFrame;
+        const frame = {
           at,
+          worldFrame,
+          elapsed: Number(d.startupElapsed),
+          throwId: d.throwId,
           probe: Number(d.startupProbe),
           intro: d.graphicsIntro,
           rolling: d.startupRolling,
@@ -99,7 +147,10 @@ try {
             d.sceneResolution,
           ]),
           changes: JSON.parse(d.startupQualityChanges),
-        });
+        };
+        // The renderer increments worldFrame only after the complete actual
+        // draw. Keep genuine identical static frames, omit stale throttled RAFs.
+        window.retestFrames.push(frame);
       });
   });
   await page.goto(`http://127.0.0.1:${port}`);
@@ -108,6 +159,7 @@ try {
     timeout: 60000,
   });
   await expect(table).toHaveAttribute("data-graphics-intro", "false");
+  await expect(table).toHaveAttribute("data-world-frame", /^\d+$/);
   await clickTV(page, "settings");
   await clickTV(page, "graphics");
   send({ type: "aim", aim: { active: true, x: 0.2, power: 0.6 } });
@@ -121,7 +173,17 @@ try {
     "aiming defers automatic quality changes",
   );
   send({ type: "roll", gesture: { x: 0.2, power: 0.6 } });
-  await waitState((s) => s.rolling);
+  authorityFlight = (await waitState((s) => s.rolling)).throw;
+  assert.equal(authorityFlight.duration, 8000);
+  assert.equal(authorityFlight.frames.at(-1)[0], 8000);
+  assert.equal(authorityFlight.settledAt - authorityFlight.startAt, 7040);
+  assert(
+    authorityFlight.physicsSteps >= 120 && authorityFlight.frames.length >= 61,
+  );
+  assert.equal(
+    authorityFlight.simulationDuration,
+    authorityFlight.physicsSteps / 120,
+  );
   await expect(table).toHaveAttribute("data-startup-rolling", "true");
   await pause(450);
   assert.deepEqual(
@@ -130,6 +192,11 @@ try {
     "airborne dice defer automatic quality changes",
   );
   const settled = await waitState((s) => !s.rolling && !!s.lastRoll);
+  const authorityTiming = authorityTimings.get(authorityFlight.id);
+  assert(
+    authorityTiming.settledAt - authorityTiming.rollingAt >= 7750,
+    "the real RoomHub holds its actual eight-second flight; browser timestamps are not slowed or forged",
+  );
   await expect
     .poll(
       async () =>
@@ -148,7 +215,12 @@ try {
   );
   const frames = await page.evaluate(() => window.retestFrames);
   const airborne = frames.filter(
-    (f) => f.intro === "true" && f.rolling === "true" && f.dice.length === 2,
+    (f) =>
+      f.intro === "true" &&
+      f.rolling === "true" &&
+      f.done === "false" &&
+      f.throwId === authorityFlight.id &&
+      f.dice.length === 2,
   );
   assert(
     airborne.length >= 2,
@@ -163,6 +235,42 @@ try {
     "the real dice move between the flight observations",
   );
   assert(airborne.every((f) => f.probe === -1 && f.changes.length === 0));
+  // Match each observed interpolation to a segment of the authority's actual
+  // Cannon trajectory, independently of when the browser managed to render it.
+  for (const observation of airborne) {
+    const position = observation.dice.flatMap((die) => die.position);
+    const matched = authorityFlight.frames.slice(0, -1).some((first, index) => {
+      const second = authorityFlight.frames[index + 1];
+      const a = [...first.slice(1, 4), ...first.slice(8, 11)];
+      const b = [...second.slice(1, 4), ...second.slice(8, 11)];
+      const delta = b.map((n, i) => n - a[i]);
+      const length = delta.reduce((sum, n) => sum + n * n, 0);
+      const t =
+        length > 1e-16
+          ? position.reduce((sum, n, i) => sum + (n - a[i]) * delta[i], 0) /
+            length
+          : 0;
+      if (
+        t < -1e-6 ||
+        t > 1 + 1e-6 ||
+        position.some((n, i) => Math.abs(n - a[i] - delta[i] * t) > 1e-6)
+      )
+        return false;
+      const expected = sampleThrow(
+        authorityFlight,
+        authorityFlight.startAt + first[0] + (second[0] - first[0]) * t,
+      );
+      return expected.dice.every((die, i) =>
+        die.quaternion.every(
+          (n, j) => Math.abs(n - observation.dice[i].quaternion[j]) < 1e-5,
+        ),
+      );
+    });
+    assert(
+      matched,
+      "rendered in-flight poses belong to the actual recorded Cannon motion",
+    );
+  }
   const changed = frames.find((f) => f.changes.length === 1);
   assert.equal(changed.probe, 0, "live candidates advance sequentially");
   assert.equal(changed.rolling, "false");
@@ -196,10 +304,16 @@ try {
         airborneFrames: airborne.length,
         airborneSpanMs,
         airbornePoses,
+        authorityDurationMs: authorityFlight.duration,
+        authorityObservedMs:
+          authorityTiming.settledAt - authorityTiming.rollingAt,
+        physicalObservationsMatched: airborne.length,
         changed,
         before,
         after,
         errors,
+        authorityFlight,
+        authorityTimings: [...authorityTimings],
       },
       null,
       2,
@@ -215,6 +329,19 @@ try {
     JSON.stringify(
       {
         message: error.stack || error.message,
+        authorityFlight,
+        authorityTimings: [...authorityTimings],
+        serverLog,
+        browserState: await page
+          ?.evaluate(() => ({
+            hidden: document.hidden,
+            dataset: { ...document.querySelector(".table-canvas")?.dataset },
+            contextLost: document
+              .querySelector(".table-canvas canvas")
+              ?.getContext("webgl2")
+              ?.isContextLost(),
+          }))
+          .catch(() => null),
         frames: await page?.evaluate(() => window.retestFrames).catch(() => []),
         errors,
       },

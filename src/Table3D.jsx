@@ -689,6 +689,7 @@ export default function Table3D(props) {
       lastPiecesConnection = null,
       lastPiecesReady = false,
       renderedOnce = false,
+      presentedWorldFrames = 0,
       metricStart = 0,
       metricFrames = 0,
       uiRevision = -1,
@@ -890,7 +891,11 @@ export default function Table3D(props) {
               }).calibrationHold;
             const holdNow = introLiveProbe ? time : elapsed;
             const probe =
-              hold && holdNow >= hold.switchAt ? hold.probe : introCandidate;
+              hold &&
+              (!introLiveProbe || hold.presentedAt != null) &&
+              holdNow >= hold.switchAt
+                ? hold.probe
+                : introCandidate;
             if (probe !== introCandidate) {
               if (introLiveProbe && hold) {
                 hold.switchedAt = time;
@@ -1537,7 +1542,11 @@ export default function Table3D(props) {
         el.dataset.lensFlareSources = String(lensFlares.activeSources);
         el.dataset.lensFlareResources = String(lensFlares.allocatedSources);
         if (stageReady && introLiveProbe)
-          markLiveCalibrationPresented(liveCalibrationHold, time);
+          markLiveCalibrationPresented(
+            liveCalibrationHold,
+            time,
+            performance.now(),
+          );
         renderer.clearDepth();
         if (stageReady) {
           // Seat, wager, and transfer labels stay native-resolution even when
@@ -1603,6 +1612,7 @@ export default function Table3D(props) {
           introPreviousFrame = time;
         }
         if (stageReady) {
+          el.dataset.worldFrame = String(++presentedWorldFrames);
           renderedOnce = true;
           if (!metricStart) metricStart = time;
           else metricFrames++;

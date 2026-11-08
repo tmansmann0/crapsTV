@@ -97,3 +97,19 @@ three asset-gate screenshots were entirely black. The separate live Retest proof
 observed 150 airborne frames without a quality change, then applied its first
 probe to resting dice with the camera already still. These are workload/device
 measurements, not a fixed loading-time promise.
+
+
+### Live Retest render-boundary regression
+
+The live camera lead begins after its first completed world draw. A hold created
+on a throttled RAF cannot start a quality switch until that view has had a full
+300ms lead; slow draw completion receives the same protection. The actual world
+frame counter records identical stationary draws and excludes skipped RAF reads.
+
+The isolated live-Retest fixture uses the production RoomHub and recorded Cannon
+trajectory with an eight-second test-only throw, giving software GPUs enough
+real airborne time to demonstrate multiple physical poses. Production throws
+remain 2500ms. Tests retain the minimum two distinct poses and 450ms observed
+flight span, match every observed pose to the recorded trajectory, and check the
+real authority timer, camera lead/recovery and unchanged ledger. Final native
+and SwiftShader runs both pass this stronger proof.

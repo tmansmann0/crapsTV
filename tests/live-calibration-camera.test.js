@@ -82,3 +82,24 @@ test("normal recovery preserves its bounded camera timeout and yields to active 
     false,
   );
 });
+
+test("live camera lead begins at the first actual draw, excluding skipped RAFs and cold work", () => {
+  const shot = hold();
+  delete shot.switchedAt;
+  delete shot.recoveryUntil;
+  assert.equal(shot.presentedAt, undefined);
+  markLiveCalibrationPresented(shot, 16.7);
+  assert.equal(shot.presentedAt, 16.7);
+  assert.equal(shot.switchAt, 316.7);
+  markLiveCalibrationPresented(shot, 33.4);
+  assert.equal(shot.switchAt, 316.7, "later draws do not restart the lead");
+  const cold = hold();
+  delete cold.switchedAt;
+  markLiveCalibrationPresented(cold, 0, 1800);
+  assert.equal(
+    cold.switchAt,
+    2100,
+    "slow draw completion also receives a full300ms lead",
+  );
+  assert(cold.endAt >= 2800);
+});
