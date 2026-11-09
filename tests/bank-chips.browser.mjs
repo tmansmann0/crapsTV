@@ -153,7 +153,10 @@ try {
   );
   assert.deepEqual(errors, []);
   await mkdir("artifacts/bank-chips", { recursive: true });
-  await page.screenshot({ path: "artifacts/bank-chips/settled-1080p.png" });
+  // This image is a diagnostic, not a pixel assertion. GPU readback on the
+  // software runner can stall the otherwise complete identity/landing proof.
+  if (!process.env.CI || process.env.BANK_CAPTURE === "1")
+    await page.screenshot({ path: "artifacts/bank-chips/settled-1080p.png" });
   // Many small awards fill the tray and exercise real colour-ups/restacks.
   // Each update still passes through the ordinary production flow planner.
   for (let index = 0; index < 100; index++) {
