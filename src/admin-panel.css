@@ -1,0 +1,744 @@
+.ha-panel {
+  --ha-green: #123c32;
+  --ha-gold: #c4a568;
+  --ha-muted: #736b5d;
+  color: #231f18;
+  font-family: "DM Sans", sans-serif;
+  min-width: 0;
+  text-align: left;
+}
+.ha-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ha-header > div > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ha-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.ha-panel .ha-header h2 {
+  font-family: Manrope, sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  margin: 4px 0 0;
+  line-height: 1.2;
+}
+.ha-seat-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid #d1c8b7;
+  border-radius: 12px;
+  background: #e8e4d7;
+  color: var(--ha-green);
+  font-weight: 800;
+  font-size: 18px;
+}
+.ha-seat-count small {
+  font-size: 12px;
+  color: var(--ha-muted);
+  font-weight: 500;
+}
+.ha-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  background: #e2ddcf;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.ha-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  min-height: 44px;
+  padding: 8px 4px;
+  border-radius: 9px;
+  background: transparent;
+  color: #665e50;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ha-tabs button[aria-selected="true"] {
+  background: var(--ha-green);
+  color: #fff9e9;
+  box-shadow: 0 2px 4px #122b241a;
+}
+.ha-panel button:focus-visible,
+.ha-panel input:focus-visible,
+.ha-panel select:focus-visible,
+.ha-panel summary:focus-visible {
+  outline: 3px solid var(--ha-gold);
+  outline-offset: 3px;
+}
+.ha-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 15px;
+}
+.ha-panel label input:not([type="checkbox"]),
+.ha-panel label select {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid #c9c0ae;
+  border-radius: 8px;
+  padding: 11px;
+  background: #fbf7ee;
+  color: #231f18;
+  font:
+    400 16px "DM Sans",
+    sans-serif;
+}
+.ha-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 12px;
+  min-width: 0;
+}
+.ha-panel legend {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 9px;
+  padding: 0;
+}
+.ha-panel .button {
+  min-height: 44px;
+}
+.ha-panel .button.dark {
+  background: var(--ha-green);
+  color: #fff7e6;
+  border-color: var(--ha-green);
+}
+.ha-panel button:disabled,
+.ha-panel input:disabled,
+.ha-panel select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ha-tab-content {
+  min-width: 0;
+}
+.ha-panel h3 {
+  font:
+    700 16px Manrope,
+    sans-serif;
+  margin: 0;
+}
+.ha-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 14px;
+}
+.ha-section-heading p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ha-muted);
+  margin: 4px 0 0;
+}
+.ha-section-heading > b {
+  font-size: 26px;
+  color: var(--ha-green);
+  white-space: nowrap;
+}
+.ha-section-heading > b > span {
+  font-size: 14px;
+  color: var(--ha-muted);
+  font-weight: 400;
+}
+.ha-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ha-mode-grid button {
+  padding: 12px 10px;
+  text-align: left;
+  min-width: 0;
+  background: #f5f0e4;
+  border: 1px solid #cfc6b4;
+  border-radius: 9px;
+}
+.ha-mode-grid button[aria-pressed="true"] {
+  background: #e3eadf;
+  border-color: var(--ha-green);
+  box-shadow: inset 0 0 0 1px var(--ha-green);
+}
+.ha-mode-grid strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+  font-size: 12px;
+}
+.ha-mode-grid small {
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 6px;
+  color: #716959;
+}
+.ha-money-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+.ha-money-grid input {
+  font-weight: 700 !important;
+}
+.ha-rule-summary {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 17px;
+}
+.ha-rule-summary span {
+  padding: 6px 8px;
+  border: 1px solid #d3cbb9;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #625b4e;
+  background: #efe9db;
+}
+.ha-timing {
+  background: #ede8db;
+  border: 1px solid #d8d0be;
+  border-radius: 11px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.ha-timing h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+}
+.ha-panel .ha-seconds {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 0 9px;
+  font-size: 12px;
+}
+.ha-seconds > span:first-child {
+  min-width: 0;
+}
+.ha-stepper {
+  display: flex;
+  align-items: center;
+  border: 1px solid #c4baa5;
+  border-radius: 8px;
+  background: #fbf7ee;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.ha-stepper > button {
+  width: 38px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  color: var(--ha-green);
+}
+.ha-stepper > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.ha-stepper small {
+  font-size: 12px;
+  color: #716959;
+  padding-right: 7px;
+}
+.ha-panel label.ha-seconds .ha-stepper input {
+  width: 33px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ha-stepper input::-webkit-outer-spin-button,
+.ha-stepper input::-webkit-inner-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.ha-timing p {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ha-muted);
+  margin: 2px 0 0;
+}
+.ha-timing .button {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
+}
+.ha-panel .ha-teach {
+  border: 0;
+  margin: 0;
+  padding: 13px 0;
+}
+.ha-teach small {
+  font-size: 11px;
+}
+.ha-panel .toggle-label > span {
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ha-panel .toggle-label > span > small {
+  display: block;
+  color: var(--ha-muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.ha-disclosure {
+  border-top: 1px solid #d4cbb9;
+  border-bottom: 1px solid #d4cbb9;
+  margin: 10px 0 15px;
+}
+.ha-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+  min-height: 52px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ha-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.ha-disclosure > summary > span {
+  flex: 1;
+}
+.ha-disclosure > summary small {
+  display: block;
+  color: var(--ha-muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 2px;
+}
+.ha-disclosure > summary > svg:last-child {
+  transition: transform 0.15s;
+}
+.ha-disclosure[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.ha-disclosure > div {
+  padding: 4px 0 15px;
+}
+.ha-management .button,
+.ha-management .text-button {
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+.ha-panel .ha-danger {
+  border-color: #b28a7a;
+  color: #8c332c;
+  background: transparent;
+}
+.ha-fair-play {
+  font-size: 11px;
+  color: var(--ha-muted);
+  line-height: 1.5;
+  margin: 9px 0;
+}
+.ha-graphics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+.ha-graphics-grid label {
+  font-size: 11px;
+}
+.ha-panel .ha-graphics-grid label select {
+  font-size: 14px;
+}
+.ha-invite-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 20px;
+}
+.ha-invite-actions button {
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid #d0c6b4;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 11px;
+  color: #534d40;
+}
+.ha-roster {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 14px;
+  border: 1px solid #d6cdbc;
+  border-radius: 11px;
+  overflow: hidden;
+}
+.ha-roster > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  min-height: 62px;
+  border-bottom: 1px solid #ded6c8;
+}
+.ha-roster > li:last-child {
+  border: 0;
+}
+.ha-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--player-color, var(--ha-green));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border: 2px solid #ffffff99;
+}
+.ha-avatar.is-bot {
+  background: #ded0a7;
+  color: #594825;
+  border-color: #f5eed7;
+}
+.ha-roster > li > div {
+  min-width: 0;
+  flex: 1;
+}
+.ha-roster strong {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.ha-roster strong svg {
+  color: #93743c;
+  flex-shrink: 0;
+}
+.ha-roster small {
+  display: block;
+  font-size: 10px;
+  color: var(--ha-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.ha-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  color: #796b57;
+  border-radius: 8px;
+}
+.ha-add {
+  width: 100%;
+  justify-content: center;
+  gap: 7px;
+}
+.ha-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ha-muted);
+  margin: 17px 0 7px;
+}
+.ha-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.ha-note button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ha-green);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ha-bot-form {
+  padding: 13px;
+  border: 1px solid #bbab86;
+  border-radius: 11px;
+  background: #f5f0e3;
+}
+.ha-bot-form > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 7px;
+}
+.ha-bot-form > header .ha-remove {
+  margin-right: -8px;
+}
+.ha-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.ha-strategy-grid > button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 51px;
+  padding: 8px;
+  text-align: left;
+  border: 1px solid #d1c7b4;
+  border-radius: 8px;
+  background: #fbf8ef;
+  color: #6f6757;
+}
+.ha-strategy-grid > button[aria-pressed="true"] {
+  border-color: var(--ha-green);
+  background: #e2eadf;
+  color: var(--ha-green);
+  box-shadow: inset 0 0 0 1px var(--ha-green);
+}
+.ha-strategy-grid > button > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 29px;
+  font:
+    700 17px Manrope,
+    sans-serif;
+}
+.ha-strategy-grid > button > strong {
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.ha-strategy-grid > button > svg {
+  position: absolute;
+  right: 4px;
+  top: 3px;
+}
+.ha-choice-description {
+  min-height: 42px;
+  font-size: 11px;
+  color: #716856;
+  line-height: 1.5;
+  margin: 6px 0 10px;
+}
+.ha-difficulty {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #c8bda7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ha-difficulty > button {
+  min-height: 44px;
+  padding: 8px 3px;
+  border: 0;
+  border-right: 1px solid #c8bda7;
+  background: #fbf7ee;
+  color: #716856;
+  font-size: 11px;
+  font-weight: 700;
+}
+.ha-difficulty > button:last-child {
+  border-right: 0;
+}
+.ha-difficulty > button[aria-pressed="true"] {
+  background: var(--ha-green);
+  color: #fff8e6;
+}
+.ha-bot-form > .button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ha-status {
+  font-size: 11px;
+  line-height: 1.4;
+  min-height: 16px;
+  color: var(--ha-green);
+  margin: 10px 0;
+}
+.ha-start {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 0 max(9px, env(safe-area-inset-bottom));
+  background: var(--paper, #f5f0e4);
+  border-top: 1px solid #d4cbb9;
+  box-shadow: 0 -8px 12px -12px #261e1270;
+}
+.ha-start > .button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ha-start > small {
+  display: block;
+  margin: 7px 0 0;
+  text-align: center;
+  color: var(--ha-muted);
+  font-size: 10px;
+}
+.ha-panel.is-lobby {
+  padding-bottom: 0;
+}
+.phone-page:has(> .ha-panel) {
+  padding: 0 17px;
+  margin-top: 20px;
+}
+.session-controls:has(> .ha-panel) > summary {
+  margin-bottom: 18px;
+}
+.ha-panel .ha-timing .ha-seconds:last-of-type {
+  margin-bottom: 6px;
+}
+@media (max-width: 360px) {
+  .ha-panel .ha-header h2 {
+    font-size: 22px;
+  }
+  .ha-tabs button {
+    font-size: 12px;
+    gap: 5px;
+  }
+  .ha-stepper > button {
+    width: 33px;
+  }
+  .ha-panel .ha-seconds {
+    font-size: 11px;
+  }
+  .ha-strategy-grid > button {
+    gap: 4px;
+    padding-left: 5px;
+  }
+  .ha-strategy-grid > button > span {
+    min-width: 24px;
+    font-size: 15px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ha-disclosure > summary > svg:last-child {
+    transition: none;
+  }
+}
+/* Five strategies form a deliberate featured default plus two balanced rows. */
+.ha-strategy-grid > button:first-child {
+  grid-column: 1/-1;
+}
+.ha-panel .ha-graphics-grid label select {
+  font-size: 16px;
+}
+/* Claude's screenshot review: readable help and full thumb targets. */
+.ha-stepper > button {
+  width: 44px;
+  height: 44px;
+}
+.ha-panel .ha-seconds {
+  font-size: 13px;
+}
+.ha-mode-grid small,
+.ha-timing p {
+  font-size: 12px;
+  color: #586153;
+  line-height: 1.5;
+}
+.ha-strategy-grid > button > strong {
+  font-size: 13px;
+}
+.ha-strategy-grid > button {
+  min-height: 56px;
+}
+.ha-strategy-grid > button > span {
+  font-size: 17px;
+  min-width: 26px;
+}
+.ha-choice-description {
+  font-size: 12px;
+  min-height: 38px;
+}
+.ha-fair-play {
+  font-size: 12px;
+}
+.ha-note {
+  font-size: 12px;
+}
+.ha-note button {
+  display: block;
+  min-height: 44px;
+  text-align: left;
+  padding-top: 6px;
+}
+.ha-start {
+  border-top: 0;
+  box-shadow: 0 -8px 14px -12px #261e1233;
+}
+.ha-roster small {
+  font-size: 11px;
+}
+@media (max-width: 360px) {
+  .ha-stepper > button {
+    width: 44px;
+  }
+  .ha-panel .ha-seconds {
+    font-size: 12px;
+  }
+  .ha-strategy-grid > button > strong {
+    font-size: 12px;
+  }
+  .ha-strategy-grid > button {
+    padding: 8px;
+  }
+  .ha-strategy-grid > button > span {
+    font-size: 15px;
+    min-width: 20px;
+  }
+}

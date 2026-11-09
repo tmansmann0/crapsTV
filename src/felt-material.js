@@ -3,7 +3,7 @@ import * as THREE from "three";
 /** Selected B: soft wool shading only. No fibre meshes or displacement. */
 export const SOFT_WOOL_FELT = Object.freeze({
   relief: 0.7,
-  tile: 0.43,
+  tile: 0.47,
   sheen: 0.75,
   sheenRoughness: 0.69,
   sheenColor: "#47775a",

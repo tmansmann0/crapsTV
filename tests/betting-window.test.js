@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as game from "../src/game.js";
 import { RoomHub } from "../src/hub.js";
-import { bettingSecondsRemaining } from "../src/betting-window.js";
+import {
+  bettingSecondsRemaining,
+  botRollSecondsRemaining,
+} from "../src/betting-window.js";
 
 function table() {
   const s = game.createState("WINDOW");
@@ -11,6 +14,29 @@ function table() {
   game.start(s, a.id);
   return { s, a, b };
 }
+
+test("bot countdown includes its extra delay without extending human throw eligibility", () => {
+  const state = {
+    status: "playing",
+    rolling: false,
+    shooterId: "bot",
+    players: [{ id: "bot", bot: { strategy: "line" } }],
+    nextRollAt: 21000,
+    botRollAt: 26000,
+    clockOffsetMs: 5000,
+  };
+  assert.equal(bettingSecondsRemaining(state, 16000), 0);
+  assert.equal(botRollSecondsRemaining(state, 16000), 5);
+  assert.equal(botRollSecondsRemaining(state, 21000), 0);
+  for (const change of [
+    { rolling: true },
+    { botRollAt: null },
+    { status: "ended" },
+    { shooterId: "human" },
+    { players: [{ id: "bot", left: true, bot: {} }] },
+  ])
+    assert.equal(botRollSecondsRemaining({ ...state, ...change }, 16000), 0);
+});
 
 test("default window starts at table open; betting stays open and both throw paths lock", (t) => {
   let now = 100000;

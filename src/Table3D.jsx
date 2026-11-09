@@ -29,11 +29,16 @@ import {
   normalizeGraphics,
 } from "./graphics-settings.js";
 import { recommendGraphics, resolveGraphics } from "./graphics-profile.js";
+import {
+  readGraphicsCalibration,
+  writeGraphicsCalibration,
+} from "./graphics-calibration-store.js";
 import { createTextureQuality } from "./texture-quality.js";
 import {
   createStartupShowcase,
   sampleStartup,
   STARTUP_DURATION_MS,
+  STARTUP_UI_AT,
 } from "./startup-sequence.js";
 import { createStartupClock } from "./startup-clock.js";
 import {
@@ -74,7 +79,9 @@ export default function Table3D(props) {
     remoteGraphicsRevision = useRef(-1),
     graphicsPage = useRef("main"),
     retainedView = useRef(null),
-    introDone = useRef(false);
+    introDone = useRef(false),
+    calibrationActive = useRef(null),
+    profileSource = useRef(null);
   if (!graphicsRef.current) graphicsRef.current = savedGraphics();
   latest.current = props;
   const [failed, setFailed] = useState(false);
@@ -129,11 +136,26 @@ export default function Table3D(props) {
     const { software } = configureRenderer(renderer);
     capabilities.software = software;
     capabilities.maxTextureSize = renderer.capabilities.maxTextureSize;
+    const glInfo = renderer
+      .getContext()
+      .getExtension("WEBGL_debug_renderer_info");
+    const deviceName = glInfo
+      ? renderer.getContext().getParameter(glInfo.UNMASKED_RENDERER_WEBGL)
+      : "WebGL device";
+    const savedCalibration = readGraphicsCalibration({
+      capabilities,
+      rendererName: String(deviceName),
+    });
+    const recommendedProfile = recommendGraphics(capabilities);
+    if (calibrationActive.current === null)
+      calibrationActive.current = !savedCalibration;
+    if (profileSource.current === null)
+      profileSource.current = savedCalibration ? "saved" : "initial";
+    let calibrating = calibrationActive.current;
     if (!profileRef.current)
-      profileRef.current = recommendGraphics(capabilities);
-    const recommendedProfile = { ...profileRef.current };
+      profileRef.current = savedCalibration?.profile || recommendedProfile;
     let candidates = startupCandidates(recommendedProfile, { software });
-    if (!introDone.current) profileRef.current = candidates[0];
+    if (!introDone.current && calibrating) profileRef.current = candidates[0];
     let quality = resolveGraphics(graphics, profileRef.current, capabilities);
     if (
       quality.antialias !==
@@ -155,7 +177,7 @@ export default function Table3D(props) {
     let introPaused = null;
     let introPreviousFrame = null;
     let introReports = [[], [], []],
-      introCandidate = 0;
+      introCandidate = calibrating ? 0 : 3;
     let introCheckpointClock = null;
     let introShowcase = null,
       introFinishedAt = introDone.current ? -Infinity : null;
@@ -169,12 +191,6 @@ export default function Table3D(props) {
     let introQualityChanges = [];
     let sceneRevealedAt = introDone.current ? -Infinity : null;
     const introDuration = STARTUP_DURATION_MS;
-    const glInfo = renderer
-      .getContext()
-      .getExtension("WEBGL_debug_renderer_info");
-    const deviceName = glInfo
-      ? renderer.getContext().getParameter(glInfo.UNMASKED_RENDERER_WEBGL)
-      : "WebGL device";
     el.dataset.renderQuality = software ? "software" : "full";
     renderer.setSize(el.clientWidth, el.clientHeight);
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -537,10 +553,19 @@ export default function Table3D(props) {
       // A completed opening already selected its final profile during the
       // last static result hold. Escape retains the currently applied quality;
       // skipping a visible throw must not trigger a surprise texture upload.
-      if (skipped && introStart === null && !introLiveProbe) {
+      if (skipped && introStart === null && !introLiveProbe && calibrating) {
         profileRef.current = recommendedProfile;
         applyRuntimeQuality();
       }
+      if (!skipped && calibrating && introCandidate === 3) {
+        writeGraphicsCalibration(profileRef.current, {
+          capabilities,
+          rendererName: String(deviceName),
+        });
+        profileSource.current = "measured";
+      }
+      calibrating = false;
+      calibrationActive.current = false;
       introDone.current = true;
       // Live Retest never fades the UI. Input event time can be slightly ahead
       // of the next RAF timestamp, so a synthetic 1200ms fade endpoint can
@@ -565,6 +590,9 @@ export default function Table3D(props) {
     function handleGraphics(action) {
       const key = action.slice("graphics:".length);
       if (key === "retest") {
+        calibrating = true;
+        calibrationActive.current = true;
+        profileSource.current = "retest";
         automaticReflectionUnavailable = false;
         autoEffects.retest();
         introDone.current = false;
@@ -808,7 +836,16 @@ export default function Table3D(props) {
             let elapsed = time - introStart;
             if (!introLiveProbe) {
               introCheckpointClock ||= createStartupClock(
-                introShowcase.calibrationHolds,
+                calibrating ? introShowcase.calibrationHolds : [],
+                [
+                  ...introShowcase.stages
+                    .filter(({ state }) => state.rolling)
+                    .map(({ at, state }) => ({
+                      startAt: at,
+                      endAt: at + state.throw.duration,
+                    })),
+                  { startAt: STARTUP_UI_AT, endAt: STARTUP_DURATION_MS },
+                ],
               );
               const adjusted = introCheckpointClock.advance({
                 elapsed,
@@ -892,6 +929,7 @@ export default function Table3D(props) {
               }).calibrationHold;
             const holdNow = introLiveProbe ? time : elapsed;
             const probe =
+              calibrating &&
               hold &&
               (!introLiveProbe || hold.presentedAt != null) &&
               holdNow >= hold.switchAt
@@ -1313,10 +1351,11 @@ export default function Table3D(props) {
             phase: autoEffectsState.phase,
             flags: appliedEffectFlags,
           },
-          status: testing ? "testing" : "ready",
-          progress: testing
-            ? Math.min(1, (time - introStart) / introDuration)
-            : 1,
+          status: testing && calibrating ? "testing" : "ready",
+          progress:
+            testing && calibrating
+              ? Math.min(1, (time - introStart) / introDuration)
+              : 1,
           textureLabel: `${Math.min(quality.textureLimit, textureQuality.maxNativeDimension || quality.textureLimit)}px`,
         },
       });
@@ -1355,6 +1394,11 @@ export default function Table3D(props) {
       el.dataset.startupProbe = String(introCandidate);
       el.dataset.startupUploadPausedMs = String(introUploadPausedMs);
       el.dataset.startupQualityChanges = JSON.stringify(introQualityChanges);
+      el.dataset.graphicsProfileSource = profileSource.current;
+      el.dataset.graphicsProfile = JSON.stringify(profileRef.current);
+      el.dataset.graphicsCalibrating = String(
+        calibrating && !introDone.current,
+      );
       el.dataset.startupCalibrationHold = String(
         !!introSample?.calibrationHold || !!liveCalibrationHold,
       );
@@ -1632,9 +1676,20 @@ export default function Table3D(props) {
       }
     }
     frame = requestAnimationFrame(animate);
+    // Full-page navigation does not run React effect cleanup. Release the GPU
+    // context explicitly instead of retaining another table until browser GC.
+    // A back/forward-cache entry keeps its live context for restoration.
+    const releasePageContext = (event) => {
+      if (event.persisted) return;
+      alive = false;
+      cancelAnimationFrame(frame);
+      renderer.forceContextLoss();
+    };
+    window.addEventListener("pagehide", releasePageContext);
     return () => {
       alive = false;
       cancelAnimationFrame(frame);
+      window.removeEventListener("pagehide", releasePageContext);
       observer.disconnect();
       controls.dispose();
       el.removeEventListener("pointerdown", pointerDown, true);

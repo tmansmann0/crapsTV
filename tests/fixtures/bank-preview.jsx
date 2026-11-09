@@ -6,6 +6,7 @@ import * as game from "../../src/game.js";
 import "../../src/style.css";
 
 let banks,
+  wagers,
   transfers,
   publish,
   clock = 100000,
@@ -14,6 +15,7 @@ const add = Scene.prototype.add;
 Scene.prototype.add = function (...objects) {
   objects.forEach((object) => {
     if (object.name === "Player bankrolls") banks = object;
+    if (object.name === "Live wagers") wagers = object;
     if (object.name === "Chip transfers") transfers = object;
   });
   return add.apply(this, objects);
@@ -59,6 +61,7 @@ window.bankQA = {
         batch.getMatrixAt(index, matrix);
         return { ...spec, matrix: matrix.toArray() };
       }),
+      wagers: Object.values(wagers?.userData.layouts || {}).flat(),
       flights: (transfers?.children || [])
         .filter((group) => group.userData.flow)
         .map((group) => ({

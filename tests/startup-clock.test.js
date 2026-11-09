@@ -8,6 +8,72 @@ const holds = [
   { probe: 3, startAt: 28360, switchAt: 28660 },
 ];
 
+test("a cached intro presents its final UI fade before releasing the live table", () => {
+  const clock = createStartupClock([], [{ startAt: 28200, endAt: 30000 }]);
+  let paused = 0;
+  const visible = [];
+  // Failed CI trace jumped from 28449.7ms straight to the live UI.
+  for (const now of [
+    27449.7, 28449.7, 31000, 32000, 33000, 34000, 35000, 36000, 37000, 38000,
+  ]) {
+    const result = clock.advance({
+      elapsed: now - paused,
+      now,
+      completedProbe: 3,
+    });
+    paused += result.pausedMs;
+    visible.push(result.elapsed);
+  }
+  assert(visible.some((elapsed) => elapsed >= 29000 && elapsed < 30000));
+  assert(
+    visible.filter((elapsed) => elapsed >= 28200 && elapsed < 30000).length >=
+      8,
+  );
+  assert(visible.at(-1) >= 30000);
+});
+
+test("first-use shader stalls cannot skip either physical intro throw", () => {
+  const windows = [
+    { startAt: 6200, endAt: 9200 },
+    { startAt: 18600, endAt: 21600 },
+  ];
+  // Cached openings also need motion protection, without calibration holds.
+  for (const checkpoints of [[], holds]) {
+    const clock = createStartupClock(checkpoints, windows);
+    let now = 0,
+      paused = 0,
+      completedProbe = 0;
+    const visible = [];
+    for (let i = 0; i < 150; i++) {
+      now += 1100;
+      const result = clock.advance({
+        elapsed: now - paused,
+        now,
+        completedProbe,
+      });
+      paused += result.pausedMs;
+      assert.equal(result.elapsed, now - paused);
+      visible.push(result.elapsed);
+      const hold = checkpoints.find(({ probe }) => probe > completedProbe);
+      if (hold && result.elapsed >= hold.switchAt) completedProbe = hold.probe;
+      if (result.elapsed >= 30000) break;
+    }
+    for (const { startAt, endAt } of windows) {
+      const frames = visible.filter(
+        (elapsed) => elapsed >= startAt && elapsed <= endAt,
+      );
+      assert.equal(frames[0], startAt, "launch is presented before advancing");
+      assert(
+        frames.length >= 13,
+        "the throw has visible motion, not only a landed result",
+      );
+      for (let i = 1; i < frames.length; i++)
+        assert(frames[i] - frames[i - 1] <= 250);
+    }
+    assert(visible.at(-1) >= 30000);
+  }
+});
+
 test("a skipped result shot receives its full real camera lead before calibration", () => {
   const clock = createStartupClock(holds);
   assert.deepEqual(

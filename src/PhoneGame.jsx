@@ -29,7 +29,14 @@ import {
   X,
 } from "lucide-react";
 import { validBetChoices } from "./bet-options.js";
-import { catalogue, describeBet, equity, money, net } from "./game.js";
+import {
+  catalogue,
+  describeBet,
+  equity,
+  money,
+  net,
+  minimumPlayableBet,
+} from "./game.js";
 import {
   freshMobileSettlement,
   MOBILE_DICE_HOLD_MS,
@@ -1113,7 +1120,7 @@ function RollOutcome({
   expanded,
   onToggle,
 }) {
-  const remaining = useBettingWindow(state);
+  const remaining = useBettingWindow(state, { includeBot: true });
   const bettingLabel = remaining > 0 ? `Betting open · ${remaining}s` : null;
   const roll = state.lastRoll;
   if (state.rolling)
@@ -1500,7 +1507,8 @@ export default function PhoneGame({
       (isShooter || isAdmin) && !state.rolling && connected && remaining === 0,
     shooterName =
       state.players.find((p) => p.id === state.shooterId)?.name || "The host",
-    canReup = equity(player) < state.config.minBet && !player.bets.length;
+    canReup =
+      !player.bets.length && player.bank < minimumPlayableBet(state, player);
 
   // A continuous connection and a new, recent server result are required.
   // First snapshots and reconnects establish a baseline without replaying money.

@@ -4,7 +4,10 @@ import { wagerStackLayout } from "./wager-layout.js";
 import {
   DEFAULT_ROLL_COOLDOWN_SECONDS,
   MAX_ROLL_COOLDOWN_SECONDS,
+  DEFAULT_BOT_ROLL_DELAY_SECONDS,
+  MAX_BOT_ROLL_DELAY_SECONDS,
 } from "./betting-window.js";
+import { normalizeBotOptions } from "./bot-options.js";
 import {
   DEFAULT_GRAPHICS,
   mergeGraphics,
@@ -88,6 +91,7 @@ export function createState(code = "LOCAL") {
       minBet: 500,
       teach: false,
       rollCooldownSeconds: DEFAULT_ROLL_COOLDOWN_SECONDS,
+      botRollDelaySeconds: DEFAULT_BOT_ROLL_DELAY_SECONDS,
     },
     display: {
       sound: false,
@@ -104,6 +108,7 @@ export function createState(code = "LOCAL") {
     rolling: false,
     bettingOpenedAt: null,
     nextRollAt: null,
+    botRollAt: null,
     aim: null,
     throw: null,
     rolls: [],
@@ -301,6 +306,14 @@ export function catalogue(state, player) {
       Math.ceil(state.config.minBet / (b.quantum || 100)) * (b.quantum || 100),
   }));
 }
+/** A configured minimum can sit between the table's legal chip increments. */
+export function minimumPlayableBet(state, player) {
+  return catalogue(state, player).reduce(
+    (minimum, row) =>
+      row.available ? Math.min(minimum, row.minimum) : minimum,
+    Infinity,
+  );
+}
 // Active line bets use their own traveled point, independent of the table point.
 export function describeBet(state, player, bet) {
   const info = catalogue(state, player).find(
@@ -378,6 +391,21 @@ export function join(s, name) {
   log(s, `${name} pulled up a chair.`, "player-joined");
   return p;
 }
+export function addBot(s, id, options = {}) {
+  admin(s, id);
+  const host = active(s, id);
+  assert(!host.bot, "Only a human host can add bots.");
+  const bot = normalizeBotOptions(options);
+  const p = join(s, options.name);
+  p.bot = bot;
+  return p;
+}
+export function removeBot(s, id, playerId) {
+  admin(s, id);
+  const p = active(s, playerId);
+  assert(p.bot, "Choose a bot to remove.");
+  leave(s, p.id);
+}
 function active(s, id) {
   const p = s.players.find((p) => p.id === id && !p.left);
   assert(p, "Join the table first.");
@@ -400,6 +428,8 @@ export function configure(s, id, changes) {
     teach = s.config.teach,
     rollCooldownSeconds = s.config.rollCooldownSeconds ??
       DEFAULT_ROLL_COOLDOWN_SECONDS,
+    botRollDelaySeconds = s.config.botRollDelaySeconds ??
+      DEFAULT_BOT_ROLL_DELAY_SECONDS,
   } = changes;
   assert(["craps", "crapless"].includes(mode), "Choose craps or crapless.");
   assert(
@@ -414,7 +444,15 @@ export function configure(s, id, changes) {
   );
   assert(typeof teach === "boolean", "Teach mode must be on or off.");
   validateCooldown(rollCooldownSeconds);
-  s.config = { startingBank, minBet, mode, teach, rollCooldownSeconds };
+  validateBotDelay(botRollDelaySeconds);
+  s.config = {
+    startingBank,
+    minBet,
+    mode,
+    teach,
+    rollCooldownSeconds,
+    botRollDelaySeconds,
+  };
   for (const p of s.players) {
     p.bank = startingBank;
     p.buyIn = startingBank;
@@ -437,10 +475,25 @@ function validateCooldown(seconds) {
   );
 }
 function openBettingWindow(s) {
+  s.botRollAt = null;
   s.bettingOpenedAt = Date.now();
   s.nextRollAt =
     s.bettingOpenedAt +
     (s.config.rollCooldownSeconds ?? DEFAULT_ROLL_COOLDOWN_SECONDS) * 1000;
+}
+function validateBotDelay(seconds) {
+  assert(
+    Number.isInteger(seconds) &&
+      seconds >= 0 &&
+      seconds <= MAX_BOT_ROLL_DELAY_SECONDS,
+    "Bot roll delay must be a whole number from 0 to 60 seconds.",
+  );
+}
+export function setBotRollDelay(s, id, seconds) {
+  admin(s, id);
+  assert(s.status !== "ended", "The session has ended.");
+  validateBotDelay(seconds);
+  s.config.botRollDelaySeconds = seconds;
 }
 export function setRollCooldown(s, id, seconds) {
   admin(s, id);
@@ -542,7 +595,7 @@ export function reup(s, id) {
   betting(s);
   const p = active(s, id);
   assert(
-    equity(p) < s.config.minBet,
+    equity(p) < minimumPlayableBet(s, p),
     "Re-up after your stack falls below the table minimum.",
   );
   assert(!p.bets.length, "Take down your remaining bets before re-upping.");
@@ -694,6 +747,7 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   s.throw = timeline;
   s.aim = null;
   s.rolling = true;
+  s.botRollAt = null;
   for (const player of s.players) player.betPreview = null;
   return timeline;
 }
@@ -933,8 +987,8 @@ export function leave(s, id) {
   });
   if (s.adminId === id)
     s.adminId =
-      s.players.find((x) => !x.left && x.connected)?.id ||
-      s.players.find((x) => !x.left)?.id ||
+      s.players.find((x) => !x.left && !x.bot && x.connected)?.id ||
+      s.players.find((x) => !x.left && !x.bot)?.id ||
       null;
   if (s.shooterId === id) rotateShooter(s);
   if (s.aim?.playerId === id) s.aim = null;
@@ -949,6 +1003,7 @@ export function end(s, id) {
     p.bets = [];
   }
   s.status = "ended";
+  s.botRollAt = null;
   s.aim = null;
   for (const player of s.players) player.betPreview = null;
   s.endedAt = Date.now();
@@ -963,7 +1018,7 @@ export function changeConnection(s, id, connected) {
 }
 export function transfer(s, id, to) {
   admin(s, id);
-  active(s, to);
+  assert(!active(s, to).bot, "Host controls must stay with a human player.");
   s.adminId = to;
   log(
     s,

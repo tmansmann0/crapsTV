@@ -35,6 +35,7 @@ function Table3D(props) {
 import Recap from "./recap.jsx";
 import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
+import AdminPanel from "./AdminPanel.jsx";
 import { catalogue, describeBet, money, equity, net } from "./game.js";
 import { PHYSICS_VERSION } from "./throw-motion.js";
 import {
@@ -203,6 +204,7 @@ function App() {
           code: local.code,
           joinOrigin: local.joinOrigin,
           lanOrigin: local.lanOrigin,
+          kiosk: local.kiosk === true,
         });
         setJoinCode(local.code);
       } else if (route.controller && initialCode) {
@@ -359,6 +361,10 @@ function App() {
     }
   }, [status, state?.code]);
   const roomCode = state?.code || session?.code || "";
+  const kiosk =
+    !route.controller &&
+    (session?.kiosk === true ||
+      new URLSearchParams(location.search).get("kiosk") === "1");
   // An existing local process keeps its loaded rules after the static UI updates.
   // Old hosts cannot gain corrected throws or physical props from a UI refresh.
   const hostWarning =
@@ -374,6 +380,7 @@ function App() {
       ? controllerURL(roomCode, session.lanOrigin)
       : null;
   const sceneAction = async (action) => {
+    if (kiosk && action === "settings") return;
     if (action === "settings") setSettingsOpen((v) => !v);
     if (action === "join") window.open(joinLink, "_blank", "noopener");
     if (action === "sound") setSound((value) => !value);
@@ -407,15 +414,18 @@ function App() {
           status={checking ? "connecting" : status}
           error={visibleError}
           sound={sound}
-          settingsOpen={settingsOpen}
+          settingsOpen={kiosk ? false : settingsOpen}
+          hideSettings={kiosk}
           joinURL={joinLink}
           fallbackJoinURL={fallbackJoinLink}
           onAction={sceneAction}
         />
         <div className="scene-accessibility" aria-label="Table controls">
-          <button onClick={() => sceneAction("settings")}>
-            Table settings
-          </button>
+          {!kiosk && (
+            <button onClick={() => sceneAction("settings")}>
+              Table settings
+            </button>
+          )}
           <p role="status">
             {status}. Room {roomCode}.{" "}
             {state?.status === "ended"
@@ -635,50 +645,6 @@ function Join({ state, name, setName, code, setCode, join }) {
     </main>
   );
 }
-function BettingWindowSetting({ state, send, connected }) {
-  const [seconds, setSeconds] = useState(
-    state.config.rollCooldownSeconds ?? 10,
-  );
-  useEffect(
-    () => setSeconds(state.config.rollCooldownSeconds ?? 10),
-    [state.config.rollCooldownSeconds],
-  );
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        send({ type: "cooldown", seconds: Number(seconds) });
-      }}
-    >
-      <label>
-        Betting window (seconds)
-        <input
-          aria-label="Betting window (seconds)"
-          type="number"
-          min="0"
-          max="60"
-          step="1"
-          required
-          value={seconds}
-          onChange={(event) => setSeconds(event.target.value)}
-          disabled={!connected}
-        />
-      </label>
-      <p className="fine-print">
-        Time to place bets after the table opens and each roll. 0 allows
-        immediate rolls.
-      </p>
-      <button
-        className="button outline small"
-        type="submit"
-        disabled={!connected}
-      >
-        Set betting window
-      </button>
-    </form>
-  );
-}
-
 function Phone({
   state,
   player,
@@ -691,207 +657,34 @@ function Phone({
   fallbackJoinURL,
 }) {
   const disabled = state.rolling || !connected;
+  const adminProps = {
+    state,
+    player,
+    send,
+    connected,
+    confirm,
+    onDisplayAction,
+    fallbackJoinURL,
+    serverError,
+  };
   const settingsArea = (
     <details className="session-controls">
       <summary>
         {isAdmin ? "Host controls" : "Your session"}
         <ChevronDown size={15} />
       </summary>
-      {isAdmin && (
-        <>
-          <div className="admin-display-settings">
-            <h3>TV settings</h3>
-            <label className="toggle-label">
-              <span>TV announcer</span>
-              <input
-                aria-label="TV announcer"
-                type="checkbox"
-                checked={state.display?.sound || false}
-                onChange={(e) =>
-                  send({
-                    type: "display",
-                    settings: { sound: e.target.checked },
-                  })
-                }
-              />
-            </label>
-            <label>
-              TV camera
-              <select
-                aria-label="TV camera"
-                value={state.display?.camera || "auto"}
-                onChange={(e) =>
-                  send({
-                    type: "display",
-                    settings: { camera: e.target.value },
-                  })
-                }
-              >
-                <option value="auto">Auto</option>
-                <option value="table">Table</option>
-                <option value="room">Room</option>
-              </select>
-            </label>
-            <div
-              className="admin-graphics-settings"
-              style={{
-                borderTop: "1px solid var(--line)",
-                paddingTop: 14,
-                marginTop: 16,
-              }}
-            >
-              <h3>Graphics</h3>
-              <p style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 15 }}>
-                Auto checks the TV and chooses settings for that display. Manual
-                choices override its recommendation. Effects in Auto are
-                measured on the TV after the opening; saved On/Off choices stay
-                fixed.
-              </p>
-              {Object.entries({
-                fps: "Frame rate",
-                antialias: "Antialiasing",
-                resolution: "Resolution",
-                modelDetail: "Model detail",
-                textures: "Textures",
-                lensFlares: "Lens flares",
-                localReflections: "Local reflections",
-                contactShadows: "Contact shadows",
-              }).map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <select
-                    aria-label={`TV graphics ${label.toLowerCase()}`}
-                    value={
-                      state.display?.graphics?.[key] ?? DEFAULT_GRAPHICS[key]
-                    }
-                    disabled={!connected}
-                    onChange={(event) =>
-                      send({
-                        type: "display",
-                        settings: {
-                          graphics: {
-                            [key]:
-                              key === "fps" && event.target.value !== "auto"
-                                ? Number(event.target.value)
-                                : event.target.value,
-                          },
-                        },
-                      })
-                    }
-                  >
-                    {GRAPHICS_OPTIONS[key].map((option) => (
-                      <option key={String(option.value)} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
-              <button
-                type="button"
-                className="button outline small"
-                disabled={!connected}
-                onClick={() =>
-                  send({
-                    type: "display",
-                    settings: { graphics: { ...DEFAULT_GRAPHICS } },
-                  })
-                }
-              >
-                Use automatic graphics
-              </button>
-            </div>
-            <div className="button-row">
-              <button
-                className="button outline small"
-                onClick={() => onDisplayAction("copy")}
-              >
-                Copy invite
-              </button>
-              {fallbackJoinURL && (
-                <button
-                  className="button outline small"
-                  onClick={() => onDisplayAction("copy-ip")}
-                >
-                  Copy IP invite
-                </button>
-              )}
-              <button
-                className="button outline small"
-                onClick={() => onDisplayAction("join")}
-              >
-                Controller
-              </button>
-              <button
-                className="button outline small"
-                onClick={() => onDisplayAction("fullscreen")}
-              >
-                Fullscreen this device
-              </button>
-            </div>
-          </div>
-          {state.status === "playing" && (
-            <BettingWindowSetting
-              state={state}
-              send={send}
-              connected={connected}
-            />
-          )}
-          <label className="toggle-label">
-            <span>
-              <BookOpen size={16} />
-              Teach mode
-            </span>
-            <input
-              type="checkbox"
-              checked={state.config.teach}
-              onChange={(e) => send({ type: "teach", value: e.target.checked })}
-            />
-          </label>
-          {state.players.filter((p) => !p.left && p.id !== player.id).length >
-            0 && (
-            <label>
-              Pass host controls
-              <select
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value)
-                    send({ type: "transfer", playerId: e.target.value });
-                  e.target.value = "";
-                }}
-              >
-                <option value="" disabled>
-                  Choose a player
-                </option>
-                {state.players
-                  .filter((p) => !p.left && p.id !== player.id)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                      {!p.connected ? " (offline)" : ""}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-          {state.status === "playing" && (
-            <button
-              className="button outline"
-              disabled={disabled}
-              onClick={() => confirm("end")}
-            >
-              Close table for everyone
-            </button>
-          )}
-        </>
+      {isAdmin ? (
+        <AdminPanel {...adminProps} />
+      ) : (
+        <button
+          className="text-button"
+          disabled={disabled}
+          onClick={() => confirm("leave")}
+        >
+          <LogOut size={16} />
+          Cash out & leave
+        </button>
       )}
-      <button
-        className="text-button"
-        disabled={disabled}
-        onClick={() => confirm("leave")}
-      >
-        <LogOut size={16} /> Cash out & leave
-      </button>
     </details>
   );
 
@@ -919,7 +712,7 @@ function Phone({
   return (
     <main className="phone-page">
       {isAdmin ? (
-        <Setup state={state} send={send} />
+        <AdminPanel {...adminProps} />
       ) : (
         <section className="waiting-card">
           <Dices size={35} />
@@ -936,118 +729,8 @@ function Phone({
           </div>
         </section>
       )}
-      {settingsArea}
+      {!isAdmin && settingsArea}
     </main>
-  );
-}
-function Setup({ state, send }) {
-  const [bank, setBank] = useState(state.config.startingBank / 100),
-    [min, setMin] = useState(state.config.minBet / 100),
-    [mode, setMode] = useState(state.config.mode),
-    [teach, setTeach] = useState(state.config.teach),
-    [cooldown, setCooldown] = useState(state.config.rollCooldownSeconds ?? 10);
-  function start(e) {
-    e.preventDefault();
-    send({
-      type: "start",
-      config: {
-        startingBank: Math.round(Number(bank) * 100),
-        minBet: Math.round(Number(min) * 100),
-        mode,
-        teach,
-        rollCooldownSeconds: Number(cooldown),
-      },
-    });
-  }
-  return (
-    <form className="setup" onSubmit={start}>
-      <div className="eyebrow">
-        <Crown size={15} /> HOST SETTINGS
-      </div>
-      <h2>Table setup</h2>
-      <div className="mode-picker">
-        {[
-          ["craps", "Classic craps", "7 or 11 wins on the come-out."],
-          [
-            "crapless",
-            "Crapless craps",
-            "Every number except 7 can become the point.",
-          ],
-        ].map(([v, title, desc]) => (
-          <button
-            type="button"
-            key={v}
-            className={mode === v ? "selected" : ""}
-            onClick={() => setMode(v)}
-          >
-            <span>
-              {title}
-              {mode === v && <Check size={16} />}
-            </span>
-            <small>{desc}</small>
-          </button>
-        ))}
-      </div>
-      <div className="form-row">
-        <label>
-          Starting chips ($)
-          <input
-            type="number"
-            min="10"
-            max="1000000"
-            step="1"
-            value={bank}
-            onChange={(e) => setBank(e.target.value)}
-            required
-          />
-        </label>
-        <label>
-          Table minimum ($)
-          <input
-            type="number"
-            min="1"
-            max={bank}
-            step="1"
-            value={min}
-            onChange={(e) => setMin(e.target.value)}
-            required
-          />
-        </label>
-      </div>
-      <label>
-        Betting window (seconds)
-        <input
-          aria-label="Betting window (seconds)"
-          type="number"
-          min="0"
-          max="60"
-          step="1"
-          required
-          value={cooldown}
-          onChange={(event) => setCooldown(event.target.value)}
-        />
-        <small>
-          Time to place bets before each throw. 0 allows immediate rolls.
-        </small>
-      </label>
-      <label className="toggle-label">
-        <span>
-          <BookOpen size={18} />
-          <div>
-            Teach mode<small>Payouts, probabilities, and useful context.</small>
-          </div>
-        </span>
-        <input
-          type="checkbox"
-          checked={teach}
-          onChange={(e) => setTeach(e.target.checked)}
-        />
-      </label>
-      <button type="submit" className="button dark jumbo">
-        Open the table <ArrowRight size={18} />
-      </button>
-      <p className="fine-print">Teach mode can be changed during play.</p>
-    </form>
   );
 }
 createRoot(document.getElementById("root")).render(<App />);

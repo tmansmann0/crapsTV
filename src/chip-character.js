@@ -11,7 +11,9 @@ const unit = (seed) => chipHash(seed) / 4294967295;
 /** Packed dirt/finish variation; stable when a chip moves or switches LOD. */
 export function chipPatinaParameters(spec, index = 0) {
   const seed =
-    spec.id ?? `${spec.denomination || 500}:${spec.wear || 0}:${index}`;
+    spec.appearanceId ??
+    spec.id ??
+    `${spec.denomination || 500}:${spec.wear || 0}:${index}`;
   return [
     unit(`${seed}:u`),
     unit(`${seed}:v`),

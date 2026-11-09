@@ -1,0 +1,15 @@
+[Unit]
+Description=Home Assistant craps night TV launcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/share/crapstv-night/craps_night.py --config %h/.config/crapstv-night/config.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillMode=control-group
+
+[Install]
+WantedBy=default.target

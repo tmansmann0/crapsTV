@@ -3,6 +3,7 @@ import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { upperDieFace } from "../../src/throw-motion.js";
 import { clickTV } from "../helpers/tv-actions.mjs";
+import { openAdminSection } from "../helpers/admin-controls.mjs";
 // Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
 // captured locally; CI retains every interaction/assertion and DOM trace.
 async function capture(page, options) {
@@ -134,9 +135,9 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     ).toBeEnabled({ timeout: 15000 });
     // The rest of this multi-roll fixture deliberately uses immediate throws.
     await phone.getByRole("button", { name: "Open settings" }).click();
-    await phone.locator("summary").click();
+    await openAdminSection(phone, "Table");
     await phone.getByLabel("Betting window (seconds)").fill("0");
-    await phone.getByRole("button", { name: "Set betting window" }).click();
+    await phone.getByRole("button", { name: "Save timing" }).click();
     await phone.getByRole("button", { name: "Close settings" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).click();
     await expect(phone.locator(".pg-tile-pay")).toHaveCount(0);
@@ -278,7 +279,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "2",
     );
     await phone.getByRole("button", { name: "Open settings" }).click();
-    await phone.locator("summary").click();
+    await openAdminSection(phone, "TV");
     await phone.getByLabel("TV camera").selectOption("room");
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-camera",
@@ -365,7 +366,8 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.reload();
     await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
     await phone.getByRole("button", { name: "Open settings" }).click();
-    await phone.locator("summary").click();
+    await openAdminSection(phone, "Table");
+    await phone.locator(".ha-management > summary").click();
     await phone
       .getByRole("button", { name: "Close table for everyone" })
       .click();

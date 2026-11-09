@@ -20,6 +20,15 @@ On boot, the screen stays black until the models, surface maps, playing-piece te
 
 Automatic settings ramp through conservative, medium and capability-recommended resolution, texture and chip-detail candidates. The first frames after each change are excluded from measurement; a final confirmation section uses the selected profile. Explicit choices always override the automatic profile. Low-memory/software devices keep conservative candidates. Reduced motion holds a stable camera; hidden tabs pause the opening and its measurements. See [opening validation](startup.md).
 
+After the first complete calibration, its measured Auto base profile is saved
+locally. Later openings keep that same quality from the first visible frame,
+while still playing the full cinematic. An already-playing room also uses the
+saved profile. **Retest automatic settings** deliberately measures and saves a
+new result; skipping an opening or cancelling a Retest preserves the last good
+record. Manual graphics/effect choices keep their existing separate storage.
+Only a meaningful GPU/resource change or a much larger pixel workload invalidates
+the automatic cache. This stores no room balances, tokens or gameplay settings.
+
 See [TV display QA](tv-display-qa.md) for measured glyph sizes, viewing-distance calculations, exact-resolution benchmarks, and the distinction between font size and visible character height.
 
 The diagnostic compares rendered frame intervals against the requested frame budget, including refresh quantization for 24 FPS. Automatic FPS probes target 60 and can fall back to 30 or 24. Sparse measurements retain a conservative candidate; skipped openings without measurements use capability recommendations. Rendered FPS, actual resolution and texture cap are shown in Graphics. This calibration is evidence for this workload, not a guarantee for every later scene. **Retest automatic settings** replays the opening in a lobby; during an active game it measures the real table with the UI visible, without introducing demonstration players or interrupting play.

@@ -88,6 +88,17 @@ try {
   const seven = await seek(at + 2000);
   assert.equal(seven.bank, 79500);
   unchanged(eight, seven);
+  assert(
+    seven.wagers.every((chip) =>
+      initial.chips.some(
+        (old) =>
+          old.id === chip.id &&
+          old.denomination === chip.denomination &&
+          old.wear === chip.wear,
+      ),
+    ),
+    "The actual spent bank chips are on the felt",
+  );
   const plan = await page.evaluate(() => window.bankQA.win());
   const flow = plan.transfers.find((f) => f.to.kind === "bank");
   assert(flow);
@@ -114,6 +125,17 @@ try {
   assert(Math.max(...after.chips.map((c) => c.level)) < 10);
   const flightChips = flying.flights.find((f) => f.flow.id === flow.id).chips;
   assert(
+    seven.wagers.every((chip) =>
+      flightChips.some(
+        (flying) =>
+          flying.id === chip.id &&
+          flying.denomination === chip.denomination &&
+          flying.wear === chip.wear,
+      ),
+    ),
+    "A winning stake leaves the felt without being reissued in other colours",
+  );
+  assert(
     flightChips.every((c) =>
       after.chips.some(
         (bank) => bank.id === c.id && bank.denomination === c.denomination,
@@ -131,7 +153,10 @@ try {
   );
   assert.deepEqual(errors, []);
   await mkdir("artifacts/bank-chips", { recursive: true });
-  await page.screenshot({ path: "artifacts/bank-chips/settled-1080p.png" });
+  // This image is a diagnostic, not a pixel assertion. GPU readback on the
+  // software runner can stall the otherwise complete identity/landing proof.
+  if (!process.env.CI || process.env.BANK_CAPTURE === "1")
+    await page.screenshot({ path: "artifacts/bank-chips/settled-1080p.png" });
   // Many small awards fill the tray and exercise real colour-ups/restacks.
   // Each update still passes through the ordinary production flow planner.
   for (let index = 0; index < 100; index++) {
