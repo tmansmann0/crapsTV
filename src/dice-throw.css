@@ -20,21 +20,80 @@
   letter-spacing: 0.12em;
   color: #aac9c2;
 }
+.dice-power-text,
+.dice-throw:has(.dice-throw-view[data-aiming="true"]) .dice-throw-status {
+  display: none;
+}
+.dice-throw:has(.dice-throw-view[data-aiming="true"]) .dice-power-text {
+  display: inline;
+  font-variant-numeric: tabular-nums;
+  color: #f3d795;
+}
 .dice-throw-view {
-  height: clamp(260px, 44dvh, 390px);
+  height: clamp(240px, 39dvh, 350px);
+  isolation: isolate;
   position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #183931, #0b1618 78%);
+  border-block: 1px solid #dabc7c26;
+}
+.dice-throw-view[data-draggable="true"] {
   touch-action: none;
   cursor: grab;
-  overflow: hidden;
 }
-.dice-throw-view canvas {
+.dice-throw-view[data-aiming="true"][data-draggable="true"] {
+  cursor: grabbing;
+}
+.dice-aim-preview,
+.dice-flight,
+.dice-flight canvas {
   display: block;
   width: 100%;
   height: 100%;
 }
+.dice-aim-preview,
+.dice-flight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.dice-flight {
+  visibility: hidden;
+}
+.dice-flight[data-loaded="true"] {
+  visibility: visible;
+}
+.dice-aim-shift {
+  transform: translateX(var(--aim-shift, 0px));
+}
+.dice-aim-die {
+  transform: translateY(var(--aim-lift, 0px)) rotate(var(--aim-angle, 0rad));
+}
+.dice-aim-die-0 {
+  rotate: -10deg;
+}
+.dice-aim-die-1 {
+  rotate: 12deg;
+}
+.dice-aim-die-face {
+  stroke: #ffebd0;
+  stroke-opacity: 0.3;
+}
+.dice-aim-arrow {
+  opacity: 0.42;
+  transform: rotate(var(--aim-angle, 0rad)) scaleY(0.63);
+}
+.dice-aim-arrow[data-show-guide="false"] {
+  visibility: hidden;
+}
+.dice-throw-view[data-aiming="true"] .dice-aim-arrow {
+  opacity: 1;
+  transform: rotate(var(--aim-angle, 0rad))
+    scaleY(calc(0.63 + 0.43 * var(--aim-power, 0)));
+}
 .dice-swipe-hint {
   position: absolute;
-  bottom: 18px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   width: max-content;
@@ -53,13 +112,20 @@
   bottom: 0;
   left: 0;
   right: 0;
-  height: 4px;
+  height: 3px;
   background: #ffffff20;
+  visibility: hidden;
+  pointer-events: none;
+}
+.dice-throw-view[data-aiming="true"] .dice-power {
+  visibility: visible;
 }
 .dice-power i {
   height: 100%;
   display: block;
   background: #e7c378;
+  transform-origin: left;
+  transform: scaleX(var(--aim-power, 0));
 }
 .dice-throw-bottom {
   padding: 10px 14px 14px;
@@ -69,6 +135,7 @@
 .dice-appearance {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .dice-appearance > button {

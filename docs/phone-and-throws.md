@@ -16,7 +16,7 @@ Phone chip thumbnails are pre-rendered from the GLB. Software GPU renderers use 
 
 ## Showing a settled roll
 
-The mobile Roll view is a dice close-up with a dark background. It uses the same physical timeline as the TV and frames both dice. After an unchanged 500ms landing hold, the phone returns to Play. It does not switch the resting dice to a different face or show an incomplete imitation of the TV table.
+The mobile Roll view shows a 2D aim preview with the chosen dice color and finish, a direction arrow, and a power meter. While you swipe, the phone updates the preview locally and sends sampled aim updates to the TV. Once the dice are out, the phone frames both simulated dice using the same physical timeline as the TV. After a 500ms landing hold, the phone returns to Play.
 
 Winning chips then appear at the matching betting area. The label separates profit from a returned stake; standing place/hardway bets show profit while the stake stays on the table. After a short explanation hold, the chips travel to Bank and its displayed amount updates on arrival. This is presentation only: the server ledger remains authoritative. Historical results and reconnect snapshots do not replay credits. Reduced-motion mode shows the explanation without the flight.
 

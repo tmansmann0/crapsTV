@@ -39,12 +39,33 @@ export class RoomHub {
   }
   broadcast() {
     this.scheduleBots();
+    this.broadcastState();
+  }
+  broadcastState() {
     const message = {
       type: "state",
       state: game.snapshot(this.state),
       sentAt: Date.now(),
     };
     for (const id of this.clients.keys()) this.send(id, message);
+  }
+  broadcastAim() {
+    // Legacy displays still accept full snapshots. Updated clients need only
+    // the transient controls, with no wager layouts or old throw timelines.
+    const update = { type: "aim", aim: this.state.aim };
+    let legacy;
+    for (const [id, client] of this.clients) {
+      this.send(
+        id,
+        client.aimUpdates
+          ? update
+          : (legacy ??= {
+              type: "state",
+              state: game.snapshot(this.state),
+              sentAt: Date.now(),
+            }),
+      );
+    }
   }
   disconnect(id) {
     const client = this.clients.get(id);
@@ -70,6 +91,8 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if ((type === "watch" || type === "join") && message.aimUpdates === true)
+        c.aimUpdates = true;
       if (type === "clock") {
         if (
           typeof message.clientAt !== "number" ||
@@ -150,7 +173,13 @@ export class RoomHub {
         else if (type === "end") game.end(s, pid);
         else if (type === "transfer") game.transfer(s, pid, message.playerId);
         else if (type === "aim") {
+          const wasAiming = !!s.aim?.active;
+          const botRollAt = s.botRollAt;
           if (!game.setAim(s, pid, message.aim)) return;
+          if (wasAiming !== !!s.aim?.active) this.scheduleBots();
+          if (botRollAt !== s.botRollAt) this.broadcastState();
+          else this.broadcastAim();
+          return;
         } else if (type === "roll") {
           this.beginRoll(pid, message.gesture);
         } else if (type === "reset") {

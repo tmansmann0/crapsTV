@@ -95,7 +95,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `src/Table3D.jsx`           | Blender models, finite HDR backdrop, cinematic shared dice playback    |
 | `src/PhoneGame.jsx`         | Stable phone board, chip bundles and animated payout results           |
 | `src/LearnCenter.jsx`       | Short animated lessons, examples and playback controls                 |
-| `src/DiceThrow.jsx`         | 3D phone dice, aim gestures, and shared trajectory playback            |
+| `src/DiceThrow.jsx`         | Phone aim gestures, 2D preview, and shared trajectory playback           |
 | `src/throw-motion.js`       | Authority-generated physics timeline and stateless frame sampling      |
 | `public/assets/`            | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
 | `assets/source/`            | Editable Blender sources                                               |

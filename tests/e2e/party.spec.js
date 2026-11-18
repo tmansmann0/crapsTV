@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { upperDieFace } from "../../src/throw-motion.js";
@@ -36,12 +36,22 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
         : { width: 1280, height: 800 },
     });
     tv.on("pageerror", (e) => errors.push(e.message));
+    let previewPackets = null;
+    await tv.routeWebSocket("**/socket", (ws) => {
+      const server = ws.connectToServer();
+      server.onMessage((raw) => {
+        if (previewPackets) previewPackets.push(JSON.parse(raw));
+        ws.send(raw);
+      });
+    });
+    const shooterThrows = [];
     let rejectedOnce = false;
     const interceptWagers = (ws) => {
       const server = ws.connectToServer();
       let name = "";
       ws.onMessage((raw) => {
         const message = JSON.parse(raw);
+        if (["aim", "roll"].includes(message.type)) shooterThrows.push(message);
         if (message.type === "join") name = message.name || name;
         if (
           name === "Tyler" &&
@@ -359,7 +369,137 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(
       phone.getByRole("button", { name: "Roll the dice", exact: true }),
     ).toBeEnabled();
-    await swipeDice(phone);
+    const aimView = phone.getByTestId("phone-dice");
+    const aimArt = aimView.locator("svg.dice-aim-preview");
+    await expect(aimArt).toHaveAttribute("data-color", "blue");
+    await expect(aimArt).toHaveAttribute("data-finish", "translucent");
+    await expect(aimView.locator("canvas")).toHaveCount(0);
+    if (!process.env.CI || process.env.CRAPSTV_CAPTURE_AIM)
+      await phone
+        .locator(".dice-throw")
+        .screenshot({ path: "artifacts/phone-aim-ready.png" });
+    await phone.setViewportSize({ width: 375, height: 640 });
+    await aimView.scrollIntoViewIfNeeded();
+    expect(
+      await phone.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(375);
+    await tv.evaluate(() => {
+      const table = document.querySelector(".table-canvas");
+      window.previewFrames = [];
+      window.previewObserver = new MutationObserver(() => {
+        if (table.dataset.aim)
+          window.previewFrames.push({
+            at: performance.now(),
+            aim: JSON.parse(table.dataset.aim),
+          });
+      });
+      window.previewObserver.observe(table, {
+        attributes: true,
+        attributeFilter: ["data-aim"],
+      });
+    });
+    previewPackets = [];
+    const box = await aimView.boundingBox();
+    const startX = Math.round(box.x + box.width * 0.5);
+    const startY = Math.round(box.y + box.height * 0.79);
+    await aimView.evaluate((view) => {
+      view.addEventListener(
+        "pointerdown",
+        (e) => {
+          view.dataset.testPointer = e.pointerId;
+        },
+        { once: true },
+      );
+    });
+    await phone.mouse.move(startX, startY);
+    await phone.mouse.down();
+    const local = await aimView.evaluate(
+      async (view, { startX, startY }) => {
+        const samples = [];
+        const pointerId = Number(view.dataset.testPointer);
+        for (let i = 1; i <= 36; i++) {
+          view.dispatchEvent(
+            new PointerEvent("pointermove", {
+              bubbles: true,
+              pointerId,
+              clientX: startX + i * 2,
+              clientY: startY - i * 3,
+            }),
+          );
+          const at = await new Promise(requestAnimationFrame);
+          samples.push({
+            at,
+            power: Number(view.style.getPropertyValue("--aim-power")),
+          });
+        }
+        return samples;
+      },
+      { startX, startY },
+    );
+    expect(
+      new Set(local.map((sample) => sample.power)).size,
+    ).toBeGreaterThanOrEqual(30);
+    expect(local.at(-1).power).toBeCloseTo(108 / 130, 3);
+    await expect(phone.locator(".dice-power-text")).toHaveText("83% POWER");
+    await expect
+      .poll(
+        () => previewPackets.filter((m) => m.type === "aim").at(-1)?.aim?.power,
+      )
+      .toBeCloseTo(108 / 130, 3);
+    expect(previewPackets.filter((m) => m.type === "state")).toHaveLength(0);
+    const aimPackets = previewPackets.filter((m) => m.type === "aim");
+    expect(aimPackets.length).toBeLessThan(local.length);
+    expect(
+      aimPackets
+        .slice(1)
+        .every((m, i) => m.aim.at - aimPackets[i].aim.at >= 100),
+    ).toBe(true);
+    if (!process.env.CI || process.env.CRAPSTV_CAPTURE_AIM)
+      await phone
+        .locator(".dice-throw")
+        .screenshot({ path: "artifacts/phone-aim-drag-375.png" });
+    const remote = await tv.evaluate(() => {
+      window.previewObserver.disconnect();
+      return window.previewFrames;
+    });
+    await writeFile(
+      "artifacts/throw-aim-samples.json",
+      JSON.stringify({ local, remote, packets: aimPackets }, null, 2),
+    );
+    expect(new Set(remote.map((sample) => sample.aim[1])).size).toBeGreaterThan(
+      2,
+    );
+    // TV renders intermediate power values without matching a fresh packet.
+    expect(
+      remote.some(({ aim: [, power] }) =>
+        aimPackets.every((m) => Math.abs(m.aim.power - power) > 0.001),
+      ),
+    ).toBe(true);
+
+    // A cancelled pointer clears both views and never launches the dice.
+    await aimView.evaluate((view) =>
+      view.dispatchEvent(
+        new PointerEvent("pointercancel", {
+          bubbles: true,
+          pointerId: Number(view.dataset.testPointer),
+        }),
+      ),
+    );
+    await phone.mouse.up();
+    await expect(tv.locator(".table-canvas")).toHaveAttribute("data-aim", "");
+    await expect(aimView).toHaveAttribute("data-aiming", "false");
+    expect(shooterThrows.filter((m) => m.type === "roll")).toHaveLength(0);
+    previewPackets = null;
+
+    // The release can arrive before the next network tick or local repaint.
+    // Its coordinates determine the physical launch.
+    await phone.mouse.move(startX, startY);
+    await phone.mouse.down();
+    await phone.mouse.move(startX + 55, startY - 104);
+    await phone.mouse.up();
+    await expect
+      .poll(() => shooterThrows.filter((m) => m.type === "roll"))
+      .toEqual([{ type: "roll", gesture: { x: 0.5, power: 0.8 } }]);
     await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
     await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
       "data-throw-id",
@@ -369,6 +509,11 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       .getByTestId("phone-dice")
       .getAttribute("data-throw-id");
     expect(throwId).toBeTruthy();
+    await expect(aimView.locator(".dice-flight")).toHaveAttribute(
+      "data-loaded",
+      "true",
+    );
+    await expect(aimView.locator(".dice-flight canvas")).toBeVisible();
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-throw-id",
       throwId,
