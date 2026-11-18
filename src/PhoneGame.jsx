@@ -31,6 +31,7 @@ import {
 import { validBetChoices } from "./bet-options.js";
 import {
   catalogue,
+  canRemoveBet,
   describeBet,
   equity,
   money,
@@ -160,6 +161,7 @@ function betIssue(row, amount, { player, state, connected }) {
 
 function unavailableLabel(row) {
   if (row.available) return "";
+  if (row.unavailableReason) return row.unavailableReason;
   return row.id === "come" || row.id === "dontcome"
     ? "after a point"
     : "come-out only";
@@ -356,7 +358,13 @@ function BetTile({
         <small className="pg-tile-pay">{row.payout.split(" · ")[0]}</small>
       )}
       {!row.available && (
-        <small className="pg-tile-off">{unavailableLabel(row)}</small>
+        <small className="pg-tile-off">
+          {row.unavailableReason
+            ? row.id.startsWith("bonus-")
+              ? "Entry closed"
+              : "Opposing bet"
+            : unavailableLabel(row)}
+        </small>
       )}
       <Stake amount={stake} count={count} />
     </button>
@@ -560,9 +568,18 @@ function OddsCue({ side, label, text }) {
   );
 }
 
-function Board({ state, rows, travelled, tile, passBet, dontBet, oddsTile }) {
+function Board({
+  state,
+  rows,
+  numberMode,
+  travelled,
+  tile,
+  passBet,
+  dontBet,
+  oddsTile,
+}) {
   const by = (id) => rows.find((row) => row.id === id);
-  const places = rows.filter(isPlaceRow),
+  const places = rows.filter((row) => row.id.startsWith(`${numberMode}-`)),
     crapless = state.config.mode === "crapless";
   const come = by("come"),
     dontCome = by("dontcome"),
@@ -664,42 +681,212 @@ function Board({ state, rows, travelled, tile, passBet, dontBet, oddsTile }) {
 }
 
 function MoreBets({ extra, tile }) {
-  const groups = ["True odds", "Hardways", "One roll", "Big numbers"];
+  const groups = [...new Set(extra.map((row) => row.group))];
+  const [chosen, setChosen] = useState("Bonus bets");
+  const [hopDice, setHopDice] = useState([1, 1]);
+  const hopId = `hop-${[...hopDice].sort((a, b) => a - b).join("-")}`;
+  const active = groups.includes(chosen) ? chosen : groups[0];
+  const items = extra.filter(
+    (row) =>
+      row.group === active &&
+      (active !== "Exact dice · one roll" || row.id === hopId),
+  );
+  const labels = {
+    "Buy & lay": "Buy / Lay",
+    "Bonus bets": "Small / Tall / All",
+    "Exact dice · one roll": "Hop pairs",
+    "True odds": "Come odds",
+    "One roll": "Totals",
+  };
   return (
     <div className="pg-more">
-      {groups.map((group) => {
-        const items = extra.filter((row) => row.group === group);
-        return (
-          <section
+      <div
+        className="pg-more-tabs"
+        role="group"
+        aria-label="More bet categories"
+      >
+        {groups.map((group) => (
+          <button
+            type="button"
             key={group}
-            className={`pg-more-group is-${group.split(" ")[0].toLowerCase()}`}
+            aria-pressed={active === group}
+            onClick={() => setChosen(group)}
           >
-            <h3>{group}</h3>
-            {items.length ? (
-              <div className="pg-more-grid">
-                {items.map((row) => {
-                  const n = Number(row.id.split("-")[1]);
-                  return tile(
-                    row,
-                    <>
-                      {row.id.startsWith("hard-") && (
-                        <span className="pg-tile-dice">
-                          <Die value={n / 2} />
-                          <Die value={n / 2} />
-                        </span>
-                      )}
-                      <span className="pg-tile-name is-tiny">{row.name}</span>
-                    </>,
-                    "pg-tile-more",
-                  );
-                })}
-              </div>
-            ) : (
-              <p>Come odds appear here once a come bet has a point.</p>
-            )}
-          </section>
-        );
-      })}
+            {labels[group] || group}
+          </button>
+        ))}
+      </div>
+      <section
+        className={`pg-more-group ${active === "Exact dice · one roll" ? "is-hops" : active === "Bonus bets" ? "is-bonus" : ""}`}
+        aria-label={active}
+      >
+        <h3>{active}</h3>
+        {active === "Exact dice · one roll" && (
+          <>
+            <p>
+              Choose two faces: 21 unordered pairs, either order, one roll.
+              Other pairs with the same total lose.
+            </p>
+            <div className="pg-hop-picker">
+              {[0, 1].map((index) => (
+                <div
+                  role="group"
+                  aria-label={index ? "Second die" : "First die"}
+                  key={index}
+                >
+                  <b>{index ? "Die 2" : "Die 1"}</b>
+                  <div>
+                    {[1, 2, 3, 4, 5, 6].map((value) => (
+                      <button
+                        type="button"
+                        key={value}
+                        aria-label={`${index ? "Second" : "First"} die ${value}`}
+                        aria-pressed={hopDice[index] === value}
+                        onClick={() =>
+                          setHopDice((current) =>
+                            current.map((face, i) =>
+                              i === index ? value : face,
+                            ),
+                          )
+                        }
+                      >
+                        <Die value={value} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {active === "Bonus bets" && (
+          <p>
+            Every marked number before any 7. Entry before the first roll or
+            after a 7; locks after the first roll.
+          </p>
+        )}
+        <div className="pg-more-grid">
+          {items.map((row) => {
+            const n = Number(row.id.split("-")[1]);
+            const dice = row.id.startsWith("hop-")
+              ? row.id.split("-").slice(1).map(Number)
+              : row.id.startsWith("hard-")
+                ? [n / 2, n / 2]
+                : null;
+            return tile(
+              row,
+              <>
+                {dice && (
+                  <span className="pg-tile-dice">
+                    <Die value={dice[0]} />
+                    <Die value={dice[1]} />
+                  </span>
+                )}
+                <span className="pg-tile-name is-tiny">{row.name}</span>
+                {row.targets && (
+                  <span
+                    className="pg-bonus-progress"
+                    aria-label={`${row.progress.length} of ${row.targets.length} numbers hit`}
+                  >
+                    {row.targets.map((number) => (
+                      <i
+                        key={number}
+                        className={
+                          row.progress.includes(number) ? "is-hit" : ""
+                        }
+                      >
+                        {number}
+                      </i>
+                    ))}
+                  </span>
+                )}
+              </>,
+              "pg-tile-more",
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// Match stored wager IDs, including each travelled Come contract and its odds.
+function matchingWagers(row, bets) {
+  if (!row) return [];
+  return bets.filter((bet) =>
+    row.parent
+      ? bet.type === "odds" && bet.parent === row.parent
+      : bet.type === row.id,
+  );
+}
+
+function WagerActions({ row, bets, locked, teach, send }) {
+  const [chosen, setChosen] = useState(null);
+  const matches = matchingWagers(row, bets);
+  const bet = matches.find((item) => item.id === chosen) || matches[0];
+  if (!bet) return null;
+  const removable = canRemoveBet(bet);
+  const refund = bets
+    .filter((item) => item.id === bet.id || item.parent === bet.id)
+    .reduce((total, item) => total + item.amount, 0);
+  const reason = !removable
+    ? bet.type.startsWith("bonus-")
+      ? "Locked until bonus resolves"
+      : "Locked until its point resolves"
+    : "Refund to bank";
+  return (
+    <div
+      className="pg-wager-actions"
+      role="group"
+      aria-label="Selected wager actions"
+    >
+      <div className="pg-wager-action-text">
+        {matches.length > 1 ? (
+          <select
+            aria-label="Choose existing wager"
+            value={bet.id}
+            onChange={(event) => setChosen(event.target.value)}
+          >
+            {matches.map((item) => (
+              <option key={item.id} value={item.id}>
+                {row.name}
+                {item.point ? ` · ${item.point}` : " · coming out"} ·{" "}
+                {money(item.amount)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <b>
+            {row.name}
+            {bet.point && !row.parent ? ` · ${bet.point}` : ""} ·{" "}
+            {money(bet.amount)}
+          </b>
+        )}
+        <small>
+          {reason}
+          {` · pays ${row.payout}`}
+        </small>
+      </div>
+      <button
+        type="button"
+        disabled={locked || !removable}
+        aria-label={
+          removable
+            ? `Take down ${row.name}${bet.point ? ` at ${bet.point}` : ""}, refund ${money(refund)}`
+            : `${row.name} locked: ${reason}`
+        }
+        onClick={() => send({ type: "remove", betId: bet.id })}
+      >
+        {!removable ? (
+          <>
+            <Lock size={13} /> Locked
+          </>
+        ) : (
+          <>
+            Take down <b>{money(refund)}</b>
+          </>
+        )}
+      </button>
     </div>
   );
 }
@@ -728,6 +915,7 @@ function PlayPanel({
   onDragTarget,
 }) {
   const [view, setView] = useState("board");
+  const [numberMode, setNumberMode] = useState("place");
   const locked = state.rolling || !connected || busy;
   const context = { player, state, connected };
   const drag = useChipDrag({
@@ -823,7 +1011,7 @@ function PlayPanel({
       "pg-odds-row pg-tile-odds",
       {
         note: `${detail}. Pays ${row.payout}. Total odds limit ${money(row.max)}`,
-        disabled: !open || state.rolling || !connected,
+        disabled: state.rolling || !connected,
       },
     );
   };
@@ -832,15 +1020,23 @@ function PlayPanel({
     : state.rolling
       ? { tone: "lock", text: "Dice are out. Bets are locked." }
       : notice;
-  const showQuick = !locked && !!selectedRow?.available && !liveNotice;
+  const selectedWagers = matchingWagers(selectedRow, player.bets);
+  const selectedChoices = selectedRow
+    ? validBetChoices(selectedRow, amount, player)
+    : null;
+  const showQuick =
+    !locked &&
+    !!selectedRow?.available &&
+    !!selectedChoices?.quick.length &&
+    !liveNotice;
   const fallback = selectedRow
-    ? `${selectedRow.name} · min ${money(selectedRow.minimum)}${
+    ? `${selectedRow.name}${!selectedRow.available ? ` · ${unavailableLabel(selectedRow)}` : !selectedChoices.quick.length ? ` · ${selectedChoices.reason}` : ""} · min ${money(selectedRow.minimum)}${
         selectedRow.quantum > 100
           ? ` · ${money(selectedRow.quantum)} steps`
           : ""
-      }${
+      } · pays ${selectedRow.payout}${
         teach
-          ? ` · pays ${selectedRow.payout.split(" · ")[0]} · ${(selectedRow.prob * 100).toFixed(1)}% win · ${selectedRow.edge.toFixed(2)}% edge`
+          ? ` · ${(selectedRow.prob * 100).toFixed(1)}% win · ${selectedRow.edge.toFixed(2)}% edge`
           : ""
       }`
     : amount
@@ -911,16 +1107,20 @@ function PlayPanel({
         )}
         {!canReup && (
           <div className="pg-feedback">
-            {showQuick ? (
+            {selectedWagers.length && !liveNotice ? (
+              <WagerActions
+                row={selectedRow}
+                bets={player.bets}
+                locked={locked}
+                teach={teach}
+                send={send}
+              />
+            ) : showQuick ? (
               <QuickBets
                 row={selectedRow}
                 player={player}
                 onBet={wager}
-                detail={
-                  teach
-                    ? `Min ${money(selectedRow.minimum)} · pays ${selectedRow.payout.split(" · ")[0]} · ${(selectedRow.prob * 100).toFixed(1)}% win · ${selectedRow.edge.toFixed(2)}% edge`
-                    : undefined
-                }
+                detail={`Min ${money(selectedRow.minimum)} · ${money(selectedRow.quantum)} steps · pays ${selectedRow.payout}${teach ? ` · ${(selectedRow.prob * 100).toFixed(1)}% win · ${selectedRow.edge.toFixed(2)}% edge` : ""}`}
               />
             ) : (
               <Notice
@@ -950,12 +1150,32 @@ function PlayPanel({
           {moreStake > 0 && <b>{compact(moreStake)}</b>}
           {oddsCount > 0 && <em>Odds</em>}
         </button>
+        <select
+          className="pg-number-mode"
+          aria-label="Number wager type"
+          value={numberMode}
+          onChange={(event) => {
+            setNumberMode(event.target.value);
+            setView("board");
+            setSelectedId(null);
+            setNotice(null);
+          }}
+        >
+          <option value="place">Place numbers</option>
+          <option value="buy">Buy numbers</option>
+          <option value="lay" disabled={state.config.mode === "crapless"}>
+            {state.config.mode === "crapless"
+              ? "Lay: classic only"
+              : "Lay numbers"}
+          </option>
+        </select>
       </div>
       <div className={`pg-felt ${locked ? "is-locked" : ""}`}>
         {view === "board" ? (
           <Board
             state={state}
             rows={rows}
+            numberMode={numberMode}
             travelled={travelled}
             tile={tile}
             passBet={passBet}
@@ -973,11 +1193,17 @@ function PlayPanel({
 
 function betStatus(state, player, bet) {
   const parent = player.bets.find((b) => b.id === bet.parent);
-  if (bet.point && (bet.type === "pass" || bet.type === "come"))
-    return { text: "Locked until its point resolves", locked: true };
+  if (!canRemoveBet(bet))
+    return {
+      text: bet.type.startsWith("bonus-")
+        ? "Locked until bonus resolves"
+        : "Locked until its point resolves",
+      locked: true,
+    };
   if (
     !state.point &&
     (bet.type.startsWith("place") ||
+      bet.type.startsWith("buy") ||
       bet.type.startsWith("hard") ||
       (bet.type === "odds" && parent?.type === "come"))
   )
@@ -1086,14 +1312,24 @@ function BetsPanel({
                 )}
                 <button
                   type="button"
-                  className="pg-icon"
+                  className="pg-bet-remove"
                   aria-label={
-                    status.locked ? `${name} is locked` : `Take down ${name}`
+                    status.locked
+                      ? `${name} is locked`
+                      : `Take down ${name}, refund ${money(sum(player.bets.filter((item) => item.id === b.id || item.parent === b.id).map((item) => item.amount)))}`
                   }
                   disabled={locked || status.locked}
                   onClick={() => send({ type: "remove", betId: b.id })}
                 >
-                  {status.locked ? <Lock size={16} /> : <X size={18} />}
+                  {status.locked ? (
+                    <Lock size={16} />
+                  ) : (
+                    <span>
+                      Take
+                      <br />
+                      down
+                    </span>
+                  )}
                 </button>
               </li>
             );

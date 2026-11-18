@@ -47,6 +47,42 @@ export const WAYS = {
 };
 export const POINTS = [4, 5, 6, 8, 9, 10];
 export const ALL_POINTS = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+export const BONUS_NUMBERS = {
+  "bonus-small": [2, 3, 4, 5, 6],
+  "bonus-tall": [8, 9, 10, 11, 12],
+  "bonus-all": ALL_POINTS,
+};
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+const oddsRatio = (numerator, denominator) => {
+  const divisor = gcd(numerator, denominator);
+  return `${numerator / divisor}:${denominator / divisor}`;
+};
+// Exact probability of collecting this set before a seven, ignoring repeats.
+function bonusProbability(numbers, mask = 0, memo = new Map()) {
+  if (mask === (1 << numbers.length) - 1) return 1;
+  if (memo.has(mask)) return memo.get(mask);
+  const unseen = numbers.reduce(
+    (sum, n, i) => sum + (mask & (1 << i) ? 0 : WAYS[n]),
+    0,
+  );
+  const probability = numbers.reduce(
+    (sum, n, i) =>
+      sum +
+      (mask & (1 << i)
+        ? 0
+        : (WAYS[n] / (6 + unseen)) *
+          bonusProbability(numbers, mask | (1 << i), memo)),
+    0,
+  );
+  memo.set(mask, probability);
+  return probability;
+}
+const BONUS_PROBABILITIES = Object.fromEntries(
+  Object.entries(BONUS_NUMBERS).map(([id, numbers]) => [
+    id,
+    bonusProbability(numbers),
+  ]),
+);
 export const money = (n) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -113,6 +149,7 @@ export function createState(code = "LOCAL") {
     throw: null,
     rolls: [],
     lastRoll: null,
+    bonus: { hits: [] },
     log: [],
     createdAt: Date.now(),
     endedAt: null,
@@ -126,6 +163,38 @@ export function net(p) {
 }
 export function snapshot(state) {
   return structuredClone(state);
+}
+/** This table excludes directly opposing entry bets; other casino hedges remain legal. */
+export function betConflict(player, betId) {
+  const opposite = {
+    pass: "dont",
+    dont: "pass",
+    come: "dontcome",
+    dontcome: "come",
+  }[betId];
+  if (
+    opposite &&
+    player?.bets.some((bet) => bet.type === opposite && !bet.point)
+  )
+    return "Take down the opposing line bet first.";
+  const [kind, n] = betId.split("-");
+  if (
+    ["place", "buy", "lay"].includes(kind) &&
+    player?.bets.some((bet) =>
+      kind === "lay"
+        ? [`place-${n}`, `buy-${n}`].includes(bet.type)
+        : bet.type === `lay-${n}`,
+    )
+  )
+    return "Take down the opposing bet on this number first.";
+  return "";
+}
+/** Pass/Come contracts lock at their point; bonus contracts lock once play starts. */
+export function canRemoveBet(bet) {
+  return (
+    !(bet.point && ["pass", "come"].includes(bet.type)) &&
+    !(BONUS_NUMBERS[bet.type] && bet.started)
+  );
 }
 export function catalogue(state, player) {
   const crapless = state.config.mode === "crapless",
@@ -231,6 +300,62 @@ export function catalogue(state, player) {
               ? 6
               : 5) * 100,
     })),
+    ...points.map((n) => ({
+      id: `buy-${n}`,
+      name: `Buy ${n}`,
+      group: "Buy & lay",
+      payout: `${oddsRatio(6, WAYS[n])} · less 5% of stake on wins`,
+      prob: WAYS[n] / (WAYS[n] + 6),
+      edge: (5 * WAYS[n]) / (WAYS[n] + 6),
+      description: `${n} before 7. True odds, with a 5% stake commission only on a win. Stake stays up. Off on come-out rolls.`,
+      available: true,
+      quantum: (WAYS[n] / gcd(6, WAYS[n])) * 100,
+    })),
+    ...(!crapless
+      ? POINTS.map((n) => ({
+          id: `lay-${n}`,
+          name: `Lay ${n}`,
+          group: "Buy & lay",
+          payout: `${oddsRatio(WAYS[n], 6)} · less 5% of winnings`,
+          prob: 6 / (WAYS[n] + 6),
+          edge: (5 * WAYS[n]) / (WAYS[n] + 6),
+          description: `7 before ${n}. A 5% commission is deducted from winnings only. Stake stays up. Always working, including come-out.`,
+          available: true,
+          quantum: (6 / gcd(6, WAYS[n])) * 100,
+        }))
+      : []),
+    ...Object.entries(BONUS_NUMBERS).map(([id, numbers]) => ({
+      id,
+      name:
+        id === "bonus-small"
+          ? "All Small"
+          : id === "bonus-tall"
+            ? "All Tall"
+            : "Make ’em All",
+      group: "Bonus bets",
+      payout: id === "bonus-all" ? "175:1" : "34:1",
+      prob: BONUS_PROBABILITIES[id],
+      edge:
+        (1 - BONUS_PROBABILITIES[id] * (id === "bonus-all" ? 176 : 35)) * 100,
+      description: `Roll every ${numbers.join(", ")} before any 7, including come-out 7s. Enter only before the first roll or immediately after a 7. Locks after the first roll; pays once and comes down.`,
+      available: !point && (!state.rolls.length || state.lastRoll?.total === 7),
+      unavailableReason:
+        "Enter bonus bets before the first roll or immediately after a 7.",
+      progress: numbers.filter((n) => state.bonus?.hits?.includes(n)),
+      targets: numbers,
+    })),
+    ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap((a) =>
+      Array.from({ length: 7 - a }, (_, i) => a + i).map((b) => ({
+        id: `hop-${a}-${b}`,
+        name: `Hop ${a} + ${b}`,
+        group: "Exact dice · one roll",
+        payout: a === b ? "30:1" : "15:1",
+        prob: (a === b ? 1 : 2) / 36,
+        edge: a === b ? 13.889 : 11.111,
+        description: `The next dice must show ${a} and ${b}${a !== b ? ", in either order" : ""}. One roll only; other combinations with the same total lose.`,
+        available: true,
+      })),
+    ),
     ...[4, 6, 8, 10].map((n) => ({
       id: `hard-${n}`,
       name: `Hard ${n}`,
@@ -289,18 +414,21 @@ export function catalogue(state, player) {
         id: `odds:${b.id}`,
         name: `${against ? "Lay" : "Take"} odds · ${b.type === "pass" ? "pass" : b.type === "dont" ? "don’t pass" : b.type === "dontcome" ? "don’t come" : "come"} ${b.point}`,
         group: "True odds",
-        payout: against ? `${w}:6` : `6:${w}`,
+        payout: against ? oddsRatio(w, 6) : oddsRatio(6, w),
         prob: against ? 6 / (6 + w) : w / (6 + w),
         edge: 0,
         description: `Back your ${b.point} with true odds, up to 5× the line stake.${b.type === "come" ? " Off on come-out rolls." : ""}`,
         available: true,
-        quantum: (against ? 6 : w) * 100,
+        quantum: ((against ? 6 : w) / gcd(6, w)) * 100,
         parent: b.id,
         max: b.amount * 5,
       });
     }
   return rows.map((b) => ({
     ...b,
+    ...(betConflict(player, b.id)
+      ? { available: false, unavailableReason: betConflict(player, b.id) }
+      : {}),
     quantum: b.quantum || 100,
     minimum:
       Math.ceil(state.config.minBet / (b.quantum || 100)) * (b.quantum || 100),
@@ -547,7 +675,10 @@ export function place(s, id, betId, amount) {
   betting(s);
   const p = active(s, id),
     item = catalogue(s, p).find((b) => b.id === betId);
-  assert(item && item.available, "That bet is not available on this roll.");
+  assert(
+    item && item.available,
+    item?.unavailableReason || "That bet is not available on this roll.",
+  );
   assert(
     Number.isSafeInteger(amount) &&
       amount >= item.minimum &&
@@ -573,6 +704,7 @@ export function place(s, id, betId, amount) {
         ? p.bets.find((b) => b.id === item.parent).point
         : null,
       parent: item.parent || null,
+      ...(BONUS_NUMBERS[betId] ? { started: false } : {}),
     });
   p.bank -= amount;
   p.betPreview = null;
@@ -584,8 +716,10 @@ export function remove(s, id, betId) {
     b = p.bets.find((b) => b.id === betId);
   assert(b, "Bet not found.");
   assert(
-    !(b.point && ["pass", "come"].includes(b.type)),
-    "That line bet is locked until its point resolves.",
+    canRemoveBet(b),
+    BONUS_NUMBERS[b.type]
+      ? "That bonus bet is locked until it resolves."
+      : "That line bet is locked until its point resolves.",
   );
   const removed = p.bets.filter((x) => x.id === b.id || x.parent === b.id);
   p.bank += removed.reduce((n, b) => n + b.amount, 0);
@@ -786,6 +920,11 @@ export function finishRoll(s, dice = s.throw?.dice) {
   const total = dice[0] + dice[1],
     oldPoint = s.point,
     crapless = s.config.mode === "crapless";
+  s.bonus ??= { hits: [] };
+  s.bonus.hits =
+    total === 7
+      ? []
+      : [...new Set([...s.bonus.hits, total])].sort((a, b) => a - b);
   const events = [];
   const presentationSources = {};
   for (const p of s.players.filter((p) => !p.left)) {
@@ -852,9 +991,9 @@ export function finishRoll(s, dice = s.throw?.dice) {
     for (const b of pending.filter(
       (b) => !["pass", "dont", "come", "dontcome", "odds"].includes(b.type),
     )) {
-      const [kind, ns] = b.type.split("-"),
+      const [kind, ns, secondDie] = b.type.split("-"),
         n = Number(ns);
-      if (["place", "hard"].includes(kind) && !oldPoint) continue;
+      if (["place", "buy", "hard"].includes(kind) && !oldPoint) continue;
       if (kind === "place") {
         if (total === 7) settleBet(b, "lose");
         else if (total === n) {
@@ -869,6 +1008,25 @@ export function finishRoll(s, dice = s.throw?.dice) {
                   : 7 / 6;
           settleBet(b, "win", ratio, true);
         }
+      } else if (kind === "buy") {
+        if (total === 7) settleBet(b, "lose");
+        else if (total === n) settleBet(b, "win", 6 / WAYS[n] - 0.05, true);
+      } else if (kind === "lay") {
+        if (total === n) settleBet(b, "lose");
+        else if (total === 7) settleBet(b, "win", (WAYS[n] / 6) * 0.95, true);
+      } else if (kind === "bonus") {
+        b.started = true;
+        if (total === 7) settleBet(b, "lose");
+        else if (
+          BONUS_NUMBERS[b.type].every((number) => s.bonus.hits.includes(number))
+        )
+          settleBet(b, "win", b.type === "bonus-all" ? 175 : 34);
+      } else if (kind === "hop") {
+        const other = Number(secondDie);
+        const hit =
+          (dice[0] === n && dice[1] === other) ||
+          (dice[1] === n && dice[0] === other);
+        settleBet(b, hit ? "win" : "lose", n === other ? 30 : 15);
       } else if (kind === "hard") {
         if (total === 7 || (total === n && dice[0] !== dice[1]))
           settleBet(b, "lose");

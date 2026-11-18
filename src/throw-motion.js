@@ -2,7 +2,7 @@ import { createDicePhysics, DICE_SIZE, BOUNDS } from "./dice-physics.js";
 import { diceLaunchPositions } from "./dice-launch.js";
 
 export const THROW_DURATION = 2500;
-export const PHYSICS_VERSION = 5;
+export const PHYSICS_VERSION = 6;
 export const DEFAULT_GESTURE = Object.freeze({ x: 0, power: 0.65 });
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const rounded = (value) => Math.round(value * 100000) / 100000;
@@ -148,6 +148,7 @@ export function createThrowTimeline({
   physics.throwDice(seed, controls);
   const raw = [physics.bodies.map(physicalPose)];
   const rawPuck = physics.puckBody ? [physicalPose(physics.puckBody)] : null;
+  const rawWager = new Map();
   let steps = 0;
   while (steps < 1440) {
     physics.step(1 / 120);
@@ -155,6 +156,11 @@ export function createThrowTimeline({
     if (steps % 2 === 0) {
       raw.push(physics.bodies.map(physicalPose));
       if (rawPuck) rawPuck.push(physicalPose(physics.puckBody));
+      for (const [id, track] of physics.chipsInMotion) {
+        if (!rawWager.has(id))
+          rawWager.set(id, { firstFrame: raw.length - 1, frames: [], track });
+        rawWager.get(id).frames.push(track.bodies.map(physicalPose));
+      }
       if (steps >= 120 && physics.sleeping) break;
     }
   }
@@ -165,6 +171,7 @@ export function createThrowTimeline({
   function supportedHeight(pose) {
     let top = DICE_SIZE * 0.15;
     for (const stack of stacks) {
+      const moved = physics.chipsInMotion.get(stack.id);
       if (
         Math.hypot(
           pose.position[0] - stack.position[0],
@@ -172,7 +179,31 @@ export function createThrowTimeline({
         ) <=
         stack.radius + DICE_SIZE * 0.72
       )
-        top = Math.max(top, stack.position[1] + stack.height / 2);
+        top = Math.max(
+          top,
+          moved
+            ? stack.impactChips[0].bottom
+            : stack.position[1] + stack.height / 2,
+        );
+      moved?.bodies.forEach((chip, index) => {
+        const shape = stack.impactChips[index];
+        if (
+          Math.hypot(
+            pose.position[0] - chip.position.x,
+            pose.position[2] - chip.position.z,
+          ) >
+          shape.radius + DICE_SIZE * 0.72
+        )
+          return;
+        const { x, z } = chip.quaternion;
+        const vertical = Math.min(1, Math.abs(1 - 2 * (x * x + z * z)));
+        top = Math.max(
+          top,
+          chip.position.y +
+            (shape.height / 2) * vertical +
+            shape.radius * Math.sqrt(1 - vertical * vertical),
+        );
+      });
     }
     if (physics.puckBody) {
       const marker = physicalPose(physics.puckBody),
@@ -234,6 +265,18 @@ export function createThrowTimeline({
     position: contact.position.map(rounded),
     velocity: contact.velocity.map(rounded),
   }));
+  const wagerChipFrames = [...rawWager.entries()]
+    .filter(([, { track }]) => track.hit)
+    .map(([id, { firstFrame, frames: poses, track }]) => {
+      const samples = poses.map((chips, index) => [
+        frames[firstFrame + index][0],
+        ...chips.flatMap((chip) =>
+          [...chip.position, ...chip.quaternion].map(rounded),
+        ),
+      ]);
+      samples.push([duration, ...samples.at(-1).slice(1)]);
+      return { id, layers: track.bodies.map((chip) => chip.layer), samples };
+    });
   // Hold the unmodified, already sleeping bodies briefly before results show.
   frames.push([duration, ...frames.at(-1).slice(1)]);
   return {
@@ -248,6 +291,7 @@ export function createThrowTimeline({
     gesture: controls,
     frames,
     puckFrames,
+    wagerChipFrames,
     props: {
       puck: puck ? structuredClone(puck) : null,
       stacks: structuredClone(stacks),

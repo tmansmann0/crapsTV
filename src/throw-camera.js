@@ -1,10 +1,20 @@
-import { SEAT_LAYOUT, arcPosition, betRoute } from "./chip-flow.js";
-import { chipPoseBounds } from "./chip-character.js";
+import {
+  SEAT_LAYOUT,
+  DEALER_CHIP_POSITION,
+  chipTransferPosition,
+  betRoute,
+  routeKey,
+} from "./chip-flow.js";
+import { chipPoseBounds, chipStackBounds } from "./chip-character.js";
 import { createBankChipInventory } from "./bank-chip-inventory.js";
 import { bankPhysicalSpecs } from "./bank-chip-presentation.js";
 import { BOARD_BET_SHIFT_Z } from "./board-layout.js";
-import { wagerPosition, wagerPileLayout } from "./wager-layout.js";
-import { planOutcomeTour, sampleOutcomeTour } from "./round-presentation.js";
+import { wagerPlacementMap, wagerPileLayout } from "./wager-layout.js";
+import {
+  planOutcomeTour,
+  sampleOutcomeTour,
+  SETTLEMENT_FLIGHT_MS,
+} from "./round-presentation.js";
 
 // Table-level rigs are inside the cushion corners. A recorded trajectory
 // chooses one rig for the entire throw; the camera never chases the dice.
@@ -28,8 +38,25 @@ const hash = (value) =>
 export const IDLE_PLAYER_SHOT_MS = 3000;
 export const IDLE_OVERVIEW_MS = 1200;
 export const IDLE_MAX_SHOTS = 3;
+export const IDLE_REVISIT_REST_MS = 45000;
+export const IDLE_CHANGE_REST_MS = 30000;
 const outcomePlanCache = new Map();
 const idlePlanCache = new Map();
+
+function makeIdleVisit(id, origin, players) {
+  const slots = players.map((player, index) => ({
+    playerId: player.id,
+    seat: player.seat,
+    name: player.name,
+    startAt: origin + IDLE_OVERVIEW_MS + index * IDLE_PLAYER_SHOT_MS,
+    endAt: origin + IDLE_OVERVIEW_MS + (index + 1) * IDLE_PLAYER_SHOT_MS,
+    index,
+  }));
+  return { id, startAt: origin, endAt: slots.at(-1)?.endAt ?? origin, slots };
+}
+
+const idleVisitAt = (cached, now) =>
+  cached.visit && now >= cached.visit.startAt ? cached.visit : cached.plan;
 
 export function planFiniteIdleCamera(
   state,
@@ -71,15 +98,7 @@ export function planFiniteIdleCamera(
     1 + (hash(seed) % IDLE_MAX_SHOTS),
   );
   const id = `idle:${seed}:${origin}:${onlyPlayerIds?.join(",") || "round"}`;
-  const slots = candidates.slice(0, count).map((player, index) => ({
-    playerId: player.id,
-    seat: player.seat,
-    name: player.name,
-    startAt: origin + IDLE_OVERVIEW_MS + index * IDLE_PLAYER_SHOT_MS,
-    endAt: origin + IDLE_OVERVIEW_MS + (index + 1) * IDLE_PLAYER_SHOT_MS,
-    index,
-  }));
-  return { id, startAt: origin, endAt: slots.at(-1)?.endAt ?? origin, slots };
+  return makeIdleVisit(id, origin, candidates.slice(0, count));
 }
 
 function finiteIdleCameraPlan(state, presentation, origin, now) {
@@ -88,20 +107,43 @@ function finiteIdleCameraPlan(state, presentation, origin, now) {
     (player) => !player.left && player.connected !== false,
   );
   const ids = players.map((player) => player.id);
+  let cached = idlePlanCache.get(key);
+  if (
+    cached &&
+    cached.players === state.players &&
+    cached.snapshotAt === state.snapshotAt &&
+    cached.connectedCount === players.length &&
+    now < cached.checkAt
+  )
+    return idleVisitAt(cached, now);
+
+  const settledIds = new Set(
+    (state.lastRoll?.events || [])
+      .filter((event) => event.bets?.length)
+      .map((event) => event.playerId),
+  );
   const active = players.some(
     (player) =>
       player.bets?.length ||
       player.betPreview?.amount ||
-      (state.lastRoll?.events || []).some(
-        (event) => event.playerId === player.id && event.bets?.length,
-      ),
+      settledIds.has(player.id),
   );
-  let cached = idlePlanCache.get(key);
+  const bets = new Map(
+    players.map((player) => [
+      player.id,
+      (player.bets || [])
+        .map((bet) => `${bet.id}:${bet.type}:${bet.amount}:${bet.on === false}`)
+        .sort()
+        .join("|"),
+    ]),
+  );
   if (!cached) {
     cached = {
       known: new Set(ids),
       consumed: active,
       plan: planFiniteIdleCamera(state, { presentation, origin }),
+      changedAt: null,
+      visit: null,
     };
     idlePlanCache.set(key, cached);
     if (idlePlanCache.size > 64)
@@ -126,15 +168,69 @@ function finiteIdleCameraPlan(state, presentation, origin, now) {
         onlyPlayerIds: newcomers,
       });
       cached.consumed = true;
+      cached.visit = null;
+      cached.changedAt = null;
     } else if (!cached.consumed && active) {
       cached.plan = planFiniteIdleCamera(state, {
         presentation,
         origin: Math.max(origin, state.snapshotAt ?? now),
       });
       cached.consumed = true;
+    } else if (
+      players.some(
+        (player) => cached.bets.get(player.id) !== bets.get(player.id),
+      )
+    ) {
+      cached.changedAt ??= state.snapshotAt ?? now;
     }
   }
-  return cached.plan;
+  cached.bets = bets;
+  cached.players = state.players;
+  cached.snapshotAt = state.snapshotAt;
+  cached.connectedCount = players.length;
+
+  const previous = cached.visit || cached.plan;
+  const changed = cached.changedAt !== null;
+  const repeatAt = Math.min(
+    previous.endAt + IDLE_REVISIT_REST_MS,
+    changed
+      ? Math.max(previous.endAt + IDLE_CHANGE_REST_MS, cached.changedAt)
+      : Infinity,
+  );
+  cached.checkAt = repeatAt;
+  if (now < repeatAt) return idleVisitAt(cached, now);
+
+  const candidates = players
+    .filter(
+      (player) =>
+        player.bets?.some((bet) => bet.amount > 0) || settledIds.has(player.id),
+    )
+    .sort((a, b) => a.seat - b.seat || a.id.localeCompare(b.id));
+  if (!candidates.length || (!changed && candidates.length === 1)) {
+    cached.checkAt = Infinity;
+    return previous;
+  }
+  const count = Math.min(candidates.length, IDLE_MAX_SHOTS);
+  const cycleMs =
+    IDLE_REVISIT_REST_MS + IDLE_OVERVIEW_MS + count * IDLE_PLAYER_SHOT_MS;
+  const skipped = Math.floor((now - repeatAt) / cycleMs);
+  const startAt = repeatAt + skipped * cycleMs;
+  const lastId = previous.slots.at(-1)?.playerId;
+  const offset =
+    (candidates.findIndex((p) => p.id === lastId) + 1 + skipped * count) %
+    candidates.length;
+  const selected = Array.from(
+    { length: count },
+    (_, i) => candidates[(offset + i) % candidates.length],
+  );
+  cached.visit = makeIdleVisit(
+    `idle-revisit:${key}:${startAt}`,
+    startAt,
+    selected,
+  );
+  cached.changedAt = null;
+  cached.checkAt = cached.visit.endAt + IDLE_REVISIT_REST_MS;
+  return cached.visit;
 }
 
 export function outcomePresentation(state) {
@@ -164,6 +260,37 @@ const boundsOf = (points) => ({
   max: [0, 1, 2].map((axis) => Math.max(...points.map((p) => p[axis]))),
 });
 const mix = (a, b, t) => a.map((value, axis) => value + (b[axis] - value) * t);
+
+/** Move from the captured view to a new resting composition along a single eased path. */
+export function sampleCameraSlide(from, to, progress) {
+  if (progress <= 0) return from;
+  if (progress >= 1) return to;
+  const t = smooth(progress);
+  const orbit = ({ position, target }) => {
+    const [x, y, z] = position.map((value, axis) => value - target[axis]);
+    return [
+      Math.hypot(x, y, z),
+      Math.atan2(x, z),
+      Math.atan2(y, Math.hypot(x, z)),
+    ];
+  };
+  const start = orbit(from);
+  const end = orbit(to);
+  const turn = end[1] - start[1];
+  end[1] = start[1] + Math.atan2(Math.sin(turn), Math.cos(turn));
+  const [distance, heading, pitch] = mix(start, end, t);
+  const target = mix(from.target, to.target, t);
+  const horizontal = Math.cos(pitch) * distance;
+  return {
+    position: [
+      target[0] + horizontal * Math.sin(heading),
+      target[1] + distance * Math.sin(pitch),
+      target[2] + horizontal * Math.cos(heading),
+    ],
+    target,
+    fov: from.fov + (to.fov - from.fov) * t,
+  };
+}
 
 const estimatedBankLayouts = new Map();
 const bankSubjectCache = new WeakMap();
@@ -219,30 +346,64 @@ function bankSubject(player, macro = false, state = null) {
   const bounds = boundsOf(points);
   return (cache[cacheKey] = {
     points,
+    bounds,
     height: bounds.max[1] - bounds.min[1],
     kind: "bank",
     area,
   });
 }
-function wagerSubject(route, state) {
-  const pile = wagerPileLayout(route, state, route.bet.amount || 500);
-  return {
-    points: corners(pile.bounds.min, pile.bounds.max),
-    height: pile.height,
-    kind: "bet",
-  };
-}
-function routeFocus(route, state) {
-  if (route.kind === "dealer") return [0, 1.2, -3.03];
-  if (route.kind === "bank") {
-    const player = (state.players || []).find((p) => p.id === route.playerId);
-    const area = SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0];
-    return [area.center[0], area.center[1] + 0.13, area.center[2]];
+const emptyPlayers = [];
+const wagerSubjects = new WeakMap();
+function wagerSubject(route, state, plan = null) {
+  const players = state.players || emptyPlayers;
+  let record = wagerSubjects.get(players);
+  if (record?.plan !== plan || record?.mode !== state.config.mode) {
+    record = { plan, mode: state.config.mode, subjects: new Map() };
+    wagerSubjects.set(players, record);
   }
-  const point = wagerPosition(route, state);
-  point[1] += 0.12;
-  return point;
+  const id = routeKey(route);
+  const key = `${id}:${route.bet.amount}`;
+  const spec = state.wagerLayouts?.get(id);
+  const cached = record.subjects.get(key);
+  if (cached && (cached.spec === spec || (plan && cached.spec))) return cached;
+  let bounds;
+  if (spec?.length) bounds = chipStackBounds(spec);
+  else {
+    record.placements ??= wagerPlacementMap(
+      state,
+      plan?.transfers.map((flow) => flow.from),
+    );
+    bounds = wagerPileLayout(
+      route,
+      state,
+      route.bet.amount || 500,
+      record.placements.get(id),
+    ).bounds;
+  }
+  const subject = {
+    points: corners(bounds.min, bounds.max),
+    height: bounds.max[1] - bounds.min[1],
+    spec,
+  };
+  record.subjects.set(key, subject);
+  return subject;
 }
+
+const dealerSubject = {
+  height: 0.56,
+  points: corners(
+    [
+      DEALER_CHIP_POSITION[0] - 1.08,
+      DEALER_CHIP_POSITION[1] - 0.09,
+      DEALER_CHIP_POSITION[2] - 0.36,
+    ],
+    [
+      DEALER_CHIP_POSITION[0] + 1.08,
+      DEALER_CHIP_POSITION[1] + 0.47,
+      DEALER_CHIP_POSITION[2] + 0.21,
+    ],
+  ),
+};
 function safeVerticalFraction(viewportHeight, hudRects) {
   if (!viewportHeight || !hudRects.length) return 0.8;
   let top = 0,
@@ -278,15 +439,16 @@ function fitChipCamera({
   hudRects = [],
   variant = "bank-macro",
   transfer = false,
+  traveling = false,
+  aim = null,
   railClearance = 0,
 }) {
   const bounds = boundsOf(points);
-  const target = bounds.min.map(
-    (value, axis) => (value + bounds.max[axis]) / 2,
-  );
+  const target =
+    aim || bounds.min.map((value, axis) => (value + bounds.max[axis]) / 2);
   const overhead = variant.endsWith("overhead");
   const bet = variant.startsWith("bet-");
-  const phase = smooth(clamp(progress, 0, 1));
+  const phase = traveling ? 0.5 : smooth(clamp(progress, 0, 1));
   const sign = seed % 2 ? 1 : -1;
   const motion =
     (phase - 0.5) * (variant.includes("sweep") ? 0.18 : 0.22) * sign;
@@ -336,7 +498,10 @@ function fitChipCamera({
     }
     return distance;
   };
-  let distance = fitDistance(direction, variant === "bank-macro" ? 0.96 : 1.18);
+  let distance = fitDistance(
+    direction,
+    traveling ? 2.1 : variant === "bank-macro" ? 0.96 : 1.18,
+  );
   let position = target.map(
     (value, axis) => value + direction[axis] * distance,
   );
@@ -446,43 +611,58 @@ export function sampleOutcomeCamera({
       ...metadata,
     };
   const seed = hash(`${plan.rollId}:${sample.index}:${memberIds.join(":")}`);
-  let height = 0,
-    points = [];
+  let height = 0;
+  const points = [],
+    aims = [];
   const p = clamp(sample.transferProgress, 0, 1);
+  const flightMs = slot.flightMs || SETTLEMENT_FLIGHT_MS;
+  const [travel, lift] = chipTransferPosition(
+    [0, 0, 0],
+    [1, 0, 0],
+    p * flightMs,
+    0,
+    flightMs,
+  );
   for (const flow of transfers) {
-    const subject = wagerSubject(flow.from, state);
-    height = Math.max(height, subject.height);
-    const center = arcPosition(
-      routeFocus(flow.from, state),
-      routeFocus(flow.to, state),
-      p,
+    const subject =
+      flow.kind === "win" && flow.sourceAmount === 0
+        ? dealerSubject
+        : wagerSubject(flow.from, state, plan);
+    const receiver =
+      flow.to.kind === "bank" &&
+      state.players?.find((player) => player.id === flow.playerId);
+    const rack =
+      flow.to.kind === "bank"
+        ? bankSubject(receiver || slot, false, state)
+        : null;
+    const endBounds = rack?.bounds;
+    const destination = endBounds
+      ? corners(endBounds.min, endBounds.max)
+      : dealerSubject.points;
+    const startBounds = boundsOf(subject.points);
+    const start = mix(startBounds.min, startBounds.max, 0.5);
+    // A deposit can shift the rack's occupied bounds during the tail. Keep
+    // the track anchored to the tray instead of correcting back as it lands.
+    const seat = rack?.area.center;
+    const end = seat
+      ? [seat[0], seat[1] + 0.13, seat[2]]
+      : DEALER_CHIP_POSITION;
+    aims.push(mix(start, end, travel));
+    height = Math.max(
+      height,
+      subject.height +
+        ((rack?.height ?? dealerSubject.height) - subject.height) * travel,
     );
-    let flying = corners(
-      [center[0] - 0.2, center[1] - 0.13, center[2] - 0.2],
-      [
-        center[0] + 0.2,
-        center[1] + Math.max(0.3, subject.height),
-        center[2] + 0.2,
-      ],
-    );
-    if (flow.to.kind === "bank" && p > 0.78) {
-      const receiver = state.players?.find((p) => p.id === flow.playerId);
-      if (receiver) {
-        const rack = bankSubject(receiver, false, state);
-        const rackBounds = boundsOf(rack.points);
-        const destination = corners(rackBounds.min, rackBounds.max);
-        const landing = smooth(clamp((p - 0.78) / 0.22, 0, 1));
-        flying = flying.map((point, index) =>
-          mix(point, destination[index], landing),
-        );
-        height = Math.max(height, rack.height * landing);
-      }
-    }
-    const lift = smooth(clamp(p / 0.12, 0, 1));
-    points.push(
-      ...subject.points.map((point, index) => mix(point, flying[index], lift)),
-    );
+    subject.points.forEach((point, index) => {
+      const rest = mix(point, destination[index], travel);
+      points.push([rest[0], rest[1] + lift, rest[2]]);
+    });
   }
+  // Advance to the receiving chips on a single path. Keep the arc inside the
+  // frame without pitching up with it and then pulling the view back down.
+  const aimed = boundsOf(aims);
+  const aim = mix(aimed.min, aimed.max, 0.5);
+  aim[1] += 0.32;
   const region = slot.focus?.region;
   const area = { ...(SEAT_LAYOUT[player?.seat ?? 0] || SEAT_LAYOUT[0]) };
   if (slot.kind === "group")
@@ -509,6 +689,8 @@ export function sampleOutcomeCamera({
     hudRects,
     variant,
     transfer: p > 0,
+    traveling: true,
+    aim,
     railClearance: smooth(clamp((p - 0.5) * 2, 0, 1)),
   });
   return {
@@ -539,7 +721,7 @@ export function samplePlayerAreaCamera({
   const seed = hash(`${roundId}:${player?.id || slot?.playerId || seat}`);
   let variant = CHIP_CAMERA_VARIANTS[seed % CHIP_CAMERA_VARIANTS.length];
   const bets = (player?.bets || []).filter((bet) => bet.amount > 0);
-  if (variant.startsWith("bet-") && (!state || !bets.length))
+  if (variant.startsWith("bet-") && (!state?.config || !bets.length))
     variant = ["bank-macro", "bank-overhead", "bank-sweep"][seed % 3];
   const subject = variant.startsWith("bet-")
     ? wagerSubject(betRoute(player.id, bets[seed % bets.length], bets), state)
@@ -715,7 +897,8 @@ export function sampleTableCamera({
   const player = (state.players || []).find(
     (player) => player.id === slot.playerId,
   );
-  if (!player || player.left) return { ...overview, ...idleMetadata };
+  if (!player || player.left || player.connected === false)
+    return { ...overview, ...idleMetadata };
   return {
     ...samplePlayerAreaCamera({
       player,
@@ -864,7 +1047,6 @@ export function sampleThrowCamera({
     1,
   );
   const position = [...THROW_CAMERA_RIGS[rig]];
-  position[1] += Math.sin(progress * Math.PI) * 0.01;
   const direction = target.map((value, axis) => value - position[axis]);
   const length = Math.hypot(...direction);
   direction.forEach((value, axis) => {

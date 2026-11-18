@@ -1,6 +1,47 @@
 import { CHIP_DENOMINATIONS } from "./chip-stack.js";
 import { chipHash } from "./chip-character.js";
 
+/** Reserve the exact identities that will land after the dealer's exchange. */
+export function planWagerReceipt(flowId, canonical, standing, incoming) {
+  const known = new Map();
+  for (const chip of [...standing, ...incoming])
+    if (!known.has(chip.id)) known.set(chip.id, chip);
+  const pool = [...known.values()];
+  const used = new Set();
+  const issued = [];
+  const selected = canonical.map((spec, index) => {
+    let physical = pool.find(
+      (chip) => chip.denomination === spec.denomination && !used.has(chip.id),
+    );
+    if (!physical) {
+      const id = `wager-receipt:${flowId}:${index}`;
+      physical = {
+        id,
+        denomination: spec.denomination,
+        wear: chipHash(id) % 3,
+        appearanceId: id,
+      };
+      issued.push(physical);
+    }
+    used.add(physical.id);
+    return physical;
+  });
+  const ordered = [
+    ...pool.filter((chip) => selected.includes(chip)),
+    ...issued,
+  ];
+  const placements = canonical.map((spec, index) =>
+    worldChip(spec, ordered[index]),
+  );
+
+  return {
+    carried: incoming.filter((chip) => !used.has(chip.id)),
+    removed: standing.filter((chip) => !used.has(chip.id)),
+    issued: placements.slice(placements.length - issued.length),
+    placements,
+  };
+}
+
 const denominations = new Set(CHIP_DENOMINATIONS.map((chip) => chip.value));
 const copy = (chip) => ({
   ...chip,
@@ -66,7 +107,12 @@ export function createWagerChipPresentation({
   function reconcile(
     key,
     canonicalSpecs,
-    { incoming = [], outgoingIds = [], sourceExchangeRemoved = [] } = {},
+    {
+      incoming = [],
+      outgoingIds = [],
+      sourceExchangeRemoved = [],
+      preserveLayerOrder = false,
+    } = {},
   ) {
     if (
       typeof key !== "string" ||
@@ -139,6 +185,18 @@ export function createWagerChipPresentation({
       minted = [],
       blocked = new Set();
     for (const chip of [...canonicalSpecs, ...arrivals]) blocked.add(chip.id);
+    if (preserveLayerOrder) {
+      const wanted = canonicalSpecs.map((chip) => chip.denomination);
+      const layered = [...old, ...arrivals].flatMap((chip) => {
+        const index = wanted.indexOf(chip.denomination);
+        return index < 0 ? [] : wanted.splice(index, 1);
+      });
+      layered.push(...wanted);
+      canonicalSpecs = canonicalSpecs.map((spec, index) => ({
+        ...spec,
+        denomination: layered[index],
+      }));
+    }
     const chips = canonicalSpecs.map((geometry, index) => {
       let physical = old[index];
       if (

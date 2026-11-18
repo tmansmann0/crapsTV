@@ -150,7 +150,7 @@ test("confirmed cached Cannon contact nudges only the top three underlying chips
   assert(greatestTilt <= Math.PI / 360 + 1e-12);
 });
 
-test("the landing has a tiny rebound and returns to exact stable poses", () => {
+test("the chip stays seated after contact and ends at its exact stable pose", () => {
   const source = stack(8),
     plan = planFor(source),
     event = plan.tracks[0].events[0];
@@ -163,8 +163,8 @@ test("the landing has a tiny rebound and returns to exact stable poses", () => {
         arriving.position[1],
     );
   assert(
-    rebound >= 0.002 && rebound <= 0.005,
-    "rebound is millimetres, not a stack jump",
+    rebound < 0.002,
+    "the supported chip never deliberately lifts back off the stack",
   );
   const end = sampleChipLanding(plan, plan.settlingUntil);
   assert.equal(end.active, false);

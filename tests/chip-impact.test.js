@@ -76,7 +76,7 @@ test("late motion is ignored so recovery cannot interrupt settlement", () => {
   late.frames = [frame(0, -1), frame(1500, -1), frame(1800, 1), frame(2500, 1)];
   assert.equal(findChipImpactCandidates(late, [stack()]).length, 0);
 });
-test("authoritative solid-stack contacts drive reactions when a rotated die stops outside the old reach gate", () => {
+test("a legacy solid-stack contact alone cannot move chips the die never reaches", () => {
   const chips = stack(6),
     timeline = flight(0.23);
   timeline.frames = [
@@ -102,23 +102,7 @@ test("authoritative solid-stack contacts drive reactions when a rotated die stop
     },
   ];
   assert.equal(findChipImpactCandidates(timeline, [chips]).length, 1);
-  const [track] = createChipImpacts(timeline, [chips]);
-  assert.ok(track);
-  assert.ok(
-    track.frames.some((f) =>
-      f.poses.some(
-        (p, i) =>
-          Math.hypot(
-            p.position[0] - track.original[i].position[0],
-            p.position[2] - track.original[i].position[2],
-          ) > 0.001,
-      ),
-    ),
-  );
-  assert.ok(
-    track.startAt + track.physicsMs + track.recoveryMs <=
-      timeline.startAt + timeline.duration,
-  );
+  assert.deepEqual(createChipImpacts(timeline, [chips]), []);
   timeline.stackContacts = [];
   assert.equal(
     createChipImpacts(timeline, [chips]).length,

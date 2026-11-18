@@ -25,7 +25,7 @@ export function validBetChoices(row, requested, player) {
       )
     : [];
   const reason = !row?.available
-    ? "This bet is not available on this roll."
+    ? row?.unavailableReason || "This bet is not available on this roll."
     : !available
       ? bank < minimum
         ? "Your bank is below this bet’s minimum."

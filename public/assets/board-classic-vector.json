@@ -1,13 +1,13 @@
 {
   "width": 2048,
   "height": 1024,
-  "vertices": 49154,
-  "triangles": 48462,
-  "filled": 466,
-  "stroked": 55,
+  "vertices": 57274,
+  "triangles": 56330,
+  "filled": 641,
+  "stroked": 59,
   "removedHatchPaths": 12,
-  "paintCount": 544,
-  "logoPaint": 45,
+  "paintCount": 751,
+  "logoPaint": 215,
   "logoRect": {
     "x": 879,
     "y": 9.1484375,
@@ -67,145 +67,145 @@
       "id": "mask-9",
       "opacity": 0.7,
       "emptyObjectBox": false,
-      "paint": 47
+      "paint": 217
     },
     {
       "id": "mask-10",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 134
+      "paint": 304
     },
     {
       "id": "mask-11",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 147
+      "paint": 317
     },
     {
       "id": "mask-12",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 160
+      "paint": 330
     },
     {
       "id": "mask-13",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 173
+      "paint": 343
     },
     {
       "id": "mask-14",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 186
+      "paint": 356
     },
     {
       "id": "mask-15",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 199
+      "paint": 369
     },
     {
       "id": "mask-16",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 214
+      "paint": 384
     },
     {
       "id": "mask-17",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 245
+      "paint": 415
     },
     {
       "id": "mask-18",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 260
+      "paint": 430
     },
     {
       "id": "mask-19",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 331
+      "paint": 501
     },
     {
       "id": "mask-20",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 340
+      "paint": 510
     },
     {
       "id": "mask-21",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 357
+      "paint": 527
     },
     {
       "id": "mask-22",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 358
+      "paint": 528
     },
     {
       "id": "mask-23",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 377
+      "paint": 547
     },
     {
       "id": "mask-24",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 398
+      "paint": 568
     },
     {
       "id": "mask-25",
       "opacity": 0.7,
       "emptyObjectBox": true,
-      "paint": 399
+      "paint": 569
     },
     {
       "id": "mask-26",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 425
+      "paint": 595
     },
     {
       "id": "mask-27",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 457
+      "paint": 627
     },
     {
       "id": "mask-28",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 465
+      "paint": 635
     },
     {
       "id": "mask-29",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 477
+      "paint": 647
     },
     {
       "id": "mask-30",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 490
+      "paint": 660
     }
   ],
   "clipPaints": 30,
   "colorEncoding": "sRGB; premultiplied once in native ink shader",
   "curveToleranceSvgPixels": 0.02,
-  "sourceSHA256": "01fa18cefd6e922c35264964de0c1f9ef678caab84cf3eb75dcc76e834ffb05a",
-  "binarySHA256": "e982a4cf4443c6d0dae7777bc83c450b43c9453d349308e645624b07fb792055",
-  "bytes": 1564656,
+  "sourceSHA256": "ad78b0925f14fe07f8b69faa797d83b1f9f95e9fabb2b8207b300e1339e005ac",
+  "binarySHA256": "288e96b83009c0c528704d064b3eb4d30d37e6b5072d318cef5976579e9231cf",
+  "bytes": 1821472,
   "minificationFallback": {
     "width": 2048,
     "height": 1024,
     "file": "board-classic-minified.png",
-    "sha256": "7931ff0100a4a272a5c857267e1071f7506c0b04f501245f2cafcb69fae24ca9"
+    "sha256": "0d1bd9bb5aba8ad15e4f62eb56e46c835926e892198ea433588e5761e4941ad4"
   }
 }

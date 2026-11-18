@@ -619,8 +619,19 @@ export function createSceneUI(renderer, onAction) {
       } else if (!state.rolling && focus?.phase === "idle-player") {
         const player = state.players.find((p) => p.id === focus.playerId);
         if (player) {
-          heading = player.name;
-          detail = `Bank ${money(player.bank)} · ${bettingSeconds > 0 ? `Betting open · ${bettingSeconds}s` : `${shooter} to roll`}`;
+          const delta =
+            roll?.events?.find((event) => event.playerId === player.id)
+              ?.delta || 0;
+          const stake = (player.bets || []).reduce(
+            (sum, bet) => sum + bet.amount,
+            0,
+          );
+          heading = delta
+            ? `${player.name} · ${delta > 0 ? "+" : "−"}${money(Math.abs(delta))}`
+            : player.name;
+          headingColor = delta > 0 ? "#c4e1b5" : delta < 0 ? "#edb6a5" : C.ink;
+          detail = `Bank ${money(player.bank)} · In play ${money(stake)}`;
+          if (bettingSeconds > 0) detail += ` · ${bettingSeconds}s to roll`;
         }
       }
     }
@@ -755,6 +766,11 @@ export function createSceneUI(renderer, onAction) {
         botRollSecondsRemaining(next.state),
       ),
     };
+    const focusPlayer =
+      next.cameraFocus?.playerId &&
+      next.state?.players.find(
+        (player) => player.id === next.cameraFocus.playerId,
+      );
     const key = JSON.stringify([
       next.code,
       next.joinURL,
@@ -787,9 +803,9 @@ export function createSceneUI(renderer, onAction) {
       next.state?.lastRoll?.id,
       next.state?.shooterId,
       next.cameraFocus?.shotKey,
-      next.cameraFocus &&
-        next.state?.players.find((p) => p.id === next.cameraFocus.playerId)
-          ?.bank,
+      focusPlayer?.bank,
+      next.cameraFocus?.phase === "idle-player" &&
+        focusPlayer?.bets?.map((bet) => bet.amount),
       next.state?.players.map((p) => [p.id, p.name]),
     ]);
     if (next.joinURL && next.joinURL !== qrURL && next.code) {

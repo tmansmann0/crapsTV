@@ -4,6 +4,7 @@ import {
   sampleThrowCamera,
   sampleTableCamera,
   sampleBankDetailCamera,
+  sampleCameraSlide,
 } from "./throw-camera.js";
 import { planOutcomeTour } from "./round-presentation.js";
 import { wagerStackLayout } from "./wager-layout.js";
@@ -138,13 +139,21 @@ export function createStartupShowcase() {
 export function sampleStartup(
   showcase,
   elapsed,
-  { aspect = 16 / 9, reducedMotion = false, bankLayouts = null } = {},
+  {
+    aspect = 16 / 9,
+    reducedMotion = false,
+    bankLayouts = null,
+    wagerLayouts = null,
+  } = {},
 ) {
   const time = clamp(elapsed, 0, STARTUP_DURATION_MS);
   const entry =
     [...showcase.stages].reverse().find((stage) => time >= stage.at) ||
     showcase.stages[0];
-  const state = bankLayouts ? { ...entry.state, bankLayouts } : entry.state;
+  const state =
+    bankLayouts || wagerLayouts
+      ? { ...entry.state, bankLayouts, wagerLayouts }
+      : entry.state;
   const pose = state.throw ? sampleThrow(state.throw, time) : null;
   const calibrationHold =
     showcase.calibrationHolds.find(
@@ -184,26 +193,18 @@ export function sampleStartup(
       progress: t,
       aspect,
     });
-  } else if (time < 3800) {
-    const t = smooth((time - 2200) / 1600);
+  } else if (time < 6200) {
     const detail = sampleBankDetailCamera({
       player: state.players[0],
       state,
       progress: 1,
       aspect,
     });
-    camera = {
-      position: mix(detail.position, [-3.8, 3.1, 5.0], t),
-      target: mix(detail.target, [-1.8, 0.8, 2.4], t),
-      fov: detail.fov + (47 - detail.fov) * t,
-    };
-  } else if (time < 6200) {
-    const t = smooth((time - 3800) / 2400);
-    camera = {
-      position: mix([-4.8, 3.5, 6.0], [-3.8, 3.1, 5.0], t),
-      target: [-1.8, 0.8, 2.4],
-      fov: 47 - t * 3,
-    };
+    camera = sampleCameraSlide(
+      detail,
+      { position: [-3.8, 3.1, 5.0], target: [-1.8, 0.8, 2.4], fov: 44 },
+      (time - 2200) / 4000,
+    );
   } else if (diceShot) camera = diceShot;
   else if (playerShot.phase.startsWith("outcome")) camera = playerShot;
   else if (time >= 14000 && time < 16500) {

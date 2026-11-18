@@ -7,7 +7,11 @@ import {
   planOutcomeTour,
   sampleOutcomeTour,
 } from "../src/round-presentation.js";
-import { SEAT_LAYOUT, arcPosition } from "../src/chip-flow.js";
+import {
+  SEAT_LAYOUT,
+  chipTransferPosition,
+  arcPosition,
+} from "../src/chip-flow.js";
 import { wagerStackLayout, wagerPosition } from "../src/wager-layout.js";
 import { chipStackPose } from "../src/chip-character.js";
 import { createThrowTimeline, sampleThrow } from "../src/throw-motion.js";
@@ -16,8 +20,11 @@ import {
   RESULT_CAMERA_HOLD_MS,
   sampleThrowCamera,
   sampleTableCamera,
+  sampleCameraSlide,
   IDLE_PLAYER_SHOT_MS,
   IDLE_OVERVIEW_MS,
+  IDLE_REVISIT_REST_MS,
+  IDLE_CHANGE_REST_MS,
   sampleOutcomeCamera,
   samplePlayerAreaCamera,
   planFiniteIdleCamera,
@@ -108,7 +115,7 @@ test("Auto rests wide in the lobby and nearly overhead during active betting", (
   assert.ok(horizontal / (playing.position[1] - playing.target[1]) < 0.16);
 });
 
-test("idle camera makes one finite pass over active players and then holds overhead", () => {
+test("idle camera makes finite visits separated by a long overhead rest", () => {
   const state = {
     code: "finite-basic",
     status: "playing",
@@ -122,11 +129,29 @@ test("idle camera makes one finite pass over active players and then holds overh
   const first = sampleTableCamera({ state, now: 2300 });
   assert.equal(first.phase, "idle-player");
   assert.ok(first.idleShotCount <= IDLE_MAX_SHOTS);
-  for (const now of [first.idleTourEndAt + 1, 50000, 120000]) {
+  const revisitAt = first.idleTourEndAt + IDLE_REVISIT_REST_MS;
+  for (const now of [first.idleTourEndAt + 1, revisitAt - 1]) {
     const held = sampleTableCamera({ state, now });
     assert.equal(held.phase, "betting");
     assert.equal(held.idleTourEndAt, first.idleTourEndAt);
   }
+  const revisits = [0, 1].map((index) =>
+    sampleTableCamera({
+      state,
+      now: revisitAt + IDLE_OVERVIEW_MS + index * IDLE_PLAYER_SHOT_MS + 1,
+    }),
+  );
+  assert.ok(revisits.every((shot) => shot.phase === "idle-player"));
+  assert.equal(revisits[0].idleTourKey, revisits[1].idleTourKey);
+  assert.deepEqual(
+    new Set(revisits.map((shot) => shot.playerId)),
+    new Set(["a", "b"]),
+  );
+  const rest = sampleTableCamera({
+    state,
+    now: revisits[1].idleTourEndAt + 1500,
+  });
+  assert.equal(rest.phase, "betting");
   assert.equal(
     sampleTableCamera({ state, now: 2400, reducedMotion: true }).phase,
     "betting",
@@ -135,6 +160,28 @@ test("idle camera makes one finite pass over active players and then holds overh
     sampleTableCamera({ state: { ...state, rolling: true }, now: 2400 }).phase,
     "betting",
   );
+});
+
+test("camera slides ease once along the short heading with bounded zoom and pitch", () => {
+  const from = { position: [0.3, 1, -2], target: [0, 0, 0], fov: 54 };
+  const to = { position: [2.8, 8, -2], target: [3, 0, 1], fov: 36 };
+  assert.deepEqual(sampleCameraSlide(from, to, -0.5), from);
+  assert.deepEqual(sampleCameraSlide(from, to, 1.5), to);
+  let last = [0, 0, 0, 0];
+  for (let i = 0; i <= 32; i++) {
+    const shot = sampleCameraSlide(from, to, i / 32);
+    const [x, y, z] = shot.position.map(
+      (value, axis) => value - shot.target[axis],
+    );
+    const radius = Math.hypot(x, y, z),
+      pitch = Math.atan2(y, Math.hypot(x, z));
+    const heading = Math.atan2(-x, -z),
+      focal = -shot.fov;
+    assert.ok(z < 0, "does not turn through the opposite angle");
+    const values = [radius, pitch, heading, focal];
+    if (i > 0) assert.ok(values.every((value, axis) => value > last[axis]));
+    last = values;
+  }
 });
 
 const throwState = {
@@ -685,6 +732,30 @@ test("idle passes ignore repeated financial/preview updates but welcome a new pl
   assert.equal(sampleTableCamera({ state, now: 50000 }).phase, "betting");
 });
 
+test("a new committed wager can prompt another visit after the minimum rest", () => {
+  const state = {
+    code: "idle-committed-change",
+    status: "playing",
+    bettingOpenedAt: 1000,
+    players: [
+      { id: "a", name: "A", seat: 0, bets: [{ id: "a1", amount: 500 }] },
+    ],
+  };
+  const first = sampleTableCamera({ state, now: 2500 });
+  const at = first.idleTourEndAt + IDLE_CHANGE_REST_MS;
+  state.players[0].bets.push({ id: "a2", amount: 500 });
+  state.snapshotAt = at - 1000;
+  assert.equal(sampleTableCamera({ state, now: at - 1 }).phase, "betting");
+  const changed = sampleTableCamera({ state, now: at + IDLE_OVERVIEW_MS + 1 });
+  assert.equal(changed.phase, "idle-player");
+  assert.equal(changed.playerId, "a");
+  assert.notEqual(changed.idleTourKey, first.idleTourKey);
+  assert.equal(
+    sampleTableCamera({ state, now: at + 2 * IDLE_REVISIT_REST_MS }).phase,
+    "betting",
+  );
+});
+
 test("idle planner considers only active unfeatured players and caps the one-pass selection", () => {
   const state = tourState(12);
   const active = state.players;
@@ -776,7 +847,7 @@ test("focused pairs and left clusters frame their own transfers rather than the 
   assert.equal(cluster.region, "left");
 });
 
-test("payout camera is parked before transfer then tracks its actual current arc closely", () => {
+test("payout camera arrives before transfer and advances directly toward the receiving rack", () => {
   const state = tourState(1);
   const plan = state.lastRoll.presentation,
     slot = plan.slots[0];
@@ -794,21 +865,24 @@ test("payout camera is parked before transfer then tracks its actual current arc
   assert.equal(ready.preparing, true);
   assert.equal(ready.arrivalAt, slot.startAt);
   assert.equal(ready.transferAt, slot.transferAt);
+  const landed = at(slot.transferAt + slot.flightMs);
   const mid = at(slot.transferAt + slot.flightMs / 2);
-  const flown = arcPosition(
-    [
-      wagerPosition(plan.transfers[0].from, state)[0],
-      0.134,
-      wagerPosition(plan.transfers[0].from, state)[2],
-    ],
-    [
-      SEAT_LAYOUT[state.players[0].seat].center[0],
-      0.805,
-      SEAT_LAYOUT[state.players[0].seat].center[2],
-    ],
-    0.5,
+  const [travel] = chipTransferPosition(
+    [0, 0, 0],
+    [1, 0, 0],
+    slot.flightMs / 2,
+    0,
+    slot.flightMs,
   );
-  assert(Math.hypot(...mid.target.map((v, i) => v - flown[i])) < 0.25);
+  for (let i = 0; i < 3; i++)
+    assert(
+      Math.abs(
+        mid.target[i] -
+          (ready.target[i] + (landed.target[i] - ready.target[i]) * travel),
+      ) < 1e-9,
+    );
+  const focusTop = Math.max(...mid.focusPoints.map((point) => point[1]));
+  assert(focusTop > mid.target[1]);
   assert(Math.hypot(...arrived.target.map((v, i) => v - mid.target[i])) > 0.5);
   assert.equal(arrived.shotKey, mid.shotKey);
   assert.equal(mid.preparing, false);

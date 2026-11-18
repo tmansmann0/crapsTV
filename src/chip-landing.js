@@ -14,13 +14,12 @@ export const CHIP_LANDING_LIMITS = Object.freeze({
   drop: 0.15,
   staggerMs: 80,
   reactionChips: 3,
-  reactionMs: 420,
-  recoveryMs: 160,
-  maxSlide: 0.005,
+  reactionMs: 225,
+  recoveryMs: 100,
+  maxSlide: 0.002,
   // Conservative cylinder envelopes add vertical clearance for tilt. Keeping
   // this below .5deg prevents a rapid cohort from accumulating a tall ripple.
   maxTilt: 0.0035,
-  bounce: 0.003,
   maxBodies: 4,
 });
 const L = CHIP_LANDING_LIMITS;
@@ -346,23 +345,12 @@ export function writeChipLandingPoses(plan, now, write) {
         elapsed = now - event.startAt;
       if (elapsed < fallMs) {
         arrival.position[1] += L.drop - 0.5 * L.gravity * (elapsed / 1000) ** 2;
-      } else {
-        // A restitution-sized ballistic rebound, gated by confirmed contact in
-        // the cached four-body solve. It cannot sink below the final support.
-        if (event.kernel.contact) {
-          const t = (elapsed - fallMs) / 1000,
-            velocity = Math.sqrt(2 * L.gravity * L.bounce);
-          arrival.position[1] += Math.max(
-            0,
-            velocity * t - 0.5 * L.gravity * t * t,
-          );
-        }
       }
       const sinceContact = now - event.contactAt;
       if (sinceContact < 0 || !event.kernel.contact) continue;
       const gain = 1 - smooth((sinceContact - L.reactionMs) / L.recoveryMs);
       const ramp = smooth(sinceContact / 24);
-      for (let offset = 0; offset <= event.count; offset++) {
+      for (let offset = 0; offset < event.count; offset++) {
         const row = track.rows[event.row - event.count + offset];
         const dx =
           clamp(
