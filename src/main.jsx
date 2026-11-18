@@ -702,7 +702,6 @@ function Phone({
           <DiceThrow
             state={state}
             player={player}
-            isAdmin={isAdmin}
             send={send}
             connected={connected}
           />

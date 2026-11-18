@@ -14,7 +14,7 @@ Classic come-out: pass/come wins on 7 or 11; loses on 2, 3, 12; other totals est
 
 Crapless come-out: only 7 wins immediately, every other total establishes a point. There is no don’t side. Individual come bets retain their own points, independent of the table point.
 
-The shooter continues after a point hit or come-out craps. A seven-out passes the dice to the next connected active player. The admin may roll for the table. The authority locks betting, obtains a cryptographic launch seed, and simulates both dice until they sleep flat on the felt. Their upper faces determine the outcome; no face is selected in advance. The shared timeline preserves those settled positions and orientations, including a brief unchanged hold before the ledger resolves. Cocked or off-table simulations are retried with fresh launch conditions, never rotated into a desired result. The UI probabilities describe ideal fair dice rather than a statistical certification of the physics model.
+The shooter continues after a point hit or come-out craps. A seven-out passes the dice to the next connected active player. Only the current shooter can aim or roll. The authority locks betting, obtains a cryptographic launch seed, and simulates both dice until they sleep flat on the felt. Their upper faces determine the outcome; no face is selected in advance. The shared timeline preserves those settled positions and orientations, including a brief unchanged hold before the ledger resolves. Cocked or off-table simulations are retried with fresh launch conditions, never rotated into a desired result. The UI probabilities describe ideal fair dice rather than a statistical certification of the physics model.
 
 | Wager | Profit payout | Resolution |
 | --- | --- | --- |

@@ -17,7 +17,7 @@ import {
 } from "./dice-material.js";
 import { assetURL as asset } from "./asset-url.js";
 
-export default function DiceThrow({ state, player, isAdmin, send, connected }) {
+export default function DiceThrow({ state, player, send, connected }) {
   const host = useRef(null),
     latest = useRef(null),
     drag = useRef(null),
@@ -26,20 +26,15 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
   const [aim, setAim] = useState(null),
     [failed, setFailed] = useState(false);
   const shooter = state.players.find((p) => p.id === state.shooterId);
+  const isShooter = player.id === state.shooterId;
   if (state.rolling && state.throw?.id) observedThrow.current = state.throw.id;
   const justLanded =
     !!observedThrow.current &&
     !state.rolling &&
     state.lastRoll?.throwId === observedThrow.current;
   const remaining = useBettingWindow(state);
-  const canCustomize =
-    connected && !state.rolling && player.id === state.shooterId;
-  const canThrow =
-    connected &&
-    !state.rolling &&
-    !justLanded &&
-    remaining === 0 &&
-    (player.id === state.shooterId || isAdmin);
+  const canCustomize = connected && !state.rolling && isShooter;
+  const canThrow = canCustomize && !justLanded && remaining === 0;
   const launchProps = useMemo(
     () => ({
       puck:
@@ -57,11 +52,11 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     activeThrowId: observedThrow.current,
   };
   useEffect(() => {
-    if (state.rolling || !connected || remaining > 0) {
+    if (!canThrow) {
       drag.current = null;
       setAim(null);
     }
-  }, [state.rolling, connected, remaining]);
+  }, [canThrow]);
   useEffect(() => {
     const el = host.current;
     let renderer;
@@ -295,7 +290,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     };
   }, []);
   function updateAim(e) {
-    if (!drag.current || e.pointerId !== drag.current.pointerId) return null;
+    if (!canThrow || !drag.current || e.pointerId !== drag.current.pointerId)
+      return null;
     const dx = e.clientX - drag.current.x,
       dy = drag.current.y - e.clientY;
     const next = {
@@ -310,12 +306,11 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
     return { next, dy };
   }
   function release(e, cancel = false) {
-    if (!drag.current || e.pointerId !== drag.current.pointerId) return;
     const result = updateAim(e);
+    if (!result) return;
     drag.current = null;
     setAim(null);
-    if (!cancel && result.dy > 20 && canThrow)
-      send({ type: "roll", gesture: result.next });
+    if (!cancel && result.dy > 20) send({ type: "roll", gesture: result.next });
     else send({ type: "aim", aim: { active: false } });
   }
   const pendingChoice = useRef(shooter?.dice),
@@ -370,8 +365,8 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         ref={host}
         className="dice-throw-view"
         data-testid="phone-dice"
-        role="application"
-        aria-label="Swipe dice upward to throw"
+        role={canThrow ? "application" : "group"}
+        aria-label={canThrow ? "Swipe dice upward to throw" : "Dice close-up"}
         onPointerDown={(e) => {
           if (!canThrow || drag.current) return;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -384,7 +379,11 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         onPointerUp={(e) => release(e)}
         onPointerCancel={(e) => release(e, true)}
       >
-        {failed && <span>3D unavailable. Use Roll below.</span>}
+        {failed && (
+          <span>
+            {canThrow ? "3D unavailable. Use Roll below." : "3D unavailable."}
+          </span>
+        )}
         {!state.rolling && canThrow && (
           <div className="dice-swipe-hint">↑ Swipe up to throw</div>
         )}
@@ -395,7 +394,7 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
         )}
       </div>
       <div className="dice-throw-bottom">
-        {player.id === state.shooterId && (
+        {isShooter && (
           <div className="dice-appearance" aria-label="Dice appearance">
             {Object.keys(colors).map((color) => (
               <button
@@ -435,14 +434,11 @@ export default function DiceThrow({ state, player, isAdmin, send, connected }) {
             Roll the dice
           </button>
         )}
-        {!state.rolling &&
-          !justLanded &&
-          remaining > 0 &&
-          (player.id === state.shooterId || isAdmin) && (
-            <button className="dice-roll-button" disabled>
-              Betting open · {remaining}s
-            </button>
-          )}
+        {!state.rolling && !justLanded && remaining > 0 && isShooter && (
+          <button className="dice-roll-button" disabled>
+            Betting open · {remaining}s
+          </button>
+        )}
         {state.rolling && (
           <button className="dice-roll-button" disabled>
             Dice are rolling…

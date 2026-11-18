@@ -131,7 +131,7 @@ test("bot rolls wait five extra seconds after cooldown, place ordinary bets and 
   assert.equal(hub.state.rolls.length, 1);
 });
 
-test("bot delay is admin-controlled, bounded, and independent of human throw timing", (t) => {
+test("bot delay is admin-controlled, bounded, and the host cannot roll early for a bot", (t) => {
   const { hub, time, human, bot, messages } = hubTable(t);
   hub.connect("guest", () => {});
   hub.receive("guest", { type: "join", code: "BOTQA", name: "Guest" });
@@ -149,13 +149,15 @@ test("bot delay is admin-controlled, bounded, and independent of human throw tim
   assert.equal(hub.state.botRollAt, 112000);
   hub.receive("host", { type: "cooldown", seconds: 5 });
   assert.equal(hub.state.botRollAt, 107000);
-  // A human host can still choose to throw after the normal betting window.
   time.advance(2000);
   hub.receive("host", { type: "roll", gesture: { x: 0, power: 0.5 } });
+  assert.match(messages.at(-1).message, /only the current shooter/i);
+  assert.equal(hub.state.rolling, false);
+  assert.equal(hub.state.botRollAt, 107000);
+  time.advance(2000);
   assert.equal(hub.state.rolling, true);
-  assert.equal(hub.state.throw.playerId, human.id);
+  assert.equal(hub.state.throw.playerId, bot.id);
   assert.equal(hub.state.throw.shooterId, bot.id);
-  assert(!messages.some((m) => m.type === "error"));
 });
 
 test("zero-delay bots still get one bounded decision and never spam multiple rolls", (t) => {
@@ -208,34 +210,26 @@ test("bots pause without connected humans; a spectator cannot restart them, reco
   assert.equal(hub.state.rolling, true);
 });
 
-test("a human host holding aim pauses bot autoplay and canceling aim starts a fresh bot delay", (t) => {
-  const { hub, time, human } = hubTable(t, { cooldown: 0 });
-  giveBotDice(hub);
-  time.advance(1000);
+test("a human shooter holding aim pauses bot betting until the gesture is canceled", (t) => {
+  const { hub, time, human, bot } = hubTable(t, { cooldown: 0 });
   hub.receive("host", {
     type: "aim",
     aim: { active: true, x: -0.25, power: 0.6 },
   });
   assert.equal(hub.state.aim?.playerId, human.id);
-  assert.equal(hub.state.botRollAt, null);
   assert.equal(time.pending, 0);
-  time.advance(6000);
-  assert.equal(
-    hub.state.rolling,
-    false,
-    "A timer must not throw while a human is holding the dice",
-  );
+  time.advance(1000);
+  assert.equal(bot.bets.length, 0);
   assert.equal(hub.state.aim?.active, true);
   hub.receive("host", {
     type: "aim",
     aim: { active: false, x: -0.25, power: 0.6 },
   });
   assert.equal(hub.state.aim, null);
-  assert.equal(hub.state.botRollAt, time.now() + 5000);
-  time.advance(4999);
+  time.advance(0);
+  assert(bot.bets.length > 0);
+  assert.equal(hub.state.botRollAt, null);
   assert.equal(hub.state.rolling, false);
-  time.advance(1);
-  assert.equal(hub.state.rolling, true);
 });
 
 test("leaving/transfer never grants host to a bot; removal and session close cancel automatic work", (t) => {
