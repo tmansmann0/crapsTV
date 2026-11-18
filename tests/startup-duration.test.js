@@ -34,6 +34,27 @@ test("slow terminal RAF is measured separately from 30s content using its actual
   assert(Math.abs(measured.completionFrameGapMs - 2599.8) < 0.1);
 });
 
+test("an exact deadline crossing survives fractional RAF timestamps and accumulated pauses", () => {
+  // CI's separately accumulated pause total put the reconstructed endpoint
+  // one floating-point step below 30s despite the actual clock reaching it.
+  const first = { ...start, at: 6077.8 };
+  const previous = {
+    ...active,
+    at: 61392.2,
+    elapsed: 29993.299999999996,
+    uploadPausedMs: 25321.100000000002,
+  };
+  const final = { ...end, at: 61408.9, uploadPausedMs: 25331.100000000002 };
+  const measured = measureStartupDuration([first, previous, final]);
+  assert.equal(measured.rawContentDuration, 30000);
+  assert.equal(measured.terminalOvershootMs, 0);
+  assert.throws(
+    () =>
+      measureStartupDuration([first, previous, { ...final, at: 61408.899999 }]),
+    /before its deadline/,
+  );
+});
+
 test("deadline proof rejects early completion, late eligible frames and unaccounted clock jumps", () => {
   assert.throws(
     () => measureStartupDuration([start, active, { ...end, at: 36000 }]),
