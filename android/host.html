@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta charset="utf-8" />
+    <title>crapsTV host</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font: 17px system-ui;
+        background: #102b25;
+        color: #fff;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 30px;
+        margin: 12px;
+      }
+      p {
+        line-height: 1.5;
+        color: #d0ded8;
+      }
+      a {
+        color: #f3db9a;
+      }
+      #qr {
+        display: block;
+        width: min(82vw, 420px);
+        height: auto;
+        margin: 16px auto;
+        border-radius: 14px;
+        background: white;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+      button,
+      .link {
+        display: inline-block;
+        background: #e5cb89;
+        color: #15291f;
+        border: 0;
+        border-radius: 10px;
+        padding: 14px 22px;
+        font: inherit;
+        text-decoration: none;
+      }
+      body.full {
+        background: white;
+        padding: 0;
+        display: grid;
+        place-content: center;
+        min-height: 96vh;
+        color: #15291f;
+      }
+      body.full #qr {
+        width: min(96vw, 90vh);
+        max-width: none;
+        margin: 0;
+      }
+      body.full p {
+        color: #15291f;
+      }
+      #details {
+        white-space: pre-line;
+      }
+      .small {
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="main"></main>
+    <script>
+      const main = document.getElementById("main"),
+        network = location.pathname === "/android-network",
+        full = location.pathname === "/android-qr";
+      if (full) document.body.className = "full";
+      let fingerprint = "";
+      async function update() {
+        try {
+          const r = await fetch("/android/status", { cache: "no-store" }),
+            s = await r.json(),
+            key = JSON.stringify(s);
+          if (key === fingerprint) return;
+          fingerprint = key;
+          main.replaceChildren();
+          function add(tag, text) {
+            const e = document.createElement(tag);
+            if (text) e.textContent = text;
+            main.append(e);
+            return e;
+          }
+          function qr(kind, large) {
+            const a = add("a");
+            a.href = large
+              ? "javascript:history.back()"
+              : "/android-qr?kind=" + kind;
+            const i = document.createElement("img");
+            i.id = "qr";
+            i.alt = kind === "wifi" ? "Join Wi-Fi QR" : "Join game QR";
+            i.src =
+              "/android/qr.svg?kind=" + kind + "&v=" + encodeURIComponent(key);
+            a.append(i);
+          }
+          if (full) {
+            const kind =
+              new URLSearchParams(location.search).get("kind") === "wifi"
+                ? "wifi"
+                : "game";
+            qr(kind, true);
+            add("p", "Android Back closes this QR");
+            return;
+          }
+          add("h1", network ? "Network Setup" : "crapsTV");
+          if (network) {
+            add(
+              "p",
+              s.message ||
+                "Choose Host on my own Wi-Fi to create an offline network.",
+            );
+            if (s.ssid) {
+              add("h2", "1 · Join Wi-Fi");
+              qr("wifi");
+              add("p", "Network: " + s.ssid);
+              add("p", "Password: " + s.password);
+            } else {
+              add(
+                "p",
+                "Ordinary hotspot fallback: enable your phone’s hotspot in Android Settings, return here, then connect guests to it. No venue Wi-Fi is required.",
+              );
+            }
+            add(
+              "p",
+              "Stay connected when the phone says “No internet.” Then return to Host and scan the game QR.",
+            );
+            if (s.addresses?.length)
+              add("p", "Host addresses: " + s.addresses.join(", "));
+          } else {
+            if (s.message) add("p", s.message);
+            add(
+              "p",
+              s.mode === "local-only"
+                ? "Offline Wi-Fi is active. Guests join its network first."
+                : "Host on my own Wi-Fi works without venue Wi-Fi, even when cellular data is on.",
+            );
+            add("h2", "Join game · " + s.code);
+            if (s.joinURL) {
+              qr("game");
+              add("p", "Tap the QR to enlarge");
+              add("code", s.joinURL);
+            } else
+              add(
+                "p",
+                "Choose Host on my own Wi-Fi, or use Network Setup to connect a local network. A game QR appears when a host address is available.",
+              );
+            add("p", "Wi-Fi credentials and Wi-Fi QR are in Network Setup.");
+            const a = add("a", "Open table");
+            a.href = "/";
+            a.className = "link";
+          }
+          add(
+            "p",
+            "Play chips only · No account or internet needed",
+          ).className = "small";
+        } catch {
+          main.textContent = "Starting the local table…";
+        }
+      }
+      update();
+      setInterval(update, 1500);
+    </script>
+  </body>
+</html>

@@ -13,3 +13,19 @@ artifacts/
 
 *.blend1
 __pycache__/
+
+# Android generated tooling, embedded runtime and release material
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/src/main/assets/payload.zip
+android/app/src/main/jniLibs/
+android/vendor/
+*.keystore
+*.jks
+android/build/
+android/host.cjs
+android/build-info.json
+android/THIRD-PARTY-NOTICES.txt
+
+*.hprof
