@@ -44,15 +44,6 @@ The darker satin wood material derives from [Poly Haven Dark Wood](https://polyh
 
 ## Drinking Mode icons
 
-The built-in image generation tool produced four transparent cutouts on November 20, 2026. The 192-pixel WebP copies live in `public/assets/drinking/` and preserve alpha.
+The built-in image generation tool produced a concept sheet on November 20, 2026. The four production glyphs in `src/DrinkIcon.jsx` use Lucide's 24-unit grid, rounded caps, and two-unit strokes. Artwork uses deep felt green (`#0c3b2b`) and brass (`#a97f33`), with ivory (`#f7f1e3`) for outlines on dark surfaces. The phone navigation uses the same monochrome active and inactive colors as its other tabs.
 
-Each prompt used this template with `transparent_background: true`:
-
-> Use case: stylized-concept. Generate one standalone square raster UI inventory icon for crapsTV Drinking Mode: [subject]. Vintage casino luxury, three-quarter view of beveled warm brushed brass and fired emerald and burgundy ceramic, cream accents, clean thick silhouettes, restrained warm studio highlights, tactile collectible game-piece feel. Objects centered and grouped tightly, filling 78% of square, all parts inside safe margin. Readable at 32px. Genuine transparent background, isolated cutout, no backdrop, no drop shadow outside the silhouette, no text, no watermark, no border.
-
-| Asset | Subject |
-| --- | --- |
-| `mode.webp` | Two short cocktail glasses gently clinking with a small casino chip in front |
-| `credit.webp` | A five-dollar-style red casino chip stack beside a short tumbler, topped with a bold simple gold plus symbol (no numeral or lettering) |
-| `verify.webp` | An emerald enamel shield with a prominent ivory checkmark beside a gold casino token |
-| `offer.webp` | One amber casino chip sliding toward a pair of short cocktail glasses, a short curved gold arrow indicating a gift |
+> Use case: ui-mockup. Create a minimalist icon reference sheet for crapsTV, exactly 4 evenly spaced line glyphs, in a single horizontal row on flat ivory #fffaf0. Left to right: two tilted simple short glasses meeting for a toast; a pair of stacked flat casino tokens with small plus; a simple shield with a centered checkmark; one short tumbler with an outward northeast arrow. Match Lucide-style 24px UI icons, with very consistent rounded 2px strokes and 24px-grid proportions, drawn large for inspection. Only two ink tones: deep felt green #0c3b2b for main outlines and dark brass #94681f for a single semantic mark per icon. Main shapes unfilled; no other ink colors. Thin simple open strokes, balanced negative space, strict visual consistency, clear tiny silhouettes. No gradients, shadows, textures, 3D objects, faux depth, borders, lettering or labels.

@@ -70,6 +70,9 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
     await expect(add.getByText(/Waiting for verification/)).toBeVisible();
     expect(alice.bank).toBe(0);
     await guest.getByRole("tab", { name: /Drinks/ }).click();
+    await expect(
+      guest.locator('[aria-label="Incoming requests"] svg.drink-icon'),
+    ).toBeVisible();
     await guest.getByRole("button", { name: "Verify top-up" }).click();
     await expect(host.locator("[data-bank-value]")).toHaveAttribute(
       "data-bank-value",
@@ -101,12 +104,12 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
     await expect(host.locator(".pg-drink-hero")).toContainText("$12.50");
     expect([alice.bank, alice.buyIn, jordan.bank]).toEqual([4250, 3000, 0]);
     expect(hub.state.drinkRequests).toHaveLength(0);
-    const assets = await host
-      .locator(".pg-drinks img")
-      .evaluateAll((images) =>
-        images.every((image) => image.complete && image.naturalWidth > 0),
-      );
-    expect(assets).toBe(true);
+    await expect(host.locator(".pg-drinks svg.drink-icon")).toHaveCount(3);
+    await expect(
+      host
+        .getByRole("tab", { name: "Drinks", exact: true })
+        .locator(".drink-icon"),
+    ).toHaveAttribute("width", "21");
     expect(
       await guest
         .locator(".pg-drinks")

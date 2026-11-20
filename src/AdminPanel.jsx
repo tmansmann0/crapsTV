@@ -16,7 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { money } from "./game.js";
-import { assetURL } from "./asset-url.js";
+import DrinkIcon from "./DrinkIcon.jsx";
 import { DEFAULT_DRINKING_RULES, DRINK_UNITS } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import {
@@ -105,12 +105,7 @@ function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
         aria-pressed={enabled}
         onClick={() => setEnabled(!enabled)}
       >
-        <img
-          src={assetURL("drinking/mode.webp")}
-          width="50"
-          height="50"
-          alt=""
-        />
+        <DrinkIcon name="mode" size={30} />
         <span>
           <strong>Drinking Mode</strong>
           <small>

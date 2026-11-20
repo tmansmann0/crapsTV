@@ -1,6 +1,7 @@
 import { useBettingWindow } from "./use-betting-window.js";
 import { assetURL } from "./asset-url.js";
-import DrinksPanel, { DrinkIcon } from "./DrinksPanel.jsx";
+import DrinkIcon from "./DrinkIcon.jsx";
+import DrinksPanel from "./DrinksPanel.jsx";
 import {
   createContext,
   useCallback,
@@ -1064,7 +1065,7 @@ function PlayPanel({
           <div className="pg-reup is-rack">
             <span>Below the table minimum.</span>
             <button type="button" onClick={onDrinks}>
-              <DrinkIcon name="credit" size={23} /> Add chips in Drinks
+              <DrinkIcon name="credit" size={18} /> Add chips in Drinks
             </button>
           </div>
         ) : canReup ? (
@@ -2189,7 +2190,7 @@ export default function PhoneGame({
                 {Icon ? (
                   <Icon size={21} aria-hidden="true" />
                 ) : (
-                  <DrinkIcon name="mode" size={28} />
+                  <DrinkIcon name="mode" size={21} />
                 )}
                 {badge && <b>{badge}</b>}
               </span>

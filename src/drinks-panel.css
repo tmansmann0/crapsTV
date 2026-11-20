@@ -1,7 +1,19 @@
 .drink-icon {
+  --drink-accent: var(--pg-brass, #a97f33);
   display: block;
   flex: none;
-  object-fit: contain;
+  color: var(--pg-felt-deep, #0c3b2b);
+}
+.drink-icon-accent {
+  stroke: var(--drink-accent);
+}
+.pg-drink-hero .drink-icon,
+.pg-reup .drink-icon {
+  color: var(--pg-ivory);
+}
+.pg-nav-icon .drink-icon {
+  --drink-accent: currentColor;
+  color: inherit;
 }
 .ha-drinking {
   margin-block: 16px 0;

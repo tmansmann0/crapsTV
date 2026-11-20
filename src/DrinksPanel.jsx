@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { assetURL } from "./asset-url.js";
+import DrinkIcon from "./DrinkIcon.jsx";
 import { drinkOfferBudget, drinkOfferLimit, money } from "./game.js";
 import {
   DEFAULT_DRINKING_RULES,
@@ -8,19 +8,6 @@ import {
   drinkUnits,
 } from "./drinking-mode.js";
 import "./drinks-panel.css";
-
-export function DrinkIcon({ name, size = 36 }) {
-  return (
-    <img
-      className="drink-icon"
-      src={assetURL(`drinking/${name}.webp`)}
-      width={size}
-      height={size}
-      alt=""
-      draggable="false"
-    />
-  );
-}
 
 function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
   const [unit, setUnit] = useState("sip");
@@ -44,7 +31,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
   return (
     <section className="pg-drink-card">
       <div className="pg-drink-title">
-        <DrinkIcon name={isOffer ? "offer" : "credit"} size={48} />
+        <DrinkIcon name={isOffer ? "offer" : "credit"} size={28} />
         <div>
           <h3>{title}</h3>
           <p>
@@ -191,7 +178,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
           <h2>Drinks</h2>
           <p>Any beverage works. Drink offers are always optional.</p>
         </div>
-        <DrinkIcon name="mode" size={80} />
+        <DrinkIcon name="mode" size={52} />
         <dl>
           <div>
             <dt>Verified top-ups</dt>
@@ -216,7 +203,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
       {incoming.length > 0 && (
         <section className="pg-drink-card" aria-label="Incoming requests">
           <div className="pg-drink-title">
-            <DrinkIcon name="verify" size={48} />
+            <DrinkIcon name="verify" size={28} />
             <div>
               <h3>For you</h3>
               <p>Approve a top-up only if you witnessed it.</p>
