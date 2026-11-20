@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { upperDieFace } from "../../src/throw-motion.js";
 import { clickTV } from "../helpers/tv-actions.mjs";
 import { openAdminSection } from "../helpers/admin-controls.mjs";
+import { DEFAULT_ROLL_COOLDOWN_SECONDS } from "../../src/betting-window.js";
+import { createState, join, start } from "../../src/game.js";
 // Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
 // captured locally; CI retains every interaction/assertion and DOM trace.
 async function capture(page, options) {
@@ -153,7 +155,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.bringToFront();
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
-    // Default ten-second betting window is enforced and the local countdown
+    // The default betting window is enforced and the local countdown
     // unlocks without a new server broadcast. Dice style stays editable.
     await expect(phone.locator(".pg-strip-text small")).toContainText(
       "Betting open",
@@ -168,7 +170,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     ).toBeEnabled();
     await expect(
       phone.getByRole("button", { name: "Roll the dice", exact: true }),
-    ).toBeEnabled({ timeout: 15000 });
+    ).toBeEnabled({ timeout: (DEFAULT_ROLL_COOLDOWN_SECONDS + 5) * 1000 });
     // The rest of this multi-roll fixture deliberately uses immediate throws.
     await phone.getByRole("button", { name: "Open settings" }).click();
     await openAdminSection(phone, "Table");
@@ -594,4 +596,63 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
   } finally {
     await controllers.close();
   }
+});
+
+test("the phone unlocks throwing at the room deadline without another packet", async ({
+  page,
+}) => {
+  const code = "DEADLN";
+  const now = Date.UTC(2030, 0, 1);
+  const state = createState(code);
+  const player = join(state, "Shooter");
+  start(state, player.id);
+  state.bettingOpenedAt = now;
+  state.nextRollAt = now + DEFAULT_ROLL_COOLDOWN_SECONDS * 1000;
+
+  // Open the Roll tab between polling boundaries, then freeze the exact
+  // deadline locally. Only the initial state and join response are sent.
+  const openedAt = now + 137;
+  await page.clock.install({ time: openedAt - 1000 });
+  await page.clock.pauseAt(openedAt);
+  await page.route("**/api/config", (route) =>
+    route.fulfill({ json: { local: true, code } }),
+  );
+  await page.routeWebSocket("**/socket", (ws) => {
+    const packet = JSON.stringify({ type: "state", state, sentAt: openedAt });
+    ws.send(packet);
+    ws.onMessage((raw) => {
+      if (JSON.parse(raw).type !== "join") return;
+      ws.send(
+        JSON.stringify({
+          type: "welcome",
+          playerId: player.id,
+          token: "deadline-test",
+        }),
+      );
+      ws.send(packet);
+    });
+  });
+
+  await page.goto(`/join?code=${code}`);
+  await page.getByLabel("Your name").fill("Shooter");
+  await page.getByRole("button", { name: "Join", exact: true }).press("Enter");
+  await page.getByRole("tab", { name: "Roll", exact: true }).press("Enter");
+  const button = page.locator(".dice-roll-button");
+  await expect(button).toBeDisabled();
+
+  await page.clock.fastForward(state.nextRollAt - openedAt - 1);
+  await expect(button).toHaveText("Betting open · 1s");
+  await expect(button).toBeDisabled();
+  await expect(page.getByTestId("phone-dice")).toHaveAttribute(
+    "data-draggable",
+    "false",
+  );
+
+  await page.clock.runFor(1);
+  await expect(button).toHaveText("Roll the dice");
+  await expect(button).toBeEnabled();
+  await expect(page.getByTestId("phone-dice")).toHaveAttribute(
+    "data-draggable",
+    "true",
+  );
 });
