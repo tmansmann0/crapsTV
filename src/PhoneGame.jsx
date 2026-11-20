@@ -1,5 +1,6 @@
 import { useBettingWindow } from "./use-betting-window.js";
 import { assetURL } from "./asset-url.js";
+import DrinksPanel, { DrinkIcon } from "./DrinksPanel.jsx";
 import {
   createContext,
   useCallback,
@@ -36,7 +37,6 @@ import {
   equity,
   money,
   net,
-  minimumPlayableBet,
 } from "./game.js";
 import {
   freshMobileSettlement,
@@ -911,6 +911,8 @@ function PlayPanel({
   wager,
   lastAmount,
   canReup,
+  needsDrinkCredit,
+  onDrinks,
   send,
   onDragTarget,
 }) {
@@ -1058,7 +1060,14 @@ function PlayPanel({
   return (
     <div className="pg-play">
       <div className="pg-rack">
-        {canReup ? (
+        {needsDrinkCredit ? (
+          <div className="pg-reup is-rack">
+            <span>Below the table minimum.</span>
+            <button type="button" onClick={onDrinks}>
+              <DrinkIcon name="credit" size={23} /> Add chips in Drinks
+            </button>
+          </div>
+        ) : canReup ? (
           <div className="pg-reup is-rack">
             <span>Below the table minimum.</span>
             <button
@@ -1737,13 +1746,23 @@ export default function PhoneGame({
   const rows = useMemo(() => catalogue(state, player), [state, player]);
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
   const stake = sum(player.bets.map((b) => b.amount));
+  const drinkingMode = !!state.config.drinkingMode;
+  const drinkAlerts = drinkingMode
+    ? (state.drinkRequests ?? []).filter(
+        (request) =>
+          request.from !== player.id &&
+          (request.kind === "credit" || request.to === player.id),
+      ).length
+    : 0;
+  const belowMinimum = !rows.some(
+    (row) => row.available && row.minimum <= player.bank,
+  );
   const remaining = useBettingWindow(state);
   const isShooter = state.shooterId === player.id,
     canThrow = isShooter && !state.rolling && connected && remaining === 0,
     shooterName =
       state.players.find((p) => p.id === state.shooterId)?.name || "The host",
-    canReup =
-      !player.bets.length && player.bank < minimumPlayableBet(state, player);
+    canReup = !drinkingMode && !player.bets.length && belowMinimum;
 
   // A continuous connection and a new, recent server result are required.
   // First snapshots and reconnects establish a baseline without replaying money.
@@ -1994,6 +2013,9 @@ export default function PhoneGame({
         ]
       : []),
     { id: "learn", label: "Learn", icon: BookOpen },
+    ...(drinkingMode
+      ? [{ id: "drinks", label: "Drinks", badge: drinkAlerts || null }]
+      : []),
   ];
   return (
     <ChipImages.Provider value={images}>
@@ -2112,6 +2134,8 @@ export default function PhoneGame({
               wager={wager}
               lastAmount={lastAmount}
               canReup={canReup}
+              needsDrinkCredit={drinkingMode && belowMinimum}
+              onDrinks={() => setTab("drinks")}
               send={send}
               onDragTarget={setDragTarget}
             />
@@ -2129,6 +2153,14 @@ export default function PhoneGame({
             />
           )}
           {tab === "dice" && <div className="pg-dice">{rollArea}</div>}
+          {tab === "drinks" && (
+            <DrinksPanel
+              state={state}
+              player={player}
+              connected={connected}
+              send={send}
+            />
+          )}
           {tab === "learn" && (
             <Suspense
               fallback={
@@ -2154,7 +2186,11 @@ export default function PhoneGame({
               onClick={() => setTab(id)}
             >
               <span className="pg-nav-icon" aria-hidden="true">
-                <Icon size={21} aria-hidden="true" />
+                {Icon ? (
+                  <Icon size={21} aria-hidden="true" />
+                ) : (
+                  <DrinkIcon name="mode" size={28} />
+                )}
                 {badge && <b>{badge}</b>}
               </span>
               {label}

@@ -146,6 +146,15 @@ export class RoomHub {
           game.place(s, pid, message.betId, message.amount);
         else if (type === "remove") game.remove(s, pid, message.betId);
         else if (type === "reup") game.reup(s, pid);
+        else if (type === "drink-request")
+          game.requestDrink(s, pid, {
+            kind: message.kind,
+            unit: message.unit,
+            quantity: message.quantity,
+            to: message.to ?? null,
+          });
+        else if (type === "drink-response")
+          game.respondToDrink(s, pid, message.requestId, message.response);
         else if (type === "leave") game.leave(s, pid);
         else if (type === "end") game.end(s, pid);
         else if (type === "transfer") game.transfer(s, pid, message.playerId);

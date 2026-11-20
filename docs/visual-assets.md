@@ -41,3 +41,18 @@ All three generated images were visually inspected. The logo spells `crapsTV` co
 ## Scanned wood PBR source
 
 The darker satin wood material derives from [Poly Haven Dark Wood](https://polyhaven.com/a/dark_wood), [CC0-1.0](https://polyhaven.com/license), by Dimitrios Savva (photography), Dario Barresi (baking), and Rico Cilliers (tiling). Bundled source diffuse/normal/roughness maps and provenance live under `assets/source/materials/dark-wood/`. The runtime maps are color adjusted and resized; normals and roughness remain spatially matched. See [table materials](table-materials.md).
+
+## Drinking Mode icons
+
+The built-in image generation tool produced four transparent cutouts on November 20, 2026. The 192-pixel WebP copies live in `public/assets/drinking/` and preserve alpha.
+
+Each prompt used this template with `transparent_background: true`:
+
+> Use case: stylized-concept. Generate one standalone square raster UI inventory icon for crapsTV Drinking Mode: [subject]. Vintage casino luxury, three-quarter view of beveled warm brushed brass and fired emerald and burgundy ceramic, cream accents, clean thick silhouettes, restrained warm studio highlights, tactile collectible game-piece feel. Objects centered and grouped tightly, filling 78% of square, all parts inside safe margin. Readable at 32px. Genuine transparent background, isolated cutout, no backdrop, no drop shadow outside the silhouette, no text, no watermark, no border.
+
+| Asset | Subject |
+| --- | --- |
+| `mode.webp` | Two short cocktail glasses gently clinking with a small casino chip in front |
+| `credit.webp` | A five-dollar-style red casino chip stack beside a short tumbler, topped with a bold simple gold plus symbol (no numeral or lettering) |
+| `verify.webp` | An emerald enamel shield with a prominent ivory checkmark beside a gold casino token |
+| `offer.webp` | One amber casino chip sliding toward a pair of short cocktail glasses, a short curved gold arrow indicating a gift |
