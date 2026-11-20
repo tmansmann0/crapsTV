@@ -105,12 +105,8 @@ export function findChipImpactCandidates(timeline, stacks) {
     const selected = stack.chips.slice(-CHIP_IMPACT_LIMITS.chips);
     const center = selected[0].position;
     const radius = selected[0].diameter / 2;
-    const bottom = Math.min(
-      ...selected.map((c) => chipPoseBounds(c).min[1]),
-    );
-    const top = Math.max(
-      ...selected.map((c) => chipPoseBounds(c).max[1]),
-    );
+    const bottom = Math.min(...selected.map((c) => chipPoseBounds(c).min[1]));
+    const top = Math.max(...selected.map((c) => chipPoseBounds(c).max[1]));
     let found = null;
     for (let i = 1; i < timeline.frames.length && !found; i++) {
       const a = timeline.frames[i - 1],
@@ -205,9 +201,7 @@ function simulateContact(timeline, candidate) {
   world.addBody(floor);
   const lower = stack.chips.slice(0, -selected.length);
   if (lower.length) {
-    const top = Math.max(
-      ...lower.map((c) => chipPoseBounds(c).max[1]),
-    );
+    const top = Math.max(...lower.map((c) => chipPoseBounds(c).max[1]));
     const support = new Body({
       mass: 0,
       material: clay,
@@ -277,7 +271,6 @@ function simulateContact(timeline, candidate) {
     start + CHIP_IMPACT_LIMITS.physicsMs + 50,
     timeline.duration - CHIP_IMPACT_LIMITS.recoveryMs,
   );
-  let transmitted = false;
   for (let time = start; time <= until; time += dt * 1000) {
     currentTime = time;
     const current = sampleThrow(timeline, timeline.startAt + time),
@@ -302,28 +295,6 @@ function simulateContact(timeline, candidate) {
         .scale(Math.min(angle, Math.PI) / dt, body.angularVelocity);
       body.aabbNeedsUpdate = true;
     });
-    if (candidate.contact && !transmitted && time >= candidate.time) {
-      transmitted = true;
-      // The authority's solid cylinder can stop a die before the selected top
-      // chips touch its replayed body. Transmit that real contact through the
-      // stack, instead of requiring an impossible second geometric intrusion.
-      {
-        contactAt ??= candidate.time;
-        const normal = new Vec3(...candidate.contact.normal);
-        if (normal.lengthSquared() > 0) normal.normalize();
-        const kick = clamp(candidate.speed * 0.16, 0.2, 0.8);
-        bodies.forEach((body, index) => {
-          const radius = selected[index].diameter / 2;
-          const impulse = normal.scale(-body.mass * kick);
-          const point = new Vec3(
-            normal.x * radius * 0.7,
-            -chipHeight(selected[index]) * 0.5,
-            normal.z * radius * 0.7,
-          );
-          body.applyImpulse(impulse, point);
-        });
-      }
-    }
     world.step(dt);
     bodies.forEach((body, i) => {
       // Keep this cosmetic collision local: no chips can leave their betting area.
@@ -369,6 +340,37 @@ function simulateContact(timeline, candidate) {
 }
 
 export function createChipImpacts(timeline, stacks) {
+  if (Array.isArray(timeline.wagerChipFrames)) {
+    const layouts = new Map(stacks.map((stack) => [stack.id, stack.chips]));
+    return timeline.wagerChipFrames.flatMap(({ id, layers, samples }) => {
+      const chips = layers.map((layer) => layouts.get(id)?.[layer]);
+      if (!chips.every(Boolean)) return [];
+      const start = samples[0][0];
+      const original = chips.map(({ position, rotation }) => ({
+        position,
+        quaternion: new Quaternion().setFromEuler(...rotation).toArray(),
+      }));
+      return [
+        {
+          id: `${timeline.id}:${id}`,
+          stackId: id,
+          chipIds: chips.map((chip) => chip.id),
+          original,
+          frames: samples.map(([time, ...values]) => ({
+            time: time - start,
+            poses: layers.map((_, index) => ({
+              position: values.slice(index * 7, index * 7 + 3),
+              quaternion: values.slice(index * 7 + 3, index * 7 + 7),
+            })),
+          })),
+          startAt: timeline.startAt + start,
+          physicsMs: timeline.duration - start,
+          recoveryMs: 0,
+          authoritative: true,
+        },
+      ];
+    });
+  }
   return findChipImpactCandidates(timeline, stacks)
     .map((candidate) => simulateContact(timeline, candidate))
     .filter(Boolean);
@@ -379,7 +381,13 @@ export function sampleChipImpact(track, now) {
   const elapsed = now - track.startAt;
   if (elapsed < 0) return { active: false, done: false, poses: track.original };
   if (elapsed >= track.physicsMs + track.recoveryMs)
-    return { active: false, done: true, poses: track.original };
+    return track.authoritative
+      ? {
+          active: true,
+          done: true,
+          poses: track.frames.at(-1).poses,
+        }
+      : { active: false, done: true, poses: track.original };
   let a, b, t;
   if (elapsed <= track.physicsMs) {
     let i = 0;

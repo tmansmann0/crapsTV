@@ -6,6 +6,9 @@ import {
 export const presentationFlows = remainingPresentationTransfers;
 // Pure presentation planning. Money remains authoritative in game.js.
 export const CHIP_FLIGHT_MS = SETTLEMENT_FLIGHT_MS;
+export const CHIP_TRANSFER_ARC_HEIGHT = 0.65;
+export const CHIP_RACK_ARC_HEIGHT = 0.45;
+export const DEALER_CHIP_POSITION = Object.freeze([0, 1.135, -2.96]);
 export const SEAT_LAYOUT = [
   ...[-4.5, -2.7, -0.9, 0.9, 2.7, 4.5].map((x) => ({
     center: [x, 0.675, 3.91],
@@ -168,7 +171,8 @@ export function planChipFlows(previous, next, { now = Date.now() } = {}) {
       // React/network batching can combine a settlement and a later raise or
       // take-down. Infer the rule's post-settlement stake before diffing again.
       const standingWin =
-        outcome.result === "win" && /^(place|hard|big)-/.test(before.type);
+        outcome.result === "win" &&
+        (outcome.standing ?? /^(place|buy|lay|hard|big)-/.test(before.type));
       settled.set(outcome.betId, standingWin ? outcome.amount : 0);
       const from = betRoute(player.id, before, oldBets);
       if (presentation) continue;
@@ -309,8 +313,39 @@ export function arcPosition(from, to, progress, height = 1.45) {
   const t = p * p * (3 - 2 * p);
   return from.map(
     (v, i) =>
-      v + (to[i] - v) * t + (i === 1 ? Math.sin(Math.PI * p) * height : 0),
+      v + (to[i] - v) * t + (i === 1 ? 16 * (p * (1 - p)) ** 2 * height : 0),
   );
+}
+
+/** The last portion is a vertical landing over a fixed horizontal target. */
+export function chipTransferPosition(
+  from,
+  to,
+  now,
+  startAt,
+  endAt,
+  { height = CHIP_TRANSFER_ARC_HEIGHT, drop = 0.15, gravity = 9.81 } = {},
+) {
+  if (now <= startAt) return [...from];
+  if (now >= endAt) return [...to];
+  const fall = Math.min(
+    Math.sqrt((2 * drop) / gravity),
+    (endAt - startAt) / 4000,
+  );
+  const releaseAt = endAt - fall * 1000;
+  const lift = (gravity / 2) * fall ** 2;
+  if (now < releaseAt)
+    return arcPosition(
+      from,
+      [to[0], to[1] + lift, to[2]],
+      (now - startAt) / (releaseAt - startAt),
+      height,
+    );
+  return [
+    to[0],
+    to[1] + Math.max(0, lift - (gravity / 2) * ((now - releaseAt) / 1000) ** 2),
+    to[2],
+  ];
 }
 
 /** Hold incoming chips out of stationary stacks until their visible arrival. */

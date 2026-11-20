@@ -12,6 +12,23 @@ export const diceWearIndex = (playerId, index) =>
   ) +
     index) %
   3;
+
+function addOpaqueResinFill(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      "#include <lights_fragment_maps>",
+      `#include <lights_fragment_maps>
+// Low broad bounce from the room at table level. Light the perturbed resin
+// normal so scratches and the beveled edges still shape the diffuse response.
+vec3 resinWorldNormal = inverseTransformDirection( geometryNormal, viewMatrix );
+float resinSide = 1.0 - abs( resinWorldNormal.y );
+float resinBounce = 0.23 + 0.94 * resinSide * resinSide;
+irradiance += vec3( 0.98, 1.0, 1.03 ) * resinBounce;`,
+    );
+  };
+  material.customProgramCacheKey = () => "opaque-resin-fill-v1";
+}
+
 export function createDiceMaterial(
   appearance,
   normalMap,
@@ -56,6 +73,7 @@ export function createDiceMaterial(
     attenuationDistance: 0.7,
     envMapIntensity: 1.1,
   });
+  if (!translucent) addOpaqueResinFill(material);
   if (surfaceProfile) applySurfaceProfile(material, "dice");
   return material;
 }

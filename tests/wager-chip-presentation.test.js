@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createWagerChipPresentation } from "../src/wager-chip-presentation.js";
+import {
+  createWagerChipPresentation,
+  planWagerReceipt,
+} from "../src/wager-chip-presentation.js";
 import { chipPileSpecs } from "../src/wager-layout.js";
 import { chipPatinaParameters } from "../src/chip-character.js";
 
@@ -86,6 +89,29 @@ test("normal incoming$100+$25 and later growth retain actual IDs, wear and appea
   assert.deepEqual(
     chipPatinaParameters(next.chips[0]),
     chipPatinaParameters(black),
+  );
+});
+
+test("a larger incoming denomination lands on top without passing through retained chips", () => {
+  const book = createWagerChipPresentation();
+  const before = book.reconcile("pass", canonical(2500));
+  const black = incoming("new-black", 10000, 2);
+  const geometry = canonical(12500);
+  const receipt = planWagerReceipt("raise", geometry, before.chips, [black]);
+  assert.deepEqual(receipt.issued, []);
+  assert.deepEqual(receipt.carried, []);
+  assert.deepEqual(receipt.removed, []);
+  assert.deepEqual(receipt.placements[0], before.chips[0]);
+  assert.equal(receipt.placements[1].id, black.id);
+  assert(receipt.placements[1].position[1] > before.chips[0].position[1]);
+  const next = book.reconcile("pass", geometry, {
+    incoming: [receipt.placements[1]],
+    preserveLayerOrder: true,
+  });
+  assert.deepEqual(next.chips, receipt.placements);
+  assert.deepEqual(
+    book.reconcile("pass", geometry, { preserveLayerOrder: true }).chips,
+    next.chips,
   );
 });
 

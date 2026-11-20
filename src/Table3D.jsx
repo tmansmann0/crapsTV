@@ -21,7 +21,11 @@ import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
-import { sampleThrowCamera, sampleTableCamera } from "./throw-camera.js";
+import {
+  sampleThrowCamera,
+  sampleTableCamera,
+  sampleCameraSlide,
+} from "./throw-camera.js";
 import { assetURL as asset } from "./asset-url.js";
 import {
   DEFAULT_GRAPHICS,
@@ -733,7 +737,7 @@ export default function Table3D(props) {
       puckRotation = new THREE.Quaternion(),
       aimOffset = new THREE.Vector3(0.17, -0.07, 0),
       aimDirection = new THREE.Vector3();
-    let previousCameraShot = null;
+    let overviewSlide = null;
     let launchState = null,
       launchProps = {};
     let incomingState = null,
@@ -926,6 +930,7 @@ export default function Table3D(props) {
                 aspect: camera.aspect,
                 reducedMotion: reduced.matches,
                 bankLayouts: pieces.bankLayouts,
+                wagerLayouts: pieces.wagerLayouts,
               }).calibrationHold;
             const holdNow = introLiveProbe ? time : elapsed;
             const probe =
@@ -1005,6 +1010,7 @@ export default function Table3D(props) {
                 aspect: camera.aspect,
                 reducedMotion: reduced.matches,
                 bankLayouts: pieces.bankLayouts,
+                wagerLayouts: pieces.wagerLayouts,
               },
             )
           : null;
@@ -1053,7 +1059,13 @@ export default function Table3D(props) {
       const autoView =
         automaticCamera && cameraMode === "auto" && (!testing || introLiveProbe)
           ? sampleTableCamera({
-              state: s ? { ...s, bankLayouts: pieces.bankLayouts } : s,
+              state: s
+                ? {
+                    ...s,
+                    bankLayouts: pieces.bankLayouts,
+                    wagerLayouts: pieces.wagerLayouts,
+                  }
+                : s,
               now: throwTime,
               aspect: camera.aspect,
               viewportWidth: el.clientWidth,
@@ -1102,39 +1114,32 @@ export default function Table3D(props) {
       controls.minDistance = cinematic ? 0.18 : 0.35;
       controls.minPolarAngle = cinematic ? 0.0001 : 0.15;
       controls.maxPolarAngle = directedShot ? Math.PI - 0.01 : 1.43;
-      controls.enableDamping = !cinematic;
+      controls.enableDamping = !automaticCamera;
       const shotKey =
         openingShot || calibrationShot
           ? directedShot.shotKey
           : cameraShot
             ? `${s.throw.id}:${cameraShot.phase}`
             : playerShot?.shotKey || null;
-      const cut = shotKey !== null && shotKey !== previousCameraShot;
       const targetFov = !automaticCamera
         ? camera.fov
         : (directedShot?.fov ??
           autoView?.fov ??
           (cameraMode === "room" ? 60 : 43));
-      camera.fov +=
-        (targetFov - camera.fov) * (directedShot ? 1 : Math.min(1, dt * 5));
-      camera.updateProjectionMatrix();
       if (automaticCamera) {
         const elapsed = (time - startTime) / 1000;
         if (directedShot) {
-          // Flush any leftover manual orbit damping before the selected shot.
-          if (cut) controls.update();
+          overviewSlide = null;
           targetPosition.fromArray(directedShot.position);
           shotTarget.fromArray(directedShot.target);
           // The shot sampler already supplies its smooth path. A second
           // follower filter makes the camera trail the chips and miss setup.
           controls.target.copy(shotTarget);
           camera.position.copy(targetPosition);
+          camera.fov = targetFov;
         } else {
           if (autoView) shotTarget.fromArray(autoView.target);
-          controls.target.lerp(
-            autoView ? shotTarget : tableTarget,
-            Math.min(1, dt * 3),
-          );
+          else shotTarget.copy(tableTarget);
           if (cameraMode === "table") targetPosition.set(0.01, 8.1, 1.2);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
           else if (autoView) targetPosition.fromArray(autoView.position);
@@ -1145,15 +1150,38 @@ export default function Table3D(props) {
           }
           if (camera.aspect < 1 && !autoView)
             targetPosition.multiplyScalar(1.45);
-          camera.position.lerp(
-            targetPosition,
-            reduced.matches
-              ? 1
-              : 1 - Math.exp(-dt * (autoView?.phase === "betting" ? 3 : 1.6)),
+          const key = `${cameraMode}:${autoView?.phase || (aiming ? "aiming" : "lobby")}`;
+          if (!overviewSlide || overviewSlide.key !== key)
+            overviewSlide = {
+              key,
+              at: time,
+              from: {
+                position: camera.position.toArray(),
+                target: controls.target.toArray(),
+                fov: camera.fov,
+              },
+            };
+          const slide = sampleCameraSlide(
+            overviewSlide.from,
+            {
+              position: targetPosition.toArray(),
+              target: shotTarget.toArray(),
+              fov: targetFov,
+            },
+            reduced.matches ? 1 : (time - overviewSlide.at) / 850,
           );
+          camera.position.fromArray(slide.position);
+          controls.target.fromArray(slide.target);
+          camera.fov = slide.fov;
         }
+        // OrbitControls' manual clamps and residual inertia must not rewrite a
+        // composed shot after its camera sampler has already placed it.
+        camera.lookAt(controls.target);
+      } else {
+        overviewSlide = null;
+        controls.update();
       }
-      controls.update();
+      camera.updateProjectionMatrix();
       el.dataset.cameraPosition = JSON.stringify(camera.position.toArray());
       el.dataset.cameraTarget = JSON.stringify(controls.target.toArray());
       el.dataset.cameraFov = String(camera.fov);
@@ -1167,7 +1195,6 @@ export default function Table3D(props) {
       labelCameraPosition.copy(camera.position);
       labelCameraRotation.copy(camera.quaternion);
       labelCameraFov = camera.fov;
-      previousCameraShot = shotKey;
       el.dataset.cameraShot =
         openingShot?.phase ||
         cameraShot?.phase ||

@@ -42,14 +42,14 @@ test("default window starts at table open; betting stays open and both throw pat
   let now = 100000;
   t.mock.method(Date, "now", () => now);
   const { s, a } = table();
-  assert.equal(s.config.rollCooldownSeconds, 10);
+  assert.equal(s.config.rollCooldownSeconds, 15);
   assert.equal(s.bettingOpenedAt, now);
-  assert.equal(s.nextRollAt, now + 10000);
+  assert.equal(s.nextRollAt, now + 15000);
   game.place(s, a.id, "field", 500);
   assert.equal(a.bets.length, 1);
   assert.throws(() => game.beginRoll(s, a.id), /Betting open/);
   assert.throws(() => game.setAim(s, a.id, { x: 0, power: 1 }), /Betting open/);
-  now += 9999;
+  now += 14999;
   assert.throws(() => game.beginRoll(s, a.id), /Wait 1 second/);
   now++;
   game.setAim(s, a.id, { x: 0, power: 0.5 });
@@ -58,7 +58,7 @@ test("default window starts at table open; betting stays open and both throw pat
   now += 2500;
   game.finishRoll(s, [3, 4]);
   assert.equal(s.bettingOpenedAt, now);
-  assert.equal(s.nextRollAt, now + 10000);
+  assert.equal(s.nextRollAt, now + 15000);
   assert.throws(() => game.beginRoll(s, s.shooterId), /Betting open/);
 });
 
@@ -69,7 +69,7 @@ test("admin changes use the existing window origin, including zero and next-roll
   assert.throws(() => game.setRollCooldown(s, b.id, 0), /host/);
   for (const value of [-1, 61, 1.5, NaN, Infinity, "5", null, true])
     assert.throws(() => game.setRollCooldown(s, a.id, value), /whole number/);
-  assert.equal(s.config.rollCooldownSeconds, 10);
+  assert.equal(s.config.rollCooldownSeconds, 15);
   now += 7000;
   game.setRollCooldown(s, a.id, 5);
   assert.equal(s.nextRollAt, 205000); // does not start another five seconds

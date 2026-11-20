@@ -71,9 +71,9 @@ try {
     const odds = page.locator(`[data-bet-id="odds:${parent}"]`);
     await expect(odds).toBeEnabled();
     await expect(odds).toContainText("Pass Odds · 4");
-    await expect(odds).toContainText("$24");
-    await expect(odds).toContainText("Min $6 · $3 steps");
-    await expect(odds).toHaveAccessibleName(/Pays 6:3.*Total odds limit \$25/);
+    await expect(odds).toContainText("$25");
+    await expect(odds).toContainText("Min $5 · $1 steps");
+    await expect(odds).toHaveAccessibleName(/Pays 2:1.*Total odds limit \$25/);
     assert(
       (await odds.boundingBox()).height >= 43.5,
       "active odds row meets a 44px tap target",
@@ -87,17 +87,17 @@ try {
     await odds.click();
     await page
       .getByRole("button", {
-        name: "Bet $6 on Take odds · pass 4",
+        name: "Bet $5 on Take odds · pass 4",
         exact: true,
       })
       .click();
-    await expect(odds).toHaveAccessibleName(/your stake \$6/);
-    await expect(page.locator(".pg-notice")).toContainText("Placed $6");
+    await expect(odds).toHaveAccessibleName(/your stake \$5/);
+    await expect(page.locator(".pg-notice")).toContainText("Placed $5");
     const placed = await page.evaluate(() =>
       window.oddsFixture.messages.filter((m) => m.type === "bet").at(-1),
     );
     assert.equal(placed.betId, `odds:${parent}`);
-    assert.equal(placed.amount, 600);
+    assert.equal(placed.amount, 500);
     await page.screenshot({
       path: fileURLToPath(
         new URL(
@@ -162,12 +162,12 @@ try {
       window.oddsFixture.reset({ point: 4, hasLine: true }),
     );
     await page.evaluate(() => window.oddsFixture.placeOdds(2400));
-    await expect(page.locator(".pg-tile-odds")).toBeDisabled();
+    await expect(page.locator(".pg-tile-odds")).toBeEnabled();
     await expect(page.locator(".pg-tile-odds")).toContainText("At odds limit");
     await page.evaluate(() =>
-      window.oddsFixture.reset({ point: 4, hasLine: true, bank: 500 }),
+      window.oddsFixture.reset({ point: 4, hasLine: true, bank: 400 }),
     );
-    await expect(page.locator(".pg-tile-odds")).toBeDisabled();
+    await expect(page.locator(".pg-tile-odds")).toBeEnabled();
     await expect(page.locator(".pg-tile-odds")).toContainText("Bank too low");
     await page.evaluate(() =>
       window.oddsFixture.reset({ point: 4, hasLine: true }),

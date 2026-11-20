@@ -9,6 +9,7 @@ import {
   SEAT_LAYOUT,
 } from "./chip-flow.js";
 import { chipPileSpecs, wagerPileLayout } from "./wager-layout.js";
+import { planWagerReceipt } from "./wager-chip-presentation.js";
 
 const endOf = (flow) =>
   Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity);
@@ -57,6 +58,55 @@ export function bankPhysicalSpecs(snapshot, seat) {
   });
 }
 
+function canonicalWager(route, state, amount) {
+  const pile = wagerPileLayout(route, state, amount);
+  return chipPileSpecs(amount, {
+    diameter: pile.diameter,
+    seed: route.bet.id,
+  }).map((chip, index) => ({
+    ...chip,
+    id: `${routeKey(route)}:${index}`,
+    position: chip.position.map(
+      (value, axis) => value + pile.basePosition[axis],
+    ),
+  }));
+}
+
+function sameDenominations(a, b) {
+  if (a?.length !== b.length) return false;
+  const denominations = a.map((chip) => chip.denomination);
+  return b.every((chip) => {
+    const index = denominations.indexOf(chip.denomination);
+    if (index < 0) return false;
+    denominations.splice(index, 1);
+    return true;
+  });
+}
+
+function reserveWagerReceipt(plan, state, wagerSources, plans) {
+  const { flow } = plan;
+  if (flow.to.kind !== "bet") return;
+  const canonical = canonicalWager(flow.to, state, flow.to.bet.amount);
+  const predicted = [...plan.wagerDependencies]
+    .reverse()
+    .map((id) => plans.get(id)?.wagerReceipt?.placements)
+    .find(Boolean);
+  const standing =
+    predicted ||
+    wagerSources?.get(routeKey(flow.to)) ||
+    canonicalWager(
+      flow.to,
+      state,
+      Math.max(0, flow.to.bet.amount - flow.amount),
+    );
+  plan.wagerReceipt = planWagerReceipt(
+    flow.id,
+    canonical,
+    standing,
+    plan.chips,
+  );
+}
+
 function wagerSourceSpecs(flow, state, wagerSources) {
   const amount = Math.max(
     0,
@@ -64,59 +114,52 @@ function wagerSourceSpecs(flow, state, wagerSources) {
   );
   if (amount < 100 || !flow.from.bet)
     return { chips: [], specs: [], exchange: null };
-  const route = flow.from,
-    wholeAmount = route.bet.amount ?? amount;
-  const pile = wagerPileLayout(route, state, wholeAmount);
-  const canonical = chipPileSpecs(wholeAmount, {
-    diameter: pile.diameter,
-    seed: route.bet.id,
-  });
-  const candidates = wagerSources?.get(routeKey(route));
-  const actual =
-    candidates?.length === canonical.length &&
-    candidates.every(
-      (chip, index) =>
-        chip.denomination === canonical[index].denomination &&
-        typeof chip.id === "string" &&
-        chip.position?.length === 3,
-    )
-      ? candidates
-      : null;
-  const whole = actual || canonical;
-  const requested = chipPileSpecs(amount, {
-    diameter: pile.diameter,
-    seed: route.bet.id,
-  });
+  const route = flow.from;
+  const wholeAmount = route.bet.amount ?? amount;
+  const canonical = canonicalWager(route, state, wholeAmount);
+  const actual = wagerSources?.get(routeKey(route));
+  const whole = sameDenominations(actual, canonical)
+    ? actual
+    : canonical.map((chip, index) => ({
+        ...chip,
+        id: `stake:${flow.id}:${index}`,
+        appearanceId: chip.id,
+      }));
+  const requested = canonicalWager(route, state, amount);
   const selected = new Set();
-  let needsChange = false;
-  const specs = requested.map((desired, index) => {
-    // Full settlements lift exactly the original stack. Partial take-downs
-    // preferentially remove matching top chips without changing those below.
-    const originalIndex =
-      amount === wholeAmount
-        ? index
-        : whole.findLastIndex(
-            (chip, n) =>
-              !selected.has(n) && chip.denomination === desired.denomination,
-          );
-    const source = originalIndex >= 0 ? whole[originalIndex] : desired;
-    if (originalIndex >= 0) selected.add(originalIndex);
-    else needsChange = true;
-    const appearanceId =
-      originalIndex >= 0
-        ? `${routeKey(route)}:${originalIndex}`
-        : `change:${flow.id}:${index}`;
-    const physicalSource = actual && originalIndex >= 0;
-    return {
-      ...source,
-      ...(physicalSource
-        ? {}
-        : { id: `stake:${flow.id}:${index}`, appearanceId }),
-      position: physicalSource
-        ? [...source.position]
-        : source.position.map((value, axis) => value + pile.basePosition[axis]),
-    };
-  });
+  const matching = (denomination) =>
+    whole.findLastIndex(
+      (chip, index) =>
+        chip.denomination === denomination && !selected.has(index),
+    );
+  let specs =
+    amount === wholeAmount
+      ? whole
+      : requested.map((desired) => {
+          const index = matching(desired.denomination);
+          if (index < 0) return null;
+          selected.add(index);
+          return whole[index];
+        });
+  const reserve = canonicalWager(route, state, wholeAmount - amount);
+  const remainder = whole.filter((_, index) => !selected.has(index));
+  const remainingDenominations = remainder.map((chip) => chip.denomination);
+  const needsChange =
+    amount !== wholeAmount &&
+    (specs.some((chip) => !chip) ||
+      reserve.length !== remainder.length ||
+      reserve.some((chip) => {
+        const index = remainingDenominations.indexOf(chip.denomination);
+        if (index < 0) return true;
+        remainingDenominations.splice(index, 1);
+        return false;
+      }));
+  const issue = (chips, route) =>
+    chips.map((chip, index) => {
+      const id = `change:${flow.id}:${route}:${index}`;
+      return { ...chip, id, appearanceId: id, wear: chipHash(id) % 3 };
+    });
+  if (needsChange) specs = issue(requested, "outgoing");
   const chips = specs.map(({ id, appearanceId, denomination, wear }) => ({
     id,
     appearanceId,
@@ -131,17 +174,10 @@ function wagerSourceSpecs(flow, state, wagerSources) {
           kind: "make-change",
           amount,
           beforeAmount: wholeAmount,
-          afterAmount: Math.max(0, wholeAmount - amount),
-          removed: whole.map((chip, index) => ({
-            ...chip,
-            id: actual ? chip.id : `${routeKey(route)}:${index}`,
-            position: actual
-              ? [...chip.position]
-              : chip.position.map(
-                  (value, axis) => value + pile.basePosition[axis],
-                ),
-          })),
+          afterAmount: wholeAmount - amount,
+          removed: whole,
           outgoing: specs,
+          retained: issue(reserve, "retained"),
         }
       : null,
   };
@@ -186,22 +222,20 @@ function queuedWagerSources(plan, state, plans, wagerSources) {
     seed: plan.flow.from.bet.id,
   });
   const existing = wagerSources?.get(key) || [];
-  if (
-    existing.length === canonical.length &&
-    existing.every(
-      (chip, index) => chip.denomination === canonical[index].denomination,
-    )
-  )
-    return wagerSources;
+  if (sameDenominations(existing, canonical)) return wagerSources;
   const pool = new Map(existing.map((chip) => [chip.id, chip]));
   for (const id of plan.wagerDependencies || []) {
     const incoming = plans.get(id);
     if (!incoming) continue;
     // Root reserves exact flight targets. A coarse frame can skip the arrival
     // render, so fall back to the same bottom-to-top denomination ordering.
-    const chips = incoming.targetSpecs.length
-      ? [...incoming.targetSpecs].sort((a, b) => a.position[1] - b.position[1])
-      : [...incoming.chips].reverse();
+    const chips =
+      incoming.wagerReceipt?.placements ||
+      (incoming.targetSpecs.length
+        ? [...incoming.targetSpecs].sort(
+            (a, b) => a.position[1] - b.position[1],
+          )
+        : [...incoming.chips].reverse());
     for (const chip of chips) if (!pool.has(chip.id)) pool.set(chip.id, chip);
   }
   const available = [...pool.values()],
@@ -327,17 +361,22 @@ export function createBankChipPresentation() {
       }
     for (const flow of flows)
       if (!plans.has(flow.id) && endOf(flow) > now) {
-        const wagerDependencies =
-          flow.from.kind === "bet" && flow.sourceAmount >= 100
-            ? [...plans.values()]
-                .filter(
-                  (plan) =>
-                    !plan.arrived &&
-                    plan.flow.to.kind === "bet" &&
-                    routeKey(plan.flow.to) === routeKey(flow.from),
-                )
-                .map((plan) => plan.flow.id)
-            : [];
+        const dependencyRoute =
+          flow.to.kind === "bet"
+            ? flow.to
+            : flow.from.kind === "bet" && flow.sourceAmount >= 100
+              ? flow.from
+              : null;
+        const wagerDependencies = dependencyRoute
+          ? [...plans.values()]
+              .filter(
+                (plan) =>
+                  !plan.arrived &&
+                  plan.flow.to.kind === "bet" &&
+                  routeKey(plan.flow.to) === routeKey(dependencyRoute),
+              )
+              .map((plan) => plan.flow.id)
+          : [];
         plans.set(flow.id, {
           flow,
           ...seedFlowPlan(flow, state, wagerSources),
@@ -362,8 +401,22 @@ export function createBankChipPresentation() {
         );
       Object.assign(plan, seedFlowPlan(plan.flow, state, sources));
     };
+    function waitForWagerArrival(plan) {
+      if (plan.flow.to.kind !== "bet" || !plan.wagerDependencies.length) return;
+      for (const id of plan.wagerDependencies) {
+        const prior = plans.get(id);
+        if (prior)
+          plan.flow.startAt = Math.max(
+            plan.flow.startAt,
+            endOf(prior.flow) + 20,
+          );
+      }
+    }
     for (const plan of plans.values())
-      if (!plan.started && !plan.arrived) refreshBetSource(plan);
+      if (!plan.started && !plan.arrived) {
+        waitForWagerArrival(plan);
+        refreshBetSource(plan);
+      }
     // A new throw/reconnect can abandon an in-flight presentation. Credit its
     // already-authoritative incoming chips exactly once before reconciling the
     // bank, rather than minting replacements then resurrecting the old flight.
@@ -396,6 +449,8 @@ export function createBankChipPresentation() {
         player = players.find((p) => p.id === flow.playerId);
       if (!player) continue;
       if (start && !plan.started && !plan.arrived) {
+        waitForWagerArrival(plan);
+        if (flow.startAt > now) continue;
         if (flow.from.kind === "bank") {
           const bank = inventory.snapshot(player.id);
           if (bank.amount < flow.sourceAmount) {
@@ -435,6 +490,14 @@ export function createBankChipPresentation() {
               seat,
             ).map((s) => [s.id, s]),
           );
+          plan.bankExchangeRemoved = new Set(
+            result.exchanges.map((exchange) => exchange.id),
+          );
+          plan.bankExchangeIssued = new Set(
+            result.exchanges.flatMap((exchange) =>
+              exchange.added.map((chip) => chip.id),
+            ),
+          );
           plan.sourceSpecs = plan.chips.map(
             (chip) => sources.get(chip.id) || changed.get(chip.id) || chip,
           );
@@ -442,6 +505,7 @@ export function createBankChipPresentation() {
           refreshBetSource(plan);
           if (flow.startAt > now) continue;
         }
+        reserveWagerReceipt(plan, state, wagerSources, plans);
         plan.started = true;
       } else if (!start && !plan.arrived) {
         if (flow.to.kind === "bank")

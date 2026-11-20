@@ -36,6 +36,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - run: npm run test:odds
+      - run: npm run test:betting
       - run: npm run test:payout
       - run: npm run test:layout
       - run: npm run test:learn

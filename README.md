@@ -42,8 +42,8 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 
 - **Classic craps or crapless craps.** Rules lock at the start; teach mode can change during play.
 - **Starting stack and table minimum.** The first player chooses both.
-- **Time to bet.** A 10-second betting window follows table opening and each roll. The admin can set 0–60 seconds in setup or during play. Betting stays open while the host prevents early throws.
-- **Pass / don’t pass, come / don’t come, 5× true odds, place bets, field, hardways, big 6/8, and one-roll propositions.** Crapless adds 2, 3, 11, 12 as points and places, with no don’t side.
+- **Time to bet.** A 15-second betting window follows table opening and each roll. The admin can set 0–60 seconds in setup or during play. Betting stays open while the host prevents early throws; bot shooters retain their additional five-second delay.
+- **Pass / don’t pass, come / don’t come, 5× true odds, place, buy, lay, field, hardways, big 6/8, bonus Small/Tall/All, and one-roll propositions including all 21 hop pairs.** Crapless adds 2, 3, 11, 12 as points, places and buys, with no don’t side or lay bets. [Payouts, commissions and contract rules](docs/betting-rules.md).
 - **Teach mode starts off.** Enable it to show win probabilities, profit payouts, and house edges. The animated Learn lessons remain available, with simple explanations and local Classic/Crapless examples.
 - **Visual phone controls.** Tap denomination piles into a bundle, then drag it down onto the compact betting board. A tap-and-place alternative is also available. Taking odds lives directly below Pass Line on the main board, with current stake, legal increments, remaining capacity, and quick amounts. Quick bets use the correct minimum and chip increment. If a bundle falls between legal amounts, choose the displayed lower or higher wager; nothing is silently rounded.
 - **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw. The authority securely randomizes the launch, simulates the dice until they settle, and reads the upper faces. Those exact physical poses remain unchanged after landing.
@@ -65,6 +65,7 @@ npm run build           # portable static bundle in dist/
 npx playwright install chromium
 npm run test:e2e        # starts an isolated local server; TV + two phones
 npm run test:odds       # isolated real-rules phone odds/layout checks
+npm run test:betting    # take-down refunds, buy/lay, bonus and all exact dice pairs
 npm run test:graphics   # actual WebGL settings, calibration and persistence checks
 npm run test:board      # native 4K SVG-sourced felt print, material caps and occlusion
 npm run test:learn      # animated lesson rules, controls and phone fit
@@ -101,7 +102,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `public/audio/`             | 51 MP3 announcements with manifests, hashes, and license notice        |
 | `scripts/`                  | Optional reproducible board/model/audio generation                     |
 
-No money changes hands. This is a casual game for friends; a human hosting a peer room controls that room’s authority. Sessions live in memory; save recap cards before stopping the local server or closing an online host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, hop bets, fire bets, buy/lay commission bets, or real-money gambling.
+No money changes hands. This is a casual game for friends; a human hosting a peer room controls that room’s authority. Sessions live in memory; save recap cards before stopping the local server or closing an online host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, fire bets, or real-money gambling.
 
 ## Art and voice
 

@@ -6,6 +6,7 @@ import {
   sampleTableCamera,
   IDLE_OVERVIEW_MS,
   IDLE_PLAYER_SHOT_MS,
+  IDLE_REVISIT_REST_MS,
 } from "../../src/throw-camera.js";
 import { wagerStackLayout } from "../../src/wager-layout.js";
 import { Scene } from "three";
@@ -154,7 +155,13 @@ const metadata = () => ({
   },
   plan: structuredClone(state.lastRoll?.presentation || null),
   expectedCamera: sampleTableCamera({
-    state: { ...state, bankLayouts: renderedBanks?.userData.layouts || {} },
+    state: {
+      ...state,
+      bankLayouts: renderedBanks?.userData.layouts || {},
+      wagerLayouts: new Map(
+        Object.entries(renderedWagers?.userData.layouts || {}),
+      ),
+    },
     now: clock,
     ...cameraOptions(),
   }),
@@ -341,16 +348,27 @@ window.tourQA = {
       state.lastRoll.presentation.endAt,
       state.nextRollAt,
     );
-    const visits = [],
-      keys = new Set();
-    for (let at = origin; at <= origin + 60000; at += 250) {
-      const camera = sampleTableCamera({ state, now: at, ...cameraOptions() });
-      if (camera.phase.startsWith("idle") && !keys.has(camera.shotKey)) {
-        keys.add(camera.shotKey);
-        visits.push({ at: at + 500, camera });
+    function collectVisits(start, end) {
+      const visits = [],
+        keys = new Set();
+      for (let at = start; at <= end; at += 250) {
+        const camera = sampleTableCamera({
+          state,
+          now: at,
+          ...cameraOptions(),
+        });
+        if (camera.phase.startsWith("idle") && !keys.has(camera.shotKey)) {
+          keys.add(camera.shotKey);
+          visits.push({ at: at + 500, camera });
+        }
       }
+      return visits;
     }
-    return { visits, heldAt: origin + 120000 };
+    const visits = collectVisits(origin, origin + 11000);
+    const heldAt = (visits[0]?.camera.idleTourEndAt ?? origin) + 1000;
+    const repeatAt = heldAt - 1000 + IDLE_REVISIT_REST_MS;
+    const revisits = collectVisits(repeatAt, repeatAt + 11000);
+    return { visits, heldAt, revisits };
   },
 };
 function App() {

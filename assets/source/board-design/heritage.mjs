@@ -19,7 +19,10 @@ import {
   logo,
   wrap,
 } from "./lib.mjs";
-import { BOARD_LAYOUT } from "../../../src/board-layout.js";
+import {
+  BOARD_LAYOUT,
+  BOARD_SPECIAL_REGIONS,
+} from "../../../src/board-layout.js";
 const c = {
   ground: "#0a3a2d",
   deep: "#072b21",
@@ -74,6 +77,73 @@ const shade = (str, x, y, o) =>
   T(str, x + 3, y + 3, { ...o, fill: o.sh || c.oxD, extra: 'data-shade="1"' }) +
   T(str, x, y, o);
 
+function bonusPanels() {
+  const sans = "Arial, Helvetica, sans-serif";
+  const panel = (x, y, w, h) =>
+    R(x, y, x + w, y + h, {
+      rx: 8,
+      fill: c.deep,
+      stroke: c.brass,
+      sw: 1.8,
+    });
+  const labels = {
+    "bonus-small": ["ALL SMALL", "2  3  4  5  6", "34:1"],
+    "bonus-tall": ["ALL TALL", "8  9  10  11  12", "34:1"],
+    "bonus-all": ["MAKE ’EM ALL", "SMALL + TALL", "175:1"],
+  };
+  let ink = "";
+  for (const [id, [title, numbers, payout]] of Object.entries(labels)) {
+    const [x, y, w, h] = BOARD_SPECIAL_REGIONS[id].pixelRect;
+    const cx = x + w / 2;
+    ink += bet(
+      id,
+      title,
+      [x, y, x + w, y + h],
+      panel(x, y, w, h) +
+        T(title, cx, y + 27, { f: cap, s: 15, w: 700, fill: c.ivory }) +
+        T(numbers, cx, y + 55, { f: sans, s: 15, w: 600, fill: c.hi }) +
+        T(payout, cx, y + 89, { f: bas, s: 27, w: 700, fill: c.ivory }) +
+        T("BEFORE ANY 7", cx, y + 116, { f: sans, s: 11, fill: c.hi }),
+    );
+  }
+  const [x, y, w, h] = BOARD_SPECIAL_REGIONS.hops.pixelRect;
+  ink += bet(
+    "hops",
+    "Exact dice — one roll",
+    [x, y, x + w, y + h],
+    panel(x, y, w, h) +
+      T("HOP BETS · EXACT DICE", x + w / 2, y + 28, {
+        f: sans,
+        s: 20,
+        w: 700,
+        fill: c.ivory,
+        ls: 2,
+      }) +
+      die(x + 67.5, y + 69, 1, 25, { face: c.ivory, pip: c.deep }) +
+      die(x + 96.5, y + 69, 2, 25, { face: c.ivory, pip: c.deep }) +
+      T("MIXED · 15:1", x + 235, y + 77, {
+        f: sans,
+        s: 19,
+        w: 700,
+        fill: c.hi,
+      }) +
+      pair(x + 394, y + 69, 5, 25, { face: c.ivory, pip: c.deep }) +
+      T("DOUBLE · 30:1", x + 540, y + 77, {
+        f: sans,
+        s: 19,
+        w: 700,
+        fill: c.hi,
+      }) +
+      T("EITHER ORDER · NEXT ROLL", x + w / 2, y + 115, {
+        f: sans,
+        s: 13,
+        fill: c.ivory,
+        ls: 1,
+      }),
+  );
+  return ink;
+}
+
 function header(mode, colXs, pointCaption) {
   let h = "";
   // Quiet symmetric print rules reserve actual headroom for the brand and puck.
@@ -119,7 +189,9 @@ function header(mode, colXs, pointCaption) {
       C(x, G.rail.y, G.rail.r, { fill: c.deep, stroke: c.brass, sw: 2 }) +
       C(x, G.rail.y, G.rail.r - 6, { stroke: c.brass, sw: 0.8, op: 0.7 });
   h += `</g>`;
-  return `<g id="header" data-rect="20 9 2028 243">${h}</g>` + logo();
+  return (
+    `<g id="header" data-rect="20 9 2028 243">${h}${bonusPanels()}</g>` + logo()
+  );
 }
 function numbers(list, numeralSize, cornerPay, placeSize, inset) {
   const w = (G.nums.x1 - G.nums.x0) / list.length;

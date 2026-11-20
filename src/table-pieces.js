@@ -18,6 +18,10 @@ import {
   presentationFlows,
   sampleChipFlow,
   arcPosition,
+  chipTransferPosition,
+  CHIP_RACK_ARC_HEIGHT,
+  CHIP_TRANSFER_ARC_HEIGHT,
+  DEALER_CHIP_POSITION,
   visualChipAmount,
 } from "./chip-flow.js";
 import { createChipFactory, CHIP_DENOMINATIONS } from "./chip-rendering.js";
@@ -48,9 +52,9 @@ import {
   rectsOverlap,
 } from "./label-motion.js";
 import {
-  wagerPosition,
   isLineWager,
   wagerPileLayout,
+  wagerPlacementMap,
   chipPileSpecs as pileSpecs,
 } from "./wager-layout.js";
 import {
@@ -63,8 +67,33 @@ export const SEATS = SEAT_LAYOUT.map((s) => [s.center[0], s.center[2], 0]);
 const hash = (s) =>
   [...s].reduce((n, c) => (n * 31 + c.charCodeAt(0)) >>> 0, 0);
 
+const flowEnd = (flow) =>
+  Math.min(flow.startAt + flow.duration, flow.cutAt ?? Infinity);
+const rackDeparture = (flow) =>
+  flow.startAt + (flowEnd(flow) - flow.startAt) * 0.49;
+const rackArrival = (flow) =>
+  flow.startAt + (flowEnd(flow) - flow.startAt) * 0.42;
+const rackRotation = [Math.PI / 2, 0, 0];
+
+function rackSlot(chip, index = 0) {
+  const column = CHIP_DENOMINATIONS.findIndex(
+    ({ value }) => value === chip.denomination,
+  );
+  return [
+    -0.94 + column * 0.376,
+    DEALER_CHIP_POSITION[1],
+    DEALER_CHIP_POSITION[2] - (index % 8) * 0.038,
+  ];
+}
+
 function wagerFlightTargets(plan, state, current = []) {
   if (plan.flow.to.kind !== "bet") return [];
+  if (plan.wagerReceipt) {
+    const reserved = new Set(
+      [...plan.chips, ...plan.wagerReceipt.issued].map((chip) => chip.id),
+    );
+    return plan.wagerReceipt.placements.filter((chip) => reserved.has(chip.id));
+  }
   const pile = wagerPileLayout(plan.flow.to, state, plan.flow.to.bet.amount);
   const available = pileSpecs(plan.flow.to.bet.amount, {
     diameter: pile.diameter,
@@ -132,6 +161,20 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
   const bankPresentation = createBankChipPresentation();
   const wagerPresentation = createWagerChipPresentation();
   let wagerSources = new Map();
+  let placementState = null,
+    wagerPlacements = new Map();
+  function packedPlacement(route, state) {
+    if (placementState !== state) {
+      placementState = state;
+      wagerPlacements = wagerPlacementMap(state);
+      for (const pile of state.throw?.props?.stacks || [])
+        if (!wagerPlacements.has(pile.id)) wagerPlacements.set(pile.id, pile);
+    }
+    const key = routeKey(route);
+    if (!wagerPlacements.has(key))
+      wagerPlacements.set(key, wagerPileLayout(route, state));
+    return wagerPlacements.get(key);
+  }
   const receivedWagerFlows = new Set(),
     departedWagerFlows = new Set(),
     seenExchanges = new Set(),
@@ -400,13 +443,13 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     return seatLayout[player?.seat ?? 0] || seatLayout[0];
   }
   function routePosition(route, state) {
-    if (route.kind === "dealer") return [0, 1.2, -3.03];
+    if (route.kind === "dealer") return DEALER_CHIP_POSITION;
     const player = state.players.find((p) => p.id === route.playerId);
     if (route.kind === "bank") {
       const seat = layout(player);
       return [seat.center[0], seat.center[1] + 0.13, seat.center[2]];
     }
-    const p = wagerPosition(route, state);
+    const p = [...packedPlacement(route, state).basePosition];
     p[1] += 0.12;
     return p;
   }
@@ -495,6 +538,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         bankDisplay.banks.get(p.id)?.revision,
       ]),
       wagers.map((w) => [routeKey(w.route), w.visible]),
+      [...bankDisplay.plans.values()].map((plan) => [
+        plan.flow.id,
+        plan.started,
+        plan.arrived,
+      ]),
     ]);
     if (key === lastStatic) return;
     lastStatic = key;
@@ -543,26 +591,43 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       bindImpactBatch(batch, specs);
     }
     const changedIds = new Set();
-    for (const event of bankDisplay.mutations.values())
-      for (const exchange of event.exchanges) {
-        if (exchange.kind !== "color-up" && exchange.kind !== "make-change")
-          continue;
-        const removed = exchange.removed
-          .map((chip) => previousBankSpecs.get(chip.id))
-          .filter(Boolean);
-        const present = new Set(specs.map((chip) => chip.id));
-        exchange.added.forEach((chip) => {
-          if (present.has(chip.id)) changedIds.add(chip.id);
-        });
-        queueExchange(exchange.id, removed, now);
-      }
-    const addedIds = [...bankDisplay.mutations.values()].flatMap((event) => [
-      ...event.added.map((chip) => chip.id),
-      ...event.moved.map((chip) => chip.id),
-      ...event.exchanges.flatMap((exchange) =>
-        exchange.added.map((chip) => chip.id),
-      ),
-    ]);
+    const currentBankSpecs = new Map(specs.map((chip) => [chip.id, chip]));
+    const bankExchanges = [...bankDisplay.mutations.values()].flatMap(
+      (event) => event.exchanges,
+    );
+    for (const exchange of bankExchanges) {
+      if (!["color-up", "make-change", "cash-change"].includes(exchange.kind))
+        continue;
+      const removed = exchange.removed
+        .map((chip) => previousBankSpecs.get(chip.id))
+        .filter(Boolean);
+      const added = exchange.added
+        .map((chip) => currentBankSpecs.get(chip.id))
+        .filter(Boolean);
+      if (!removed.length && !added.length) continue;
+      added.forEach((chip) => changedIds.add(chip.id));
+      const spend = [...bankDisplay.plans.values()].find(
+        (plan) =>
+          plan.started &&
+          !plan.arrived &&
+          (exchange.added.some((chip) =>
+            plan.bankExchangeIssued?.has(chip.id),
+          ) ||
+            plan.bankExchangeRemoved?.has(exchange.id)),
+      );
+      queueExchange(exchange.id, removed, now, {
+        added,
+        arrival: spend ? rackArrival(spend.flow) : now + 320,
+        departure: spend ? rackDeparture(spend.flow) : now + 390,
+        end: spend ? flowEnd(spend.flow) : now + 780,
+      });
+    }
+    const addedIds = [...bankDisplay.mutations.values()]
+      .flatMap((event) => [
+        ...event.added.map((chip) => chip.id),
+        ...event.moved.map((chip) => chip.id),
+      ])
+      .filter((id) => !changedIds.has(id));
     // A capacity exchange may reuse a slot while an earlier arrival is still
     // settling. Its saved target is no longer the physical rack's target.
     if (
@@ -594,22 +659,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       const completedIds = new Set(
         completed.flatMap((plan) => plan.chips.map((chip) => chip.id)),
       );
-      const contactAt = changedIds.size
-        ? now +
-          420 +
-          Math.sqrt(
-            (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
-          ) *
-            1000
-        : completed.length && addedIds.every((id) => completedIds.has(id))
-          ? Math.max(
-              ...completed.map((p) =>
-                Math.min(
-                  p.flow.startAt + p.flow.duration,
-                  p.flow.cutAt ?? Infinity,
-                ),
-              ),
-            )
+      const contactAt =
+        completed.length && addedIds.every((id) => completedIds.has(id))
+          ? Math.max(...completed.map((p) => flowEnd(p.flow)))
           : now +
             Math.sqrt(
               (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
@@ -630,19 +682,40 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     }
     const wagerSpecs = [],
       activeWagerKeys = [];
-    for (const plan of bankDisplay.plans.values())
-      if (plan.started && plan.sourceExchange) {
+    for (const plan of bankDisplay.plans.values()) {
+      if (!plan.started || plan.arrived) continue;
+      const timing = {
+        arrival: rackArrival(plan.flow),
+        departure: rackDeparture(plan.flow),
+        end: flowEnd(plan.flow),
+      };
+      if (plan.sourceExchange)
         queueExchange(
           `source:${plan.flow.id}`,
           plan.sourceExchange.removed,
-          now,
-          Math.min(420, plan.flow.duration * 0.32),
+          plan.flow.startAt,
+          {
+            ...timing,
+            added: plan.sourceExchange.retained,
+          },
         );
-      }
+      if (plan.wagerReceipt?.removed.length)
+        queueExchange(
+          `receipt:${plan.flow.id}`,
+          plan.wagerReceipt.removed,
+          plan.flow.startAt,
+          timing,
+        );
+    }
     wagers.forEach(({ route, player, visible }) => {
       if (visible <= 0) return;
       const pile = new THREE.Group();
-      const pileLayout = wagerPileLayout(route, state, visible);
+      const pileLayout = wagerPileLayout(
+        route,
+        state,
+        visible,
+        packedPlacement(route, state),
+      );
       pile.position.fromArray(pileLayout.basePosition);
       const compact = pileLayout.compact;
       const diameter = pileLayout.diameter;
@@ -661,8 +734,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         ),
       }));
       const incoming = [],
-        outgoingIds = [],
-        sourceExchangeRemoved = [];
+        outgoingIds = [];
       for (const plan of bankDisplay.plans.values()) {
         if (
           plan.flow.to.kind === "bet" &&
@@ -675,7 +747,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
               plan,
               state,
               wagerSources.get(impactStack.id),
-            ).sort((a, b) => a.position[1] - b.position[1]),
+            ),
+          );
+          outgoingIds.push(
+            ...(plan.wagerReceipt?.removed || []).map((chip) => chip.id),
           );
           receivedWagerFlows.add(plan.flow.id);
         }
@@ -686,28 +761,43 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
           !departedWagerFlows.has(plan.flow.id)
         ) {
           outgoingIds.push(...plan.sourceSpecs.map((chip) => chip.id));
-          sourceExchangeRemoved.push(...(plan.sourceExchange?.removed || []));
+          if (plan.sourceExchange) {
+            outgoingIds.push(
+              ...plan.sourceExchange.removed.map((chip) => chip.id),
+            );
+            incoming.push(...plan.sourceExchange.retained);
+          }
           departedWagerFlows.add(plan.flow.id);
         }
       }
       const physical = wagerPresentation.reconcile(impactStack.id, canonical, {
         incoming,
         outgoingIds,
-        sourceExchangeRemoved,
+        preserveLayerOrder: true,
       });
       activeWagerKeys.push(impactStack.id);
       wagerSpecs.push(...physical.chips);
       impactStack.chips.push(...physical.chips);
       if (physical.exchange) {
         const id = `wager:${impactStack.id}:${physical.exchange.added.map((chip) => chip.id).join(":")}`;
-        queueExchange(id, physical.exchange.removed, now);
+        const end = now + 780;
+        queueExchange(id, physical.exchange.removed, now, {
+          added: physical.exchange.added,
+          end,
+        });
         for (const chip of physical.exchange.added)
-          wagerDrops.set(chip.id, { startAt: now + 420 });
+          wagerDrops.set(chip.id, { readyAt: end });
       }
       const marker = ring(player.color, diameter / 0.33);
       marker.position.y = 0.016;
       pile.add(marker);
-      const label = textLabel(money(visible), player.color, 0.4, 2);
+      const hop = /^hop-(\d)-(\d)$/.exec(route.bet.type);
+      const label = textLabel(
+        hop ? `${hop[1]}–${hop[2]}  ${money(visible)}` : money(visible),
+        player.color,
+        hop ? 0.55 : 0.4,
+        2,
+      );
       label.material.depthTest = false;
       label.renderOrder = 30;
       label.userData = {
@@ -735,13 +825,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     for (const specs of wagerSources.values())
       for (const spec of specs) {
         const drop = wagerDrops.get(spec.id);
-        if (drop)
-          spec.readyAt =
-            drop.startAt +
-            Math.sqrt(
-              (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
-            ) *
-              1000;
+        if (drop) spec.readyAt = drop.readyAt;
       }
     chips.userData.layouts = Object.fromEntries(wagerSources);
     for (const id of receivedWagerFlows)
@@ -835,7 +919,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     dirtyImpactChips.clear();
     activeIds.forEach((id) => dirtyImpactChips.add(id));
     impacts = impacts.filter(
-      (track) => now < track.startAt + track.physicsMs + track.recoveryMs,
+      (track) =>
+        (track.authoritative && state.rolling) ||
+        now < track.startAt + track.physicsMs + track.recoveryMs,
     );
     impactStatus.active = active;
   }
@@ -856,83 +942,93 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     });
     if (!active && now >= landingPlan.settlingUntil) landingPlan = null;
   }
+  function suppressStaticChip(id) {
+    for (const binding of impactBindings.get(id) || []) {
+      impactMatrix.copy(binding.base).scale(impactScale.setScalar(0));
+      binding.instances.setMatrixAt(binding.index, impactMatrix);
+    }
+  }
+
   function updateExchanges(now) {
     for (const [id, exchange] of exchangeObjects) {
       if (now >= exchange.endAt) {
+        for (const chip of exchange.added)
+          for (const binding of impactBindings.get(chip.id) || [])
+            binding.instances.setMatrixAt(binding.index, binding.base);
         clearGroup(exchange.group);
         exchange.group.removeFromParent();
         exchangeObjects.delete(id);
         continue;
       }
-      const t = Math.max(
-        0,
-        (now - exchange.startAt) / (exchange.endAt - exchange.startAt),
-      );
       const instances = exchange.group.userData.chipBatch;
       exchange.chips.forEach((spec, index) => {
-        impactPosition.fromArray(spec.position);
-        // Lift the outgoing chips together into the dealer's hand; their old
-        // denominations remain visible while the replacement chips arrive.
-        impactPosition.y += Math.sin((t * Math.PI) / 2) * 0.32;
-        impactQuaternion.setFromEuler(impactEuler.set(...spec.rotation));
-        const size =
-          spec.diameter * Math.max(0.001, 1 - Math.max(0, t - 0.65) / 0.35);
+        const outgoing = index < exchange.removed.length;
+        const from = outgoing ? spec.position : rackSlot(spec, index);
+        const to = outgoing ? rackSlot(spec, index) : spec.position;
+        const startAt = outgoing ? exchange.startAt : exchange.departure;
+        const endAt = outgoing ? exchange.arrival : exchange.endAt;
+        const progress = Math.max(
+          0,
+          Math.min(1, (now - startAt) / Math.max(1, endAt - startAt)),
+        );
+        const position = chipTransferPosition(from, to, now, startAt, endAt, {
+          height: CHIP_RACK_ARC_HEIGHT,
+          drop: outgoing ? 0 : CHIP_LANDING_LIMITS.drop,
+        });
+        impactPosition.fromArray(position);
+        impactQuaternion.setFromEuler(
+          impactEuler.set(...(outgoing ? spec.rotation : rackRotation)),
+        );
+        flightTargetQuaternion.setFromEuler(
+          impactEuler.set(...(outgoing ? rackRotation : spec.rotation)),
+        );
+        impactQuaternion.slerp(
+          flightTargetQuaternion,
+          progress * progress * (3 - 2 * progress),
+        );
+        const size = now >= startAt && now < endAt ? spec.diameter : 0;
         impactScale.set(size, size * spec.thicknessScale, size);
         instances.setMatrixAt(
           index,
           impactMatrix.compose(impactPosition, impactQuaternion, impactScale),
         );
+        suppressStaticChip(spec.id);
       });
     }
+    for (const [id, existing] of wagerDrops)
+      if (now >= existing.readyAt) wagerDrops.delete(id);
   }
-  function queueExchange(id, removed, now, duration = 420) {
-    if (!removed.length || seenExchanges.has(id)) return;
+
+  function queueExchange(
+    id,
+    removed,
+    startAt,
+    {
+      added = [],
+      arrival = startAt + 320,
+      departure = startAt + 390,
+      end = startAt + 780,
+    } = {},
+  ) {
+    if ((!removed.length && !added.length) || seenExchanges.has(id)) return;
     seenExchanges.add(id);
-    const group = chipFactory.createBatch(removed);
-    group.name = "Dealer makes change";
+    const chips = [...removed, ...added];
+    const group = chipFactory.createBatch(chips);
+    group.name = "Dealer rack chip exchange";
     group.traverse((o) => {
       if (o.isInstancedMesh) o.frustumCulled = false;
     });
-    const caption = textLabel("CHANGE", "#e5ca83", 0.4);
-    caption.position.fromArray(removed[0].position);
-    caption.position.y += 0.35;
-    group.add(caption);
     transfers.add(group);
     exchangeObjects.set(id, {
       group,
-      chips: removed,
-      startAt: now,
-      endAt: now + duration,
+      chips,
+      removed,
+      added,
+      startAt,
+      arrival,
+      departure,
+      endAt: end,
     });
-  }
-  function updateWagerDrops(state, now) {
-    if (state.rolling) {
-      for (const exchange of exchangeObjects.values()) {
-        clearGroup(exchange.group);
-        exchange.group.removeFromParent();
-      }
-      exchangeObjects.clear();
-    }
-    for (const [id, drop] of wagerDrops) {
-      const elapsed = (now - drop.startAt) / 1000;
-      const offset = state.rolling
-        ? 0
-        : Math.max(
-            0,
-            CHIP_LANDING_LIMITS.drop -
-              0.5 * CHIP_LANDING_LIMITS.gravity * Math.max(0, elapsed) ** 2,
-          );
-      for (const binding of impactBindings.get(id) || []) {
-        if (dirtyImpactChips.has(id)) continue;
-        impactMatrix.copy(binding.base);
-        if (!state.rolling && elapsed < 0)
-          impactMatrix.scale(impactScale.setScalar(0));
-        else impactMatrix.elements[13] += offset;
-        binding.instances.setMatrixAt(binding.index, impactMatrix);
-      }
-      if (state.rolling || (elapsed >= 0 && offset === 0))
-        wagerDrops.delete(id);
-    }
   }
   function updatePreviews(state, players) {
     const key = JSON.stringify([
@@ -1029,7 +1125,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
               state,
               wagerSources.get(routeKey(flow.to)),
             );
-          const specs = bankPlan.chips.map((chip, index) => {
+          const moving = [
+            ...bankPlan.chips,
+            ...(bankPlan.wagerReceipt?.issued || []),
+          ];
+          const specs = moving.map((chip, index) => {
             const pose = chipStackPose(`handful:${flow.id}`, index % 10, {
               diameter: 0.23,
               thicknessScale: 1.15,
@@ -1049,10 +1149,19 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
           group.add(batch);
           group.userData.flightBatch = batch.userData.chipBatch;
           group.userData.flightSpecs = specs;
+          group.userData.rackIssued = new Set([
+            ...bankPlan.profitChipIds,
+            ...(bankPlan.bankExchangeIssued || []),
+            ...(bankPlan.wagerReceipt?.issued || []).map((chip) => chip.id),
+            ...(bankPlan.sourceExchange?.outgoing || []).map((chip) => chip.id),
+          ]);
+          group.userData.rackReceipts = new Set(
+            (bankPlan.wagerReceipt?.carried || []).map((chip) => chip.id),
+          );
           batch.traverse((o) => {
             if (o.isInstancedMesh) o.frustumCulled = false;
           });
-        } else if (!bankPlan || bankPlan.started)
+        } else if (!bankPlan && flow.amount >= 100)
           group.add(
             chipFactory.createBatch(
               pileSpecs(flow.amount, { diameter: 0.28, max: 6, seed: flow.id }),
@@ -1064,11 +1173,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         flightObjects.set(flow.id, group);
       }
       const sample = sampleChipFlow(flow, now);
-      const changeDelay = bankPlan?.sourceExchange
-        ? Math.min(420, flow.duration * 0.32)
-        : 0;
-      const visualStartAt = flow.startAt + changeDelay;
-      group.visible = sample.active && now >= visualStartAt;
+      group.visible = sample.active;
       if (group.visible) {
         const instances = group.userData.flightBatch;
         if (instances && bankPlan) {
@@ -1087,80 +1192,84 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
             target = group.userData.targetMap;
           const fromBase = routePosition(flow.from, state),
             toBase = routePosition(flow.to, state);
-          const fallMs =
-            Math.sqrt(
-              (2 * CHIP_LANDING_LIMITS.drop) / CHIP_LANDING_LIMITS.gravity,
-            ) * 1000;
-          const endAt = Math.min(
-            flow.startAt + flow.duration,
-            flow.cutAt ?? Infinity,
-          );
-          const releaseAt = endAt - Math.min(fallMs, flow.duration * 0.4);
-          const progress = Math.max(
-            0,
-            Math.min(
-              1,
-              (now - visualStartAt) / Math.max(1, endAt - visualStartAt),
-            ),
-          );
+          const { rackIssued, rackReceipts } = group.userData;
           group.userData.flightSpecs.forEach((spec, index) => {
             const original = source.get(spec.id);
-            const from =
-              original?.position ||
-              fromBase.map((v, a) => v + spec.position[a]);
             const final = target.get(spec.id);
-            const to =
-              final?.position || toBase.map((v, a) => v + spec.position[a]);
-            let position;
-            if (final) {
-              if (now < releaseAt)
-                position = arcPosition(
-                  from,
-                  to.map(
-                    (v, a) => v + (a === 1 ? CHIP_LANDING_LIMITS.drop : 0),
-                  ),
-                  (now - visualStartAt) /
-                    Math.max(1, releaseAt - visualStartAt),
-                  0.65,
-                );
-              else {
-                const t = (now - releaseAt) / 1000;
-                position = to.map(
-                  (v, a) =>
-                    v +
-                    (a === 1
-                      ? Math.max(
-                          0,
-                          CHIP_LANDING_LIMITS.drop -
-                            0.5 * CHIP_LANDING_LIMITS.gravity * t * t,
-                        )
-                      : 0),
-                );
-              }
-            } else position = arcPosition(from, to, progress, 0.9);
+            const carriedToRack = rackReceipts.has(spec.id);
+            const fromRack =
+              rackIssued.has(spec.id) || flow.from.kind === "dealer";
+            const toRack = carriedToRack || flow.to.kind === "dealer";
+            const startAt =
+              fromRack &&
+              (bankPlan.sourceExchange ||
+                bankPlan.bankExchangeIssued?.has(spec.id) ||
+                bankPlan.wagerReceipt?.issued.some(
+                  (chip) => chip.id === spec.id,
+                ))
+                ? rackDeparture(flow)
+                : flow.startAt;
+            const endAt = carriedToRack
+              ? Math.max(startAt + 1, rackArrival(flow))
+              : flowEnd(flow);
+            const progress = Math.max(
+              0,
+              Math.min(1, (now - startAt) / Math.max(1, endAt - startAt)),
+            );
+            const from = fromRack
+              ? rackSlot(spec, index)
+              : (original?.position ??
+                fromBase.map((v, axis) => v + spec.position[axis]));
+            const to = toRack
+              ? rackSlot(spec, index)
+              : (final?.position ??
+                toBase.map((v, axis) => v + spec.position[axis]));
+            const position = chipTransferPosition(
+              from,
+              to,
+              now,
+              startAt,
+              endAt,
+              {
+                height:
+                  fromRack || toRack
+                    ? CHIP_RACK_ARC_HEIGHT
+                    : CHIP_TRANSFER_ARC_HEIGHT,
+                drop: toRack ? 0 : CHIP_LANDING_LIMITS.drop,
+              },
+            );
             impactPosition.fromArray(position);
             const blend = progress * progress * (3 - 2 * progress);
-            const startRotation = original?.rotation || spec.rotation;
+            const startRotation = fromRack
+              ? rackRotation
+              : original?.rotation || spec.rotation;
             impactQuaternion.setFromEuler(impactEuler.set(...startRotation));
             flightTargetQuaternion.setFromEuler(
-              impactEuler.set(...(final?.rotation || startRotation)),
+              impactEuler.set(
+                ...(toRack ? rackRotation : final?.rotation || startRotation),
+              ),
             );
             impactQuaternion.slerp(flightTargetQuaternion, blend);
-            const startDiameter = original?.diameter ?? spec.diameter;
+            const startDiameter = fromRack
+              ? 0.278
+              : (original?.diameter ?? spec.diameter);
             const diameter =
               startDiameter +
-              ((final?.diameter ??
-                (flow.to.kind === "bet" ? 0.31 : spec.diameter)) -
+              ((toRack
+                ? 0.278
+                : (final?.diameter ??
+                  (flow.to.kind === "bet" ? 0.31 : spec.diameter))) -
                 startDiameter) *
                 blend;
             const startThickness =
               original?.thicknessScale ?? spec.thicknessScale;
             const thickness =
               startThickness +
-              ((final?.thicknessScale ?? spec.thicknessScale) -
+              ((toRack ? 1 : (final?.thicknessScale ?? spec.thicknessScale)) -
                 startThickness) *
                 blend;
-            impactScale.set(diameter, diameter * thickness, diameter);
+            const size = now >= startAt && now < endAt ? diameter : 0;
+            impactScale.set(size, size * thickness, size);
             impactMatrix.compose(impactPosition, impactQuaternion, impactScale);
             instances.setMatrixAt(index, impactMatrix);
           });
@@ -1170,6 +1279,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
               routePosition(flow.from, state),
               routePosition(flow.to, state),
               sample.progress,
+              CHIP_TRANSFER_ARC_HEIGHT,
             ),
           );
           group.rotation.y = Math.sin(sample.progress * Math.PI) * 0.32;
@@ -1545,8 +1655,35 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       connected &&
       (state.snapshotAt ?? state) === reconnectBaseline;
     if (connected && !waitingForFresh && snapshotRef !== state) {
-      if (state.rolling && state.throw?.id !== previousState?.throw?.id)
+      if (state.rolling && state.throw?.id !== previousState?.throw?.id) {
         flows = [];
+        for (const exchange of exchangeObjects.values()) {
+          clearGroup(exchange.group);
+          exchange.group.removeFromParent();
+        }
+        if (exchangeObjects.size) lastStatic = "";
+        exchangeObjects.clear();
+        wagerDrops.clear();
+      }
+      if (!state.rolling && previousState?.rolling) {
+        for (const track of impacts) {
+          if (!track.authoritative) continue;
+          const actual = sampleChipImpact(track, now).poses;
+          const specs = wagerSources.get(track.stackId);
+          if (!specs) continue;
+          for (const [index, id] of track.chipIds.entries()) {
+            const chip = specs.find((spec) => spec.id === id);
+            if (!chip) continue;
+            chip.position = [...actual[index].position];
+            impactQuaternion.fromArray(actual[index].quaternion);
+            chip.rotation = impactEuler
+              .setFromQuaternion(impactQuaternion)
+              .toArray()
+              .slice(0, 3);
+          }
+        }
+        impacts = [];
+      }
       if (chipFactory && connectedBefore && previousState) {
         const planned = planChipFlows(previousState, state, { now });
         const ids = new Set(flows.map((f) => f.id));
@@ -1632,7 +1769,6 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         connected && !waitingForFresh && state.status === "playing",
       );
       updateLandings(now);
-      updateWagerDrops(state, now);
       updateExchanges(now);
     }
     if (!state.rolling && !flows.length && !impacts.length && !landingPlan)
@@ -1660,6 +1796,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     },
     get bankLayouts() {
       return bankLayoutCache;
+    },
+    get wagerLayouts() {
+      return wagerSources;
     },
     get financialLabelsVisible() {
       return financialLabelsVisible;

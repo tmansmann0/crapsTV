@@ -2002,3 +2002,194 @@ body:has(.pg-shell) {
     min-height: 44px;
   }
 }
+
+/* Number type shares the existing layout-control row: the felt never moves. */
+.pg-number-mode {
+  flex: 1.35;
+  min-width: 0;
+  min-height: 44px;
+  max-width: 43%;
+  padding: 0 5px;
+  border: 1px solid var(--pg-rule);
+  border-radius: 9px;
+  color: var(--pg-ink);
+  background: var(--pg-paper);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+}
+.pg-board-switch button {
+  gap: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+.pg-more {
+  display: block;
+}
+.pg-more-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.pg-shell .pg-more-tabs button {
+  min-height: 44px;
+  padding: 5px 9px;
+  border: 1px solid var(--pg-line);
+  border-radius: 8px;
+  color: var(--pg-ivory);
+  background: rgba(0, 0, 0, 0.1);
+  font-size: 11px;
+}
+.pg-shell .pg-more-tabs button[aria-pressed="true"] {
+  color: var(--pg-ink);
+  background: var(--pg-ivory);
+}
+.pg-more-group > p {
+  margin: 0 0 8px;
+}
+.is-hops .pg-more-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.is-bonus .pg-more-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pg-shell .is-hops .pg-tile-more {
+  min-height: 64px;
+}
+.pg-shell .is-bonus .pg-tile-more {
+  min-height: 74px;
+}
+.pg-bonus-progress {
+  display: flex;
+  justify-content: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.pg-bonus-progress i {
+  display: inline-grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  border: 1px solid var(--pg-line);
+  border-radius: 50%;
+  font-size: 10px;
+  font-style: normal;
+}
+.pg-bonus-progress i.is-hit {
+  color: var(--pg-ink);
+  background: var(--pg-brass-bright);
+}
+.pg-wager-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 44px;
+  min-width: 0;
+}
+.pg-wager-action-text {
+  flex: 1;
+  min-width: 0;
+  max-height: 44px;
+  overflow-y: auto;
+}
+.pg-wager-action-text b {
+  display: block;
+  font-size: 11px;
+}
+.pg-wager-action-text small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.15;
+}
+.pg-wager-action-text select {
+  width: 100%;
+  min-height: 24px;
+  font: inherit;
+  font-size: 11px;
+}
+.pg-shell .pg-wager-actions > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 4px 9px;
+  border: 1px solid var(--pg-felt-deep);
+  border-radius: 9px;
+  color: var(--pg-paper);
+  background: var(--pg-felt-deep);
+  font-size: 11px;
+  font-weight: 700;
+}
+.pg-shell .pg-wager-actions > button:disabled {
+  opacity: 0.65;
+}
+.pg-shell .pg-bet-remove {
+  flex: 0 0 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 2px;
+  border: 1px solid var(--pg-rule);
+  border-radius: 8px;
+  color: var(--pg-ink);
+  background: var(--pg-paper);
+  font-size: 10px;
+  line-height: 1.05;
+}
+.pg-hop-picker {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.pg-hop-picker > div > b {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+}
+.pg-hop-picker > div > div {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+}
+.pg-shell .pg-hop-picker button {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  min-width: 0;
+  border: 1px solid var(--pg-line);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.pg-shell .pg-hop-picker button[aria-pressed="true"] {
+  border-color: var(--pg-brass-bright);
+  background: var(--pg-felt-deep);
+  box-shadow: inset 0 0 0 1px var(--pg-brass-bright);
+}
+.pg-hop-picker .pg-die {
+  --pg-die: 27px;
+}
+.is-hops .pg-more-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* Categories stay within reach while the chosen family scrolls. */
+.pg-more-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px 0;
+  background: var(--pg-felt);
+}
+.pg-shell .pg-more-tabs button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.pg-feedback .pg-quickbets > span {
+  max-height: 44px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}

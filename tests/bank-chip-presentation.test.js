@@ -208,6 +208,29 @@ test("fractional banks and payouts remain exact without rendering fictional sub-
   assert(done.banks.get("p").chips.every((c) => c.denomination >= 100));
 });
 
+test("buy and lay cash commission remainders stay in reserve through dealer payouts", () => {
+  for (const [id, profit] of [
+    ["buy-4", 975],
+    ["lay-4", 237],
+  ]) {
+    const presentation = createBankChipPresentation();
+    presentation.sync(state(100000), [], 1000);
+    const next = state(100000 + profit);
+    const flow = transfer(id, profit, { sourceAmount: 0 });
+    flow.from.bet.type = id;
+    const flying = presentation.sync(next, [flow], flow.startAt);
+    const [plan] = flying.plans.values();
+    assert.equal(value(plan.chips), Math.floor(profit / 100) * 100);
+    assert.deepEqual(
+      plan.chips.map((chip) => chip.id),
+      plan.profitChipIds,
+    );
+    const done = presentation.sync(next, [flow], flow.startAt + flow.duration);
+    exact(done, next, [flow], flow.startAt + flow.duration);
+    assert.equal(done.banks.get("p").reserveCents, profit % 100);
+  }
+});
+
 test("players have independent physical inventories and a new room discards every old reservation", () => {
   const p = createBankChipPresentation(),
     s = state(100000, {
@@ -762,6 +785,24 @@ test("partial take-downs preserve a real matching top chip or explicitly request
       assert.equal(value(plan.sourceExchange.removed), before);
       assert.equal(plan.sourceExchange.afterAmount, before - returned);
       assert.equal(value(plan.sourceExchange.outgoing), returned);
+      assert.equal(value(plan.sourceExchange.retained), before - returned);
+      assert.equal(
+        value([
+          ...plan.sourceExchange.outgoing,
+          ...plan.sourceExchange.retained,
+        ]),
+        before,
+      );
+      assert(
+        ![
+          ...plan.sourceExchange.outgoing,
+          ...plan.sourceExchange.retained,
+        ].some((chip) =>
+          plan.sourceExchange.removed.some(
+            (original) => chip.id === original.id,
+          ),
+        ),
+      );
     }
   }
 });
@@ -915,7 +956,7 @@ test("a canceled queued undo credits its original wager identities once before t
   );
 });
 
-test("a queued undo waits for a receipt denomination exchange to clear before lifting its canonical chip", () => {
+test("a queued undo lifts the same dealer-issued chip after a pre-placement exchange", () => {
   const presentation = createBankChipPresentation(),
     before = state(100000);
   presentation.sync(before, [], 1000);
@@ -946,24 +987,14 @@ test("a queued undo waits for a receipt denomination exchange to clear before li
     .sync(before, [wager, undo], 1200, { wagerSources: new Map() })
     .plans.get(undo.id);
   const contactAt = wager.startAt + wager.duration;
-  assert.equal(undo.startAt, contactAt + 620);
-  assert.equal(queued.receiptExchangeDelay, 620);
-  const pile = wagerPileLayout(wager.to, placed, 50000),
-    geometry = chipPileSpecs(50000, {
-      diameter: pile.diameter,
-      seed: bet.id,
-    })[0];
-  const purple = {
-    ...geometry,
-    id: "dealer-issued-purple",
-    appearanceId: "purple-patina",
-    wear: 2,
-    position: geometry.position.map(
-      (value, axis) => value + pile.basePosition[axis],
-    ),
-  };
+  assert.equal(undo.startAt, contactAt + 20);
+  assert.deepEqual(departing.wagerReceipt.carried, departing.chips);
+  assert.equal(departing.wagerReceipt.issued.length, 1);
+  const [purple] = departing.wagerReceipt.issued;
+  assert.equal(purple.denomination, 50000);
+  assert(!departing.chips.some((chip) => chip.id === purple.id));
   const wagerSources = new Map([[routeKey(wager.to), [purple]]]);
-  presentation.sync(before, [wager, undo], contactAt + 595, { wagerSources });
+  presentation.sync(before, [wager, undo], contactAt + 10, { wagerSources });
   assert.equal(
     queued.started,
     false,
@@ -976,7 +1007,7 @@ test("a queued undo waits for a receipt denomination exchange to clear before li
       id: purple.id,
       appearanceId: purple.appearanceId,
       denomination: 50000,
-      wear: 2,
+      wear: purple.wear,
     },
   ]);
   assert.deepEqual(queued.sourceSpecs, [purple]);

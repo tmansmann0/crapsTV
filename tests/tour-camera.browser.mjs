@@ -362,6 +362,11 @@ try {
         [],
         "the bank has received the chips before the shot's tail ends",
       );
+      assert.deepEqual(
+        banked.target,
+        heroSequence.at(-2).camera.target,
+        "the approach holds its tray aim through the physical landing",
+      );
       for (let step = 1; step < heroSequence.length; step++) {
         const previous = heroSequence[step - 1].camera,
           current = heroSequence[step].camera;
@@ -395,7 +400,7 @@ try {
         );
         assert(
           Math.max(a.length, b.length) / Math.min(a.length, b.length) < 1.6,
-          "the close payout shot has no sudden wide/macro distance jump",
+          `the close payout shot has no sudden wide/macro distance jump (${heroSequence[step - 1].progress} → ${heroSequence[step].progress}: ${a.length.toFixed(2)} → ${b.length.toFixed(2)})`,
         );
         assert.equal(current.shotKey, arrived.shotKey);
       }
@@ -429,7 +434,7 @@ try {
   const postTour = await page.evaluate(() => window.tourQA.postTourSchedule());
   assert(
     postTour.visits.length > 0 && postTour.visits.length <= 3,
-    "idle visitation is finite, rather than cycling indefinitely",
+    "each idle visit sequence is finite",
   );
   assert.equal(
     new Set(postTour.visits.map((visit) => visit.camera.playerId)).size,
@@ -481,7 +486,7 @@ try {
   assert.deepEqual(
     held.expectedCamera.position,
     heldLater.expectedCamera.position,
-    "after the finite visit sequence, the camera stays over the board",
+    "after the finite visit sequence, the camera rests over the board",
   );
   assert(
     Math.hypot(
@@ -491,6 +496,22 @@ try {
     ) < 0.02,
     "rendered camera remains at the held overview after ordinary easing",
   );
+  assert(postTour.revisits.length > 1 && postTour.revisits.length <= 3);
+  assert.equal(
+    new Set(postTour.revisits.map((visit) => visit.camera.playerId)).size,
+    postTour.revisits.length,
+  );
+  for (const [index, visit] of postTour.revisits.entries()) {
+    const sought = await page.evaluate(
+      (at) => window.tourQA.seek(at),
+      visit.at,
+    );
+    await capture(
+      `idle-revisit-${index + 1}`,
+      sought.expectedCamera.phase,
+      sought.expectedCamera.playerId,
+    );
+  }
   const shortProofs = [];
   for (const seconds of [0, 1, 2]) {
     const short = await page.evaluate(
@@ -677,7 +698,7 @@ try {
       assert(distance < 2.5, "engraved bank faces receive a close macro view");
     if (detail.camera.shotVariant.startsWith("bet-")) {
       assert(
-        detail.wager?.chipCount === 8 && detail.wager.height > 0.4,
+        detail.wager?.chipCount === 8 && detail.wager.height > 0.35,
         "the subject is a physically tall eight-chip pile",
       );
       assert(

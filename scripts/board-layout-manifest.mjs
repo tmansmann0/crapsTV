@@ -3,6 +3,8 @@ import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import {
   BOARD_LAYOUT,
+  BOARD_SPECIAL_REGIONS,
+  boardPixelToWorld,
   legacyBoardToPixel,
   legacyBoardToWorld,
 } from "../src/board-layout.js";
@@ -34,6 +36,8 @@ for (const mode of ["classic", "crapless"]) {
       x = 136 + (index + 0.5) * width;
     const rect = [136 + index * width, 242, width, 158];
     add(`place-${point}`, { type: `place-${point}` }, x, 290, rect);
+    for (const kind of mode === "classic" ? ["buy", "lay"] : ["buy"])
+      add(`${kind}-${point}`, { type: `${kind}-${point}` }, x, 290, rect);
     add(`come-point-${point}`, { type: "come", point }, x, 345, rect);
     if (mode === "classic")
       add(`dontcome-point-${point}`, { type: "dontcome", point }, x, 345, rect);
@@ -123,6 +127,30 @@ for (const mode of ["classic", "crapless"]) {
       32,
     ]);
   }
+  function addSpecial(id, region) {
+    const [x, y, width, height] = region.pixelRect;
+    const pixel = [x + width / 2, y + height / 2];
+    // Invert the shared transform for consumers that retain legacy anchors.
+    const legacy = [
+      1024 + (pixel[0] - 1024) / BOARD_LAYOUT.xScale,
+      (pixel[1] - BOARD_LAYOUT.betOffsetY) / BOARD_LAYOUT.yScale,
+    ];
+    regions[id] = { pixelRect: [...region.pixelRect] };
+    anchors[id] = {
+      bet: { type: id },
+      legacy,
+      pixel,
+      world: boardPixelToWorld(...pixel),
+    };
+  }
+  for (const id of ["bonus-small", "bonus-tall", "bonus-all"])
+    addSpecial(id, BOARD_SPECIAL_REGIONS[id]);
+  addSpecial("hops", BOARD_SPECIAL_REGIONS.hops);
+  for (let first = 1; first <= 6; first++)
+    for (let second = first; second <= 6; second++)
+      addSpecial(`hop-${first}-${second}`, BOARD_SPECIAL_REGIONS.hops);
+  // The group itself is paint, not a separately placeable wager.
+  delete anchors.hops;
   map.modes[mode] = { regions, anchors };
 }
 if (process.argv.includes("--annotate"))
@@ -155,6 +183,11 @@ if (process.argv.includes("--annotate"))
       map.modes[mode].regions[alias].pixelRect = [
         ...map.modes[mode].regions[source].pixelRect,
       ];
+    for (const point of BOARD_LAYOUT.points[mode])
+      for (const kind of mode === "classic" ? ["buy", "lay"] : ["buy"])
+        map.modes[mode].regions[`${kind}-${point}`].pixelRect = [
+          ...map.modes[mode].regions[`place-${point}`].pixelRect,
+        ];
     svg = svg
       .replace(/\sdata-layout-version="[^"]*"/, "")
       .replace(/<svg\b/, '<svg data-layout-version="2"');

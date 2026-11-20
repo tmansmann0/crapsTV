@@ -1,13 +1,13 @@
 {
   "width": 2048,
   "height": 1024,
-  "vertices": 52134,
-  "triangles": 51428,
-  "filled": 470,
-  "stroked": 68,
+  "vertices": 60254,
+  "triangles": 59296,
+  "filled": 645,
+  "stroked": 72,
   "removedHatchPaths": 14,
-  "paintCount": 555,
-  "logoPaint": 45,
+  "paintCount": 760,
+  "logoPaint": 215,
   "logoRect": {
     "x": 879,
     "y": 9.1484375,
@@ -91,151 +91,151 @@
       "id": "mask-13",
       "opacity": 0.7,
       "emptyObjectBox": false,
-      "paint": 47
+      "paint": 217
     },
     {
       "id": "mask-14",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 121
+      "paint": 291
     },
     {
       "id": "mask-15",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 135
+      "paint": 305
     },
     {
       "id": "mask-16",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 149
+      "paint": 319
     },
     {
       "id": "mask-17",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 162
+      "paint": 332
     },
     {
       "id": "mask-18",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 175
+      "paint": 345
     },
     {
       "id": "mask-19",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 188
+      "paint": 358
     },
     {
       "id": "mask-20",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 201
+      "paint": 371
     },
     {
       "id": "mask-21",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 214
+      "paint": 384
     },
     {
       "id": "mask-22",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 229
+      "paint": 399
     },
     {
       "id": "mask-23",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 245
+      "paint": 415
     },
     {
       "id": "mask-24",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 261
+      "paint": 431
     },
     {
       "id": "mask-25",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 276
+      "paint": 446
     },
     {
       "id": "mask-26",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 347
+      "paint": 517
     },
     {
       "id": "mask-27",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 369
+      "paint": 539
     },
     {
       "id": "mask-28",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 384
+      "paint": 554
     },
     {
       "id": "mask-29",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 401
+      "paint": 571
     },
     {
       "id": "mask-30",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 420
+      "paint": 590
     },
     {
       "id": "mask-31",
       "opacity": 0.75,
       "emptyObjectBox": false,
-      "paint": 444
+      "paint": 614
     },
     {
       "id": "mask-32",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 464
+      "paint": 634
     },
     {
       "id": "mask-33",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 472
+      "paint": 642
     },
     {
       "id": "mask-34",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 484
+      "paint": 654
     },
     {
       "id": "mask-35",
       "opacity": 0.8,
       "emptyObjectBox": true,
-      "paint": 497
+      "paint": 667
     }
   ],
   "clipPaints": 35,
   "colorEncoding": "sRGB; premultiplied once in native ink shader",
   "curveToleranceSvgPixels": 0.02,
-  "sourceSHA256": "edfa62390a8795fb6eaa1ad9360c5c884c3ac8959de882707e7f7a503f643294",
-  "binarySHA256": "5d672a3ff646cd54a910e0ea67bccf50ae032fcb5b1c41f87895baf1cc5d3eb6",
-  "bytes": 1659848,
+  "sourceSHA256": "afa79fbe68e400d4ec56579015f3958444456693b813cde65dc84664a1dd4e69",
+  "binarySHA256": "d9f1c66d527b7b2f8e2947111d231c72e10948e1ed39e3fd8a0c4fd50bd5fe87",
+  "bytes": 1916664,
   "minificationFallback": {
     "width": 2048,
     "height": 1024,
     "file": "board-crapless-minified.png",
-    "sha256": "16b3b1185e1b204ab3c3d60b903082e7b34d2c709bdca1abe4b51a74194f328f"
+    "sha256": "dfe85535dead59e68623907482195a3d39e7be8fb7a7d385971899a46b976c63"
   }
 }

@@ -13,6 +13,8 @@ import {
   PUCK_MASS,
 } from "../src/puck-layout.js";
 import { wagerStackLayout } from "../src/wager-layout.js";
+import { createChipImpacts, sampleChipImpact } from "../src/chip-impact.js";
+import { chipPileSpecs } from "../src/wager-layout.js";
 import * as game from "../src/game.js";
 
 const marker = { ...puckHome(9), position: [0, PUCK_HEIGHT / 2 + 0.002, 0] };
@@ -214,4 +216,105 @@ test("real field stack produces serialized authority contact metadata on the sam
     JSON.parse(JSON.stringify(flight)).stackContacts[0].stackId,
     stacks[0].id,
   );
+  assert.deepEqual(
+    flight.wagerChipFrames,
+    [],
+    "a grazing collision leaves the chips standing",
+  );
+});
+
+test("a centered strike moves real upper wager chips in the same world as the dice", () => {
+  const bet = { id: "field-proof", type: "field", amount: 1900 };
+  const state = {
+    config: { mode: "craps" },
+    players: [{ id: "alice", seat: 0, bets: [bet] }],
+  };
+  const [stack] = wagerStackLayout(state);
+  const gesture = { x: -0.7, power: 0 },
+    puck = puckHome(null);
+  const flight = createThrowTimeline({
+    ...options,
+    seed: 1,
+    gesture,
+    puck,
+    stacks: [stack],
+  });
+  const unobstructed = createThrowTimeline({
+    ...options,
+    seed: 1,
+    gesture,
+    puck,
+  });
+  assert.notDeepEqual(flight.frames, unobstructed.frames);
+  assert.equal(flight.wagerChipFrames.length, 1);
+  const [wireTrack] = flight.wagerChipFrames;
+  assert.equal(wireTrack.id, stack.id);
+  assert.deepEqual(wireTrack.layers, [
+    stack.chipCount - 3,
+    stack.chipCount - 2,
+    stack.chipCount - 1,
+  ]);
+  assert(
+    flight.stackContacts.some(
+      (contact) => contact.id === stack.id && contact.speed > 1,
+    ),
+  );
+  const physics = createDicePhysics({ puck, stacks: [stack] });
+  physics.throwDice(1, gesture);
+  const recorded = new Map(
+    wireTrack.samples.slice(0, -1).map((row) => [row[0], row.slice(1)]),
+  );
+  for (let frame = 1; frame < flight.frames.length - 1; frame++) {
+    physics.step(1 / 120);
+    physics.step(1 / 120);
+    const values = recorded.get(flight.frames[frame][0]);
+    if (!values) continue;
+    const track = physics.chipsInMotion.get(stack.id);
+    assert.deepEqual(
+      values,
+      track.bodies
+        .flatMap((body) => [
+          ...body.position.toArray(),
+          ...body.quaternion.toArray(),
+        ])
+        .map((n) => Math.round(n * 1e5) / 1e5),
+    );
+  }
+  const chips = chipPileSpecs(bet.amount, {
+    diameter: stack.diameter,
+    seed: bet.id,
+  }).map((chip) => ({
+    ...chip,
+    position: chip.position.map(
+      (offset, axis) => offset + stack.basePosition[axis],
+    ),
+  }));
+  const [presentation] = createChipImpacts(JSON.parse(JSON.stringify(flight)), [
+    { ...stack, chips },
+  ]);
+  const resting = sampleChipImpact(
+    presentation,
+    flight.startAt + flight.duration,
+  ).poses;
+  const displacement = Math.hypot(
+    ...resting
+      .at(-1)
+      .position.map((v, axis) => v - chips.at(-1).position[axis]),
+  );
+  assert(displacement > 0.03 && displacement < 0.15);
+  assert.deepEqual(
+    sampleChipImpact(presentation, flight.startAt + flight.duration + 300)
+      .poses,
+    resting,
+  );
+  const final = sampleThrow(flight, flight.startAt + flight.duration);
+  assert.deepEqual(
+    final.dice.map(({ quaternion }) => upperDieFace(quaternion).value),
+    flight.dice,
+  );
+  assert.deepEqual(
+    sampleThrow(flight, flight.startAt + flight.duration + 300),
+    final,
+  );
+  assert(!wagerStackLayout(state).some((pile) => pile.position[1] < 0));
 });

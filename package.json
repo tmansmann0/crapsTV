@@ -14,6 +14,7 @@
     "format": "prettier --write src server tests scripts/*.mjs *.js *.json *.html .github/workflows/*.yml",
     "test:online": "node scripts/check-online.mjs",
     "test:odds": "node tests/phone-odds.browser.mjs",
+    "test:betting": "node tests/phone-betting.browser.mjs",
     "benchmark": "node scripts/benchmark-render.mjs",
     "test:graphics": "node tests/graphics.browser.mjs",
     "test:board": "node tests/board-artwork.browser.mjs",

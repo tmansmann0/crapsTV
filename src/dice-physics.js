@@ -25,6 +25,11 @@ export function seededRandom(seed) {
   };
 }
 export const MAX_WAGER_COLLIDERS = 1024;
+export const MAX_LOOSE_WAGER_STACKS = 2;
+const LOOSE_WAGER_CHIPS = 3;
+const MINIMUM_CHIP_IMPACT_SPEED = 2.1;
+const LOOSE_CHIP_MASS = 0.023;
+const PHYSICS_STEP = 1 / 120;
 function correctContactFriction(world) {
   // cannon-es 0.20's averaged-friction path swaps body-local contact arms.
   // Use each original contact instead, sharing the manifold's Coulomb force
@@ -82,6 +87,15 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
   world.addContactMaterial(
     new ContactMaterial(marker, clay, { friction: 0.5, restitution: 0.06 }),
   );
+  world.addContactMaterial(
+    new ContactMaterial(clay, felt, { friction: 0.75, restitution: 0.01 }),
+  );
+  world.addContactMaterial(
+    new ContactMaterial(clay, clay, { friction: 0.72, restitution: 0.02 }),
+  );
+  world.addContactMaterial(
+    new ContactMaterial(clay, rubber, { friction: 0.6, restitution: 0.025 }),
+  );
   const floor = new Body({ mass: 0, material: felt, shape: new Plane() });
   floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
   world.addBody(floor);
@@ -131,7 +145,22 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
   if (
     !Array.isArray(stacks) ||
     stacks.length > MAX_WAGER_COLLIDERS ||
-    stacks.some((prop) => !validCylinder(prop))
+    stacks.some(
+      (prop) =>
+        !validCylinder(prop) ||
+        (prop.impactChips !== undefined &&
+          (!Array.isArray(prop.impactChips) ||
+            prop.impactChips.length > LOOSE_WAGER_CHIPS ||
+            prop.impactChips.some(
+              (chip) =>
+                !validCylinder(chip) ||
+                !validPosition(chip.rotation) ||
+                !Number.isInteger(chip.layer) ||
+                chip.layer < 0 ||
+                !Number.isFinite(chip.bottom) ||
+                chip.bottom < 0,
+            ))),
+    )
   )
     throw new Error("Invalid wager colliders.");
   if (
@@ -154,6 +183,18 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
     world.addBody(body);
     return body;
   });
+  const chipsInMotion = new Map();
+  const movableStacks = stacks.flatMap((stack, index) =>
+    stack.impactChips?.length >= 2
+      ? [
+          {
+            stack,
+            body: stackBodies[index],
+            originalShape: stackBodies[index].shapes[0],
+          },
+        ]
+      : [],
+  );
   const puckBody = puck
     ? new Body({
         mass: 0.18,
@@ -223,7 +264,102 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
       }
     }),
   );
+  function releaseWagerChips(entry) {
+    const { stack, body } = entry;
+    const upper = stack.impactChips;
+    const floorY = stack.position[1] - stack.height / 2;
+    const height = upper[0].bottom - floorY - 0.0003;
+    const track = { bodies: [], hit: false };
+    chipsInMotion.set(stack.id, track);
+    if (height > 0.002) {
+      body.removeShape(entry.originalShape);
+      body.addShape(new Cylinder(stack.radius, stack.radius, height, 12));
+      body.position.y = floorY + height / 2;
+      body.aabbNeedsUpdate = true;
+    } else world.removeBody(body);
+    for (const chip of upper) {
+      const loose = new Body({
+        mass: LOOSE_CHIP_MASS,
+        material: clay,
+        shape: new Cylinder(chip.radius, chip.radius, chip.height, 16),
+        linearDamping: 0.74,
+        angularDamping: 0.78,
+        sleepSpeedLimit: 0.055,
+        sleepTimeLimit: 0.16,
+      });
+      loose.position.set(...chip.position);
+      loose.quaternion.setFromEuler(...chip.rotation);
+      loose.propId = stack.id;
+      loose.layer = chip.layer;
+      loose.addEventListener("collide", ({ body: other, contact }) => {
+        if (
+          bodies.includes(other) &&
+          Math.abs(contact.getImpactVelocityAlongNormal()) >= 0.75
+        )
+          track.hit = true;
+      });
+      track.bodies.push(loose);
+      world.addBody(loose);
+    }
+  }
+
+  function prepareChipContacts() {
+    // Only expose the upper layers for a close, centered strike. The lower
+    // cylinder and all distant stacks stay fixed, and Cannon supplies the
+    // entire two-way impulse between the dice and the released chips.
+    if (chipsInMotion.size >= MAX_LOOSE_WAGER_STACKS) return;
+    for (const die of bodies) {
+      const { position, velocity } = die;
+      const speed = Math.hypot(velocity.x, velocity.z);
+      if (speed < MINIMUM_CHIP_IMPACT_SPEED) continue;
+      const ux = velocity.x / speed,
+        uz = velocity.z / speed;
+      const near = speed * PHYSICS_STEP * 2.5;
+      for (const entry of movableStacks) {
+        const { stack } = entry;
+        if (chipsInMotion.has(stack.id)) continue;
+        const dx = stack.position[0] - position.x,
+          dz = stack.position[2] - position.z;
+        const along = dx * ux + dz * uz;
+        if (along <= 0 || along > near + stack.radius + DICE_SIZE * 0.9)
+          continue;
+        const across = Math.abs(dx * uz - dz * ux);
+        if (across > stack.radius * 0.72) continue;
+        const top = stack.position[1] + stack.height / 2;
+        const bottom = stack.impactChips[0].bottom;
+        const thickness = DICE_SIZE * 0.66;
+        const touchTime = Math.max(
+          0,
+          (along - stack.radius - thickness) / speed,
+        );
+        const y = position.y + velocity.y * touchTime;
+        if (y - thickness > top || y + thickness < bottom) continue;
+        if (Math.abs(velocity.y) > speed * 0.64) continue;
+        releaseWagerChips(entry);
+        if (chipsInMotion.size >= MAX_LOOSE_WAGER_STACKS) return;
+      }
+    }
+  }
+
+  function resetChipContacts() {
+    if (!chipsInMotion.size) return;
+    for (const track of chipsInMotion.values())
+      for (const chip of track.bodies) world.removeBody(chip);
+    for (const entry of movableStacks) {
+      if (!chipsInMotion.has(entry.stack.id)) continue;
+      const { stack, body, originalShape } = entry;
+      if (body.shapes[0] !== originalShape) {
+        body.removeShape(body.shapes[0]);
+        body.addShape(originalShape);
+      }
+      body.position.set(...stack.position);
+      body.aabbNeedsUpdate = true;
+      if (!body.world) world.addBody(body);
+    }
+    chipsInMotion.clear();
+  }
   function throwDice(seed = 1, gesture = { x: 0, power: 0.65 }) {
+    resetChipContacts();
     elapsed = 0;
     wallHits = 0;
     propHits = 0;
@@ -273,7 +409,8 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
   }
   function step(dt) {
     if (!running) return;
-    world.step(1 / 120, Math.min(dt, 0.5), 60);
+    prepareChipContacts();
+    world.step(PHYSICS_STEP, Math.min(dt, 0.5), 60);
     elapsed += dt;
     if (elapsed > 12) running = false;
   }
@@ -289,6 +426,7 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
     bodies,
     puckBody,
     stackBodies,
+    chipsInMotion,
     throwDice,
     step,
     stop,

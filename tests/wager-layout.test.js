@@ -12,6 +12,64 @@ import {
 import { catalogue, createState, POINTS, ALL_POINTS } from "../src/game.js";
 import { boardWorldToPixel, boardPixelToWorld } from "../src/board-layout.js";
 
+test("crowded boxes pack separate types and players without leaving the artwork", () => {
+  for (const mode of ["craps", "crapless"]) {
+    const types = [
+      "place-6",
+      "buy-6",
+      "prop-2",
+      "prop-12",
+      "field",
+      "big-6",
+      "hop-1-2",
+      "hop-5-6",
+      "bonus-tall",
+    ];
+    if (mode === "craps") types.push("lay-6");
+    const state = {
+      config: { mode },
+      players: Array.from({ length: 12 }, (_, seat) => ({
+        id: `p${seat}`,
+        seat,
+        bets: types.map((type) => ({
+          type,
+          id: `${type}:${seat}`,
+          amount: 14900,
+        })),
+      })),
+    };
+    const stacks = wagerStackLayout(state);
+    assert.equal(stacks.length, types.length * 12);
+    for (const [i, stack] of stacks.entries()) {
+      const type = stack.betId.split(":")[0];
+      const [x, y, w, h] = wagerRegion({ type }, mode).pixelRect;
+      const [left, top] = boardPixelToWorld(x, y),
+        [right, bottom] = boardPixelToWorld(x + w, y + h);
+      const [centerX, , centerZ] = stack.position;
+      assert(centerX - stack.radius >= left && centerX + stack.radius <= right);
+      assert(centerZ - stack.radius >= top && centerZ + stack.radius <= bottom);
+      for (const other of stacks.slice(0, i)) {
+        const distance = Math.hypot(
+          centerX - other.position[0],
+          centerZ - other.position[2],
+        );
+        assert(
+          distance > stack.radius + other.radius,
+          `${stack.betId} overlaps ${other.betId}`,
+        );
+      }
+    }
+    const reversed = wagerStackLayout({
+      ...state,
+      players: [...state.players].reverse(),
+    });
+    assert.deepEqual(
+      Object.fromEntries(stacks.map((pile) => [pile.id, pile.position])),
+      Object.fromEntries(reversed.map((pile) => [pile.id, pile.position])),
+    );
+  }
+});
+
 test("physical pile cylinder encloses every rendered chip, including visual offsets", () => {
   for (const mode of ["craps", "crapless"])
     for (const type of [

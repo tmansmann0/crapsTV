@@ -143,14 +143,11 @@ try {
     ),
     "The actual winning chips land in the bank",
   );
-  const matrixMotion = added.some((chip) => {
+  const contactStayedSeated = added.every((chip) => {
     const rest = after.chips.find((c) => c.id === chip.id);
-    return Math.abs(chip.matrix[13] - rest.matrix[13]) > 1e-6;
+    return Math.abs(chip.matrix[13] - rest.matrix[13]) < 0.002;
   });
-  assert(
-    matrixMotion,
-    "Contact includes a small physical rebound before settling",
-  );
+  assert(contactStayedSeated, "Incoming chips remain seated once they land");
   assert.deepEqual(errors, []);
   await mkdir("artifacts/bank-chips", { recursive: true });
   // This image is a diagnostic, not a pixel assertion. GPU readback on the

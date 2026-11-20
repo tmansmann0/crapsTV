@@ -8,6 +8,7 @@ import {
   betRoute,
   sampleChipFlow,
   arcPosition,
+  chipTransferPosition,
   bankChipStacks,
   SEAT_LAYOUT,
   seatStackSlot,
@@ -15,6 +16,28 @@ import {
 } from "../src/chip-flow.js";
 
 const wager = { id: "b1", type: "pass", amount: 500, point: null };
+
+test("chip trajectories stop over the receiving slot and land without overtravel", () => {
+  const from = [3, 0.8, -2],
+    to = [-1, 0.45, 2];
+  for (const duration of [80, 1150]) {
+    let previous = from,
+      dropping = false;
+    for (let now = 0; now <= duration; now++) {
+      const pose = chipTransferPosition(from, to, now, 0, duration);
+      assert(pose[0] <= previous[0] && pose[0] >= to[0]);
+      assert(pose[2] >= previous[2] && pose[2] <= to[2]);
+      if (dropping) {
+        assert.equal(pose[0], to[0]);
+        assert.equal(pose[2], to[2]);
+        assert(pose[1] <= previous[1] && pose[1] >= to[1]);
+      }
+      dropping ||= pose[0] === to[0] && pose[2] === to[2];
+      previous = pose;
+    }
+    assert.deepEqual(previous, to);
+  }
+});
 function state(bank = 10000, bets = []) {
   return {
     code: "FLOWAA",
