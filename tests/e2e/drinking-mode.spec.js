@@ -81,6 +81,12 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
     hub.state.rolling = true;
     finishRoll(hub.state, [1, 1]);
     hub.broadcast();
+    await expect(host.locator("[data-bank-value]")).toHaveAttribute(
+      "data-bank-value",
+      "8000",
+    );
+    await host.getByRole("tab", { name: "Drinks", exact: true }).click();
+    await guest.getByRole("tab", { name: "Drinks", exact: true }).click();
     const sendOffer = offer.getByRole("button", { name: /Send offer/ });
     await offer.getByLabel("Drink", { exact: true }).selectOption("finish");
     await expect(sendOffer).toHaveText(/\$37\.50/);
