@@ -9,6 +9,16 @@ import { openAdminSection } from "../helpers/admin-controls.mjs";
 async function capture(page, options) {
   if (!process.env.CI) await page.screenshot(options);
 }
+async function swipeDice(page) {
+  const box = await page.getByTestId("phone-dice").boundingBox();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.85);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.25, {
+    steps: 12,
+  });
+  await page.mouse.up();
+}
+
 test("TV and phones complete a session, reconnect and export a recap", async ({
   browser,
 }, testInfo) => {
@@ -106,6 +116,22 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     const bob = await controllers.newPage({
       viewport: { width: 390, height: 844 },
       isMobile: true,
+    });
+    const guestThrows = [];
+    const guestErrors = [];
+    let guestSocket;
+    await bob.routeWebSocket("**/socket", (ws) => {
+      guestSocket = ws.connectToServer();
+      ws.onMessage((raw) => {
+        const message = JSON.parse(raw);
+        if (["aim", "roll"].includes(message.type)) guestThrows.push(message);
+        guestSocket.send(raw);
+      });
+      guestSocket.onMessage((raw) => {
+        const message = JSON.parse(raw);
+        if (message.type === "error") guestErrors.push(message.message);
+        ws.send(raw);
+      });
     });
     bob.on("pageerror", (e) => errors.push(e.message));
     await bob.goto(`http://127.0.0.1:4321/?join=${cfg.code}`);
@@ -291,19 +317,49 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "data-camera",
       "auto",
     );
+    // Table management can change hands while the shooter keeps the dice.
+    await openAdminSection(phone, "Players");
+    await phone
+      .locator(".ha-disclosure > summary")
+      .filter({ hasText: "Pass host controls" })
+      .click();
+    await phone
+      .getByLabel("Pass host controls", { exact: true })
+      .selectOption({ label: "Jordan" });
     await phone.getByRole("button", { name: "Close settings" }).click();
-    const diceBox = await phone.getByTestId("phone-dice").boundingBox();
-    await phone.mouse.move(
-      diceBox.x + diceBox.width * 0.5,
-      diceBox.y + diceBox.height * 0.85,
+    await bob.bringToFront();
+    await expect(bob.locator(".pg-identity small")).toContainText("Host");
+    await expect(
+      bob.getByRole("tab", { name: "Roll", exact: true }),
+    ).toHaveCount(0);
+    await bob.getByRole("tab", { name: "Dice", exact: true }).click();
+    await expect(
+      bob.getByText("Tyler has the dice", { exact: true }).last(),
+    ).toBeVisible();
+    await expect(bob.getByTestId("phone-dice")).toHaveAttribute(
+      "aria-label",
+      "Dice close-up",
     );
-    await phone.mouse.down();
-    await phone.mouse.move(
-      diceBox.x + diceBox.width * 0.65,
-      diceBox.y + diceBox.height * 0.25,
-      { steps: 12 },
-    );
-    await phone.mouse.up();
+    await expect(
+      bob.getByRole("button", { name: "Roll the dice", exact: true }),
+    ).toHaveCount(0);
+    await swipeDice(bob);
+    expect(guestThrows).toEqual([]);
+    // A stale client can still submit its old commands through the socket.
+    guestSocket.send(JSON.stringify({ type: "aim", aim: { x: 0, power: 1 } }));
+    guestSocket.send(JSON.stringify({ type: "roll" }));
+    await expect
+      .poll(() => guestErrors)
+      .toEqual([
+        "Only the current shooter can throw the dice.",
+        "Only the current shooter can throw the dice.",
+      ]);
+    await expect(bob.locator(".pg-strip.is-rolling")).toHaveCount(0);
+    await phone.bringToFront();
+    await expect(
+      phone.getByRole("button", { name: "Roll the dice", exact: true }),
+    ).toBeEnabled();
+    await swipeDice(phone);
     await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
     await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
       "data-throw-id",
@@ -365,16 +421,15 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     // Reload must preserve identity and chips, rather than creating another seat.
     await phone.reload();
     await expect(phone.locator(".pg-identity b")).toHaveText("Tyler");
-    await phone.getByRole("button", { name: "Open settings" }).click();
-    await openAdminSection(phone, "Table");
-    await phone.locator(".ha-management > summary").click();
-    await phone
-      .getByRole("button", { name: "Close table for everyone" })
-      .click();
-    await phone
+    await bob.bringToFront();
+    await openAdminSection(bob, "Table");
+    await bob.locator(".ha-management > summary").click();
+    await bob.getByRole("button", { name: "Close table for everyone" }).click();
+    await bob
       .getByRole("button", { name: "Close for everyone", exact: true })
       .click();
-    await bob.getByText("YOUR NIGHT, RECAPPED").waitFor();
+    await phone.getByText("YOUR NIGHT, RECAPPED").waitFor();
+    await phone.bringToFront();
     const downloadP = phone.waitForEvent("download");
     await phone.getByRole("button", { name: "Save your recap card" }).click();
     const download = await downloadP;

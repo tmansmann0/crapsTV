@@ -1739,8 +1739,7 @@ export default function PhoneGame({
   const stake = sum(player.bets.map((b) => b.amount));
   const remaining = useBettingWindow(state);
   const isShooter = state.shooterId === player.id,
-    canThrow =
-      (isShooter || isAdmin) && !state.rolling && connected && remaining === 0,
+    canThrow = isShooter && !state.rolling && connected && remaining === 0,
     shooterName =
       state.players.find((p) => p.id === state.shooterId)?.name || "The host",
     canReup =
@@ -1987,7 +1986,7 @@ export default function PhoneGame({
       ? [
           {
             id: "dice",
-            label: isShooter || isAdmin ? "Roll" : "Dice",
+            label: isShooter ? "Roll" : "Dice",
             badge: remaining || null,
             icon: Dices,
             ready: canThrow,

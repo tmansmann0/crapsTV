@@ -46,7 +46,7 @@ test("teach mode starts off and only a valid host can enable it", () => {
   assert.equal(state.config.teach, true);
 });
 
-test("aim requires the shooter or admin and clamps finite coordinates", () => {
+test("aim requires the current shooter and clamps finite coordinates", () => {
   const { state, a, b } = table();
   assert.throws(() => game.setAim(state, b.id, { x: 0, power: 0.5 }));
   for (const input of [{ x: NaN }, { power: Infinity }, { x: "0" }, null, []])
@@ -69,6 +69,49 @@ test("aim requires the shooter or admin and clamps finite coordinates", () => {
   assert.equal(pose.dice.length, 2);
   assert(pose.direction[0] > 0 && pose.direction[2] < 0);
   assert.equal(DICE_SIZE, 0.22);
+});
+
+test("a seven-out revokes the host's throw controls and grants them to the next shooter", (t) => {
+  const hub = new RoomHub("TESTAB");
+  t.after(() => hub.close());
+  const hostMessages = [];
+  hub.connect("host", (message) => hostMessages.push(message));
+  hub.connect("guest", () => {});
+  hub.receive("host", { type: "join", code: "TESTAB", name: "Alice" });
+  hub.receive("guest", { type: "join", code: "TESTAB", name: "Bob" });
+  hub.receive("host", { type: "start", config: { rollCooldownSeconds: 0 } });
+
+  const state = hub.state;
+  const [alice, bob] = state.players;
+  game.beginRoll(state, alice.id);
+  game.finishRoll(state, [3, 3]);
+  game.beginRoll(state, alice.id);
+  game.finishRoll(state, [3, 4]);
+  assert.equal(state.lastRoll.kind, "seven-out");
+  assert.equal(state.adminId, alice.id);
+  assert.equal(state.shooterId, bob.id);
+
+  const gesture = { x: -0.3, power: 0.7 };
+  hub.receive("guest", { type: "aim", aim: gesture });
+  const aim = state.aim;
+  assert.equal(aim.playerId, bob.id);
+  const before = structuredClone(state);
+  for (const command of [
+    { type: "aim", aim: { x: 1, power: 1 } },
+    { type: "aim", aim: { active: false } },
+    { type: "roll", gesture },
+  ]) {
+    hub.receive("host", { ...command, playerId: bob.id });
+    assert.equal(hostMessages.at(-1).type, "error");
+    assert.match(hostMessages.at(-1).message, /only the current shooter/i);
+    assert.deepEqual(state, before);
+  }
+  assert.equal(hub.timer, null);
+  hub.receive("guest", { type: "roll" });
+  assert.equal(state.rolling, true);
+  assert.equal(state.throw.playerId, bob.id);
+  assert.equal(state.throw.shooterId, bob.id);
+  assert.deepEqual(state.throw.gesture, gesture);
 });
 
 test("release freezes the gesture and chooses an authoritative outcome before settlement", () => {

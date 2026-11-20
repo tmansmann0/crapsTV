@@ -814,10 +814,7 @@ export function setDisplaySettings(s, id, options) {
 function throwController(s, id) {
   betting(s);
   active(s, id);
-  assert(
-    id === s.shooterId || id === s.adminId,
-    "The shooter or host rolls the dice.",
-  );
+  assert(id === s.shooterId, "Only the current shooter can throw the dice.");
   const remaining = Math.ceil(((s.nextRollAt ?? 0) - Date.now()) / 1000);
   assert(
     remaining <= 0,
