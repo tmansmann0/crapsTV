@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { finishRoll } from "../../src/game.js";
 import { RoomHub } from "../../src/hub.js";
 
-test("two phones verify top-ups and spend winnings on an optional offer", async ({
+test("two phones verify top-ups and complete a required drink assignment", async ({
   browser,
   baseURL,
 }) => {
@@ -43,7 +43,7 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
     await expect(host.getByLabel("Finish drink value ($)")).toHaveCount(0);
     await host.getByLabel("Sip value ($)").fill("6");
     await host.getByLabel("Shot value ($)").fill("20");
-    await host.getByLabel("Offer markup (%)").fill("25");
+    await host.getByLabel("Drink assignment markup (%)").fill("25");
     await host.getByLabel(/Enable.*Finish drink/).check();
     await host.getByLabel("Finish drink value ($)").fill("30");
     await host.getByLabel("Betting window (seconds)").fill("0");
@@ -58,11 +58,11 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
       .filter({ has: host.getByRole("heading", { name: "Add chips" }) });
     const offer = host
       .locator(".pg-drink-card")
-      .filter({ has: host.getByRole("heading", { name: "Offer a drink" }) });
+      .filter({ has: host.getByRole("heading", { name: "Assign a drink" }) });
     await expect(add.locator("option[value=sip]")).toHaveText("Sip · $6");
     await expect(offer.locator("option[value=shot]")).toHaveText("Shot · $25");
     await expect(
-      offer.getByRole("button", { name: /Send offer/ }),
+      offer.getByRole("button", { name: /Assign drink/ }),
     ).toBeDisabled();
     await add.getByLabel("Drink", { exact: true }).selectOption("finish");
     await expect(add.getByLabel("Quantity")).toHaveCount(0);
@@ -90,19 +90,19 @@ test("two phones verify top-ups and spend winnings on an optional offer", async 
     );
     await host.getByRole("tab", { name: "Drinks", exact: true }).click();
     await guest.getByRole("tab", { name: "Drinks", exact: true }).click();
-    const sendOffer = offer.getByRole("button", { name: /Send offer/ });
+    const assignDrink = offer.getByRole("button", { name: /Assign drink/ });
     await offer.getByLabel("Drink", { exact: true }).selectOption("finish");
-    await expect(sendOffer).toHaveText(/\$37\.50/);
-    await sendOffer.click();
-    await expect(offer.getByText(/Waiting for the recipient/)).toBeVisible();
-    await guest.getByRole("button", { name: "Decline", exact: true }).click();
-    await expect(sendOffer).toBeEnabled();
-    expect(alice.bank).toBe(8000);
-
-    await sendOffer.click();
-    await guest.getByRole("button", { name: "Accept offer" }).click();
+    await expect(assignDrink).toHaveText(/\$37\.50/);
+    await assignDrink.click();
+    await expect(offer.getByText(/awaiting completion/)).toBeVisible();
+    await expect(guest.getByText(/Required drink/)).toBeVisible();
+    await expect(guest.getByRole("button", { name: /Decline/ })).toHaveCount(0);
+    await expect(offer.getByRole("button", { name: /Cancel/ })).toHaveCount(0);
     await expect(host.locator(".pg-drink-hero")).toContainText("$12.50");
     expect([alice.bank, alice.buyIn, jordan.bank]).toEqual([4250, 3000, 0]);
+    await guest.getByRole("button", { name: "Mark drink complete" }).click();
+    await expect(offer.getByText(/awaiting completion/)).toHaveCount(0);
+    expect(alice.bank).toBe(4250);
     expect(hub.state.drinkRequests).toHaveLength(0);
     await expect(host.locator(".pg-drinks svg.drink-icon")).toHaveCount(3);
     await expect(

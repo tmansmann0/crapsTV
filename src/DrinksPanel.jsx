@@ -26,7 +26,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
     amount > 0 &&
     (!isOffer || count <= max);
   const disabled = locked || !!pending || !peers.length;
-  const title = isOffer ? "Offer a drink" : "Add chips";
+  const title = isOffer ? "Assign a drink" : "Add chips";
 
   return (
     <section className="pg-drink-card">
@@ -36,7 +36,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
           <h3>{title}</h3>
           <p>
             {isOffer
-              ? "Spend winnings if the recipient accepts."
+              ? "Spend available winnings to assign a drink."
               : "Log a drink after taking it. Another player verifies the top-up."}
           </p>
         </div>
@@ -47,25 +47,27 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
             <strong>{money(pending.amount)} in chips</strong>
             <p>
               {isOffer
-                ? "Waiting for the recipient"
+                ? "Assigned · awaiting completion"
                 : "Waiting for verification"}
               {" · "}
               {drinkDescription(pending.unit, pending.quantity)}
             </p>
           </div>
-          <button
-            type="button"
-            disabled={locked}
-            onClick={() =>
-              send({
-                type: "drink-response",
-                requestId: pending.id,
-                response: "cancel",
-              })
-            }
-          >
-            Cancel {isOffer ? "offer" : "top-up"}
-          </button>
+          {!isOffer && (
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() =>
+                send({
+                  type: "drink-response",
+                  requestId: pending.id,
+                  response: "cancel",
+                })
+              }
+            >
+              Cancel top-up
+            </button>
+          )}
         </div>
       ) : (
         <form
@@ -145,7 +147,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
             </p>
           )}
           <button className="pg-drink-primary" disabled={disabled || !valid}>
-            {isOffer ? "Send offer" : "Request verification"}
+            {isOffer ? "Assign drink" : "Request verification"}
             {valid && (
               <span>
                 {isOffer ? "−" : "+"}
@@ -176,7 +178,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
       <header className="pg-drink-hero">
         <div>
           <h2>Drinks</h2>
-          <p>Any beverage works. Drink offers are always optional.</p>
+          <p>Complete the drinks assigned to you.</p>
         </div>
         <span className="pg-drink-emblem">
           <DrinkIcon name="mode" size={40} />
@@ -199,7 +201,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
       )}
       {!peers.length && (
         <p className="pg-drink-notice">
-          A second connected player can verify top-ups and receive offers.
+          A second connected player can verify top-ups and receive assignments.
         </p>
       )}
       {incoming.length > 0 && (
@@ -208,50 +210,45 @@ export default function DrinksPanel({ state, player, connected, send }) {
             <DrinkIcon name="verify" size={28} />
             <div>
               <h3>For you</h3>
-              <p>Approve a top-up only if you witnessed it.</p>
+              {incoming.some((request) => request.kind === "credit") && (
+                <p>Approve a top-up only if you witnessed it.</p>
+              )}
             </div>
           </div>
           {incoming.map((request) => {
             const sender = state.players.find((p) => p.id === request.from);
             const isCredit = request.kind === "credit";
-            const valid =
-              sender?.connected &&
-              (isCredit || drinkOfferLimit(sender, request.amount) >= 1);
+            const canVerify = !isCredit || sender?.connected;
             const reply = (response) =>
               send({ type: "drink-response", requestId: request.id, response });
             return (
               <div className="pg-drink-incoming" key={request.id}>
                 <strong>
-                  {sender?.name} · {isCredit ? "Top-up" : "Drink offer"}
+                  {sender?.name} · {isCredit ? "Top-up" : "Required drink"}
                 </strong>
                 <p>
                   {drinkDescription(request.unit, request.quantity)}
-                  {" · "}
-                  {money(request.amount)} in chips
+                  {isCredit && ` · ${money(request.amount)} in chips`}
                 </p>
-                {!valid && (
-                  <p>
-                    {sender?.connected
-                      ? "The sender’s available winnings changed."
-                      : "Waiting for the sender to reconnect."}
-                  </p>
-                )}
+                {!canVerify && <p>Waiting for the sender to reconnect.</p>}
                 <div>
                   <button
                     type="button"
                     className="pg-drink-primary"
-                    disabled={locked || !valid}
-                    onClick={() => reply("accept")}
+                    disabled={locked || !canVerify}
+                    onClick={() => reply(isCredit ? "accept" : "complete")}
                   >
-                    {isCredit ? "Verify top-up" : "Accept offer"}
+                    {isCredit ? "Verify top-up" : "Mark drink complete"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={locked}
-                    onClick={() => reply("decline")}
-                  >
-                    Decline
-                  </button>
+                  {isCredit && (
+                    <button
+                      type="button"
+                      disabled={locked}
+                      onClick={() => reply("decline")}
+                    >
+                      Decline top-up
+                    </button>
+                  )}
                 </div>
               </div>
             );

@@ -34,7 +34,7 @@ test("Drinking Mode starts humans at zero and only peer-verified drinks fund pla
   assert.throws(() => requestCredit(state, host, "sip", 1), /pending/);
   assert.throws(
     () => game.respondToDrink(state, host.id, id, "accept"),
-    /another player/,
+    /another player/i,
   );
   assert.throws(
     () => game.respondToDrink(state, bot.id, id, "accept"),
@@ -86,31 +86,40 @@ test("host pricing, finish option, and markups apply to the correct transactions
   assert.equal(game.net(host), 8000);
   assert.throws(() => offer("finish", 3), /whole number/);
   assert.throws(() => offer("shot", 4), /winnings/);
-  const declined = offer("sip", 1);
+  const assigned = offer("sip", 1);
   assert.equal(state.drinkRequests[0].amount, 780);
+  assert.equal(game.net(host), 7220);
   assert.throws(
-    () => game.respondToDrink(state, observer.id, declined, "accept"),
-    /another player/,
+    () => game.respondToDrink(state, observer.id, assigned, "complete"),
+    /Only the assigned player/,
   );
-  game.respondToDrink(state, guest.id, declined, "decline");
-  assert.equal(game.net(host), 8000);
+  for (const response of ["accept", "decline", "cancel"]) {
+    assert.throws(
+      () => game.respondToDrink(state, guest.id, assigned, response),
+      /must be completed/,
+    );
+  }
+  assert.throws(
+    () => game.respondToDrink(state, host.id, assigned, "cancel"),
+    /Only the assigned player/,
+  );
+  assert.throws(() => offer("sip", 1), /still open/);
+  game.respondToDrink(state, guest.id, assigned, "complete");
+  assert.equal(game.net(host), 7220);
 
-  const accepted = offer("finish", 1);
+  const finish = offer("finish", 1);
   assert.equal(state.drinkRequests[0].amount, 3600);
-  game.respondToDrink(state, guest.id, accepted, "accept");
-  assert.equal(game.net(host), 4400);
-  assert.equal(host.bank, 9200);
+  assert.equal(game.net(host), 3620);
+  assert.equal(host.bank, 8420);
+  game.changeConnection(state, host.id, false);
+  game.respondToDrink(state, guest.id, finish, "complete");
+  game.changeConnection(state, host.id, true);
+  assert.equal(host.bank, 8420);
   assert.equal(guest.bank, 0);
-  assert.throws(() => offer("shot", 3), /winnings/);
-
-  const stale = offer("shot", 2);
-  game.place(state, host.id, "field", 7000);
-  assert.throws(
-    () => game.respondToDrink(state, guest.id, stale, "accept"),
-    /no longer/,
-  );
-  assert.equal(host.bank, 2200);
-  game.respondToDrink(state, host.id, stale, "cancel");
+  assert.throws(() => offer("shot", 2), /winnings/);
+  game.place(state, host.id, "field", 8000);
+  assert.throws(() => offer("sip", 1), /available chips/);
+  assert.equal(host.bank, 420);
   assert.equal(state.drinkRequests.length, 0);
 });
 
@@ -140,7 +149,7 @@ test("the shared room takes the requester and prices from authoritative state", 
     response: "accept",
     playerId: guest.id,
   });
-  assert.match(inbox.host.at(-1).message, /another player/);
+  assert.match(inbox.host.at(-1).message, /another player/i);
   assert.equal(host.bank, 0);
   hub.receive("guest", {
     type: "drink-response",

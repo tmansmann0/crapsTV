@@ -109,7 +109,7 @@ function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
         <span>
           <strong>Drinking Mode</strong>
           <small>
-            Verified drink top-ups and optional offers from winnings.
+            Verified chip top-ups and drink assignments from winnings.
           </small>
         </span>
         <b>{enabled ? "On" : "Off"}</b>
@@ -134,7 +134,7 @@ function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
               </label>
             ))}
             <label>
-              Offer markup (%)
+              Drink assignment markup (%)
               <input
                 type="number"
                 min="0"
@@ -157,8 +157,8 @@ function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
             Enable “Finish drink”
           </label>
           <small>
-            Markup changes the price of offers. Top-ups use the listed drink
-            values.
+            Markup changes the price of assignments. Top-ups use the listed
+            drink values.
           </small>
         </>
       )}

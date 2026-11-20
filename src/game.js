@@ -806,22 +806,31 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
     "Enter a valid whole number.",
   );
   const requests = (s.drinkRequests ??= []);
-  assert(
-    !requests.some((request) => request.from === id && request.kind === kind),
-    "You already have a pending request of this kind.",
+  const pending = requests.some(
+    (request) => request.from === id && request.kind === kind,
   );
   if (kind === "credit") {
+    assert(!pending, "You already have a pending top-up.");
     assert(
       s.players.some((p) => p.id !== id && p.connected && !p.left && !p.bot),
       "Another connected player must verify your top-up.",
     );
     assert(to === null, "Top-ups can be verified by any other player.");
   } else {
-    assert(to !== id, "Choose someone else for your drink offer.");
-    drinkPlayer(s, to);
+    assert(!pending, "Your last drink assignment is still open.");
+    assert(to !== id, "Choose someone else for the drink assignment.");
+    const recipient = drinkPlayer(s, to);
     assert(
       quantity <= drinkOfferLimit(player, price),
-      "Offers must fit your winnings and available chips.",
+      "Drink assignments must fit your winnings and available chips.",
+    );
+    player.bank -= amount;
+    player.betPreview = null;
+    recordDrinkChange(s, player, "Assigned a drink");
+    log(
+      s,
+      `${player.name} assigned a drink to ${recipient.name}.`,
+      "drink-offer",
     );
   }
   requests.push({ id: uid(), kind, unit, quantity, amount, from: id, to });
@@ -835,47 +844,37 @@ export function respondToDrink(s, id, requestId, response) {
     s.drinkRequests?.findIndex((request) => request.id === requestId) ?? -1;
   assert(index >= 0, "That request has already been closed.");
   const { kind, from, to, amount } = s.drinkRequests[index];
-  if (response === "cancel") {
+  if (kind === "offer") {
+    assert(id === to, "Only the assigned player can complete this drink.");
+    assert(response === "complete", "Assigned drinks must be completed.");
+    log(
+      s,
+      `${responder.name} completed their assigned drink.`,
+      "drink-completed",
+    );
+  } else if (response === "cancel") {
     assert(id === from, "Only the sender can cancel this request.");
   } else {
     assert(
       response === "accept" || response === "decline",
       "Unknown drink response.",
     );
-    assert(
-      kind === "credit" ? id !== from : id === to,
-      "This request is for another player to answer.",
-    );
+    assert(id !== from, "Another player must answer this top-up.");
     if (response === "accept") {
       const sender = drinkPlayer(s, from);
-      if (kind === "credit") {
-        assert(
-          Number.isSafeInteger(equity(sender) + amount) &&
-            Number.isSafeInteger(sender.buyIn + amount),
-          "That top-up is too large.",
-        );
-        sender.bank += amount;
-        sender.buyIn += amount;
-        recordDrinkChange(s, sender, "Verified chip top-up");
-        log(
-          s,
-          `${responder.name} verified ${money(amount)} in chips for ${sender.name}.`,
-          "drink-credit",
-        );
-      } else {
-        assert(
-          drinkOfferLimit(sender, amount) >= 1,
-          "The sender no longer has enough available winnings for this offer.",
-        );
-        sender.bank -= amount;
-        sender.betPreview = null;
-        recordDrinkChange(s, sender, "Drink offer accepted");
-        log(
-          s,
-          `${responder.name} accepted a drink offer from ${sender.name}.`,
-          "drink-offer",
-        );
-      }
+      assert(
+        Number.isSafeInteger(equity(sender) + amount) &&
+          Number.isSafeInteger(sender.buyIn + amount),
+        "That top-up is too large.",
+      );
+      sender.bank += amount;
+      sender.buyIn += amount;
+      recordDrinkChange(s, sender, "Verified chip top-up");
+      log(
+        s,
+        `${responder.name} verified ${money(amount)} in chips for ${sender.name}.`,
+        "drink-credit",
+      );
     }
   }
   s.drinkRequests.splice(index, 1);
@@ -1278,8 +1277,8 @@ export function leave(s, id) {
   p.left = true;
   p.connected = false;
   if (s.drinkRequests?.length)
-    s.drinkRequests = s.drinkRequests.filter(
-      (r) => r.from !== id && r.to !== id,
+    s.drinkRequests = s.drinkRequests.filter((request) =>
+      request.kind === "credit" ? request.from !== id : request.to !== id,
     );
   p.leftAt = Date.now();
   p.history.push({
