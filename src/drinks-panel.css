@@ -1,19 +1,21 @@
 .drink-icon {
-  --drink-accent: var(--pg-brass, #a97f33);
+  --drink-gold: #e8b74d;
+  --drink-cranberry: #b83e50;
   display: block;
   flex: none;
-  color: var(--pg-felt-deep, #0c3b2b);
+  color: #134b36;
 }
-.drink-icon-accent {
-  stroke: var(--drink-accent);
+.drink-icon-gold {
+  fill: var(--drink-gold);
 }
-.pg-drink-hero .drink-icon,
+.drink-icon-cranberry {
+  fill: var(--drink-cranberry);
+}
 .pg-reup .drink-icon {
   color: var(--pg-ivory);
 }
-.pg-nav-icon .drink-icon {
-  --drink-accent: currentColor;
-  color: inherit;
+.pg-nav button:not([aria-selected="true"]) .drink-icon {
+  opacity: 0.8;
 }
 .ha-drinking {
   margin-block: 16px 0;
@@ -67,7 +69,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 7px;
+  gap: 8px 7px;
   padding: 12px;
   border: 1px solid var(--pg-brass);
   border-radius: 14px;
@@ -84,7 +86,16 @@
   font-size: 12px;
   line-height: 1.45;
 }
-.pg-drink-hero dl {
+.pg-drink-emblem {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid var(--pg-brass);
+  border-radius: 16px;
+  background: var(--pg-ivory);
+}
+.pg-shell .pg-drink-hero dl {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: 1fr 1fr;

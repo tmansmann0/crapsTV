@@ -178,7 +178,9 @@ export default function DrinksPanel({ state, player, connected, send }) {
           <h2>Drinks</h2>
           <p>Any beverage works. Drink offers are always optional.</p>
         </div>
-        <DrinkIcon name="mode" size={52} />
+        <span className="pg-drink-emblem">
+          <DrinkIcon name="mode" size={40} />
+        </span>
         <dl>
           <div>
             <dt>Verified top-ups</dt>
