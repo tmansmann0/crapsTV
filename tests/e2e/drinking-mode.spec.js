@@ -58,11 +58,11 @@ test("two phones verify top-ups and complete a required drink assignment", async
       .filter({ has: host.getByRole("heading", { name: "Add chips" }) });
     const offer = host
       .locator(".pg-drink-card")
-      .filter({ has: host.getByRole("heading", { name: "Assign a drink" }) });
+      .filter({ has: host.getByRole("heading", { name: "Send a drink" }) });
     await expect(add.locator("option[value=sip]")).toHaveText("Sip · $6");
     await expect(offer.locator("option[value=shot]")).toHaveText("Shot · $25");
     await expect(
-      offer.getByRole("button", { name: /Assign drink/ }),
+      offer.getByRole("button", { name: /Send a drink/ }),
     ).toBeDisabled();
     await add.getByLabel("Drink", { exact: true }).selectOption("finish");
     await expect(add.getByLabel("Quantity")).toHaveCount(0);
@@ -90,13 +90,15 @@ test("two phones verify top-ups and complete a required drink assignment", async
     );
     await host.getByRole("tab", { name: "Drinks", exact: true }).click();
     await guest.getByRole("tab", { name: "Drinks", exact: true }).click();
-    const assignDrink = offer.getByRole("button", { name: /Assign drink/ });
+    const sendDrink = offer.getByRole("button", { name: /Send a drink/ });
     await offer.getByLabel("Drink", { exact: true }).selectOption("finish");
-    await expect(assignDrink).toHaveText(/\$37\.50/);
-    await assignDrink.click();
+    await expect(sendDrink).toHaveText(/\$37\.50/);
+    await sendDrink.click();
     await expect(offer.getByText(/awaiting completion/)).toBeVisible();
     await expect(guest.getByText(/Required drink/)).toBeVisible();
-    await expect(guest.getByRole("button", { name: /Decline/ })).toHaveCount(0);
+    await expect(
+      guest.getByRole("button", { name: /Accept|Decline/ }),
+    ).toHaveCount(0);
     await expect(offer.getByRole("button", { name: /Cancel/ })).toHaveCount(0);
     await expect(host.locator(".pg-drink-hero")).toContainText("$12.50");
     expect([alice.bank, alice.buyIn, jordan.bank]).toEqual([4250, 3000, 0]);

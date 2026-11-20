@@ -26,7 +26,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
     amount > 0 &&
     (!isOffer || count <= max);
   const disabled = locked || !!pending || !peers.length;
-  const title = isOffer ? "Assign a drink" : "Add chips";
+  const title = isOffer ? "Send a drink" : "Add chips";
 
   return (
     <section className="pg-drink-card">
@@ -36,7 +36,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
           <h3>{title}</h3>
           <p>
             {isOffer
-              ? "Spend available winnings to assign a drink."
+              ? "Spend available winnings to send a drink."
               : "Log a drink after taking it. Another player verifies the top-up."}
           </p>
         </div>
@@ -47,7 +47,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
             <strong>{money(pending.amount)} in chips</strong>
             <p>
               {isOffer
-                ? "Assigned · awaiting completion"
+                ? "Sent · awaiting completion"
                 : "Waiting for verification"}
               {" · "}
               {drinkDescription(pending.unit, pending.quantity)}
@@ -147,7 +147,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
             </p>
           )}
           <button className="pg-drink-primary" disabled={disabled || !valid}>
-            {isOffer ? "Assign drink" : "Request verification"}
+            {isOffer ? "Send a drink" : "Request verification"}
             {valid && (
               <span>
                 {isOffer ? "−" : "+"}
@@ -178,7 +178,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
       <header className="pg-drink-hero">
         <div>
           <h2>Drinks</h2>
-          <p>Complete the drinks assigned to you.</p>
+          <p>Complete the drinks sent to you.</p>
         </div>
         <span className="pg-drink-emblem">
           <DrinkIcon name="mode" size={40} />
@@ -201,7 +201,7 @@ export default function DrinksPanel({ state, player, connected, send }) {
       )}
       {!peers.length && (
         <p className="pg-drink-notice">
-          A second connected player can verify top-ups and receive assignments.
+          A second connected player can verify top-ups and receive drinks.
         </p>
       )}
       {incoming.length > 0 && (
