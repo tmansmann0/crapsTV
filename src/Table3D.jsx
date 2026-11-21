@@ -21,6 +21,7 @@ import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import { DICE_SIZE } from "./dice-physics.js";
 import { sampleThrow, aimDicePose } from "./throw-motion.js";
+import { smoothAim } from "./aim-preview.js";
 import {
   sampleThrowCamera,
   sampleTableCamera,
@@ -739,7 +740,9 @@ export default function Table3D(props) {
       aimDirection = new THREE.Vector3();
     let overviewSlide = null;
     let launchState = null,
-      launchProps = {};
+      launchProps = {},
+      displayedAim = null,
+      aiming = null;
     let incomingState = null,
       displayState = null,
       localPresentation = null;
@@ -860,7 +863,11 @@ export default function Table3D(props) {
               introUploadPausedMs += adjusted.pausedMs;
               elapsed = adjusted.elapsed;
             }
-            const liveState = latest.current.state;
+            const current = latest.current;
+            const liveState = current.state;
+            const liveAim = current.roomAim
+              ? current.roomAim.get()
+              : liveState?.aim;
             const liveNow = Date.now() + (liveState?.clockOffsetMs || 0);
             const scheduledProbe =
               elapsed >= STARTUP_PROBE_AT[3]
@@ -881,15 +888,21 @@ export default function Table3D(props) {
               : scheduledProbe;
             let hold;
             if (introLiveProbe) {
-              const safe = calibrationCanHold(liveState, liveNow);
+              const safe =
+                !liveAim?.active &&
+                calibrationCanHold(
+                  liveState && { ...liveState, aim: liveAim },
+                  liveNow,
+                );
               const throwId = liveState?.throw?.id || null;
               if (
                 liveCalibrationHold &&
-                !retainLiveCalibrationCamera(liveCalibrationHold, {
-                  now: time,
-                  roomNow: liveNow,
-                  state: liveState,
-                })
+                (liveAim?.active ||
+                  !retainLiveCalibrationCamera(liveCalibrationHold, {
+                    now: time,
+                    roomNow: liveNow,
+                    state: liveState && { ...liveState, aim: liveAim },
+                  }))
               )
                 liveCalibrationHold = null;
               if (
@@ -1041,7 +1054,20 @@ export default function Table3D(props) {
       }
       const throwTime = Date.now() + (s?.clockOffsetMs || 0);
       const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
-      if (s !== launchState) {
+      const targetAim =
+        s && !s.rolling
+          ? !introSample && current.roomAim
+            ? current.roomAim.get()
+            : s.aim
+          : null;
+      const nextAim = smoothAim(
+        displayedAim,
+        targetAim,
+        frameDelta * 1000,
+        reduced.matches,
+      );
+      const launchChanged = nextAim && s !== launchState;
+      if (launchChanged) {
         launchState = s;
         launchProps = {
           puck:
@@ -1051,7 +1077,13 @@ export default function Table3D(props) {
           stacks: wagerStackLayout(s),
         };
       }
-      const aiming = s?.aim?.active ? aimDicePose(s.aim, launchProps) : null;
+      if (nextAim !== displayedAim || launchChanged) {
+        displayedAim = nextAim;
+        aiming = nextAim ? aimDicePose(nextAim, launchProps) : null;
+        el.dataset.aim = nextAim
+          ? JSON.stringify([nextAim.x, nextAim.power])
+          : "";
+      }
       const pose = aiming || shared;
       const automaticCamera = !!introSample || (time > userUntil && !dragStart);
       controls.enabled =
@@ -1062,6 +1094,7 @@ export default function Table3D(props) {
               state: s
                 ? {
                     ...s,
+                    aim: targetAim,
                     bankLayouts: pieces.bankLayouts,
                     wagerLayouts: pieces.wagerLayouts,
                   }
@@ -1482,7 +1515,7 @@ export default function Table3D(props) {
           !pieces.animating &&
           !s?.players?.some((p) => !p.left && p.betPreview?.amount) &&
           time >= settlingUntil &&
-          calibrationCanHold(s, throwTime);
+          calibrationCanHold(s && { ...s, aim: targetAim }, throwTime);
         autoEffects.configure({
           choices: graphics,
           capabilities: {

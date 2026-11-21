@@ -38,6 +38,7 @@ import DiceThrow from "./DiceThrow.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import { catalogue, describeBet, money, equity, net } from "./game.js";
 import { PHYSICS_VERSION } from "./throw-motion.js";
+import { createAimChannel } from "./aim-preview.js";
 import {
   detectLocal,
   localTransport,
@@ -169,6 +170,7 @@ function useAnnouncer(state, enabled) {
 }
 function App() {
   const route = useRef(routeInfo()).current;
+  const [roomAim] = useState(createAimChannel);
   const initialCode = route.code;
   const [session, setSession] = useState(null),
     [checking, setChecking] = useState(true),
@@ -223,6 +225,7 @@ function App() {
     if (!session) return;
     setState(null);
     setPlayerId(null);
+    roomAim.set(null);
     const key = `crapstv:${session.code}`;
     let clockOffset = null,
       bestRoundTrip = Infinity,
@@ -230,6 +233,7 @@ function App() {
     const clockTimers = [];
     const onMessage = (m) => {
       if (m.type === "state") {
+        roomAim.set(m.state.aim ?? null);
         if (!clockStarted && Object.hasOwn(m.state, "throw")) {
           clockStarted = true;
           for (const delay of [0, 250, 750])
@@ -251,6 +255,8 @@ function App() {
             clockOffset ??
             (typeof m.sentAt === "number" ? m.sentAt - Date.now() : 0),
         });
+      } else if (m.type === "aim") {
+        roomAim.set(m.aim);
       } else if (m.type === "clock") {
         const now = Date.now(),
           roundTrip = now - m.clientAt;
@@ -273,6 +279,7 @@ function App() {
     };
     const onStatus = (value) => {
       setStatus(value);
+      if (value !== "connected") roomAim.set(null);
       if (value === "connected") {
         clockStarted = false;
         const saved = getSaved(key);
@@ -282,8 +289,9 @@ function App() {
             code: session.code,
             token: saved.token,
             name: saved.name || "Player",
+            aimUpdates: true,
           });
-        else transport.current?.send({ type: "watch" });
+        else transport.current?.send({ type: "watch", aimUpdates: true });
       }
     };
     transport.current =
@@ -410,6 +418,7 @@ function App() {
       >
         <Table3D
           state={state}
+          roomAim={roomAim}
           code={roomCode}
           status={checking ? "connecting" : status}
           error={visibleError}
@@ -549,6 +558,7 @@ function App() {
       ) : (
         <Phone
           state={state}
+          roomAim={roomAim}
           player={player}
           isAdmin={isAdmin}
           send={send}
@@ -647,6 +657,7 @@ function Join({ state, name, setName, code, setCode, join }) {
 }
 function Phone({
   state,
+  roomAim,
   player,
   isAdmin,
   send,
@@ -701,6 +712,7 @@ function Phone({
         rollArea={
           <DiceThrow
             state={state}
+            roomAim={roomAim}
             player={player}
             send={send}
             connected={connected}

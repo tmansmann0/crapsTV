@@ -1,10 +1,7 @@
 import * as THREE from "three";
 import { applySurfaceProfile } from "./surface-profile.js";
-export const DICE_COLORS = {
-  red: "#9e192d",
-  green: "#147553",
-  blue: "#195bab",
-};
+import { DICE_COLORS } from "./dice-colors.js";
+export { DICE_COLORS } from "./dice-colors.js";
 export const diceWearIndex = (playerId, index) =>
   ([...(playerId || "house")].reduce(
     (n, c) => (n * 31 + c.charCodeAt(0)) >>> 0,

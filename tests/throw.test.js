@@ -310,6 +310,53 @@ test("aim clears on disconnect or cashout and bad gestures never lock betting", 
   assert.deepEqual(sanitizeGesture(), { x: 0, power: 0.65 });
 });
 
+test("aim updates stay small for current clients and preserve legacy snapshots", () => {
+  const hub = new RoomHub("AIMABC");
+  const shooter = [],
+    modern = [],
+    legacy = [];
+  hub.connect("shooter", (message) => shooter.push(message));
+  hub.connect("modern", (message) => modern.push(message));
+  hub.connect("legacy", (message) => legacy.push(message));
+  hub.receive("shooter", {
+    type: "join",
+    code: "AIMABC",
+    name: "Shooter",
+    aimUpdates: true,
+  });
+  hub.receive("modern", { type: "watch", aimUpdates: true });
+  hub.receive("legacy", { type: "watch" });
+  hub.receive("shooter", { type: "start", config: { rollCooldownSeconds: 0 } });
+  const history = {
+    id: "previous-throw",
+    frames: [
+      [0, 1],
+      [500, 2],
+    ],
+  };
+  hub.state.throw = history;
+  for (const client of [shooter, modern, legacy]) client.length = 0;
+
+  hub.receive("shooter", { type: "aim", aim: { x: 0.5, power: 0.6 } });
+  const aim = hub.state.aim;
+  assert.deepEqual(modern, [{ type: "aim", aim }]);
+  assert.deepEqual(shooter, modern);
+  assert.equal(legacy.length, 1);
+  assert.equal(legacy[0].type, "state");
+  assert.deepEqual(legacy[0].state.aim, aim);
+  assert.deepEqual(legacy[0].state.throw, history);
+
+  const reconnect = [];
+  hub.connect("reconnect", (message) => reconnect.push(message));
+  assert.deepEqual(reconnect[0].state.aim, aim);
+  hub.receive("reconnect", { type: "watch", aimUpdates: true });
+  hub.receive("shooter", { type: "aim", aim: { active: false } });
+  assert.deepEqual(modern.at(-1), { type: "aim", aim: null });
+  assert.deepEqual(reconnect.at(-1), modern.at(-1));
+  assert.equal(legacy.at(-1).state.aim, null);
+  hub.close();
+});
+
 test("clock pings work before joining without changing or broadcasting state", () => {
   const hub = new RoomHub("CLOCKA");
   const first = [],
