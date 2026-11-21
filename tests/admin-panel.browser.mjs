@@ -85,6 +85,7 @@ try {
     window.adminQA.actions.find((action) => action.type === "start"),
   );
   assert.deepEqual(start.config, {
+    drinkingMode: false,
     startingBank: 250000,
     minBet: 1000,
     mode: "craps",
