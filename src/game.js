@@ -273,9 +273,9 @@ export function catalogue(state, player) {
       id: "field",
       name: "Field",
       group: "One roll",
-      payout: "1:1 · 2 pays 2:1 · 12 pays 3:1",
+      payout: "1:1 · 2 pays 2:1 · 12 pays 2:1",
       prob: 16 / 36,
-      edge: 2.778,
+      edge: 5.556,
       description:
         "Win on 2, 3, 4, 9, 10, 11 or 12. Resolves on the very next roll.",
       available: true,
@@ -1229,7 +1229,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
         settleBet(
           b,
           [2, 3, 4, 9, 10, 11, 12].includes(total) ? "win" : "lose",
-          total === 2 ? 2 : total === 12 ? 3 : 1,
+          total === 2 || total === 12 ? 2 : 1,
         );
     }
     p.stats.rolls++;

@@ -27,7 +27,7 @@ The shooter continues after a point hit or come-out craps. A seven-out passes th
 | Place 6/8 | 7:6 | Number before 7 |
 | Crapless place 2/12 | 11:2 | Number before 7 |
 | Crapless place 3/11 | 11:4 | Number before 7 |
-| Field | 1:1, 2 pays 2:1, 12 pays 3:1 | Next roll; 2/3/4/9/10/11/12 win |
+| Field | 1:1, 2 and 12 pay 2:1 | Next roll; 2/3/4/9/10/11/12 win |
 | Hard 4/10 | 7:1 | Pair before 7 or easy total |
 | Hard 6/8 | 9:1 | Pair before 7 or easy total |
 | Any 7 | 4:1 | Next roll |

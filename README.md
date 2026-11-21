@@ -58,7 +58,7 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 
 The table uses matched wood grain and pore maps, textured red padding and short-fibre felt. Dice and chips retain separate wear patterns, roughness and engraved details. Betting artwork loads from its outlined SVG source with a dedicated print budget, independent of the material texture setting. When 3D resolution is reduced, a native-resolution felt pass keeps the lettering sharp while preserving lighting, shadows and occlusion by playing pieces.
 
-Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 pays double and 12 triple. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
+Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 and 12 both pay 2:1. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
 
 [Compare material strengths](https://tmansmann0.github.io/crapsTV/studies/materials/index.html): actual 4K renders with identical close/wide shots. Option 2 is the selected mix: stronger felt, restrained red padding and grime, visible chip scratches and fine-grained American walnut.
 

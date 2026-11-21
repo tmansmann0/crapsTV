@@ -136,7 +136,7 @@ try {
       await page
         .getByRole("button", { name: "Next step", exact: true })
         .click();
-      await expect(page.locator(".lc-caption")).toContainText("$15 profit");
+      await expect(page.locator(".lc-caption")).toContainText("$10 profit");
       const duration = await page
         .locator(".lc-chip")
         .first()

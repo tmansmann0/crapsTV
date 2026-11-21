@@ -269,7 +269,7 @@ function field(r, tagSize = 19) {
         C(x, y, 39, { fill: c.ox, stroke: c.brass, sw: 3 }) +
         C(x, y, 33, { stroke: c.hi, sw: 0.9 });
       f += T(String(v), x, y + 18, { f: bas, s: 54, w: 700, fill: c.ivory });
-      f += T(v === 2 ? "PAYS 2:1" : "PAYS 3:1", x, 667, {
+      f += T("PAYS 2:1", x, 667, {
         f: cap,
         s: tagSize,
         w: 700,

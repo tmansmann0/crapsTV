@@ -88,17 +88,19 @@ test("place 6 off on come-out then pays 7:6 and stays up", () => {
   assert.equal(p.bets.length, 0);
   assert.equal(p.bank, 100100);
 });
-test("field 2 double, 12 triple, loses on 8", () => {
-  const [s, p] = table();
-  g.place(s, p.id, "field", 500);
-  roll(s, p, 1, 1);
-  assert.equal(p.bank, 101000);
-  g.place(s, p.id, "field", 500);
-  roll(s, p, 6, 6);
-  assert.equal(p.bank, 102500);
-  g.place(s, p.id, "field", 500);
-  roll(s, p, 4, 4);
-  assert.equal(p.bank, 102000);
+test("Field pays double for 2 and 12 and loses on 8 in both games", () => {
+  for (const mode of ["craps", "crapless"]) {
+    const [s, p] = table(mode);
+    g.place(s, p.id, "field", 500);
+    roll(s, p, 1, 1);
+    assert.equal(p.bank, 101000);
+    g.place(s, p.id, "field", 500);
+    roll(s, p, 6, 6);
+    assert.equal(p.bank, 102000);
+    g.place(s, p.id, "field", 500);
+    roll(s, p, 4, 4);
+    assert.equal(p.bank, 101500);
+  }
 });
 test("hardways off come-out then double pays, easy loses", () => {
   const [s, p] = table();
@@ -225,5 +227,9 @@ test("RNG yields legal values and exhaustive field math matches displayed edge",
       roll(s, p, a, b);
       profit += g.equity(p) - 100000;
     }
-  assert.equal(profit, -1000);
+  assert.equal(profit, -2000);
+  const [s, p] = table();
+  const field = g.catalogue(s, p).find(({ id }) => id === "field");
+  assert.equal(field.edge, Number(((-profit * 100) / 36000).toFixed(3)));
+  assert.match(field.payout, /12 pays 2:1/);
 });
