@@ -1,9 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BOARD_LAYOUT, boardPixelToWorld } from "../src/board-layout.js";
+import {
+  BOARD_LAYOUT,
+  BOARD_SPECIAL_REGIONS,
+  boardPixelToWorld,
+  boardWorldToPixel,
+} from "../src/board-layout.js";
+import { G } from "../assets/source/board-design/lib.mjs";
 import { puckHome, PUCK_RADIUS } from "../src/puck-layout.js";
 import { chipLocation } from "../src/wager-layout.js";
 import { BOUNDS } from "../src/dice-physics.js";
+
+test("printed ON rings and physical puck are centered in the gap above the numbers", () => {
+  const panelBottom = Math.max(
+    ...Object.values(BOARD_SPECIAL_REGIONS).map(
+      ({ pixelRect: [, top, , height] }) => top + height,
+    ),
+  );
+  const topGap = G.rail.y - G.rail.r - panelBottom;
+  const bottomGap = G.nums.y0 - G.rail.y - G.rail.r;
+  assert(Math.abs(topGap - bottomGap) < 1e-9);
+  assert(topGap >= 11);
+  for (const mode of ["craps", "crapless"]) {
+    const [x, , z] = puckHome(6, mode).position;
+    assert(Math.abs(boardWorldToPixel(x, z)[1] - G.rail.y) < 1e-9);
+  }
+});
+
+test("the physical puck covers the outer stroke of both printed targets", () => {
+  const puckRadiusInPrint =
+    PUCK_RADIUS *
+    Math.min(
+      BOARD_LAYOUT.width / BOARD_LAYOUT.worldWidth,
+      BOARD_LAYOUT.height / BOARD_LAYOUT.worldDepth,
+    );
+  assert(puckRadiusInPrint > G.rail.r + 1);
+  assert(puckRadiusInPrint > G.rail.offRadius + 1.2);
+});
 
 test("every ON puck clears the full branding band and the shifted number row", () => {
   const logo = BOARD_LAYOUT.logo;

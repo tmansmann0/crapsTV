@@ -55,7 +55,13 @@ try {
       );
       await page.waitForFunction(() => window.tvReady);
       await page.waitForTimeout(150);
-      for (const scenario of ["gameplay", "settings", "graphics", "intro"]) {
+      for (const scenario of [
+        "come-out",
+        "gameplay",
+        "settings",
+        "graphics",
+        "intro",
+      ]) {
         const r = await page.evaluate(
           (s) => window.tvReadability.snapshot(s),
           scenario,
@@ -66,6 +72,19 @@ try {
           mode,
           "missing preference defaults to Compact; saved Large is respected",
         );
+        if (scenario === "come-out") {
+          assert(r.text.status.lines.some((line) => line.text === "COME OUT"));
+          assert(
+            r.text.status.lines.some((line) =>
+              line.text.includes("Betting open"),
+            ),
+          );
+          assert(
+            r.text.status.lines.every(
+              (line) => !/drinking mode/i.test(line.text),
+            ),
+          );
+        }
         for (const [panel, info] of Object.entries(r.text)) {
           if (!info.visible) continue;
           assert(

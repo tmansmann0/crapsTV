@@ -16,7 +16,7 @@ import { createLensFlares, findPanoramaFlareSources } from "./lens-flare.js";
 import { createLocalReflections } from "./local-reflections.js";
 import { createContactShadows } from "./contact-shadows.js";
 import { createAutoEffects } from "./auto-effects.js";
-import { puckHome } from "./puck-layout.js";
+import { puckHome, PUCK_RADIUS } from "./puck-layout.js";
 import { resolveOutcomePresentation } from "./chip-flow.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import { DICE_SIZE } from "./dice-physics.js";
@@ -523,6 +523,11 @@ export default function Table3D(props) {
       .loadAsync(asset("puck.glb"))
       .then((gltf) => {
         if (!alive) return disposeModel(gltf.scene);
+        const size = new THREE.Box3()
+          .setFromObject(gltf.scene)
+          .getSize(new THREE.Vector3());
+        const diameter = PUCK_RADIUS * 2;
+        puck.scale.set(diameter / size.x, 1, diameter / size.z);
         puck.add(addObject(gltf.scene));
         puckLoaded = true;
       })

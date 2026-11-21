@@ -229,13 +229,13 @@
   "clipPaints": 35,
   "colorEncoding": "sRGB; premultiplied once in native ink shader",
   "curveToleranceSvgPixels": 0.02,
-  "sourceSHA256": "afa79fbe68e400d4ec56579015f3958444456693b813cde65dc84664a1dd4e69",
-  "binarySHA256": "d9f1c66d527b7b2f8e2947111d231c72e10948e1ed39e3fd8a0c4fd50bd5fe87",
+  "sourceSHA256": "6912f0802f9772bfa90fbdfc488e69267acb48fc7107b0bf7134625ffe3dcb9e",
+  "binarySHA256": "3d544f080161ce8774e766fa486eec3510a2a383772300a5719e6fe43537f9ae",
   "bytes": 1916664,
   "minificationFallback": {
     "width": 2048,
     "height": 1024,
     "file": "board-crapless-minified.png",
-    "sha256": "dfe85535dead59e68623907482195a3d39e7be8fb7a7d385971899a46b976c63"
+    "sha256": "a74a094b43f30dda75f1d2188b1b5f18624c2b460eeb9e2174d04710eabf157e"
   }
 }

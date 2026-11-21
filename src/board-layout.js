@@ -40,6 +40,13 @@ export const BOARD_SPECIAL_REGIONS = Object.freeze({
   "bonus-all": { pixelRect: [670, 34, 145, 132] },
   hops: { pixelRect: [1240, 34, 650, 132] },
 });
+const NUMBER_ROW_LEGACY = [136, 242, 1776, 158];
+const HEADER_PANELS_BOTTOM = Math.max(
+  ...Object.values(BOARD_SPECIAL_REGIONS).map(({ pixelRect: [, top, , height] }) => top + height),
+);
+const NUMBER_ROW_TOP = legacyBoardToPixel(0, NUMBER_ROW_LEGACY[1])[1];
+const PUCK_ON_PIXEL_Y = (HEADER_PANELS_BOTTOM + NUMBER_ROW_TOP) / 2;
+
 export const BOARD_LAYOUT = Object.freeze({
   version: 2,
   width: BOARD_WIDTH,
@@ -52,13 +59,13 @@ export const BOARD_LAYOUT = Object.freeze({
   betShiftZ: BOARD_BET_SHIFT_Z,
   logo: { x: 879, y: 9, width: 290, height: 124 },
   puck: {
-    radius: 0.2,
-    onPixelY: 204.8,
-    onWorldZ: -1.62,
+    radius: 0.19,
+    onPixelY: PUCK_ON_PIXEL_Y,
+    onWorldZ: boardPixelToWorld(0, PUCK_ON_PIXEL_Y)[1],
     offWorld: [-4, -2.05],
     offPixel: boardWorldToPixel(-4, -2.05),
   },
-  numberRow: { legacy: [136, 242, 1776, 158] },
+  numberRow: { legacy: NUMBER_ROW_LEGACY },
   lanes: { passBottom: [778, 836], dontBottom: [718, 768], apron: [836, 1024] },
   points: {
     classic: [4, 5, 6, 8, 9, 10],

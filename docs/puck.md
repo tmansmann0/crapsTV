@@ -9,7 +9,7 @@
 - Beveled perimeter; side depth divided equally into white and black halves.
 - 1,340 triangles, one material, 98,980-byte GLB at initial generation.
 
-The collider may use the same centered cylinder dimensions. Apply the full authoritative puck position/quaternion to the model; no model-space translation or extra face correction is required. `assets/source/puck.blend` remains in the identity/ON orientation and embeds its atlas for editing.
+The table scales the model horizontally to match the collider’s 0.19 radius and keeps the authored height of 0.085. The render uses the full authoritative puck position and quaternion. `assets/source/puck.blend` remains in the identity/ON orientation and embeds its atlas for editing.
 
 Regenerate with the installed Blender runtime:
 
