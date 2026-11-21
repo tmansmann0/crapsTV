@@ -25,7 +25,7 @@ const options = {
   startAt: 1000,
   gesture: { x: 0, power: 0.65 },
 };
-function directHit(props = {}) {
+function directHit(props = {}, onStep) {
   const physics = createDicePhysics(props);
   physics.throwDice(1);
   physics.bodies.forEach((body, i) => {
@@ -34,12 +34,15 @@ function directHit(props = {}) {
     body.velocity.set(i ? 0 : 8, 0, 0);
     body.angularVelocity.set(0, 0, 0);
   });
-  for (let i = 0; i < 180; i++) physics.step(1 / 120);
+  for (let i = 0; i < 180; i++) {
+    physics.step(1 / 120);
+    onStep?.(physics);
+  }
   return physics;
 }
 
 test("puck matches modeled dimensions and rests just above felt with ON/OFF orientation", () => {
-  assert.equal(PUCK_RADIUS, 0.2);
+  assert.equal(PUCK_RADIUS, 0.19);
   assert.equal(PUCK_HEIGHT, 0.085);
   assert.equal(PUCK_MASS, 0.18);
   assert.equal(puckHome(6).position[1], PUCK_HEIGHT / 2 + 0.002);
@@ -49,17 +52,18 @@ test("puck matches modeled dimensions and rests just above felt with ON/OFF orie
 });
 
 test("a physical puck deflects dice and receives a real movement impulse", () => {
-  const empty = directHit(),
-    hit = directHit({ puck: marker });
+  const empty = directHit();
+  let peakPuckSpeed = 0;
+  const hit = directHit({ puck: marker }, ({ puckBody: { velocity } }) => {
+    peakPuckSpeed = Math.max(peakPuckSpeed, Math.hypot(velocity.x, velocity.z));
+  });
   assert.equal(hit.puckBody.mass, PUCK_MASS);
   assert(
     hit.propContacts.some(
       (contact) => contact.kind === "puck" && contact.speed > 1,
     ),
   );
-  assert(
-    hit.puckBody.position.distanceTo({ x: 0, y: PUCK_HEIGHT / 2, z: 0 }) > 0.01,
-  );
+  assert(peakPuckSpeed > 0.5);
   assert(Math.abs(empty.bodies[0].position.x - hit.bodies[0].position.x) > 0.2);
 });
 

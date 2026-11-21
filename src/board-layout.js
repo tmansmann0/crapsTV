@@ -59,7 +59,7 @@ export const BOARD_LAYOUT = Object.freeze({
   betShiftZ: BOARD_BET_SHIFT_Z,
   logo: { x: 879, y: 9, width: 290, height: 124 },
   puck: {
-    radius: 0.2,
+    radius: 0.19,
     onPixelY: PUCK_ON_PIXEL_Y,
     onWorldZ: boardPixelToWorld(0, PUCK_ON_PIXEL_Y)[1],
     offWorld: [-4, -2.05],

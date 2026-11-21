@@ -19,7 +19,8 @@ export const G = {
   modeBaseline: 150,
   rail: {
     y: BOARD_LAYOUT.puck.onPixelY,
-    r: 32,
+    r: 29,
+    offRadius: 34,
     off: BOARD_LAYOUT.puck.offPixel[0],
   },
   nums: {

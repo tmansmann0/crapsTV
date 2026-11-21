@@ -15,7 +15,7 @@
     "height": 124
   },
   "puck": {
-    "radius": 0.2,
+    "radius": 0.19,
     "onPixelY": 207.22,
     "onWorldZ": -1.60723828125,
     "offWorld": [

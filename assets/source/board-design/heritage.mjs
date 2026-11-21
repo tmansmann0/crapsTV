@@ -39,7 +39,7 @@ const bas = "Baskerville, 'Hoefler Text', Georgia, serif"; // lining figures, al
 const OFF = {
   x: BOARD_LAYOUT.puck.offPixel[0],
   y: BOARD_LAYOUT.puck.offPixel[1],
-  r: 38,
+  r: G.rail.offRadius,
 };
 const PLACE_PAY = {
   2: "11:2",

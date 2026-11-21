@@ -7,6 +7,7 @@ import {
 } from "../src/chip-footprints.js";
 import { layoutSeatLabels } from "../src/seat-label-layout.js";
 import { sampleTableCamera, fitBettingCamera } from "../src/throw-camera.js";
+import { PUCK_HEIGHT, PUCK_RADIUS } from "../src/puck-layout.js";
 import { readFileSync } from "node:fs";
 const seats = JSON.parse(
   readFileSync(
@@ -29,12 +30,12 @@ test("moving and tipped puck bounds reserve its full visible cylinder", () => {
     };
     const bounds = puckFootprintBounds(pose);
     for (let step = 0; step < 32; step++)
-      for (const y of [-0.0425, 0.0425]) {
+      for (const y of [-PUCK_HEIGHT / 2, PUCK_HEIGHT / 2]) {
         const theta = (step / 32) * Math.PI * 2;
         const p = new THREE.Vector3(
-          0.2 * Math.cos(theta),
+          PUCK_RADIUS * Math.cos(theta),
           y,
-          0.2 * Math.sin(theta),
+          PUCK_RADIUS * Math.sin(theta),
         )
           .applyQuaternion(new THREE.Quaternion(...pose.quaternion))
           .add(new THREE.Vector3(...pose.position));

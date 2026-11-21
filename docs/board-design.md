@@ -50,7 +50,7 @@ worldZ = (y / 1024 - 0.5) × 5.4
 
 The 50-pixel shift is **+0.263671875 world Z**. The place-number row begins at y248.44. Pass Line’s outer border ends at y836, leaving 188 pixels of real clear apron. Pass odds remain at y939.7. Big 6/8 tiles extend upward to y660 for readable type; their existing anchors stay at y693.7. Internal printed dividers are recorded from the editable SVG into the manifest, rather than inferred from label positions.
 
-The original logo remains x879/y9/290×124 and ends at y133. The mode label ends near y150. ON targets and the physical puck share y207.22, halfway between the upper panels and the place-number row. The printed ON circles have a 32-pixel radius. The 38-pixel OFF circle stays at world position (−4, −2.05), approximately pixel (268.28, 123.26). Crapless removes the central “THE POINT” caption to keep all ten puck targets clear. Side labels are +90° on the left and −90° on the right, and bottom labels retain their orientation.
+The original logo remains x879/y9/290×124 and ends at y133. The mode label ends near y150. ON targets and the physical puck share y207.22, halfway between the upper panels and the place-number row. The printed ON circles have a 29-pixel radius. The 34-pixel OFF circle stays at world position (−4, −2.05), approximately pixel (268.28, 123.26). Crapless removes the central “THE POINT” caption to keep all ten puck targets clear. Side labels are +90° on the left and −90° on the right, and bottom labels retain their orientation.
 
 The shared proposition areas print **2 / 12 — 30:1 EACH** and **3 / 11 — 15:1 EACH**, matching the separate individual bets in the rules. Crapless has no Don’t Pass or Don’t Come. Hardway dice show the correct doubles, with 7:1 for 4/10 and 9:1 for 6/8.
 

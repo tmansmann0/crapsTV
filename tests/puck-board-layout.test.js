@@ -20,11 +20,22 @@ test("printed ON rings and physical puck are centered in the gap above the numbe
   const topGap = G.rail.y - G.rail.r - panelBottom;
   const bottomGap = G.nums.y0 - G.rail.y - G.rail.r;
   assert(Math.abs(topGap - bottomGap) < 1e-9);
-  assert(topGap >= 8);
+  assert(topGap >= 11);
   for (const mode of ["craps", "crapless"]) {
     const [x, , z] = puckHome(6, mode).position;
     assert(Math.abs(boardWorldToPixel(x, z)[1] - G.rail.y) < 1e-9);
   }
+});
+
+test("the physical puck covers the outer stroke of both printed targets", () => {
+  const puckRadiusInPrint =
+    PUCK_RADIUS *
+    Math.min(
+      BOARD_LAYOUT.width / BOARD_LAYOUT.worldWidth,
+      BOARD_LAYOUT.height / BOARD_LAYOUT.worldDepth,
+    );
+  assert(puckRadiusInPrint > G.rail.r + 1);
+  assert(puckRadiusInPrint > G.rail.offRadius + 1.2);
 });
 
 test("every ON puck clears the full branding band and the shifted number row", () => {
