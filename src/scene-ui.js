@@ -280,6 +280,7 @@ export function createSceneUI(renderer, onAction) {
       ["graphics", "Graphics", "›"],
       ["ui-size", "UI size", uiSize === "large" ? "LARGE" : "COMPACT"],
       ["labels", "Labels", labelMotion.toUpperCase()],
+      ["audio", "Table audio", "›"],
     ];
     rows.forEach(([action, label, value], i) => {
       const y = 92 + i * 76;

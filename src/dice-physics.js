@@ -231,9 +231,30 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
     propHits = 0;
   const propContacts = [];
   const contactKeys = new Set();
+  const audioContacts = [];
+  const lastAudioContact = new Map();
+  const audioMaterials = new Map([
+    [felt, "felt"],
+    [rubber, "rail"],
+    [resin, "dice"],
+    [marker, "puck"],
+    [clay, "chips"],
+  ]);
   bodies.forEach((b, die) =>
     b.addEventListener("collide", (e) => {
       if (e.body.material === rubber) wallHits++;
+      const material = audioMaterials.get(e.body.material);
+      if (material && audioContacts.length < 64) {
+        const speed = Math.abs(e.contact.getImpactVelocityAlongNormal());
+        const key = material === "dice" ? material : `${material}:${die}`;
+        if (
+          speed >= 0.4 &&
+          elapsed - (lastAudioContact.get(key) ?? -Infinity) >= 0.032
+        ) {
+          lastAudioContact.set(key, elapsed);
+          audioContacts.push({ material, elapsed, speed, x: b.position.x });
+        }
+      }
       if (e.body.material === marker || e.body.material === clay) {
         propHits++;
         const contactKey = `${e.body.propId || "puck"}:${die}:${elapsed}`;
@@ -365,6 +386,8 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
     propHits = 0;
     propContacts.length = 0;
     contactKeys.clear();
+    audioContacts.length = 0;
+    lastAudioContact.clear();
     running = true;
     if (puckBody) {
       puckBody.wakeUp();
@@ -446,6 +469,9 @@ export function createDicePhysics({ puck = null, stacks = [] } = {}) {
     },
     get propContacts() {
       return propContacts;
+    },
+    get audioContacts() {
+      return audioContacts;
     },
   };
 }
