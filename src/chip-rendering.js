@@ -164,6 +164,7 @@ export async function createChipFactory(
     }
     return cache.get(key);
   }
+  let ownerRim;
   return {
     create({
       denomination = 500,
@@ -196,7 +197,32 @@ export async function createChipFactory(
       gltf.scene.traverse((object) => {
         if (object.isMesh) sources.push(object);
       });
-      return createChipBatch(specs, sources, styled, lowGeometry);
+      const ownerColors = specs.some((spec) => spec.ownerColor);
+      if (ownerColors && !ownerRim) {
+        // Follow the glTF's upper bevel with enough clearance for either LOD.
+        const geometry = new THREE.LatheGeometry(
+          [
+            [0.504, 0.021],
+            [0.504, 0.044],
+            [0.501, 0.053],
+            [0.492, 0.063],
+            [0.478, 0.067],
+            [0.437, 0.066],
+          ].map(([radius, height]) => new THREE.Vector2(radius, height)),
+          48,
+        );
+        const material = new THREE.MeshBasicMaterial({ toneMapped: false });
+        geometries.add(geometry);
+        materials.add(material);
+        ownerRim = { geometry, material };
+      }
+      return createChipBatch(
+        specs,
+        sources,
+        styled,
+        lowGeometry,
+        ownerColors ? ownerRim : null,
+      );
     },
     updateLOD(root, camera, height, detail = "auto") {
       let changed = false;

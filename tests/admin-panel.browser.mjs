@@ -94,6 +94,17 @@ try {
     botRollDelaySeconds: 7,
   });
   await openAdminSection(page, "TV", { graphics: true });
+  const playerColors = page.getByRole("checkbox", {
+    name: "Player chip colors",
+  });
+  await expect(playerColors).not.toBeChecked();
+  await playerColors.check();
+  await expect(playerColors).toBeChecked();
+  assert.deepEqual(await page.evaluate(() => window.adminQA.actions.at(-1)), {
+    type: "display",
+    settings: { playerChipColors: true },
+  });
+  await playerColors.uncheck();
   await expect(page.getByLabel("TV graphics frame rate")).toHaveValue("auto");
   await page.getByLabel("TV graphics frame rate").selectOption("30");
   await expect(page.getByLabel("TV graphics frame rate")).toHaveValue("30");

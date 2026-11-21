@@ -7,7 +7,13 @@ import { chipPatinaParameters } from "./chip-character.js";
 export const CHIP_LOD_PIXELS = Object.freeze({ low: 128, high: 160 });
 
 /** Compact high/low instance buffers without changing any chip's source index. */
-export function createChipBatch(specs, sources, materialFor, lowGeometry) {
+export function createChipBatch(
+  specs,
+  sources,
+  materialFor,
+  lowGeometry,
+  ownerRim,
+) {
   const group = new THREE.Group();
   const matrices = specs.map((spec) =>
     new THREE.Matrix4().compose(
@@ -24,6 +30,25 @@ export function createChipBatch(specs, sources, materialFor, lowGeometry) {
   );
   const patina = specs.map(chipPatinaParameters);
   const color = new THREE.Color();
+  const rimRows = ownerRim ? new Map() : null;
+  let rimMesh;
+  if (ownerRim) {
+    for (const [index, spec] of specs.entries())
+      if (spec.ownerColor) rimRows.set(index, rimRows.size);
+    rimMesh = new THREE.InstancedMesh(
+      ownerRim.geometry,
+      ownerRim.material,
+      rimRows.size,
+    );
+    rimMesh.name = "Player color chip rims";
+    rimMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (const [index, row] of rimRows) {
+      rimMesh.setMatrixAt(row, matrices[index]);
+      rimMesh.setColorAt(row, color.set(specs[index].ownerColor));
+    }
+    rimMesh.computeBoundingSphere();
+    group.add(rimMesh);
+  }
   const detailed = new Uint8Array(specs.length).fill(1);
   const changedIndices = new Uint8Array(specs.length);
   const dirty = new Set();
@@ -107,8 +132,14 @@ export function createChipBatch(specs, sources, materialFor, lowGeometry) {
     setMatrixAt(index, matrix) {
       matrices[index].copy(matrix);
       dirty.add(index);
+      const row = rimRows?.get(index);
+      if (row !== undefined) {
+        rimMesh.setMatrixAt(row, matrix);
+        rimMesh.instanceMatrix.needsUpdate = true;
+      }
     },
     expandBounds(amount) {
+      if (rimMesh) rimMesh.boundingSphere.radius += amount;
       for (const bucket of buckets.values()) {
         bucket.bounds.radius += amount;
         bucket.meshes.forEach((mesh) =>

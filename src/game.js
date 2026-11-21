@@ -36,6 +36,10 @@ export const COLORS = [
   "#e8b8d6",
   "#c5d87c",
   "#f3a668",
+  "#60d6f0",
+  "#f4dc70",
+  "#ea7ebc",
+  "#d1e7ea",
 ];
 export const WAYS = {
   2: 1,
@@ -137,6 +141,7 @@ export function createState(code = "LOCAL") {
     },
     display: {
       sound: false,
+      playerChipColors: false,
       camera: "auto",
       graphics: { ...DEFAULT_GRAPHICS },
       graphicsRevision: 0,
@@ -500,7 +505,10 @@ export function join(s, name, bot = null) {
       ) ?? 0,
     dice: { color: "red", finish: "solid" },
     betPreview: null,
-    color: COLORS[s.players.length % COLORS.length],
+    color: COLORS.find(
+      (color) =>
+        !s.players.some((player) => !player.left && player.color === color),
+    ),
     bank: startingBank,
     buyIn: startingBank,
     ...(bot ? { bot } : {}),
@@ -926,16 +934,23 @@ export function setDisplaySettings(s, id, options) {
     Reflect.ownKeys(options).every(
       (key) =>
         typeof key === "string" &&
-        ["sound", "camera", "graphics"].includes(key),
+        ["sound", "playerChipColors", "camera", "graphics"].includes(key),
     ),
     "Unknown display setting.",
   );
   const current = s.display || { sound: false, camera: "auto", revision: 0 };
   const sound = Object.hasOwn(options, "sound") ? options.sound : current.sound;
+  const playerChipColors = Object.hasOwn(options, "playerChipColors")
+    ? options.playerChipColors
+    : (current.playerChipColors ?? false);
   const camera = Object.hasOwn(options, "camera")
     ? options.camera
     : current.camera;
   assert(typeof sound === "boolean", "Sound must be on or off.");
+  assert(
+    typeof playerChipColors === "boolean",
+    "Player chip colors must be on or off.",
+  );
   assert(
     ["auto", "table", "room"].includes(camera),
     "Choose auto, table or room view.",
@@ -945,6 +960,7 @@ export function setDisplaySettings(s, id, options) {
     : normalizeGraphics(current.graphics);
   s.display = {
     sound,
+    playerChipColors,
     camera,
     graphics,
     graphicsRevision:

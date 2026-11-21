@@ -208,6 +208,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     transfers = new THREE.Group();
   chips.name = "Live wagers";
   banks.name = "Player bankrolls";
+  labels.name = "Player names and bankrolls";
   previews.name = "Prepared bets";
   transfers.name = "Chip transfers";
   scene.add(chips, banks, labels, previews, transfers);
@@ -390,7 +391,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     sprite.layers.set(1);
     return sprite;
   }
-  function seatLabel(player, amount) {
+  function seatLabel(player, amount, playerChipColors) {
     const canvas = document.createElement("canvas");
     canvas.width = 512;
     const stake = player.bets.reduce((sum, bet) => sum + bet.amount, 0);
@@ -404,7 +405,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     ctx.strokeStyle = player.color;
     ctx.lineWidth = 5;
     ctx.stroke();
-    ctx.fillStyle = "#f5ecdc";
+    ctx.fillStyle = playerChipColors ? player.color : "#f5ecdc";
     ctx.font = "700 84px Manrope,Arial";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -501,6 +502,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     );
   }
   function buildStatic(state, players, now) {
+    const playerChipColors = state.display?.playerChipColors === true;
     const bankAmounts = players.map((p) =>
       visualChipAmount(p.bank, bankRoute(p.id), flows, now),
     );
@@ -531,6 +533,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     }));
     const key = JSON.stringify([
       layoutRevision,
+      playerChipColors,
       players.map((p, i) => [
         p.id,
         p.seat,
@@ -776,7 +779,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         preserveLayerOrder: true,
       });
       activeWagerKeys.push(impactStack.id);
-      wagerSpecs.push(...physical.chips);
+      wagerSpecs.push(
+        ...physical.chips.map((chip) =>
+          playerChipColors ? { ...chip, ownerColor: player.color } : chip,
+        ),
+      );
       impactStack.chips.push(...physical.chips);
       if (physical.exchange) {
         const id = `wager:${impactStack.id}:${physical.exchange.added.map((chip) => chip.id).join(":")}`;
@@ -784,6 +791,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         queueExchange(id, physical.exchange.removed, now, {
           added: physical.exchange.added,
           end,
+          ownerColor: playerChipColors ? player.color : undefined,
         });
         for (const chip of physical.exchange.added)
           wagerDrops.set(chip.id, { readyAt: end });
@@ -1008,12 +1016,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       arrival = startAt + 320,
       departure = startAt + 390,
       end = startAt + 780,
+      ownerColor,
     } = {},
   ) {
     if ((!removed.length && !added.length) || seenExchanges.has(id)) return;
     seenExchanges.add(id);
     const chips = [...removed, ...added];
-    const group = chipFactory.createBatch(chips);
+    const group = chipFactory.createBatch(
+      ownerColor ? chips.map((chip) => ({ ...chip, ownerColor })) : chips,
+    );
     group.name = "Dealer rack chip exchange";
     group.traverse((o) => {
       if (o.isInstancedMesh) o.frustumCulled = false;
@@ -1115,6 +1126,17 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     for (const flow of flows) {
       let group = flightObjects.get(flow.id);
       const bankPlan = bankDisplay.plans.get(flow.id);
+      const ownerColor =
+        state.display?.playerChipColors &&
+        (flow.from.kind === "bet" || flow.to.kind === "bet")
+          ? state.players.find((player) => player.id === flow.playerId)?.color
+          : undefined;
+      if (group && group.userData.ownerColor !== ownerColor) {
+        clearGroup(group);
+        transfers.remove(group);
+        flightObjects.delete(flow.id);
+        group = null;
+      }
       if (!group) {
         group = new THREE.Group();
         group.name = `Chip ${flow.kind}`;
@@ -1136,6 +1158,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
             });
             return {
               ...chip,
+              ownerColor,
               diameter: 0.23,
               thicknessScale: 1.15,
               position: [
@@ -1164,10 +1187,15 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         } else if (!bankPlan && flow.amount >= 100)
           group.add(
             chipFactory.createBatch(
-              pileSpecs(flow.amount, { diameter: 0.28, max: 6, seed: flow.id }),
+              pileSpecs(flow.amount, {
+                diameter: 0.28,
+                max: 6,
+                seed: flow.id,
+              }).map((chip) => ({ ...chip, ownerColor })),
             ),
           );
         else continue;
+        group.userData.ownerColor = ownerColor;
         group.userData.flow = flow;
         transfers.add(group);
         flightObjects.set(flow.id, group);
@@ -1288,6 +1316,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     }
   }
   function updateLabels(state, players, now) {
+    const playerChipColors = state.display?.playerChipColors === true;
     const displayedBanks = new Map(
       players.map((p) => [
         p.id,
@@ -1296,6 +1325,7 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     );
     const key = JSON.stringify([
       layoutRevision,
+      playerChipColors,
       players.map((p) => [
         p.id,
         p.name,
@@ -1314,7 +1344,11 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
     clearGroup(labels);
     for (const player of players) {
       const seat = layout(player),
-        sprite = seatLabel(player, displayedBanks.get(player.id));
+        sprite = seatLabel(
+          player,
+          displayedBanks.get(player.id),
+          playerChipColors,
+        );
       const pos = [...seat.label];
       // Tray labels sit outboard at tray height, so they do not mask bank stacks.
       sprite.position.fromArray(pos);
@@ -1634,6 +1668,9 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       return;
     }
     const now = Date.now() + (state.clockOffsetMs || 0);
+    const colorsChanged =
+      (previousState?.display?.playerChipColors === true) !==
+      (state.display?.playerChipColors === true);
     if (state.status !== "playing") {
       flows = [];
       impacts = [];
@@ -1771,7 +1808,10 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
       updateLandings(now);
       updateExchanges(now);
     }
-    if (!state.rolling && !flows.length && !impacts.length && !landingPlan)
+    if (
+      colorsChanged ||
+      (!state.rolling && !flows.length && !impacts.length && !landingPlan)
+    )
       updateLabels(state, players, now);
   }
   return {
