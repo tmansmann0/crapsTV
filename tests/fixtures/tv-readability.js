@@ -79,6 +79,7 @@ window.tvReadability = {
     ui.setSettingsPage(scenario === "graphics" ? "graphics" : "main");
     ui.update({
       ...props,
+      state: scenario === "come-out" ? { ...state, lastRoll: null } : state,
       settingsOpen: ["settings", "graphics"].includes(scenario),
       introActive: scenario === "intro",
     });

@@ -7,6 +7,7 @@ import {
   botRollSecondsRemaining,
 } from "./betting-window.js";
 import { money } from "./game.js";
+import { drawStatusCard } from "./tv-status-card.js";
 import {
   createTVLayout,
   TV_TYPE,
@@ -185,6 +186,7 @@ export function createSceneUI(renderer, onAction) {
       p.mesh.userData.textMetrics,
       p.mesh.userData.id === "brand" && !!logo,
       p.mesh.userData.id === "join" && qrVersion,
+      p.mesh.userData.statusStyle,
     ]);
     if (key !== p.drawKey) {
       p.drawKey = key;
@@ -584,7 +586,7 @@ export function createSceneUI(renderer, onAction) {
     finish(p);
 
     p = panels.status;
-    c = begin(p);
+    c = begin(p, false);
     p.mesh.visible =
       !settingsOpen &&
       !introActive &&
@@ -595,20 +597,24 @@ export function createSceneUI(renderer, onAction) {
         sceneLoading);
     let heading = "Connecting",
       detail = "",
-      headingColor = C.ink;
+      headingColor = C.ink,
+      icon = "connection";
     if (state?.status === "playing") {
       const roll = state.lastRoll;
-      const kind = {
-        natural: "WINNER",
-        craps: "CRAPS",
-        "point-hit": "POINT MADE",
-        "seven-out": "SEVEN OUT",
+      const outcome = {
+        natural: { label: "WINNER", icon: "win" },
+        craps: { label: "CRAPS", icon: "loss" },
+        "point-hit": { label: "POINT MADE", icon: "win" },
+        "seven-out": { label: "SEVEN OUT", icon: "loss" },
       }[roll?.kind];
       const point = state.point ? `POINT ${state.point}` : "COME OUT";
+      icon = state.rolling
+        ? "rolling"
+        : outcome?.icon || (state.point ? "point" : "come-out");
       heading = state.rolling
         ? "DICE ROLLING"
         : roll
-          ? `${roll.total} · ${kind || point}`
+          ? `${roll.total} · ${outcome?.label || point}`
           : point;
       const shooter =
         state.players.find((p) => p.id === state.shooterId)?.name || "Host";
@@ -622,6 +628,7 @@ export function createSceneUI(renderer, onAction) {
       const focus = current.cameraFocus;
       if (!state.rolling && focus?.phase === "outcome-player") {
         const delta = focus.delta || 0;
+        icon = delta > 0 ? "win" : delta < 0 ? "loss" : "player";
         heading = `${focus.name} · ${delta > 0 ? "+" : delta < 0 ? "−" : ""}${money(Math.abs(delta))}`;
         headingColor = delta > 0 ? "#c4e1b5" : delta < 0 ? "#edb6a5" : C.ink;
         const outcomes = (focus.bets || []).map(
@@ -635,6 +642,7 @@ export function createSceneUI(renderer, onAction) {
           focus.playerIds?.includes(event.playerId),
         );
         const total = events.reduce((sum, event) => sum + event.delta, 0);
+        icon = total > 0 ? "win" : total < 0 ? "loss" : "player";
         const names = events.map((event) => event.name);
         const group =
           names.length === 2
@@ -653,6 +661,7 @@ export function createSceneUI(renderer, onAction) {
       } else if (!state.rolling && focus?.phase === "idle-player") {
         const player = state.players.find((p) => p.id === focus.playerId);
         if (player) {
+          icon = "player";
           const delta =
             roll?.events?.find((event) => event.playerId === player.id)
               ?.delta || 0;
@@ -670,40 +679,36 @@ export function createSceneUI(renderer, onAction) {
       }
     }
     if (state?.status === "ended") {
+      icon = "closed";
       heading = "SESSION CLOSED";
       detail = "Your recaps are on your phones";
     }
     if (sceneLoading && !error) {
+      icon = "connection";
       heading = "Loading table…";
       detail = "";
     }
     if (error) {
+      icon = "notice";
       heading = "NOTICE";
       detail = error;
       headingColor = C.ink;
     }
-    c.textAlign = "center";
-    fittedText(
+    const detailColor = bettingSeconds > 0 ? C.gold : C.muted;
+    p.mesh.userData.statusStyle = [icon, headingColor, detailColor];
+    drawStatusCard(
       c,
-      heading,
-      p.w / 2,
-      70,
-      TV_TYPE.result,
-      p.w - 56,
-      headingColor,
-      700,
+      {
+        width: p.w,
+        height: p.h,
+        icon,
+        heading,
+        detail,
+        headingColor,
+        detailColor,
+      },
+      fittedText,
     );
-    fittedText(
-      c,
-      detail,
-      p.w / 2,
-      123,
-      TV_TYPE.status,
-      p.w - 56,
-      bettingSeconds > 0 ? C.gold : C.muted,
-      600,
-    );
-    c.textAlign = "left";
     finish(p);
 
     p = panels.intro;

@@ -16,8 +16,8 @@
   },
   "puck": {
     "radius": 0.2,
-    "onPixelY": 204.8,
-    "onWorldZ": -1.62,
+    "onPixelY": 207.22,
+    "onWorldZ": -1.60723828125,
     "offWorld": [
       -4,
       -2.05
