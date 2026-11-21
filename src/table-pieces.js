@@ -133,7 +133,11 @@ function wagerFlightTargets(plan, state, current = []) {
   });
 }
 
-export function createTablePieces(scene, renderer, { software = false } = {}) {
+export function createTablePieces(
+  scene,
+  renderer,
+  { software = false, onChipLanding } = {},
+) {
   let alive = true,
     chipFactory = null,
     dealerRoot = null,
@@ -1756,9 +1760,16 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         seats: seatLayout,
         wagerSources,
       });
-    flows = flows.filter(
-      (f) => now < Math.min(f.startAt + f.duration, f.cutAt ?? Infinity),
-    );
+    flows = flows.filter((flow) => {
+      const lateBy = now - flowEnd(flow);
+      if (lateBy < 0) return true;
+      const group = flightObjects.get(flow.id);
+      if (lateBy < 150 && group?.visible) {
+        const count = group.userData.flightSpecs?.length ?? 1;
+        onChipLanding?.(count, routePosition(flow.to, state)[0]);
+      }
+      return false;
+    });
     if (chipFactory) {
       buildStatic(state, players, now);
       updatePreviews(state, players);
