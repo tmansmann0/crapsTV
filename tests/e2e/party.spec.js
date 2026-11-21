@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { test, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { upperDieFace } from "../../src/throw-motion.js";
+import { DEFAULT_ROLL_COOLDOWN_SECONDS } from "../../src/betting-window.js";
 import { clickTV } from "../helpers/tv-actions.mjs";
 import { openAdminSection } from "../helpers/admin-controls.mjs";
 // Software WebGL readbacks can stall shared CI runners. Visual QA snapshots are
@@ -239,7 +240,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.bringToFront();
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
-    // Default ten-second betting window is enforced and the local countdown
+    // The default betting window is enforced and the local countdown
     // unlocks without a new server broadcast. Dice style stays editable.
     await expect(phone.locator(".pg-strip-text small")).toContainText(
       "Betting open",
@@ -254,7 +255,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     ).toBeEnabled();
     await expect(
       phone.getByRole("button", { name: "Roll the dice", exact: true }),
-    ).toBeEnabled({ timeout: 15000 });
+    ).toBeEnabled({ timeout: (DEFAULT_ROLL_COOLDOWN_SECONDS + 5) * 1000 });
     // The rest of this multi-roll fixture deliberately uses immediate throws.
     await phone.getByRole("button", { name: "Open settings" }).click();
     await openAdminSection(phone, "Table");
