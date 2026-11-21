@@ -37,6 +37,7 @@ import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import TableAudioDialog from "./TableAudioDialog.jsx";
+import AndroidHostPanel from "./AndroidHostPanel.jsx";
 import {
   createTableAudio,
   loadTableAudioSettings,
@@ -187,6 +188,7 @@ function App() {
     [sound, setSound] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [audioOpen, setAudioOpen] = useState(false),
+    [androidPanel, setAndroidPanel] = useState(null),
     [audioReady, setAudioReady] = useState(false),
     [audioSettings, setAudioSettings] = useState(loadTableAudioSettings),
     [tableAudio] = useState(createTableAudio),
@@ -194,6 +196,28 @@ function App() {
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
   const androidHost = session?.android && location.hostname === "127.0.0.1";
+  useEffect(() => {
+    if (!androidHost || view !== "tv" || session.joinOrigin) return;
+    // Android can publish its LAN address shortly after the local server is
+    // reachable. Let one network refresh settle before opening the wizard.
+    const timer = setTimeout(
+      () => setAndroidPanel((current) => current || "setup"),
+      2800,
+    );
+    return () => clearTimeout(timer);
+  }, [androidHost, view, session?.joinOrigin]);
+  useEffect(() => {
+    if (!androidHost) return;
+    const back = (event) => {
+      if (androidPanel) setAndroidPanel(null);
+      else if (audioOpen) setAudioOpen(false);
+      else if (settingsOpen) setSettingsOpen(false);
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("crapstv:back", back);
+    return () => window.removeEventListener("crapstv:back", back);
+  }, [androidHost, androidPanel, audioOpen, settingsOpen]);
   const confirmDialog = useRef(null);
   useEffect(() => {
     if (confirm) confirmDialog.current?.showModal();
@@ -454,9 +478,10 @@ function App() {
     if (action === "settings") setSettingsOpen((v) => !v);
     if (action === "audio") setAudioOpen(true);
     if (action === "join") {
-      if (androidHost) location.assign("/android-host");
+      if (androidHost) setAndroidPanel(session.joinOrigin ? "game" : "setup");
       else window.open(joinLink, "_blank", "noopener");
     }
+    if (action === "host-network" && androidHost) setAndroidPanel("settings");
     if (action === "sound") setSound((value) => !value);
     if (action === "fullscreen") {
       if (document.fullscreenElement)
@@ -467,7 +492,7 @@ function App() {
     if (action === "copy" || action === "copy-ip") {
       const link =
         action === "copy-ip" ? fallbackJoinLink || joinLink : joinLink;
-      if (!link) return toast("Open Pair to set up Wi-Fi first");
+      if (!link) return toast("Set up Wi-Fi in Settings first");
       try {
         await navigator.clipboard.writeText(link);
         toast("Join link copied");
@@ -489,6 +514,7 @@ function App() {
           status={checking ? "connecting" : status}
           error={visibleError}
           sound={sound}
+          handheld={androidHost}
           settingsOpen={kiosk ? false : settingsOpen}
           hideSettings={kiosk}
           joinURL={joinLink}
@@ -503,6 +529,11 @@ function App() {
                 Table settings
               </button>
               <button onClick={() => sceneAction("audio")}>Table audio</button>
+              {androidHost && (
+                <button onClick={() => sceneAction("host-network")}>
+                  Wi-Fi &amp; hosting
+                </button>
+              )}
             </>
           )}
           <p role="status">
@@ -524,6 +555,12 @@ function App() {
             Fullscreen table
           </button>
         </div>
+        {androidHost && androidPanel && (
+          <AndroidHostPanel
+            page={androidPanel}
+            onClose={() => setAndroidPanel(null)}
+          />
+        )}
         {audioOpen && !kiosk && (
           <TableAudioDialog
             settings={audioSettings}

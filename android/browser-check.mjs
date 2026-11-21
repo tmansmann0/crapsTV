@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { startTestHost } from "./test-host.mjs";
+import { clickTV } from "../tests/helpers/tv-actions.mjs";
 
 const server = await startTestHost({ mode: "lan", ip: "127.0.0.1" });
 const errors = [];
@@ -35,37 +36,34 @@ try {
   const host = await context.newPage();
   host.on("pageerror", (error) => errors.push(error.message));
 
-  await host.goto(server.url + "/android-host");
-  await expect(host.getByText("Local network ready")).toBeVisible();
-  const gameQR = host.getByAltText("Scan to join the game. Tap to enlarge.");
-  await expect(gameQR).toBeVisible();
-  await expect(host.getByAltText(/scan to join the offline/i)).toBeHidden();
-  const regular = await gameQR.boundingBox();
-  assert(regular.width >= 280);
-
-  await gameQR.click();
-  await host.waitForURL("**/android-qr?kind=game");
-  const fullGameQR = host.getByAltText("Join game QR", { exact: true });
-  await expect(fullGameQR).toBeVisible();
-  assert((await fullGameQR.boundingBox()).width > regular.width);
-  await host.getByRole("link", { name: "Back to pairing" }).click();
-  await host.getByRole("link", { name: "1. Join Wi-Fi" }).click();
+  await host.goto(server.url + "/android-host?view=settings");
+  await expect(host.getByText("Shared network ready")).toBeVisible();
   await expect(
-    host.getByRole("link", { name: "Create offline Wi-Fi" }),
-  ).toHaveAttribute("href", "crapstv://host/offline");
+    host.getByRole("button", { name: "Create offline Wi-Fi" }),
+  ).toBeHidden();
+  await host.getByRole("button", { name: "Show game QR" }).click();
+  const gameQR = host.getByAltText("Scan to join the CrapsTV table");
+  await expect(gameQR).toBeVisible();
+  assert((await gameQR.boundingBox()).width >= 280);
+  await expect(host.getByText("2 · Join the game")).toBeHidden();
 
+  await server.updateNetwork({ mode: "lan" });
+  await expect(
+    host.getByRole("button", { name: "Create offline Wi-Fi" }),
+  ).toBeVisible();
+  await expect(gameQR).toBeHidden();
+  await host.goto(server.url + "/android-host?view=setup");
   await server.updateNetwork({ mode: "starting" });
-  await expect(host.getByText("Creating Wi-Fi…")).toBeVisible();
-  await expect(host.getByRole("link", { name: "Show game QR" })).toBeHidden();
+  await expect(
+    host.getByRole("button", { name: "Creating offline Wi-Fi…" }),
+  ).toBeDisabled();
   await server.updateNetwork({
     mode: "local-only",
     ip: "127.0.0.1",
     ssid: "TEST-OFFLINE",
     password: "test-wifi-pass",
   });
-  const wifiQR = host.getByAltText(
-    "Scan to join the offline Wi-Fi. Tap to enlarge.",
-  );
+  const wifiQR = host.getByAltText("Scan to join the offline Wi-Fi");
   await expect(wifiQR).toBeVisible();
   await expect(wifiQR).toHaveAttribute(
     "src",
@@ -74,22 +72,61 @@ try {
   await host.getByText("Enter Wi-Fi details manually").click();
   await expect(host.getByText("TEST-OFFLINE", { exact: true })).toBeVisible();
   await expect(host.getByText("test-wifi-pass", { exact: true })).toBeVisible();
-  await wifiQR.click();
-  await host.waitForURL("**/android-qr?kind=wifi");
-  await expect(
-    host.getByAltText("Join Wi-Fi QR", { exact: true }),
-  ).toBeVisible();
-  await host.getByRole("link", { name: "Back to pairing" }).click();
-  await host.getByRole("link", { name: "Show game QR" }).click();
+  await host.getByRole("button", { name: "Show game QR" }).click();
   await expect(gameQR).toBeVisible();
   await expect(host.getByText("test-wifi-pass", { exact: true })).toBeHidden();
+  await expect(host.getByText("2 · Join the game")).toBeVisible();
 
-  // A network change updates the URL on the open pairing page.
-  await server.updateNetwork({ mode: "lan" });
-  await expect(host.getByRole("link", { name: "Set up Wi-Fi" })).toBeVisible();
-  await expect(gameQR).toBeHidden();
   await server.updateNetwork({ mode: "lan", ip: "127.0.0.1" });
-  await expect(gameQR).toBeVisible();
+  await expect(host.getByText("2 · Join the game")).toBeHidden();
+
+  if (process.argv.includes("--table")) {
+    const tv = await context.newPage();
+    tv.on("pageerror", (error) => errors.push(error.message));
+    await tv.setViewportSize({ width: 760, height: 420 });
+    await tv.goto(server.url + "/");
+    const scene = tv.locator(".table-canvas");
+    await expect(scene).toHaveAttribute("data-scene-ready", "true", {
+      timeout: 90000,
+    });
+    if ((await scene.getAttribute("data-graphics-intro")) === "true")
+      await tv.keyboard.press("Escape");
+    await expect(scene).toHaveAttribute("data-graphics-intro", "false");
+    assert(!JSON.parse(await scene.getAttribute("data-ui-actions")).join);
+    await clickTV(tv, "settings");
+    await expect
+      .poll(
+        async () =>
+          !!JSON.parse(await scene.getAttribute("data-ui-actions"))[
+            "host-network"
+          ],
+      )
+      .toBe(true);
+    await tv.evaluate(() => {
+      window.hostTestCanvas = document.querySelector(".table-canvas canvas");
+    });
+    await clickTV(tv, "join");
+    const panel = tv.frameLocator(".android-host-panel iframe");
+    await expect(
+      panel.getByAltText("Scan to join the CrapsTV table"),
+    ).toBeVisible();
+    await expect(
+      panel.getByRole("button", { name: "Create offline Wi-Fi" }),
+    ).toBeHidden();
+    await panel.getByRole("button", { name: "Done" }).click();
+    await clickTV(tv, "host-network");
+    await expect(panel.getByText("Shared network ready")).toBeVisible();
+    await panel.getByRole("button", { name: "Done" }).click();
+    assert(
+      await tv.evaluate(
+        () =>
+          window.hostTestCanvas ===
+          document.querySelector(".table-canvas canvas"),
+      ),
+    );
+    await expect(scene).toHaveAttribute("data-graphics-intro", "false");
+    await tv.close();
+  }
   const cfg = await (
     await context.request.get(server.url + "/api/config")
   ).json();

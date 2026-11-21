@@ -7,6 +7,19 @@ import {
   TV_LABEL_MOTIONS,
 } from "../src/tv-layout.js";
 
+test("handheld settings use a wide, touch-sized layout in landscape and fit portrait", () => {
+  const desktop = createTVLayout(760, 420).panels.settings;
+  const handheld = createTVLayout(760, 420, { handheld: true }).panels.settings;
+  assert.equal(handheld.logicalWidth, 940);
+  assert(handheld.width >= 700);
+  assert(handheld.scale * 76 >= 48);
+  assert(handheld.width > desktop.width * 2);
+  const portrait = createTVLayout(360, 720, { handheld: true }).panels.settings;
+  assert.equal(portrait.logicalWidth, 540);
+  assert(portrait.x >= 8 && portrait.x + portrait.width <= 352);
+  assert(portrait.y + portrait.height <= 712);
+});
+
 test("label motion defaults to smooth and accepts only the three local presentation modes", () => {
   assert.equal(createTVLayout(1920, 1080).labelMotion, "smooth");
   for (const mode of TV_LABEL_MOTIONS) {

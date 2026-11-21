@@ -58,7 +58,7 @@ function isHost(req) {
 async function pair(req, res, url) {
   if (!isHost(req)) return send(res, 404, "text/plain", "Not found");
   res.setHeader("Cache-Control", "no-store");
-  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
   if (hostPaths.has(url.pathname))
     return send(res, 200, "text/html; charset=utf-8", pairingPage);
 

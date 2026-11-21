@@ -1,288 +1,251 @@
 package com.jtmedia.crapstv;
 
 import android.Manifest;
-import android.app.*;
-import android.content.*;
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.LocationManager;
 import android.net.Uri;
-import android.os.*;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
-import android.view.*;
-import android.webkit.*;
-import android.widget.*;
-import java.net.*;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
+import android.view.WindowManager;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
   private static final String HOST = "http://127.0.0.1:3000";
-  private WebView web;
-  private TextView loading;
-  private Button retry;
-  private boolean hostReady;
-  private boolean pendingHotspot;
+  private static final int WIFI_PERMISSION = 41;
+  private static final String STARTUP = """
+      <!doctype html><html lang="en"><meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>CrapsTV</title><style>
+      body{margin:0;background:#091a13;color:#f6ebd1;font:17px system-ui;
+           display:grid;place-items:center;min-height:100vh;text-align:center}
+      h1{font-size:32px;margin:0 0 8px;color:#eacc8d}
+      p{margin:0 0 18px;color:#c7d4cb}
+      a{display:inline-block;padding:12px 19px;border-radius:10px;color:#182920;background:#eacc8d;
+        text-decoration:none;font-weight:650}
+      a[hidden]{display:none}
+      </style><main><h1>CrapsTV</h1><p id="status">Opening the table…</p>
+      <a href="crapstv://host/retry" id="retry" hidden>Try again</a></main></html>
+      """;
+
   private final Handler handler = new Handler(Looper.getMainLooper());
-  private String wanted = "/android-host";
+  private WebView web;
+  private boolean pendingHotspot;
+  private boolean ready;
+
   @Override
   public void onCreate(Bundle state) {
     super.onCreate(state);
-    wanted = state == null ? "/android-host" : state.getString("view", "/android-host");
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    LinearLayout layout = new LinearLayout(this);
-    layout.setOrientation(LinearLayout.VERTICAL);
-    layout.setBackgroundColor(0xff0b1d17);
-    layout.setOnApplyWindowInsetsListener((view, insets) -> {
-      if (Build.VERSION.SDK_INT >= 30) {
-        android.graphics.Insets safe = insets.getInsets(
-            WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-        view.setPadding(safe.left, safe.top, safe.right, safe.bottom);
-      } else {
-        view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-            insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
-      }
-      return insets;
-    });
-    LinearLayout bar = new LinearLayout(this);
-    bar.setBackgroundColor(0xff142b21);
-    button(bar, "Pair", () -> navigate("/android-host"));
-    button(bar, "Table", () -> navigate("/"));
-    button(bar, "Settings", this::settings);
-    layout.addView(bar);
-    loading = new TextView(this);
-    loading.setTextSize(18);
-    loading.setGravity(Gravity.CENTER);
-    loading.setText("Starting the local table…");
-    layout.addView(loading, new LinearLayout.LayoutParams(-1, 0, 1));
-    retry = new Button(this);
-    retry.setText("Check again");
-    retry.setVisibility(View.GONE);
-    retry.setOnClickListener(v -> {
-      retry.setVisibility(View.GONE);
-      loading.setText("Checking the local table…");
-      waitForHost(0);
-    });
-    layout.addView(retry);
+    pendingHotspot = state != null && state.getBoolean("pendingHotspot");
     web = new WebView(this);
-    web.setVisibility(View.GONE);
-    web.setBackgroundColor(0xff0b1d17);
+    web.setBackgroundColor(0xff091a13);
     web.getSettings().setJavaScriptEnabled(true);
     web.getSettings().setDomStorageEnabled(true);
     web.getSettings().setAllowFileAccess(false);
     web.getSettings().setAllowContentAccess(false);
     web.setWebViewClient(new WebViewClient() {
       @Override
-      public void onPageStarted(WebView view, String url, android.graphics.Bitmap icon) {
-        if (url.startsWith(HOST + "/")) wanted = url.substring(HOST.length());
-        boolean full = url.startsWith(HOST + "/android-qr");
-        bar.setVisibility(full ? View.GONE : View.VISIBLE);
-        if (full)
-          getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        else
-          getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-      }
-      @Override
       public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-        Uri u = request.getUrl();
+        Uri destination = request.getUrl();
         String current = view.getUrl();
-        if (request.isForMainFrame() && "crapstv".equals(u.getScheme())
-            && "host".equals(u.getHost()) && current != null
-            && (current.startsWith(HOST + "/android-network")
-                || current.startsWith(HOST + "/android-host"))) {
-          switch (u.getPath() == null ? "" : u.getPath()) {
-            case "/offline":
-              chooseHotspot();
-              break;
-            case "/wifi":
-              openNetworkSettings(false);
-              break;
-            case "/hotspot":
-              openNetworkSettings(true);
-              break;
-          }
+        if (request.isForMainFrame() && "crapstv".equals(destination.getScheme())
+            && "host".equals(destination.getHost()) && current != null
+            && current.startsWith(HOST + "/")) {
+          String action = destination.getPath();
+          if (action != null) handleAction(action, destination);
           return true;
         }
-        return !("http".equals(u.getScheme()) && "127.0.0.1".equals(u.getHost())
-            && u.getPort() == 3000);
+        return !("http".equals(destination.getScheme())
+            && "127.0.0.1".equals(destination.getHost()) && destination.getPort() == 3000);
       }
     });
-    layout.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
-    setContentView(layout);
-    layout.requestApplyInsets();
+    setContentView(web);
+    web.loadDataWithBaseURL(HOST + "/startup", STARTUP, "text/html", "UTF-8", null);
     startForegroundService(new Intent(this, HostService.class));
-    pendingHotspot = state != null && state.getBoolean("pendingHotspot", false);
     waitForHost(0);
   }
-  private void button(LinearLayout bar, String text, Runnable action) {
-    Button b = new Button(this);
-    b.setText(text);
-    b.setAllCaps(false);
-    b.setOnClickListener(v -> action.run());
-    bar.addView(b, new LinearLayout.LayoutParams(0, -2, 1));
-  }
-  private void waitForHost(int attempt) {
-    new Thread(() -> {
-      boolean ready = false;
-      try {
-        HttpURLConnection c =
-            (HttpURLConnection) new URL(HOST + "/api/config").openConnection();
-        c.setConnectTimeout(700);
-        c.setReadTimeout(700);
-        ready = c.getResponseCode() == 200;
-        c.disconnect();
-      } catch (Exception ignored) {
+
+  private void fullScreen() {
+    if (Build.VERSION.SDK_INT >= 30) {
+      getWindow().setDecorFitsSystemWindows(false);
+      WindowInsetsController bars = getWindow().getInsetsController();
+      if (bars != null) {
+        bars.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        bars.hide(WindowInsets.Type.systemBars());
       }
-      final boolean ok = ready;
+    } else {
+      getWindow().getDecorView().setSystemUiVisibility(
+          View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+              | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+              | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+    }
+  }
+
+  @Override
+  public void onWindowFocusChanged(boolean focused) {
+    super.onWindowFocusChanged(focused);
+    if (focused) fullScreen();
+  }
+
+  private void waitForHost(int attempts) {
+    new Thread(() -> {
+      boolean reachable = false;
+      try {
+        HttpURLConnection connection = (HttpURLConnection) new URL(HOST + "/api/config").openConnection();
+        connection.setConnectTimeout(700);
+        connection.setReadTimeout(700);
+        try {
+          reachable = connection.getResponseCode() == 200;
+        } finally {
+          connection.disconnect();
+        }
+      } catch (Exception ignored) {
+        // The bundled server is still coming up.
+      }
+      final boolean connected = reachable;
       handler.post(() -> {
-        if (isFinishing() || isDestroyed())
-          return;
-        if (ok) {
-          hostReady = true;
-          loading.setVisibility(View.GONE);
-          retry.setVisibility(View.GONE);
-          web.setVisibility(View.VISIBLE);
-          navigate(wanted);
-        } else if (attempt < 60)
-          handler.postDelayed(() -> waitForHost(attempt + 1), 1000);
-        else {
-          loading.setText("The local table hasn’t started. Check again, or use Settings to stop and reopen.");
-          retry.setVisibility(View.VISIBLE);
+        if (isFinishing() || isDestroyed() || ready) return;
+        if (connected) {
+          ready = true;
+          web.loadUrl(HOST + "/");
+        } else if (attempts < 60) {
+          handler.postDelayed(() -> waitForHost(attempts + 1), 1000);
+        } else {
+          web.evaluateJavascript(
+              "document.getElementById('status').textContent='The local table hasn’t started.';"
+              + "document.getElementById('retry').hidden=false;", null);
         }
       });
-    }).start();
+    }, "crapstv-check").start();
   }
-  private void navigate(String path) {
-    wanted = path;
-    if (hostReady) web.loadUrl(HOST + path);
+
+  private void handleAction(String action, Uri destination) {
+    if ("/retry".equals(action) && !ready) {
+      web.evaluateJavascript("document.getElementById('retry').hidden=true;", null);
+      waitForHost(0);
+      return;
+    }
+    if (!ready) return;
+    switch (action) {
+      case "/offline":
+        chooseHotspot();
+        break;
+      case "/wifi":
+        service("USE_LAN");
+        openSettings(new Intent(Settings.ACTION_WIFI_SETTINGS));
+        break;
+      case "/hotspot":
+        service("USE_SYSTEM_HOTSPOT");
+        openSettings(new Intent("android.settings.TETHER_SETTINGS"));
+        break;
+      case "/location":
+        openSettings(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+        break;
+      case "/app-settings":
+        openSettings(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:" + getPackageName())));
+        break;
+      case "/address":
+        String ip = destination.getQueryParameter("ip");
+        if (ip != null && (ip.isEmpty() || validIPv4(ip)))
+          getSharedPreferences("host", 0).edit().putString("ip", ip).apply();
+        break;
+      case "/stop":
+        service("STOP");
+        break;
+    }
   }
-  private void openNetworkSettings(boolean hotspot) {
-    startForegroundService(new Intent(this, HostService.class)
-        .setAction(hotspot ? "USE_SYSTEM_HOTSPOT" : "USE_LAN"));
-    navigate("/android-network");
+
+  private void service(String action) {
+    startForegroundService(new Intent(this, HostService.class).setAction(action));
+  }
+
+  private void openSettings(Intent intent) {
     try {
-      startActivity(new Intent(hotspot ? "android.settings.TETHER_SETTINGS" : Settings.ACTION_WIFI_SETTINGS));
-    } catch (ActivityNotFoundException e) {
+      startActivity(intent);
+    } catch (ActivityNotFoundException ignored) {
       startActivity(new Intent(Settings.ACTION_WIRELESS_SETTINGS));
     }
   }
+
+  private String hotspotPermission() {
+    return Build.VERSION.SDK_INT >= 33
+        ? Manifest.permission.NEARBY_WIFI_DEVICES : Manifest.permission.ACCESS_FINE_LOCATION;
+  }
+
   private boolean locationEnabled() {
-    if (Build.VERSION.SDK_INT >= 28) return getSystemService(LocationManager.class).isLocationEnabled();
+    if (Build.VERSION.SDK_INT >= 28)
+      return getSystemService(LocationManager.class).isLocationEnabled();
     return Settings.Secure.getInt(getContentResolver(), Settings.Secure.LOCATION_MODE, 0) != 0;
   }
-  private void chooseHotspot() {
-    String permission = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.NEARBY_WIFI_DEVICES
-                                                    : Manifest.permission.ACCESS_FINE_LOCATION;
-    if (checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
-      pendingHotspot = false;
-      if (Build.VERSION.SDK_INT <= 32 && !locationEnabled()) {
-        new AlertDialog.Builder(this)
-            .setTitle("Turn on Location")
-            .setMessage("This Android version requires Location to create offline Wi-Fi. Turn it on, then tap Create offline Wi-Fi again.")
-            .setPositiveButton("Open settings", (d, w) ->
-                startActivity(new Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)))
-            .setNegativeButton("Use another network", null)
-            .show();
-        return;
-      }
-      startForegroundService(new Intent(this, HostService.class).setAction("HOTSPOT"));
-      navigate("/android-network");
-      return;
-    }
-    pendingHotspot = true;
-    requestPermissions(Build.VERSION.SDK_INT >= 33 ? new String[] {permission}
-        : new String[] {Manifest.permission.ACCESS_COARSE_LOCATION, permission}, 41);
+
+  private void help(String reason) {
+    web.evaluateJavascript("window.dispatchEvent(new CustomEvent('crapstv:network-help',"
+        + "{detail:" + JSONObject.quote(reason) + "}))", null);
   }
-  @Override
-  public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
-    super.onRequestPermissionsResult(request, permissions, results);
-    if (request != 41)
-      return;
-    String permission = Build.VERSION.SDK_INT >= 33 ? Manifest.permission.NEARBY_WIFI_DEVICES
-                                                    : Manifest.permission.ACCESS_FINE_LOCATION;
-    if (pendingHotspot && checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED) {
-      chooseHotspot();
+
+  private void chooseHotspot() {
+    String permission = hotspotPermission();
+    if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
+      pendingHotspot = true;
+      requestPermissions(Build.VERSION.SDK_INT >= 33 ? new String[] {permission}
+          : new String[] {Manifest.permission.ACCESS_COARSE_LOCATION, permission}, WIFI_PERMISSION);
       return;
     }
     pendingHotspot = false;
-    new AlertDialog.Builder(this)
-        .setTitle("Wi-Fi permission needed")
-        .setMessage(
-            "Android requires this permission to create your local network. Choose Retry, or "
-            + "enable it in App Settings. On Android 8–12, Location services must also be on.")
-        .setPositiveButton("Retry", (d, w) -> chooseHotspot())
-        .setNeutralButton("App Settings",
-            (d, w)
-                -> startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                    Uri.parse("package:" + getPackageName()))))
-        .setNegativeButton("Cancel", null)
-        .show();
+    if (Build.VERSION.SDK_INT <= 32 && !locationEnabled()) {
+      help("location");
+      return;
+    }
+    service("HOTSPOT");
   }
-  private void settings() {
-    new AlertDialog.Builder(this)
-        .setTitle("Host Settings")
-        .setItems(new String[] {"Wi-Fi setup", "Choose host IP address", "Stop session"},
-            (d, which) -> {
-              if (which == 0)
-                navigate("/android-network");
-              if (which == 1) {
-                EditText ip = new EditText(this);
-                ip.setSingleLine();
-                ip.setHint("IPv4 address, or blank for automatic");
-                ip.setText(getSharedPreferences("host", 0).getString("ip", ""));
-                new AlertDialog.Builder(this)
-                    .setTitle("Host address (advanced)")
-                    .setView(ip)
-                    .setMessage("Use the hotspot host IPv4 address shown by Android. Leave blank "
-                                + "to detect automatically.")
-                    .setPositiveButton("Save",
-                        (a, b) -> {
-                          String value = ip.getText().toString().trim();
-                          if (!value.isEmpty() && !validIPv4(value)) {
-                            Toast.makeText(this, "Enter a valid IPv4 address", Toast.LENGTH_LONG)
-                                .show();
-                            return;
-                          }
-                          getSharedPreferences("host", 0).edit().putString("ip", value).apply();
-                          navigate("/android-host");
-                        })
-                    .setNegativeButton("Cancel", null)
-                    .show();
-              }
-              if (which == 2)
-                new AlertDialog.Builder(this)
-                    .setMessage("Stop hosting? All guests will disconnect and this room will end.")
-                    .setPositiveButton("Stop",
-                        (a, b)
-                            -> startService(new Intent(this, HostService.class).setAction("STOP")))
-                    .setNegativeButton("Cancel", null)
-                    .show();
-            })
-        .show();
+
+  @Override
+  public void onRequestPermissionsResult(int request, String[] permissions, int[] results) {
+    super.onRequestPermissionsResult(request, permissions, results);
+    if (request != WIFI_PERMISSION || !pendingHotspot) return;
+    pendingHotspot = false;
+    if (checkSelfPermission(hotspotPermission()) == PackageManager.PERMISSION_GRANTED)
+      chooseHotspot();
+    else
+      help("permission");
   }
+
   private boolean validIPv4(String ip) {
     String[] parts = ip.split("\\.", -1);
-    if (parts.length != 4)
-      return false;
-    try {
-      for (String p : parts)
-        if (!p.matches("\\d{1,3}") || Integer.parseInt(p) > 255)
-          return false;
-      return true;
-    } catch (Exception e) {
-      return false;
-    }
+    if (parts.length != 4) return false;
+    for (String part : parts)
+      if (!part.matches("\\d{1,3}") || Integer.parseInt(part) > 255) return false;
+    return true;
   }
+
   @Override
   public void onBackPressed() {
-    if (web.canGoBack())
-      web.goBack();
-    else
-      super.onBackPressed();
+    web.evaluateJavascript("window.dispatchEvent(new Event('crapstv:back',{cancelable:true}))",
+        (unhandled) -> {
+          if (!"false".equals(unhandled)) super.onBackPressed();
+        });
   }
+
   @Override
   public void onSaveInstanceState(Bundle state) {
     state.putBoolean("pendingHotspot", pendingHotspot);
-    state.putString("view", wanted);
     super.onSaveInstanceState(state);
   }
+
   @Override
   public void onDestroy() {
     handler.removeCallbacksAndMessages(null);

@@ -6,29 +6,30 @@ No account or internet connection is needed on the host or the guest devices.
 
 ## Start a table
 
-Open **CrapsTV Offline**. **Pair** shows the host’s pairing screen, **Table** opens
-the 3D display, and **Play on this device** opens a player controller on the host.
+Open **CrapsTV Offline** to see the full-screen table. Open the gear for
+**Pair players** and **Wi-Fi & hosting**. Closing either panel returns to the
+same table.
 
-- **Shared Wi-Fi** — Connect all devices to the same network. Open **Pair** and have
-  players scan the game QR. Tap the QR to enlarge it. Players can also enter the
-  address under **Enter the game link manually**.
-- **No shared Wi-Fi** — Open **Pair → Join Wi-Fi → Create offline Wi-Fi**. Android
+- **Shared Wi-Fi** — Connect all devices to the same network. Open
+  **Settings → Pair players** and have players scan the game QR. The manual link
+  section also gives you a TV display address for another screen.
+- **No shared Wi-Fi** — The app opens network setup. Choose **Create offline Wi-Fi**. Android
   13 and newer use the **Nearby devices** permission. Android 8–12 use precise
   Location permission and require Location to be on. Scan the Wi-Fi QR from the
   guest phones first, then tap **Show game QR**. If a guest phone says the network
   has no internet, choose **Stay connected**.
-- **Android hotspot** — If the phone cannot create offline Wi-Fi, choose **Use
-  my phone’s hotspot** in **Join Wi-Fi**. Turn on the Android hotspot, have guests
+- **Android hotspot** — If the device cannot create offline Wi-Fi, choose **Use
+  Android hotspot** under **Other ways to connect**. Turn it on, have guests
   join it, then return for the game QR. An ordinary hotspot can share mobile data
   if it’s enabled.
 
-Players enter names and the first player opens the table. Use **Settings → Stop
-session** when finished. Wi-Fi credentials are served only to the host’s pairing
+Players enter names and the first player opens the table. Use **Settings →
+Wi-Fi & hosting → Stop hosting** when finished. Wi-Fi credentials are served only to the host’s pairing
 screen over the device’s loopback connection.
 
 If a guest cannot load the link, check that both devices are on the same network.
 Some guest networks isolate devices. Try the host’s offline Wi-Fi or a different
-shared network. **Settings → Choose host IP address** can override the detected
+shared network. **Settings → Wi-Fi & hosting → Host address** can override the detected
 IPv4 address when Android exposes more than one interface. Leave it blank to
 detect automatically.
 

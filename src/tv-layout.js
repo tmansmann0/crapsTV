@@ -83,6 +83,7 @@ export function createTVLayout(
     maxTextureSize = 4096,
     uiSize = "compact",
     labelMotion = "smooth",
+    handheld = false,
   } = {},
 ) {
   width = Math.max(1, Number.isFinite(width) ? width : 1920);
@@ -109,8 +110,8 @@ export function createTVLayout(
     y,
     localScale = scale,
     logicalWidth = PANEL_SIZES[id][0],
+    logicalHeight = PANEL_SIZES[id][1],
   ) {
-    const logicalHeight = PANEL_SIZES[id][1];
     const density = Math.min(
       localScale * pixelRatio,
       maxTextureSize / logicalWidth,
@@ -129,33 +130,37 @@ export function createTVLayout(
       backingHeight: Math.max(1, Math.ceil(logicalHeight * density)),
     };
   }
-  place("settingsButton", marginX, marginY);
+  place(
+    "settingsButton",
+    marginX,
+    marginY,
+    handheld ? Math.max(scale, 0.5) : scale,
+  );
   place("brand", marginX + 108 * scale, marginY);
   place(
     "join",
     width - marginX - 600 * scale,
     compact ? marginY + 110 * scale : marginY,
   );
-  place(
-    "settings",
-    marginX,
-    marginY + 110 * scale,
-    Math.min(
-      scale,
-      (width - marginX * 2) / 540,
-      (height - marginY * 2 - 110 * scale) / 722,
-    ),
-  );
-  place(
-    "graphics",
-    marginX,
-    marginY + 110 * scale,
-    Math.min(
-      scale,
-      (width - marginX * 2) / 640,
-      (height - marginY * 2 - 110 * scale) / 710,
-    ),
-  );
+  for (const id of ["settings", "graphics"]) {
+    const wide = handheld && id === "settings" && width >= height * 1.25;
+    const [panelWidth, panelHeight] = wide ? [940, 478] : PANEL_SIZES[id];
+    const panelY = handheld ? 8 : marginY + 110 * scale;
+    const panelScale = Math.min(
+      handheld ? 1.1 : scale,
+      (width - (handheld ? 16 : marginX * 2)) / panelWidth,
+      (height - panelY - (handheld ? 8 : marginY)) /
+        (!handheld && id === "settings" ? 722 : panelHeight),
+    );
+    place(
+      id,
+      handheld ? (width - panelWidth * panelScale) / 2 : marginX,
+      panelY,
+      panelScale,
+      panelWidth,
+      panelHeight,
+    );
+  }
   const statusWidth = compact ? 700 : 1100;
   const statusScale = Math.min(scale, (width - marginX * 2) / statusWidth);
   place(

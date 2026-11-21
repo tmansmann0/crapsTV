@@ -248,6 +248,7 @@ export function createSceneUI(renderer, onAction) {
     } = current;
     let p = panels.brand,
       c = begin(p, false);
+    p.mesh.visible = !current.handheld;
     if (logo) {
       const w = 250,
         h = w / (logo.width / logo.height);
@@ -255,7 +256,8 @@ export function createSceneUI(renderer, onAction) {
     }
     finish(p);
     p = panels.settingsButton;
-    p.mesh.visible = !current.hideSettings;
+    p.mesh.visible =
+      !current.hideSettings && (!current.handheld || !settingsOpen);
     c = begin(p);
     gear(c, 44, 44, 25);
     p.mesh.userData.buttons = [
@@ -266,7 +268,20 @@ export function createSceneUI(renderer, onAction) {
     p = panels.settings;
     p.mesh.visible = !!settingsOpen && settingsPage === "main";
     c = begin(p);
-    text(c, "TABLE SETTINGS", 28, 49, 36, C.gold, 700);
+    if (current.handheld && logo) {
+      const w = 148;
+      const h = (w * logo.height) / logo.width;
+      c.drawImage(logo, 22, (76 - h) / 2, w, h);
+    }
+    text(
+      c,
+      current.handheld ? "SETTINGS" : "TABLE SETTINGS",
+      current.handheld && logo ? 191 : 28,
+      49,
+      36,
+      C.gold,
+      700,
+    );
     text(c, "×", p.w - 54, 51, 42, C.muted);
     p.mesh.userData.buttons = [
       { x: p.w - 88, y: 0, w: 88, h: 76, action: "settings" },
@@ -275,25 +290,38 @@ export function createSceneUI(renderer, onAction) {
       ["sound", "Announcer", sound ? "ON" : "OFF"],
       ["camera", "Camera", (cameraMode || "auto").toUpperCase()],
       ["copy", "Copy invite", "↗"],
-      ["join", "Phone controller", "↗"],
-      ["fullscreen", "Fullscreen", "⛶"],
+      current.handheld
+        ? ["join", "Pair players", "›"]
+        : ["join", "Phone controller", "↗"],
+      current.handheld
+        ? ["host-network", "Wi-Fi & hosting", "›"]
+        : ["fullscreen", "Fullscreen", "⛶"],
       ["graphics", "Graphics", "›"],
       ["ui-size", "UI size", uiSize === "large" ? "LARGE" : "COMPACT"],
       ["labels", "Labels", labelMotion.toUpperCase()],
       ["audio", "Table audio", "›"],
     ];
+    const rowsPerColumn = p.w > 540 ? 5 : rows.length;
+    const columnWidth = p.w > 540 ? p.w / 2 : p.w;
     rows.forEach(([action, label, value], i) => {
-      const y = 92 + i * 76;
+      const x = Math.floor(i / rowsPerColumn) * columnWidth;
+      const y = 92 + (i % rowsPerColumn) * 76;
       c.strokeStyle = C.line;
       c.beginPath();
-      c.moveTo(26, y - 10);
-      c.lineTo(p.w - 26, y - 10);
+      c.moveTo(x + 26, y - 10);
+      c.lineTo(x + columnWidth - 26, y - 10);
       c.stroke();
-      text(c, label, 28, y + 32, TV_TYPE.setting);
+      text(c, label, x + 28, y + 32, TV_TYPE.setting);
       c.textAlign = "right";
-      text(c, value, p.w - 30, y + 32, 38, C.gold, 600);
+      text(c, value, x + columnWidth - 30, y + 32, 38, C.gold, 600);
       c.textAlign = "left";
-      p.mesh.userData.buttons.push({ x: 0, y: y - 10, w: p.w, h: 76, action });
+      p.mesh.userData.buttons.push({
+        x,
+        y: y - 10,
+        w: columnWidth,
+        h: 76,
+        action,
+      });
     });
     finish(p);
 
@@ -479,7 +507,10 @@ export function createSceneUI(renderer, onAction) {
     finish(p);
 
     p = panels.join;
-    p.mesh.visible = !!current.joinURL && (!settingsOpen || !layout.compact);
+    p.mesh.visible =
+      !current.handheld &&
+      !!current.joinURL &&
+      (!settingsOpen || !layout.compact);
     c = begin(p);
     // A compact invitation: the room code leads, with the QR isolated in a
     // warm paper inset so the two ways to join have distinct visual groups.
@@ -727,6 +758,7 @@ export function createSceneUI(renderer, onAction) {
     layout = createTVLayout(w, h, {
       uiSize,
       labelMotion,
+      handheld: current.handheld,
       pixelRatio: renderer.getPixelRatio?.() || 1,
       maxTextureSize: renderer.capabilities?.maxTextureSize || 4096,
     });
@@ -762,6 +794,7 @@ export function createSceneUI(renderer, onAction) {
   }
   function update(next) {
     if (!next.settingsOpen && current.settingsOpen) settingsPage = "main";
+    const newLayout = !!next.handheld !== !!current.handheld;
     current = {
       ...next,
       bettingSeconds: Math.max(
@@ -812,7 +845,7 @@ export function createSceneUI(renderer, onAction) {
         focusPlayer?.bets?.map((bet) => bet.amount),
       next.state?.players.map((p) => [p.id, p.name]),
     ]);
-    if (next.joinURL && next.joinURL !== qrURL && next.code) {
+    if (!next.handheld && next.joinURL && next.joinURL !== qrURL && next.code) {
       qrURL = next.joinURL;
       const canvas = document.createElement("canvas");
       QRCode.toCanvas(canvas, qrURL, {
@@ -829,6 +862,7 @@ export function createSceneUI(renderer, onAction) {
         })
         .catch(() => {});
     }
+    if (newLayout) resize(layout.width, layout.height);
     if (key !== lastKey) {
       lastKey = key;
       redraw();

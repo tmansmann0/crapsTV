@@ -10,6 +10,10 @@ android {
         versionName '0.17.0-offline-preview'
     }
     buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
     androidResources { noCompress += ["zip"] }
     packaging { jniLibs { useLegacyPackaging true } }
 }

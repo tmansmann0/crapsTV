@@ -296,6 +296,7 @@ public class HostService extends Service {
       s.put("password", password);
       s.put("ip", preferred);
       s.put("addresses", new JSONArray(addresses));
+      s.put("override", addresses.contains(override) ? override : "");
       s.put("message", systemHotspot && !preferred.isEmpty() ?
             "Guests join your Android hotspot, then scan the game QR." : message);
       root.mkdirs();
