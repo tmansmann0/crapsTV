@@ -45,7 +45,7 @@ The current scene uses `EXRLoader` with `casino-room.exr` for both background an
 
 - Classic: place 4/10 pays 9:5, 5/9 pays 7:5, 6/8 pays 7:6. The don't side bars 12.
 - Crapless: additional place 2/12 pays 11:2; 3/11 pays 11:4. The don't side is omitted. Seven wins the come-out; every other total establishes a point.
-- Field: 2 pays double, 12 pays triple; the ordinary winning field numbers pay 1:1.
+- Field: 2 and 12 pay 2:1. The other winning Field numbers pay 1:1.
 - Hardways: 4/10 pays 7:1, 6/8 pays 9:1. One-roll amounts on the classic board are profit payouts.
 
 ## Rebuild

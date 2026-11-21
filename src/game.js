@@ -58,6 +58,7 @@ export const BONUS_NUMBERS = {
   "bonus-tall": [8, 9, 10, 11, 12],
   "bonus-all": ALL_POINTS,
 };
+export const MAX_BANKROLL_ADJUSTMENT = 100000000;
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 const oddsRatio = (numerator, denominator) => {
   const divisor = gcd(numerator, denominator);
@@ -167,10 +168,13 @@ export function equity(p) {
   return p.bank + p.bets.reduce((n, b) => n + b.amount, 0);
 }
 export function net(p) {
-  return equity(p) - p.buyIn;
+  const { added = 0, removed = 0 } = p.bankrollAdjustments ?? {};
+  return equity(p) - p.buyIn - added + removed;
 }
 export function drinkOfferBudget(player) {
-  return Math.max(0, Math.min(player.bank, net(player)));
+  // Withdrawn winnings no longer fund drinks, while the recap still records them.
+  const hostWithdrawals = player.bankrollAdjustments?.removed ?? 0;
+  return Math.max(0, Math.min(player.bank, net(player) - hostWithdrawals));
 }
 export function drinkOfferLimit(player, price) {
   return price > 0 ? Math.floor(drinkOfferBudget(player) / price) : 0;
@@ -273,9 +277,9 @@ export function catalogue(state, player) {
       id: "field",
       name: "Field",
       group: "One roll",
-      payout: "1:1 · 2 pays 2:1 · 12 pays 3:1",
+      payout: "1:1 · 2 pays 2:1 · 12 pays 2:1",
       prob: 16 / 36,
-      edge: 2.778,
+      edge: 5.556,
       description:
         "Win on 2, 3, 4, 9, 10, 11 or 12. Resolves on the very next roll.",
       available: true,
@@ -810,6 +814,52 @@ export function reup(s, id) {
   });
   log(s, `${p.name} is back in the game.`, "reup");
 }
+export function adjustBankroll(s, id, playerId, amount) {
+  admin(s, id);
+  const host = active(s, id);
+  assert(!host.bot, "Only a human host can adjust chips.");
+  betting(s);
+  const player = s.players.find((p) => p.id === playerId && !p.left);
+  assert(player, "Choose a player at the table.");
+  assert(
+    Number.isSafeInteger(amount) &&
+      amount !== 0 &&
+      Math.abs(amount) <= MAX_BANKROLL_ADJUSTMENT,
+    "Enter an adjustment from $0.01 to $1,000,000.",
+  );
+  assert(player.bank + amount >= 0, "Only available chips can be removed.");
+  const prior = player.bankrollAdjustments;
+  const added = (prior?.added ?? 0) + Math.max(0, amount);
+  const removed = (prior?.removed ?? 0) + Math.max(0, -amount);
+  const nextEquity = equity(player) + amount;
+  assert(
+    Number.isSafeInteger(nextEquity) &&
+      Number.isSafeInteger(player.buyIn + added) &&
+      Number.isSafeInteger(removed) &&
+      Number.isSafeInteger(nextEquity - player.buyIn - added + removed),
+    "That adjustment is too large.",
+  );
+
+  player.bank += amount;
+  player.bankrollAdjustments = { added, removed };
+  player.betPreview = null;
+  const change = amount > 0 ? "added" : "removed";
+  const value = money(Math.abs(amount));
+  player.history.push({
+    roll: s.rolls.length,
+    equity: nextEquity,
+    net: net(player),
+    event: `Host ${change} ${value}`,
+    adjustment: amount,
+    adminId: host.id,
+    at: Date.now(),
+  });
+  log(
+    s,
+    `${host.name} ${change} ${value} ${amount > 0 ? "for" : "from"} ${player.name}.`,
+    "bankroll-adjustment",
+  );
+}
 function drinkPlayer(s, id) {
   const player = active(s, id);
   assert(!player.bot && player.connected, "Choose a connected human player.");
@@ -1229,7 +1279,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
         settleBet(
           b,
           [2, 3, 4, 9, 10, 11, 12].includes(total) ? "win" : "lose",
-          total === 2 ? 2 : total === 12 ? 3 : 1,
+          total === 2 || total === 12 ? 2 : 1,
         );
     }
     p.stats.rolls++;

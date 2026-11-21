@@ -63,9 +63,9 @@ test("Android bundle serves offline assets, both QR steps and shared shooter aut
       cfg.code,
     );
   }
-  function client() {
-    const ws = new WebSocket(`ws://127.0.0.1:${host.port}/socket`, {
-        origin: host.url,
+  function client(hosted = host) {
+    const ws = new WebSocket(`ws://127.0.0.1:${hosted.port}/socket`, {
+        origin: hosted.url,
       }),
       messages = [];
     ws.on("message", (d) => messages.push(JSON.parse(d)));
@@ -104,5 +104,29 @@ test("Android bundle serves offline assets, both QR steps and shared shooter aut
   assert.equal(
     await new Promise((r) => bad.on("close", (code) => r(code))),
     1008,
+  );
+  a.send({ type: "save-session" });
+  const saved = await until(() => a.messages.find((m) => m.state?.pausedAt));
+  const replacement = await host.replacePayload();
+  const restoredConfig = await (
+    await fetch(replacement.url + "/api/config")
+  ).json();
+  assert.equal(restoredConfig.code, cfg.code);
+  const returning = client(replacement);
+  await until(() => returning.ws.readyState === WebSocket.OPEN);
+  returning.send({ type: "join", code: cfg.code, token: alice.token });
+  const resumedHost = await until(() =>
+    returning.messages.find((m) => m.type === "welcome"),
+  );
+  assert.equal(resumedHost.playerId, alice.playerId);
+  const restored = await until(() =>
+    returning.messages.find((m) => m.state?.pausedAt),
+  );
+  assert.deepEqual(restored.state.rolls, saved.state.rolls);
+  returning.send({ type: "resume-session" });
+  await until(() =>
+    returning.messages.find(
+      (m) => m.state?.status === "playing" && !m.state.pausedAt,
+    ),
   );
 });

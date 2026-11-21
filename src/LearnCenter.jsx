@@ -290,7 +290,7 @@ function lessonsFor(mode, branch) {
           hot: "field",
         }),
         frame(
-          `${fieldTotal} lands. ${fieldTotal === 8 ? "That misses the Field." : fieldTotal === 2 ? "2 pays double profit." : "12 pays triple profit."}`,
+          `${fieldTotal} lands. ${fieldTotal === 8 ? "That misses the Field." : "The Field pays double profit."}`,
           {
             dice:
               fieldTotal === 2 ? [1, 1] : fieldTotal === 12 ? [6, 6] : [4, 4],

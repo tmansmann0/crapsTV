@@ -52,7 +52,7 @@ public class HostService extends Service {
         new Notification.Builder(this, "hosting")
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setContentTitle("crapsTV local host")
-            .setContentText("Keep this host running for guests. Stop ends the room.")
+            .setContentText("Keep hosting for guests. Save from Host controls to resume later.")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(new Notification.Action.Builder(null, "Stop session", stop).build())

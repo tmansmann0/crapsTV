@@ -37,6 +37,7 @@ import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import TableAudioDialog from "./TableAudioDialog.jsx";
+import SavedTable, { ReconnectSeat } from "./SavedTable.jsx";
 import { normalizeTableAudio } from "./table-audio-settings.js";
 import AndroidHostPanel from "./AndroidHostPanel.jsx";
 import {
@@ -50,6 +51,7 @@ import {
   detectLocal,
   localTransport,
   onlineTransport,
+  readOnlineRoomSave,
   newCode,
 } from "./transport.js";
 import "@fontsource/dm-sans/latin-400.css";
@@ -74,6 +76,26 @@ const save = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch {}
+};
+const SESSION_CONFIRM = {
+  end: {
+    title: "Close the table?",
+    detail:
+      "Everyone gets their remaining chips back and a personal recap. This ends the session for all players.",
+    button: "Close for everyone",
+  },
+  leave: {
+    title: "Cash out for the night?",
+    detail:
+      "Your open bets are returned to your stack. Your recap is ready to save when you leave.",
+    button: "Cash out",
+  },
+  "save-session": {
+    title: "Save and close the table?",
+    detail:
+      "Play pauses with the same players, balances and bets. Once the table says it’s saved, you can close or update the host. Open this controller again to resume.",
+    button: "Save and close",
+  },
 };
 function Brand() {
   return (
@@ -248,7 +270,18 @@ function App() {
       } else if (route.controller && initialCode) {
         setSession({ kind: "online-join", code: initialCode });
       } else if (!route.controller) {
-        setSession({ kind: "online-host", code: newCode() });
+        try {
+          const restored = readOnlineRoomSave();
+          setSession({
+            kind: "online-host",
+            code: restored?.state.code ?? newCode(),
+            restored,
+          });
+        } catch (error) {
+          // Keep an incompatible save intact so a newer app can recover it.
+          setSession({ kind: "online-host", code: newCode(), canSave: false });
+          toast(error.message);
+        }
       }
       setChecking(false);
     });
@@ -362,6 +395,7 @@ function App() {
             session.kind === "online-host",
             onMessage,
             onStatus,
+            { restored: session.restored, canSave: session.canSave },
           );
     return () => {
       clockTimers.forEach(clearTimeout);
@@ -459,6 +493,10 @@ function App() {
     }
   }, [status, state?.code]);
   const roomCode = state?.code || session?.code || "";
+  const savedSeat =
+    state?.pausedAt && player ? getSaved("crapstv:" + roomCode) : null;
+  const reconnectSeat = (token) =>
+    send({ type: "join", code: roomCode, token, reclaim: true });
   const kiosk =
     !route.controller &&
     (session?.kiosk === true ||
@@ -545,11 +583,13 @@ function App() {
           )}
           <p role="status">
             {status}. Room {roomCode}.{" "}
-            {state?.status === "ended"
-              ? "Session closed"
-              : state?.point
-                ? `Point ${state.point}`
-                : "Come out"}
+            {state?.pausedAt
+              ? "Table saved"
+              : state?.status === "ended"
+                ? "Session closed"
+                : state?.point
+                  ? `Point ${state.point}`
+                  : "Come out"}
             .
           </p>
           <button onClick={() => sceneAction("join")}>
@@ -645,6 +685,15 @@ function App() {
           <h1>Connecting</h1>
           <p>{error || "Connecting to the table…"}</p>
         </main>
+      ) : state?.pausedAt && !player?.left ? (
+        <SavedTable
+          player={player}
+          isAdmin={isAdmin}
+          token={savedSeat?.playerId === playerId ? savedSeat.token : null}
+          connected={status === "connected"}
+          onResume={() => send({ type: "resume-session" })}
+          onReconnect={reconnectSeat}
+        />
       ) : !player ? (
         <Join
           state={state}
@@ -653,6 +702,8 @@ function App() {
           code={joinCode}
           setCode={setJoinCode}
           join={join}
+          connected={status === "connected"}
+          reconnectSeat={reconnectSeat}
         />
       ) : state.status === "ended" || player.left ? (
         <main className="recap-page">
@@ -693,18 +744,23 @@ function App() {
           fallbackJoinURL={fallbackJoinLink}
         />
       )}
-      {adminAudio && isAdmin && player && !player.left && state?.status !== "ended" && (
-        <TableAudioDialog
-          settings={adminAudio}
-          onChange={setAdminAudio}
-          canApply={status === "connected"}
-          onApply={() => {
-            send({ type: "display", settings: { audio: adminAudio } });
-            setAdminAudio(null);
-          }}
-          onClose={() => setAdminAudio(null)}
-        />
-      )}
+      {adminAudio &&
+        isAdmin &&
+        player &&
+        !player.left &&
+        !state?.pausedAt &&
+        state?.status !== "ended" && (
+          <TableAudioDialog
+            settings={adminAudio}
+            onChange={setAdminAudio}
+            canApply={status === "connected"}
+            onApply={() => {
+              send({ type: "display", settings: { audio: adminAudio } });
+              setAdminAudio(null);
+            }}
+            onClose={() => setAdminAudio(null)}
+          />
+        )}
       {confirm && (
         <dialog
           ref={confirmDialog}
@@ -713,14 +769,8 @@ function App() {
           onCancel={() => setConfirm(null)}
         >
           <div className="eyebrow">LAST CALL</div>
-          <h2 id="confirm-title">
-            {confirm === "end" ? "Close the table?" : "Cash out for the night?"}
-          </h2>
-          <p>
-            {confirm === "end"
-              ? "Everyone gets their remaining chips back and a personal recap. This ends the session for all players."
-              : "Your open bets are returned to your stack. Your recap is ready to save when you leave."}
-          </p>
+          <h2 id="confirm-title">{SESSION_CONFIRM[confirm].title}</h2>
+          <p>{SESSION_CONFIRM[confirm].detail}</p>
           <div className="button-row">
             <button className="button outline" onClick={() => setConfirm(null)}>
               Keep playing
@@ -732,7 +782,7 @@ function App() {
                 setConfirm(null);
               }}
             >
-              {confirm === "end" ? "Close for everyone" : "Cash out"}
+              {SESSION_CONFIRM[confirm].button}
             </button>
           </div>
         </dialog>
@@ -740,7 +790,16 @@ function App() {
     </>
   );
 }
-function Join({ state, name, setName, code, setCode, join }) {
+function Join({
+  state,
+  name,
+  setName,
+  code,
+  setCode,
+  join,
+  connected,
+  reconnectSeat,
+}) {
   return (
     <main className="join-page">
       <section className="join-ticket" aria-labelledby="join-title">
@@ -790,6 +849,11 @@ function Join({ state, name, setName, code, setCode, join }) {
             </button>
           </form>
         )}
+        {state?.saveSessionAvailable &&
+          state.status !== "ended" &&
+          state.players.some((player) => !player.left && !player.bot) && (
+            <ReconnectSeat connected={connected} onReconnect={reconnectSeat} />
+          )}
       </section>
       <a className="text-button" href={document.baseURI}>
         <Monitor size={16} aria-hidden="true" /> Show main screen

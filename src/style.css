@@ -1152,6 +1152,31 @@ footer span span {
   line-height: 1.8;
   color: var(--muted);
 }
+.reconnect-seat,
+.saved-room-code {
+  margin-top: 16px;
+}
+.reconnect-seat summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.reconnect-seat form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.reconnect-seat input,
+.saved-room-code input {
+  display: block;
+  width: 100%;
+  background: var(--paper);
+  border: 1px solid #c7b498;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 16px;
+}
 .player-dots {
   display: flex;
   gap: 6px;

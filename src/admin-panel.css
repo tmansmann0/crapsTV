@@ -588,6 +588,23 @@
   justify-content: center;
   gap: 7px;
 }
+.ha-adjust {
+  min-height: 44px;
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border: 1px solid #c9c0ae;
+  border-radius: 7px;
+  background: #fbf7ee;
+  color: var(--ha-green);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ha-roster > .ha-bankroll-editor {
+  display: block;
+}
+.ha-bankroll-editor .ha-rule-help {
+  margin-bottom: 12px;
+}
 .ha-note {
   display: flex;
   align-items: flex-start;

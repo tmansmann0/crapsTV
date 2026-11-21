@@ -40,7 +40,7 @@ The [Android offline host preview](android/README.md) runs the table from an And
 2. Keep that tab open. Friends scan its QR or open [/join](https://tmansmann0.github.io/crapsTV/join), enter their name and six-character room code, and join.
 3. The **first player to join** becomes the game admin. The TV itself is a spectator until someone opens **Phone controller** from Settings in a separate tab.
 
-GitHub Pages serves the static app. PeerJS’s free public signaling service introduces the browsers; game messages then travel over WebRTC. The host browser owns the session. **Some corporate networks, symmetric NATs, or restrictive firewalls require a TURN relay; this free build does not bundle a paid relay.** If a connection cannot be made, use local play or another network. Closing/reloading the hosting tab ends the online room; it is not a persistent game server. Phone reloads can rejoin the same seat while the host remains open.
+GitHub Pages serves the static app. PeerJS’s free public signaling service introduces the browsers; game messages then travel over WebRTC. The host browser owns the session. **Some corporate networks, symmetric NATs, or restrictive firewalls require a TURN relay; this free build does not bundle a paid relay.** If a connection cannot be made, use local play or another network. To recover a saved online game, reopen CrapsTV in the same display browser profile.
 
 ## House rules, your way
 
@@ -54,11 +54,12 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 - **Shared 3D throws.** Swipe the phone dice upward to choose direction and strength. The TV and phone play the same server-timed trajectory; the TV follows the flight and landing. Betting locks during the throw. The authority securely randomizes the launch, simulates the dice until they settle, and reads the upper faces. Those exact physical poses remain unchanged after landing.
 - **Re-up without losing your story.** With no open bets and total chips below the minimum, refill to the starting stack. Added chips count as new buy-in, never as winnings.
 - **Cash out or close the table.** Unresolved wagers are returned. Each player gets a personal recap, net-result chart, biggest win, comeback count, and downloadable **1080×1440 PNG** or editable SVG.
+- **Save and close.** Between rolls, open **Host controls → Table → Host & session → Save and close**. Wait for **Table saved** before stopping or updating the host. On reopening CrapsTV, use the same controller and choose **Resume table**. Players keep their seats, balances, wagers and room code. Save again before each later shutdown. The desktop server keeps its save per port in the host’s user state directory, or at the path set by `CRAPSTV_SAVE_PATH`. Keep the same port or configure a stable save path across local upgrades. Android keeps its save in app data across APK updates.
 - **Bundled announcer.** Open Settings on the TV to enable the original male Kokoro voice pack. It announces rolls, points, seven-outs, join/leave, re-ups, and other major events. Browsers require that user gesture before sound.
 
 The table uses matched wood grain and pore maps, textured red padding and short-fibre felt. Dice and chips retain separate wear patterns, roughness and engraved details. Betting artwork loads from its outlined SVG source with a dedicated print budget, independent of the material texture setting. When 3D resolution is reduced, a native-resolution felt pass keeps the lettering sharp while preserving lighting, shadows and occlusion by playing pieces.
 
-Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 pays double and 12 triple. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
+Place/hardway bets and come odds are **off on come-out**; traveled come bets themselves still work. Field 2 and 12 both pay 2:1. Proper denominations keep payouts exact. Full decisions and probabilities are documented in [game-and-network.md](docs/game-and-network.md).
 
 [Compare material strengths](https://tmansmann0.github.io/crapsTV/studies/materials/index.html): actual 4K renders with identical close/wide shots. Option 2 is the selected mix: stronger felt, restrained red padding and grime, visible chip scratches and fine-grained American walnut.
 
@@ -107,7 +108,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `public/audio/`             | 51 MP3 announcements with manifests, hashes, and license notice        |
 | `scripts/`                  | Optional reproducible board/model/audio generation                     |
 
-No money changes hands. This is a casual game for friends; a human hosting a peer room controls that room’s authority. Sessions live in memory; save recap cards before stopping the local server or closing an online host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, fire bets, or real-money gambling.
+No money changes hands. This is a casual game for friends. A human hosting a peer room controls that room’s authority, and saved tables stay on the host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, fire bets, or real-money gambling.
 
 ## Art and voice
 

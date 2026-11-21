@@ -8,16 +8,23 @@ import { WebSocketServer } from "ws";
 import QRCode from "qrcode";
 import serveStatic from "serve-static";
 import { RoomHub } from "../src/hub.js";
+import { fileRoomSave } from "../server/room-save-file.js";
 
 globalThis.crypto ??= webcrypto;
 const root = process.argv[2] || process.cwd();
 const port = Number(process.env.PORT || 3000);
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const code = Array.from(
-  randomBytes(6),
-  (b) => alphabet[b % alphabet.length],
-).join("");
-const hub = new RoomHub(code);
+// The package can replace its extracted payload on update. Saves are siblings
+// in the app's private files directory and do not depend on a payload version.
+const saveStore = fileRoomSave(
+  process.env.CRAPSTV_SAVE_PATH ||
+    path.resolve(root, "..", "crapstv-room.json"),
+);
+const restored = saveStore.load();
+const code =
+  restored?.state.code ??
+  Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
+const hub = new RoomHub(code, { saveStore, restored });
 // The Android Node build has no ICU. Using the static-file middleware
 // directly keeps Express's Unicode-dependent router out of this bundle.
 const gameFiles = serveStatic(path.join(root, "dist"), { redirect: false });

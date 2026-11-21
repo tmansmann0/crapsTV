@@ -1,8 +1,8 @@
 {
   "width": 2048,
   "height": 1024,
-  "vertices": 57274,
-  "triangles": 56330,
+  "vertices": 57239,
+  "triangles": 56295,
   "filled": 641,
   "stroked": 59,
   "removedHatchPaths": 12,
@@ -199,13 +199,13 @@
   "clipPaints": 30,
   "colorEncoding": "sRGB; premultiplied once in native ink shader",
   "curveToleranceSvgPixels": 0.02,
-  "sourceSHA256": "8406007030e803be3348cb0f287135f85d4d204296e104dfac93dd953559d7d2",
-  "binarySHA256": "9a331cfdab8516a3d2e9cb0c3ad399a571e9db0983474c5c795147dc6f9c3635",
-  "bytes": 1821472,
+  "sourceSHA256": "1e2accd62e88c2dceceb121fd824d8625a46c4e11c0c7cb40a108d47a2114c93",
+  "binarySHA256": "6e00a5063ba1df14bfb9719cd25332f5a38ac75b5e50cc7067d69cafbc985ef9",
+  "bytes": 1820352,
   "minificationFallback": {
     "width": 2048,
     "height": 1024,
     "file": "board-classic-minified.png",
-    "sha256": "985c349d11391ded012c10f7b484c8f33506767a3f2624ac4672c1eb87995b17"
+    "sha256": "5b7d7fac5dd1a0017c1aaffb3a60baec6e7fe34a9ed099e7f242fc41bf0dd969"
   }
 }

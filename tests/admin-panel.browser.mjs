@@ -162,6 +162,32 @@ try {
     page.getByRole("button", { name: "Table full (12/12)", exact: true }),
   ).toBeDisabled();
   await page.evaluate(() => window.adminQA.playing());
+  await page.getByRole("button", { name: "Adjust chips for Blair" }).click();
+  await page.getByLabel("Amount ($)", { exact: true }).fill("25.35");
+  await page.getByRole("button", { name: "Add chips", exact: true }).click();
+  const bankroll = page.locator(".ha-bankroll-editor");
+  await expect(bankroll.getByText("$1,025.35 available")).toBeVisible();
+  await page.getByLabel("Adjustment", { exact: true }).selectOption("remove");
+  const withdraw = page.getByRole("button", {
+    name: "Remove chips",
+    exact: true,
+  });
+  await page.getByLabel("Amount ($)", { exact: true }).fill("2000");
+  await expect(withdraw).toBeDisabled();
+  await page.getByLabel("Amount ($)", { exact: true }).fill("40.50");
+  await page.evaluate(() => window.adminQA.rolling(true));
+  await expect(withdraw).toBeDisabled();
+  await page.evaluate(() => window.adminQA.rolling(false));
+  await withdraw.click();
+  await expect(bankroll.getByText("$984.85 available")).toBeVisible();
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.adminQA.actions
+        .filter((action) => action.type === "adjust-bankroll")
+        .map((action) => action.amount),
+    ),
+    [2535, -4050],
+  );
   await openAdminSection(page, "Table");
   await page.getByLabel("Betting window (seconds)").fill("9");
   await page.getByLabel("Bot roll delay (seconds)").fill("6");
@@ -231,6 +257,7 @@ try {
       "all eight graphics controls",
       "table minimum first, bots hidden in drinking setup",
       "host audio entry and live drink pricing with roll guard",
+      "live chip additions and withdrawals scoped to available balance",
       "no horizontal overflow or sub16px fields",
     ],
     errors,
