@@ -62,6 +62,8 @@ function App() {
     if (message.type === "teach") initial.config.teach = message.value;
     if (message.type === "drinking-rules")
       game.setDrinkingRules(initial, host.id, message.rules);
+    if (message.type === "adjust-bankroll")
+      game.adjustBankroll(initial, host.id, message.playerId, message.amount);
     setState(structuredClone(initial));
   };
   return (

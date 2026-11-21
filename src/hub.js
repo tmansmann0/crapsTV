@@ -147,6 +147,8 @@ export class RoomHub {
           game.place(s, pid, message.betId, message.amount);
         else if (type === "remove") game.remove(s, pid, message.betId);
         else if (type === "reup") game.reup(s, pid);
+        else if (type === "adjust-bankroll")
+          game.adjustBankroll(s, pid, message.playerId, message.amount);
         else if (type === "drinking-rules")
           game.setDrinkingRules(s, pid, message.rules);
         else if (type === "drink-request")

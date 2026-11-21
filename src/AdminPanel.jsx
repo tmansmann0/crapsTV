@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -18,7 +18,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { money } from "./game.js";
+import { MAX_BANKROLL_ADJUSTMENT, money } from "./game.js";
 import DrinkIcon from "./DrinkIcon.jsx";
 import {
   DEFAULT_DRINKING_RULES,
@@ -265,6 +265,85 @@ function LiveDrinkPrices({ saved, disabled, send }) {
   );
 }
 
+function BankrollForm({ id, player, disabled, send, close }) {
+  const [direction, setDirection] = useState("add");
+  const [dollars, setDollars] = useState("");
+  const form = useRef(null);
+  useEffect(() => {
+    form.current.scrollIntoView({ block: "nearest" });
+  }, []);
+  const cents = /^(?:\d+|\d*\.\d{1,2})$/.test(dollars)
+    ? Math.round(Number(dollars) * 100)
+    : 0;
+  const removing = direction === "remove";
+  const exceedsBank = removing && cents > player.bank;
+  const valid = cents > 0 && cents <= MAX_BANKROLL_ADJUSTMENT && !exceedsBank;
+  function submit(event) {
+    event.preventDefault();
+    if (disabled || !valid) return;
+    send({
+      type: "adjust-bankroll",
+      playerId: player.id,
+      amount: removing ? -cents : cents,
+    });
+    setDollars("");
+  }
+  return (
+    <form id={id} ref={form} className="ha-bot-form" onSubmit={submit}>
+      <header>
+        <h3>Adjust {player.name}’s chips</h3>
+        <button
+          type="button"
+          className="ha-remove"
+          aria-label="Close chip adjustment"
+          onClick={close}
+        >
+          <X size={19} />
+        </button>
+      </header>
+      <p className="ha-rule-help" aria-live="polite">
+        {money(player.bank)} available
+      </p>
+      <label>
+        Adjustment
+        <select
+          aria-label="Adjustment"
+          value={direction}
+          disabled={disabled}
+          onChange={(event) => setDirection(event.target.value)}
+        >
+          <option value="add">Add chips</option>
+          <option value="remove">Remove chips</option>
+        </select>
+      </label>
+      <label>
+        Amount ($)
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0.01"
+          max={MAX_BANKROLL_ADJUSTMENT / 100}
+          step="0.01"
+          required
+          disabled={disabled}
+          value={dollars}
+          onChange={(event) => setDollars(event.target.value)}
+        />
+      </label>
+      {exceedsBank && (
+        <p className="ha-rule-help">Only available chips can be removed.</p>
+      )}
+      <button
+        type="submit"
+        className="button dark"
+        disabled={disabled || !valid}
+      >
+        {removing ? "Remove chips" : "Add chips"}
+      </button>
+    </form>
+  );
+}
+
 function PlayerSeats({
   state,
   connected,
@@ -275,7 +354,9 @@ function PlayerSeats({
   serverError,
   botsAllowed,
 }) {
+  const adjustmentId = useId();
   const [adding, setAdding] = useState(false),
+    [adjusting, setAdjusting] = useState(null),
     [name, setName] = useState(""),
     [strategy, setStrategy] = useState(DEFAULT_BOT_OPTIONS.strategy),
     [difficulty, setDifficulty] = useState(DEFAULT_BOT_OPTIONS.difficulty),
@@ -286,6 +367,7 @@ function PlayerSeats({
   );
   const full = players.length >= 12;
   const disabled = !connected || state.rolling;
+  const canAdjust = state.status === "playing";
   const selected = BOT_STRATEGIES.find((option) => option.id === strategy);
   useEffect(() => {
     if (!pending) return;
@@ -326,40 +408,73 @@ function PlayerSeats({
       {(!adding || !botsAllowed) && (
         <ul className="ha-roster" aria-label="Table players">
           {players.map((p) => (
-            <li key={p.id}>
-              <span
-                className={`ha-avatar ${p.bot ? "is-bot" : ""}`}
-                style={!p.bot ? { "--player-color": p.color } : undefined}
-              >
-                {p.bot ? <Bot size={20} /> : p.name[0]}
-              </span>
-              <div>
-                <strong>
-                  {p.name}
-                  {p.id === state.adminId && (
-                    <Crown size={13} aria-label="Host" />
-                  )}
-                </strong>
-                <small>
-                  {p.bot
-                    ? `${optionName(BOT_STRATEGIES, p.bot.strategy)} · ${optionName(BOT_DIFFICULTIES, p.bot.difficulty)}`
-                    : p.connected
-                      ? "Player"
-                      : "Reconnecting"}
-                </small>
-              </div>
-              {p.bot && (
-                <button
-                  type="button"
-                  className="ha-remove"
-                  aria-label={`Remove ${p.name}`}
-                  disabled={disabled}
-                  onClick={() => send({ type: "remove-bot", playerId: p.id })}
+            <Fragment key={p.id}>
+              <li>
+                <span
+                  className={`ha-avatar ${p.bot ? "is-bot" : ""}`}
+                  style={!p.bot ? { "--player-color": p.color } : undefined}
                 >
-                  <X size={18} />
-                </button>
+                  {p.bot ? <Bot size={20} /> : p.name[0]}
+                </span>
+                <div>
+                  <strong>
+                    {p.name}
+                    {p.id === state.adminId && (
+                      <Crown size={13} aria-label="Host" />
+                    )}
+                  </strong>
+                  <small>
+                    {p.bot
+                      ? `${optionName(BOT_STRATEGIES, p.bot.strategy)} · ${optionName(BOT_DIFFICULTIES, p.bot.difficulty)}`
+                      : p.connected
+                        ? "Player"
+                        : "Reconnecting"}
+                    {canAdjust && ` · ${money(p.bank)} available`}
+                  </small>
+                </div>
+                {canAdjust && (
+                  <button
+                    type="button"
+                    className="ha-adjust"
+                    aria-label={`Adjust chips for ${p.name}`}
+                    aria-expanded={p.id === adjusting}
+                    aria-controls={
+                      p.id === adjusting ? adjustmentId : undefined
+                    }
+                    disabled={disabled}
+                    onClick={() =>
+                      setAdjusting((current) =>
+                        current === p.id ? null : p.id,
+                      )
+                    }
+                  >
+                    Adjust
+                  </button>
+                )}
+                {p.bot && (
+                  <button
+                    type="button"
+                    className="ha-remove"
+                    aria-label={`Remove ${p.name}`}
+                    disabled={disabled}
+                    onClick={() => send({ type: "remove-bot", playerId: p.id })}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </li>
+              {canAdjust && p.id === adjusting && (
+                <li className="ha-bankroll-editor">
+                  <BankrollForm
+                    id={adjustmentId}
+                    player={p}
+                    disabled={disabled}
+                    send={send}
+                    close={() => setAdjusting(null)}
+                  />
+                </li>
               )}
-            </li>
+            </Fragment>
           ))}
         </ul>
       )}
@@ -369,6 +484,7 @@ function PlayerSeats({
           className="ha-add button outline"
           disabled={full || disabled}
           onClick={() => {
+            setAdjusting(null);
             setName(nextName(players));
             setAdding(true);
           }}

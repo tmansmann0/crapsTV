@@ -90,7 +90,8 @@ export default function Recap({ player, state, compact = false }) {
         {money(Math.abs(r.net))}
       </div>
       <p className="muted">
-        Net result after {money(player.buyIn)} in total buy-ins.
+        Net result after {money(player.buyIn)} in total buy-ins
+        {player.bankrollAdjustments ? " and host chip adjustments" : ""}.
       </p>
       <div className="recap-chart">
         <svg viewBox="0 0 800 200" aria-label="Net winnings across the session">
