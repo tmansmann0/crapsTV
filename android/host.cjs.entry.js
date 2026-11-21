@@ -1,12 +1,14 @@
-// Embedded authority: the same RoomHub as desktop and PR #4. No cloud services.
-import express from "express";
+// Embedded authority using the same RoomHub as the desktop server.
 import { createServer } from "node:http";
 import { webcrypto, randomBytes } from "node:crypto";
+import { isIPv4 } from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import { WebSocketServer } from "ws";
 import QRCode from "qrcode";
+import serveStatic from "serve-static";
 import { RoomHub } from "../src/hub.js";
+
 globalThis.crypto ??= webcrypto;
 const root = process.argv[2] || process.cwd();
 const port = Number(process.env.PORT || 3000);
@@ -16,8 +18,12 @@ const code = Array.from(
   (b) => alphabet[b % alphabet.length],
 ).join("");
 const hub = new RoomHub(code);
-const app = express();
-const server = createServer(app);
+// The Android Node build has no ICU. Using the static-file middleware
+// directly keeps Express's Unicode-dependent router out of this bundle.
+const gameFiles = serveStatic(path.join(root, "dist"), { redirect: false });
+const pairingPage = fs.readFileSync(path.join(root, "host.html"));
+const hostPaths = new Set(["/android-host", "/android-network", "/android-qr"]);
+
 function status() {
   try {
     return JSON.parse(fs.readFileSync(path.join(root, "network.json"), "utf8"));
@@ -25,58 +31,107 @@ function status() {
     return {};
   }
 }
-const origin = () => {
-  const ip = status().ip;
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip || "")
-    ? `http://${ip}:${port}`
-    : null;
+const origin = (network) =>
+  isIPv4(network.ip) ? `http://${network.ip}:${server.address().port}` : null;
+const invite = (network) => {
+  const address = origin(network);
+  return address ? `${address}/join?code=${code}` : null;
 };
-app.get("/api/config", (_req, res) =>
-  res.json({
-    local: true,
-    code,
-    kiosk: false,
-    joinOrigin: origin(),
-    lanOrigin: origin(),
-    android: true,
-  }),
-);
-app.get("/android/status", (_req, res) =>
-  res.json({
-    ...status(),
-    code,
-    joinURL: origin() ? `${origin()}/join?code=${code}` : null,
-  }),
-);
-app.get("/android/qr.svg", async (req, res) => {
-  const s = status();
+
+function send(res, statusCode, contentType, body) {
+  res.writeHead(statusCode, { "Content-Type": contentType });
+  res.end(body);
+}
+const json = (res, body) =>
+  send(res, 200, "application/json", JSON.stringify(body));
+
+function isHost(req) {
+  // Credentials belong to the host's loopback view. Validate both the actual
+  // connection and the requested host, independently of any forwarded headers.
+  return (
+    req.socket.remoteAddress === "127.0.0.1" &&
+    /^(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(req.headers.host || "") &&
+    req.headers["sec-fetch-site"] !== "cross-site"
+  );
+}
+
+async function pair(req, res, url) {
+  if (!isHost(req)) return send(res, 404, "text/plain", "Not found");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("X-Frame-Options", "DENY");
+  if (hostPaths.has(url.pathname))
+    return send(res, 200, "text/html; charset=utf-8", pairingPage);
+
+  const network = status();
+  if (url.pathname === "/android/status")
+    return json(res, {
+      ...network,
+      code,
+      joinURL: invite(network),
+      controllerURL: `/join?code=${code}`,
+    });
+
   const esc = (value) =>
     String(value || "").replace(/[\\;,:"\n\r]/g, (c) => `\\${c}`);
-  const value =
-    req.query.kind === "wifi"
-      ? s.ssid && s.password
-        ? `WIFI:T:WPA;S:${esc(s.ssid)};P:${esc(s.password)};;`
-        : null
-      : origin()
-        ? `${origin()}/join?code=${code}`
-        : null;
-  if (!value) return res.status(503).send("Network not ready");
-  res
-    .type("svg")
-    .set("Cache-Control", "no-store")
-    .send(
-      await QRCode.toString(value, {
-        type: "svg",
-        margin: 4,
-        errorCorrectionLevel: "M",
-        width: 1024,
-      }),
+  const wifi = url.searchParams.get("kind") === "wifi";
+  const value = wifi
+    ? network.mode === "local-only" && network.ssid
+      ? `WIFI:T:${network.password ? "WPA" : "nopass"};S:${esc(network.ssid)};P:${esc(network.password)};;`
+      : null
+    : invite(network);
+  if (!value) return send(res, 503, "text/plain", "Network not ready");
+  const svg = await QRCode.toString(value, {
+    type: "svg",
+    margin: 4,
+    errorCorrectionLevel: "M",
+    width: 1024,
+  });
+  send(res, 200, "image/svg+xml", svg);
+}
+
+const server = createServer((req, res) => {
+  if (req.method !== "GET" && req.method !== "HEAD")
+    return send(res, 405, "text/plain", "Method not allowed");
+  let url;
+  try {
+    url = new URL(req.url, "http://127.0.0.1");
+  } catch {
+    return send(res, 400, "text/plain", "Invalid request");
+  }
+  if (url.pathname === "/api/config") {
+    const address = origin(status());
+    res.setHeader("Cache-Control", "no-store");
+    return json(res, {
+      local: true,
+      code,
+      kiosk: false,
+      joinOrigin: address,
+      lanOrigin: address,
+      android: true,
+    });
+  }
+  if (
+    hostPaths.has(url.pathname) ||
+    url.pathname === "/android/status" ||
+    url.pathname === "/android/qr.svg"
+  )
+    return pair(req, res, url).catch(() =>
+      send(res, 500, "text/plain", "The pairing QR could not be generated."),
     );
+  if (url.pathname === "/join" || url.pathname === "/join/")
+    req.url = "/index.html";
+  gameFiles(req, res, (error) => {
+    if (res.headersSent) res.destroy();
+    else
+      send(
+        res,
+        error?.statusCode || 404,
+        "text/plain",
+        "Game file unavailable",
+      );
+  });
 });
-// Native WebView pages; guests use the normal /join application.
-app.get(["/android-host", "/android-network", "/android-qr"], (_req, res) =>
-  res.sendFile(path.join(root, "host.html")),
-);
+
 const wss = new WebSocketServer({ server, path: "/socket", maxPayload: 8192 });
 wss.on("connection", (ws, req) => {
   if (req.headers.origin) {
@@ -116,10 +171,8 @@ const heartbeat = setInterval(() => {
     ws.ping();
   }
 }, 30000);
-app.use(express.static(path.join(root, "dist")));
-app.use((_req, res) => res.sendFile(path.join(root, "dist", "index.html")));
 server.listen(port, "0.0.0.0", () =>
-  console.log(`Android local room ${code}, port ${port}`),
+  console.log(`Android local room ${code}, port ${server.address().port}`),
 );
 process.on("SIGTERM", () => {
   clearInterval(heartbeat);

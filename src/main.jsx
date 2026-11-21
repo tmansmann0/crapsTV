@@ -193,6 +193,7 @@ function App() {
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
+  const androidHost = session?.android && location.hostname === "127.0.0.1";
   const confirmDialog = useRef(null);
   useEffect(() => {
     if (confirm) confirmDialog.current?.showModal();
@@ -215,6 +216,7 @@ function App() {
           joinOrigin: local.joinOrigin,
           lanOrigin: local.lanOrigin,
           kiosk: local.kiosk === true,
+          android: local.android === true,
         });
         setJoinCode(local.code);
       } else if (route.controller && initialCode) {
@@ -229,6 +231,32 @@ function App() {
       clearTimeout(errorTimer.current);
     };
   }, []);
+  useEffect(() => {
+    if (!androidHost || view !== "tv") return;
+    let active = true;
+    let timer;
+    const refresh = async () => {
+      const local = await detectLocal();
+      if (!active) return;
+      if (local?.android) {
+        setSession((current) =>
+          current?.android && current.joinOrigin !== local.joinOrigin
+            ? {
+                ...current,
+                joinOrigin: local.joinOrigin,
+                lanOrigin: local.lanOrigin,
+              }
+            : current,
+        );
+      }
+      timer = setTimeout(refresh, 2500);
+    };
+    timer = setTimeout(refresh, 2500);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [androidHost, view]);
   useEffect(() => {
     if (!session) return;
     setState(null);
@@ -413,7 +441,10 @@ function App() {
       ? "Older host: restart this server for current physics."
       : "";
   const visibleError = error || hostWarning;
-  const joinLink = controllerURL(roomCode, session?.joinOrigin);
+  const joinLink =
+    androidHost && !session.joinOrigin
+      ? ""
+      : controllerURL(roomCode, session?.joinOrigin);
   const fallbackJoinLink =
     session?.lanOrigin && session.lanOrigin !== session.joinOrigin
       ? controllerURL(roomCode, session.lanOrigin)
@@ -422,7 +453,10 @@ function App() {
     if (kiosk && (action === "settings" || action === "audio")) return;
     if (action === "settings") setSettingsOpen((v) => !v);
     if (action === "audio") setAudioOpen(true);
-    if (action === "join") window.open(joinLink, "_blank", "noopener");
+    if (action === "join") {
+      if (androidHost) location.assign("/android-host");
+      else window.open(joinLink, "_blank", "noopener");
+    }
     if (action === "sound") setSound((value) => !value);
     if (action === "fullscreen") {
       if (document.fullscreenElement)
@@ -433,6 +467,7 @@ function App() {
     if (action === "copy" || action === "copy-ip") {
       const link =
         action === "copy-ip" ? fallbackJoinLink || joinLink : joinLink;
+      if (!link) return toast("Open Pair to set up Wi-Fi first");
       try {
         await navigator.clipboard.writeText(link);
         toast("Join link copied");
@@ -480,7 +515,7 @@ function App() {
             .
           </p>
           <button onClick={() => sceneAction("join")}>
-            Open phone controller
+            {androidHost ? "Pair players" : "Open phone controller"}
           </button>
           <button onClick={() => sceneAction("sound")}>
             {sound ? "Mute announcer" : "Enable announcer"}

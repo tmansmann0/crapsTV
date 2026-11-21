@@ -1,98 +1,89 @@
-# Android offline host (preview)
+# CrapsTV for Android (offline host preview)
 
-This Android-specific layer is stacked on `codex/shooter-turn-enforcement` (PR #4,
-`4fae95c4727728f04bac00945cff1ad661098c22`), which already contains PR #3.
-It embeds the existing RoomHub, Express and WebSocket authority, production game
-assets, and Node.js Mobile 18.20.4. The normal Node 22 desktop server, online
-transport and guest browser application are unchanged. No accounts or internet
-are needed during local play. Chips are fictional.
+Run the table on an Android phone or tablet. Players join in their phone browsers
+using the same Wi-Fi or hotspot. The APK bundles the game, audio, and room server.
+No account or internet connection is needed on the host or the guest devices.
 
-## Pairing
+## Start a table
 
-1. Install the signed preview APK on the Android host. Open **crapsTV Offline**.
-2. Tap **Host on my own Wi-Fi**. Grant Android's Nearby Wi-Fi permission
-   (Android 13+) or Location permission (Android 8–12). On Android 8–12,
-   Android also requires Location services enabled. A grant continues the
-   chosen action automatically. Nothing creates a hotspot merely because
-   internet is absent; the control remains available with cellular data on.
-3. Open **Settings → Network Setup / Wi-Fi QR**. Guests scan that Wi-Fi QR, or
-   join the displayed network/password manually. Accept **stay connected** if
-   their phone warns that the network has no internet.
-4. Return to **Host**. Guests scan the single, generously sized **game QR**.
-   Tap it for a full-screen version; Android Back returns. Guests use their
-   normal browsers, enter names, and the first player opens the table.
-5. **Table** shows the TV-style view on the host. The native Host and Settings
-   controls remain accessible. The hosting notification keeps the foreground
-   service visible; **Settings → Stop session** or the notification's Stop
-   action disconnects everyone and ends the in-memory room.
+Open **CrapsTV Offline**. **Pair** shows the host’s pairing screen, **Table** opens
+the 3D display, and **Play on this device** opens a player controller on the host.
 
-If Android rejects local-only Wi-Fi, use **Settings → Android hotspot settings**
-to enable an ordinary phone hotspot, then return. Connect guest phones to that
-network first and use the game QR. Some manufacturers isolate hotspot clients;
-the guests must be able to reach the host. If automatic address selection fails,
-**Settings → Choose host IP address** accepts the IPv4 address shown by Android.
-No fixed hotspot IP is assumed. Avoid VPNs and confirm the displayed IP belongs
-to the hotspot, rather than cellular service. Ordinary hotspots may share mobile
-data; turn mobile data off if you want to ensure no internet is supplied.
+- **Shared Wi-Fi** — Connect all devices to the same network. Open **Pair** and have
+  players scan the game QR. Tap the QR to enlarge it. Players can also enter the
+  address under **Enter the game link manually**.
+- **No shared Wi-Fi** — Open **Pair → Join Wi-Fi → Create offline Wi-Fi**. Android
+  13 and newer use the **Nearby devices** permission. Android 8–12 use precise
+  Location permission and require Location to be on. Scan the Wi-Fi QR from the
+  guest phones first, then tap **Show game QR**. If a guest phone says the network
+  has no internet, choose **Stay connected**.
+- **Android hotspot** — If the phone cannot create offline Wi-Fi, choose **Use
+  my phone’s hotspot** in **Join Wi-Fi**. Turn on the Android hotspot, have guests
+  join it, then return for the game QR. An ordinary hotspot can share mobile data
+  if it’s enabled.
 
-## Build
+Players enter names and the first player opens the table. Use **Settings → Stop
+session** when finished. Wi-Fi credentials are served only to the host’s pairing
+screen over the device’s loopback connection.
 
-Use Node 22+, JDK 17 or 21, Gradle 8.13 (wrapper included), and the official
-Android SDK with `platforms;android-35`, `build-tools;35.0.0`, and
-`ndk;27.2.12479018`. Set `ANDROID_HOME` to the SDK directory. On Linux/macOS:
+If a guest cannot load the link, check that both devices are on the same network.
+Some guest networks isolate devices. Try the host’s offline Wi-Fi or a different
+shared network. **Settings → Choose host IP address** can override the detected
+IPv4 address when Android exposes more than one interface. Leave it blank to
+detect automatically.
+
+## Build an APK
+
+The [Android workflow](../.github/workflows/android.yml) publishes an installable
+debug APK as a GitHub Actions artifact. A debug APK signed by another build
+machine may require removing a previous debug installation first.
+
+For a local build, use Node 22+, JDK 17 or 21, and the official SDK with
+`platforms;android-35`, `build-tools;35.0.0`, and `ndk;27.2.12479018`. Set
+`ANDROID_HOME` to the SDK directory. Run from the repository root on Linux or macOS:
 
 ```sh
 npm ci
-npm test
 npm run build
 node android/prepare.mjs
 node --test android/host.test.mjs
-cd android
-./gradlew :app:assembleRelease
+./android/gradlew -p android :app:assembleDebug
 ```
 
-The preparation script downloads the pinned Node.js Mobile release, validates
-its SHA-256, compiles a small JNI adapter with the official NDK, bundles the
-server for Node 18, and packages local assets and exact source revision metadata.
-The result is unsigned: `app/build/outputs/apk/release/app-release-unsigned.apk`.
-Use Android `zipalign`, a private local keystore, and `apksigner sign`, then
-`apksigner verify --verbose --print-certs`. Do not commit a keystore, password,
-APK, native library, or downloaded SDK/runtime. Node's distribution license is
-included; the preparation script adds dependency notices to the payload.
+The debug APK is at `android/app/build/outputs/apk/debug/app-debug.apk`.
+Use `:app:assembleRelease` for the unsigned release APK. Sign it with your own
+keystore and verify it with `apksigner verify --verbose`. Keep signing keys out of
+Git.
 
-For browser smoke tests, start the prepared `android/host.cjs` with a root that
-contains `dist`, `host.html`, and a local `network.json`, then run
-`node android/browser-check.mjs`. `CHROME_PATH` can select installed Chromium.
-The included smoke fixture expects SSID `TEST-OFFLINE`, port 3000, and a fresh room.
-The transport test launches its own isolated room and can also run under the
-upstream Node 18.20.4 Linux runtime to check embedded-runtime compatibility.
+The preparation script verifies the checksum of the pinned Node.js Mobile
+18.20.4 distribution, builds the JNI adapter, and packages the game assets and
+dependency notices. To test the server and pairing in Chromium without the SDK:
 
-## Device and lifecycle limits
+```sh
+npm run build
+node android/prepare.mjs --server-only
+node --test android/host.test.mjs
+npx playwright install chromium
+node android/browser-check.mjs
+```
 
-- Minimum Android 8 (API 26). Native ABIs: arm64-v8a, armeabi-v7a, x86_64.
-  These are build targets, not a device-compatibility certification.
-- Node.js Mobile's available prebuilt runtime is older than the desktop engine.
-  Its libnode has 4 KiB ELF alignment. **16 KiB-page devices are not supported
-  by this preview** unless the OS offers a working compatibility mode; do not
-  assume it. A future supported release needs a current, rebuilt mobile runtime.
-- An up-to-date Android System WebView/browser is needed for the modern game.
-  The APK cannot update a stale WebView while offline.
-- The foreground connected-device service owns the hotspot reservation, server,
-  Wi-Fi and partial wake locks. Activity rotation/navigation does not own them.
-  Stop releases them and terminates the process because Node Mobile cannot be
-  restarted in the same process. Android/OEM process termination, reboot, or
-  force-stop ends the room; there is no automatic restart or persisted session.
-- Local-only hotspot creation, hardware/OEM behavior, iPhone/Android Wi-Fi QR
-  recognition, background survival and genuinely disconnected multi-device
-  play require tests on the actual host and guest devices. Browser tests on one
-  workstation do not establish these behaviors.
-- No captive portal is provided. The public local-only hotspot API supplies
-  an OS-managed network but no supported custom DHCP/DNS captive-portal
-  advertisement. An HTTP server alone cannot reliably trigger Android/iPhone
-  captive assistants. The Wi-Fi QR followed by the game QR is the supported flow.
-  No traffic interception, privileged networking, or OS network modification is used.
+## Device support and lifecycle
 
-Official references: [Android local-only hotspot](https://developer.android.com/develop/connectivity/wifi/localonlyhotspot),
-[connected-device foreground services](https://developer.android.com/develop/background-work/services/fgs/service-types#connected-device),
-[Node.js Mobile Android embedding](https://nodejs-mobile.github.io/docs/guide/guide-android/getting-started/),
-[Node.js Mobile runtime release](https://github.com/nodejs-mobile/nodejs-mobile/releases/tag/v18.20.4).
+- Minimum Android 8 (API 26). Build ABIs are arm64-v8a, armeabi-v7a, and x86_64.
+  The guest browser and the host’s WebView need to support the current web game.
+- The packaged upstream Node runtime uses 4 KiB ELF alignment. A native build
+  for 16 KiB-page devices needs a rebuilt runtime. Compatibility mode on some
+  devices can differ.
+- The foreground service keeps the table and offline Wi-Fi running while the
+  activity is in the background. Stopping the service, force-stopping the app,
+  rebooting, or Android reclaiming the process ends the in-memory room.
+- Scan the two QR codes in order when using offline Wi-Fi. Android’s public
+  local-only hotspot API supplies the Wi-Fi network. It does not provide a
+  supported way for this app to advertise a captive portal to guests.
+- The APK can be installed and exercised on an emulator. Wi-Fi radio behavior,
+  phone-camera Wi-Fi QR recognition and hotspot reachability remain
+  physical-device checks.
+
+[Android’s local-only hotspot guide](https://developer.android.com/develop/connectivity/wifi/localonlyhotspot)
+· [Android 16 KiB compatibility](https://developer.android.com/guide/practices/page-sizes)
+· [Node.js Mobile runtime](https://github.com/nodejs-mobile/nodejs-mobile/releases/tag/v18.20.4)

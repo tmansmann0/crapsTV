@@ -479,7 +479,7 @@ export function createSceneUI(renderer, onAction) {
     finish(p);
 
     p = panels.join;
-    p.mesh.visible = !settingsOpen || !layout.compact;
+    p.mesh.visible = !!current.joinURL && (!settingsOpen || !layout.compact);
     c = begin(p);
     // A compact invitation: the room code leads, with the QR isolated in a
     // warm paper inset so the two ways to join have distinct visual groups.

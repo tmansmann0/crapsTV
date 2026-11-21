@@ -30,6 +30,10 @@ These commands are the same in macOS/Linux terminals, Windows PowerShell, and Wi
 
 `npm run dev` runs the same local server with Vite hot reload. Set the optional `PORT` environment variable to change the default port. The server listens on all interfaces so phones can connect.
 
+## Host on Android
+
+The [Android offline host preview](android/README.md) runs the table from an Android device. Friends can join through a shared Wi-Fi network or an offline hotspot created in the app.
+
 ## Play online with GitHub Pages
 
 1. Open the [online game](https://tmansmann0.github.io/crapsTV/) on your TV/laptop. It opens the 3D scene and automatically hosts an online room.

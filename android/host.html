@@ -1,178 +1,409 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta charset="utf-8" />
-    <title>crapsTV host</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CrapsTV · Pair players</title>
     <style>
       :root {
         color-scheme: dark;
-        font: 17px system-ui;
-        background: #102b25;
-        color: #fff;
+        font:
+          16px system-ui,
+          sans-serif;
+        background: #0b1d17;
+        color: #f8efd9;
+        --gold: #eacc8d;
+        --muted: #c7d4cb;
+        --edge: #496056;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
       }
       body {
         margin: 0;
-        padding: 20px;
-        text-align: center;
       }
-      h1 {
-        font-size: 30px;
-        margin: 12px;
+      main {
+        max-width: 500px;
+        padding: 24px 18px 28px;
+        margin: auto;
       }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .wordmark {
+        color: var(--gold);
+        font-weight: 800;
+        font-size: 1.15rem;
+      }
+      h1,
+      h2,
       p {
-        line-height: 1.5;
-        color: #d0ded8;
-      }
-      a {
-        color: #f3db9a;
-      }
-      #qr {
-        display: block;
-        width: min(82vw, 420px);
-        height: auto;
-        margin: 16px auto;
-        border-radius: 14px;
-        background: white;
-      }
-      code {
-        overflow-wrap: anywhere;
-      }
-      button,
-      .link {
-        display: inline-block;
-        background: #e5cb89;
-        color: #15291f;
-        border: 0;
-        border-radius: 10px;
-        padding: 14px 22px;
-        font: inherit;
-        text-decoration: none;
-      }
-      body.full {
-        background: white;
-        padding: 0;
-        display: grid;
-        place-content: center;
-        min-height: 96vh;
-        color: #15291f;
-      }
-      body.full #qr {
-        width: min(96vw, 90vh);
-        max-width: none;
         margin: 0;
       }
-      body.full p {
-        color: #15291f;
+      h1 {
+        margin: 18px 0 8px;
+        font-size: 2rem;
+        line-height: 1.15;
       }
-      #details {
-        white-space: pre-line;
+      h2 {
+        font-size: 1.25rem;
+      }
+      p {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      a {
+        color: var(--gold);
+      }
+      a:focus-visible,
+      summary:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 4px;
+      }
+      .status {
+        font-size: 0.88rem;
+        color: var(--gold);
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 20px 0 12px;
+      }
+      .steps a,
+      .button {
+        min-height: 44px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--edge);
+        text-align: center;
+        text-decoration: none;
+        font-weight: 650;
+        line-height: 1.25;
+      }
+      .steps a[aria-current],
+      .primary {
+        background: var(--gold);
+        color: #182920;
+        border-color: var(--gold);
+      }
+      .card {
+        padding: 16px;
+        border: 1px solid var(--edge);
+        border-radius: 14px;
+        background: #142b21;
+      }
+      .card p,
+      .card .button,
+      details {
+        margin-top: 10px;
+      }
+      .qr-link {
+        display: block;
+        max-width: 360px;
+        margin: 14px auto 0;
+      }
+      .qr {
+        display: block;
+        width: 100%;
+        border-radius: 10px;
+        background: white;
       }
       .small {
-        font-size: 14px;
+        font-size: 0.88rem;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--gold);
+        padding: 6px 0;
+      }
+      .code {
+        overflow-wrap: anywhere;
+        user-select: all;
+      }
+      .footer-action {
+        margin-top: 14px;
+      }
+      .full {
+        max-width: none;
+        min-height: 100dvh;
+        text-align: center;
+        background: #fff;
+        color: #17251e;
+      }
+      .full h1 {
+        font-size: 1.35rem;
+        margin: 0 0 8px;
+      }
+      .full p,
+      .full a {
+        color: #294035;
+      }
+      .full .qr-link {
+        width: min(92vw, 74vh);
+        max-width: none;
+        margin: 8px auto;
+      }
+      @media (max-width: 340px) {
+        main {
+          padding-inline: 12px;
+        }
+        .card {
+          padding-inline: 12px;
+        }
       }
     </style>
   </head>
   <body>
-    <main id="main"></main>
+    <main id="pair" hidden>
+      <header>
+        <span class="wordmark">CrapsTV</span>
+        <p id="status" class="status" role="status">Starting local table…</p>
+      </header>
+      <h1>Connect players</h1>
+      <p id="summary">Your guests can join from their phone browsers.</p>
+      <nav class="steps" aria-label="Pairing steps">
+        <a id="wifi-step" href="/android-network">1. Join Wi-Fi</a>
+        <a id="game-step" href="/android-host">2. Join the game</a>
+      </nav>
+      <section id="wifi" class="card" aria-labelledby="wifi-title" hidden>
+        <h2 id="wifi-title">Choose a network</h2>
+        <p id="wifi-help">
+          Connect everyone to the same Wi-Fi, or create a network here.
+        </p>
+        <a
+          id="wifi-qr-link"
+          class="qr-link"
+          href="/android-qr?kind=wifi"
+          hidden
+        >
+          <img
+            id="wifi-qr"
+            class="qr"
+            alt="Scan to join the offline Wi-Fi. Tap to enlarge."
+            width="1024"
+            height="1024"
+          />
+        </a>
+        <details id="wifi-details" hidden>
+          <summary>Enter Wi-Fi details manually</summary>
+          <p>Network <code id="ssid" class="code"></code></p>
+          <p id="password-row">
+            Password <code id="password" class="code"></code>
+          </p>
+        </details>
+        <a id="offline" class="button primary" href="crapstv://host/offline"
+          >Create offline Wi-Fi</a
+        >
+        <a id="system-wifi" class="button" href="crapstv://host/wifi"
+          >Open Wi-Fi settings</a
+        >
+        <a id="hotspot" class="button" href="crapstv://host/hotspot"
+          >Use my phone’s hotspot</a
+        >
+        <a id="next" class="button primary" href="/android-host" hidden
+          >Show game QR</a
+        >
+        <p id="waiting-address" class="small" hidden>
+          Waiting for the host’s Wi-Fi address. If it doesn’t appear, open
+          Settings and choose the host IP address.
+        </p>
+      </section>
+      <section id="game" class="card" aria-labelledby="game-title" hidden>
+        <h2 id="game-title">Scan the game QR</h2>
+        <p id="game-help"></p>
+        <a
+          id="game-qr-link"
+          class="qr-link"
+          href="/android-qr?kind=game"
+          hidden
+        >
+          <img
+            id="qr"
+            class="qr"
+            alt="Scan to join the game. Tap to enlarge."
+            width="1024"
+            height="1024"
+          />
+        </a>
+        <details id="game-link" hidden>
+          <summary>Enter the game link manually</summary>
+          <code id="url" class="code"></code>
+        </details>
+        <a id="choose" class="button primary" href="/android-network" hidden
+          >Set up Wi-Fi</a
+        >
+      </section>
+      <a id="controller" class="button footer-action" href="/join" hidden
+        >Play on this device</a
+      >
+    </main>
+    <main id="expanded" class="full" hidden>
+      <h1 id="expanded-title"></h1>
+      <div class="qr-link" id="expanded-image" hidden>
+        <img id="large-qr" class="qr" alt="" width="1024" height="1024" />
+      </div>
+      <p id="expanded-help"></p>
+      <a id="back" href="/android-host">Back to pairing</a>
+    </main>
     <script>
-      const main = document.getElementById("main"),
-        network = location.pathname === "/android-network",
-        full = location.pathname === "/android-qr";
-      if (full) document.body.className = "full";
-      let fingerprint = "";
-      async function update() {
+      const get = (id) => document.getElementById(id);
+      const networkPage = location.pathname === "/android-network";
+      const expanded = location.pathname === "/android-qr";
+      const wifiQR =
+        new URLSearchParams(location.search).get("kind") === "wifi";
+      const set = (id, text) => {
+        get(id).textContent = text;
+      };
+      const show = (id, visible) => {
+        get(id).hidden = !visible;
+      };
+      show("expanded", expanded);
+      show("pair", !expanded);
+      show("wifi", networkPage);
+      show("game", !networkPage);
+      get(networkPage ? "wifi-step" : "game-step").setAttribute(
+        "aria-current",
+        "step",
+      );
+      set(
+        "expanded-title",
+        wifiQR ? "Join the offline Wi-Fi" : "Join the game",
+      );
+      get("back").href = wifiQR ? "/android-network" : "/android-host";
+      get("large-qr").alt = wifiQR ? "Join Wi-Fi QR" : "Join game QR";
+
+      let lastStatus,
+        revision = 0;
+      function qr(id, kind, key) {
+        const image = get(id);
+        if (image.dataset.key === key) return;
+        image.dataset.key = key;
+        if (key)
+          image.src = "/android/qr.svg?kind=" + kind + "&rev=" + ++revision;
+        else image.removeAttribute("src");
+      }
+      function update(network) {
+        const ownWifi = network.mode === "local-only";
+        const hasWifiQR = !!(ownWifi && network.ssid);
+        const hasInvite = !!network.joinURL;
+        const starting = network.mode === "starting";
+        const status = starting
+          ? "Creating Wi-Fi…"
+          : ownWifi
+            ? "Offline Wi-Fi"
+            : hasInvite
+              ? "Local network ready"
+              : "Wi-Fi needed";
+        if (expanded) {
+          const ready = wifiQR ? hasWifiQR : hasInvite;
+          show("expanded-image", ready);
+          qr(
+            "large-qr",
+            wifiQR ? "wifi" : "game",
+            ready
+              ? wifiQR
+                ? JSON.stringify([network.ssid, network.password])
+                : network.joinURL
+              : "",
+          );
+          set(
+            "expanded-help",
+            ready
+              ? wifiQR
+                ? "Stay connected if your phone says there’s no internet."
+                : "Open your phone camera and scan."
+              : "This QR will appear when the network is ready.",
+          );
+          return;
+        }
+        set("status", status);
+        set(
+          "summary",
+          network.message ||
+            (ownWifi
+              ? "Guests join your offline Wi-Fi, then scan the game QR."
+              : "Your guests can join with their phone browsers."),
+        );
+        set("wifi-title", ownWifi ? "Scan to join Wi-Fi" : "Choose a network");
+        set(
+          "wifi-help",
+          ownWifi
+            ? "Choose Stay connected if your phone says there’s no internet."
+            : starting
+              ? "The Wi-Fi QR will appear here when Android finishes."
+              : "Connect everyone to the same Wi-Fi, or create offline Wi-Fi on this device.",
+        );
+        show("wifi-qr-link", hasWifiQR);
+        qr(
+          "wifi-qr",
+          "wifi",
+          hasWifiQR ? JSON.stringify([network.ssid, network.password]) : "",
+        );
+        show("wifi-details", hasWifiQR);
+        show("password-row", !!network.password);
+        set("ssid", network.ssid || "");
+        set("password", network.password || "");
+        show("offline", !ownWifi && !starting);
+        show("system-wifi", !ownWifi && !starting);
+        show("hotspot", !ownWifi && !starting);
+        show("next", hasInvite && !starting);
+        show("waiting-address", ownWifi && !hasInvite);
+
+        set(
+          "game-title",
+          hasInvite ? "Scan the game QR" : "Set up Wi-Fi first",
+        );
+        set(
+          "game-help",
+          hasInvite
+            ? ownWifi
+              ? "Scan after joining the offline Wi-Fi. Tap to enlarge."
+              : "On the same network, scan with your phone camera. Tap to enlarge."
+            : "Choose how guests will connect to this device.",
+        );
+        show("game-qr-link", hasInvite);
+        qr("qr", "game", network.joinURL || "");
+        show("game-link", hasInvite);
+        set("url", network.joinURL || "");
+        show("choose", !hasInvite);
+        show("controller", !!network.controllerURL);
+        if (network.controllerURL)
+          get("controller").href = network.controllerURL;
+      }
+
+      async function poll() {
         try {
-          const r = await fetch("/android/status", { cache: "no-store" }),
-            s = await r.json(),
-            key = JSON.stringify(s);
-          if (key === fingerprint) return;
-          fingerprint = key;
-          main.replaceChildren();
-          function add(tag, text) {
-            const e = document.createElement(tag);
-            if (text) e.textContent = text;
-            main.append(e);
-            return e;
+          const response = await fetch("/android/status", {
+            cache: "no-store",
+          });
+          if (!response.ok) throw new Error("Host is unavailable");
+          const network = await response.json();
+          const key = JSON.stringify(network);
+          if (key !== lastStatus) {
+            update(network);
+            lastStatus = key;
           }
-          function qr(kind, large) {
-            const a = add("a");
-            a.href = large
-              ? "javascript:history.back()"
-              : "/android-qr?kind=" + kind;
-            const i = document.createElement("img");
-            i.id = "qr";
-            i.alt = kind === "wifi" ? "Join Wi-Fi QR" : "Join game QR";
-            i.src =
-              "/android/qr.svg?kind=" + kind + "&v=" + encodeURIComponent(key);
-            a.append(i);
-          }
-          if (full) {
-            const kind =
-              new URLSearchParams(location.search).get("kind") === "wifi"
-                ? "wifi"
-                : "game";
-            qr(kind, true);
-            add("p", "Android Back closes this QR");
-            return;
-          }
-          add("h1", network ? "Network Setup" : "crapsTV");
-          if (network) {
-            add(
-              "p",
-              s.message ||
-                "Choose Host on my own Wi-Fi to create an offline network.",
-            );
-            if (s.ssid) {
-              add("h2", "1 · Join Wi-Fi");
-              qr("wifi");
-              add("p", "Network: " + s.ssid);
-              add("p", "Password: " + s.password);
-            } else {
-              add(
-                "p",
-                "Ordinary hotspot fallback: enable your phone’s hotspot in Android Settings, return here, then connect guests to it. No venue Wi-Fi is required.",
-              );
-            }
-            add(
-              "p",
-              "Stay connected when the phone says “No internet.” Then return to Host and scan the game QR.",
-            );
-            if (s.addresses?.length)
-              add("p", "Host addresses: " + s.addresses.join(", "));
-          } else {
-            if (s.message) add("p", s.message);
-            add(
-              "p",
-              s.mode === "local-only"
-                ? "Offline Wi-Fi is active. Guests join its network first."
-                : "Host on my own Wi-Fi works without venue Wi-Fi, even when cellular data is on.",
-            );
-            add("h2", "Join game · " + s.code);
-            if (s.joinURL) {
-              qr("game");
-              add("p", "Tap the QR to enlarge");
-              add("code", s.joinURL);
-            } else
-              add(
-                "p",
-                "Choose Host on my own Wi-Fi, or use Network Setup to connect a local network. A game QR appears when a host address is available.",
-              );
-            add("p", "Wi-Fi credentials and Wi-Fi QR are in Network Setup.");
-            const a = add("a", "Open table");
-            a.href = "/";
-            a.className = "link";
-          }
-          add(
-            "p",
-            "Play chips only · No account or internet needed",
-          ).className = "small";
         } catch {
-          main.textContent = "Starting the local table…";
+          update({
+            message:
+              "Waiting for the local host. Reopen the app if it doesn’t reconnect.",
+          });
+          lastStatus = undefined;
+        } finally {
+          setTimeout(poll, 1200);
         }
       }
-      update();
-      setInterval(update, 1500);
+      poll();
     </script>
   </body>
 </html>

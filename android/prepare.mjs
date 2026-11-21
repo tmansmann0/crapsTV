@@ -3,6 +3,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
+if (!fs.existsSync("dist/index.html"))
+  throw Error("Build the game with npm run build before preparing Android.");
+execFileSync(
+  "node_modules/.bin/esbuild",
+  [
+    "android/host.cjs.entry.js",
+    "--bundle",
+    "--platform=node",
+    "--target=node18",
+    "--format=cjs",
+    "--external:bufferutil",
+    "--external:utf-8-validate",
+    "--outfile=android/host.cjs",
+  ],
+  { stdio: "inherit" },
+);
+// Browser and transport checks use the real bundle without requiring the NDK.
+if (process.argv.includes("--server-only")) process.exit(0);
+
 const sdk = process.env.ANDROID_HOME || process.env.ANDROID_SDK_ROOT;
 if (!sdk)
   throw Error(
@@ -13,18 +32,28 @@ fs.mkdirSync(vendor, { recursive: true });
 const archive = path.join(vendor, "nodejs-mobile-v18.20.4-android.zip");
 const expected =
   "bd7321eaa1a7602fbe0bb87302df2d79d87835cf4363fbdd17c350dbb485c2af";
-if (!fs.existsSync(archive))
+if (!fs.existsSync(archive)) {
   execFileSync(
     "curl",
     [
       "--fail",
       "--location",
+      "--retry",
+      "2",
       "https://github.com/nodejs-mobile/nodejs-mobile/releases/download/v18.20.4/nodejs-mobile-v18.20.4-android.zip",
       "-o",
-      archive,
+      archive + ".tmp",
     ],
     { stdio: "inherit" },
   );
+  if (
+    createHash("sha256")
+      .update(fs.readFileSync(archive + ".tmp"))
+      .digest("hex") !== expected
+  )
+    throw Error("Downloaded runtime archive checksum mismatch");
+  fs.renameSync(archive + ".tmp", archive);
+}
 if (
   createHash("sha256").update(fs.readFileSync(archive)).digest("hex") !==
   expected
@@ -75,27 +104,12 @@ for (const [abi, triple, libdir] of [
     { stdio: "inherit" },
   );
 }
-execFileSync(
-  "node_modules/.bin/esbuild",
-  [
-    "android/host.cjs.entry.js",
-    "--bundle",
-    "--platform=node",
-    "--target=node18",
-    "--format=cjs",
-    "--external:bufferutil",
-    "--external:utf-8-validate",
-    "--outfile=android/host.cjs",
-  ],
-  { stdio: "inherit" },
-);
 fs.writeFileSync(
   "android/build-info.json",
   JSON.stringify({
     revision: execFileSync("git", ["rev-parse", "HEAD"], {
       encoding: "utf8",
     }).trim(),
-    base: "4fae95c4727728f04bac00945cff1ad661098c22",
     runtime: "nodejs-mobile 18.20.4",
   }),
 );
@@ -111,6 +125,7 @@ function collectNotices(dir) {
 }
 collectNotices("node_modules");
 fs.writeFileSync("android/THIRD-PARTY-NOTICES.txt", notices);
+fs.mkdirSync("android/app/src/main/assets", { recursive: true });
 execFileSync(
   "python3",
   [
@@ -118,8 +133,10 @@ execFileSync(
     `import pathlib,zipfile
 with zipfile.ZipFile('android/app/src/main/assets/payload.zip','w',zipfile.ZIP_DEFLATED) as z:
  z.write('android/host.cjs','host.cjs');z.write('android/host.html','host.html');z.write('android/build-info.json','build-info.json');z.write('android/NODE-LICENSE.txt','NODE-LICENSE.txt');z.write('android/THIRD-PARTY-NOTICES.txt','THIRD-PARTY-NOTICES.txt')
- for p in pathlib.Path('dist').rglob('*'):
-  if p.is_file(): z.write(p,str(p))
+ z.write('dist/index.html','dist/index.html')
+ for folder in ('assets','audio','licenses'):
+  for p in pathlib.Path('dist',folder).rglob('*'):
+   if p.is_file(): z.write(p,str(p))
 `,
   ],
   { stdio: "inherit" },

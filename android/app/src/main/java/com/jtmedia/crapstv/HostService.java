@@ -2,12 +2,18 @@ package com.jtmedia.crapstv;
 
 import android.app.*;
 import android.content.*;
+import android.net.ConnectivityManager;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.wifi.*;
 import android.os.*;
 import java.io.*;
 import java.net.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
+import java.util.stream.Stream;
 import java.util.zip.*;
 import org.json.*;
 
@@ -22,8 +28,9 @@ public class HostService extends Service {
   private PowerManager.WakeLock wakeLock;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private File root;
-  private boolean started, requesting;
-  private String mode = "lan", ssid = "", password = "", message = "Local host is starting.";
+  private boolean started, requesting, systemHotspot;
+  private Set<String> beforeHotspot = Collections.emptySet();
+  private String mode = "lan", ssid = "", password = "", message = "";
   private final Runnable refresh = new Runnable() {
     public void run() {
       writeStatus();
@@ -73,20 +80,58 @@ public class HostService extends Service {
           writeStatus();
           int result =
               startNode(new File(root, "host.cjs").getAbsolutePath(), root.getAbsolutePath());
-          message = "Host exited (" + result + "). Stop and reopen to restart.";
-          writeStatus();
+          report("The host stopped. End the session and reopen CrapsTV to restart.");
+          android.util.Log.i("crapstv", "Host exited with code " + result);
         } catch (Exception e) {
-          message = "Host could not start: " + e.getMessage();
-          writeStatus();
+          report("The local table could not start. End the session and reopen CrapsTV.");
+          android.util.Log.e("crapstv", "Could not start the local table", e);
         }
       }, "crapstv-node").start();
     }
-    if (intent != null && "HOTSPOT".equals(intent.getAction()))
-      startHotspot();
+    if (intent != null) {
+      String action = intent.getAction();
+      if ("HOTSPOT".equals(action)) startHotspot();
+      if ("USE_SYSTEM_HOTSPOT".equals(action)) {
+        systemHotspot = true;
+        beforeHotspot = new HashSet<>(interfaceAddresses().keySet());
+        getSharedPreferences("host", 0).edit().remove("ip").apply();
+        message = "Turn on your Android hotspot, then connect guests to it.";
+        writeStatus();
+      }
+      if ("USE_LAN".equals(action)) {
+        systemHotspot = false;
+        getSharedPreferences("host", 0).edit().remove("ip").apply();
+        message = "";
+        writeStatus();
+      }
+    }
     return START_NOT_STICKY;
   }
-  private void extract() throws IOException {
+  private void report(String status) {
+    handler.post(() -> {
+      message = status;
+      writeStatus();
+    });
+  }
+  private void extract() throws Exception {
     root.mkdirs();
+    File marker = new File(root, ".payload-version");
+    String version = Long.toString(
+        getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime);
+    if (marker.isFile() && new File(root, "host.cjs").isFile() &&
+        new File(root, "dist/index.html").isFile() &&
+        version.equals(new String(Files.readAllBytes(marker.toPath()), StandardCharsets.UTF_8)))
+      return;
+    Files.deleteIfExists(marker.toPath());
+    // Replacing an APK can remove assets as well as add them.
+    Path oldAssets = new File(root, "dist").toPath();
+    if (Files.isDirectory(oldAssets)) {
+      List<Path> obsolete = new ArrayList<>();
+      try (Stream<Path> entries = Files.walk(oldAssets)) {
+        entries.sorted(Comparator.reverseOrder()).forEach(obsolete::add);
+      }
+      for (Path entry : obsolete) Files.delete(entry);
+    }
     // Installed app updates replace the payload; room and credentials are never shipped in it.
     try (ZipInputStream zip = new ZipInputStream(getAssets().open("payload.zip"))) {
       ZipEntry entry;
@@ -106,10 +151,14 @@ public class HostService extends Service {
         }
       }
     }
+    Files.write(marker.toPath(), version.getBytes(StandardCharsets.UTF_8));
   }
   private void startHotspot() {
     if (hotspot != null || requesting)
       return;
+    systemHotspot = false;
+    beforeHotspot = new HashSet<>(interfaceAddresses().keySet());
+    getSharedPreferences("host", 0).edit().remove("ip").apply();
     requesting = true;
     message = "Starting offline Wi-Fi…";
     writeStatus();
@@ -147,45 +196,108 @@ public class HostService extends Service {
             @Override
             public void onFailed(int reason) {
               requesting = false;
-              message = "Android could not start offline Wi-Fi (code " + reason
-                  + "). Try again, or enable an ordinary phone hotspot in Settings.";
+              switch (reason) {
+                case ERROR_INCOMPATIBLE_MODE:
+                  message = "Android is already using Wi-Fi for tethering. Use that hotspot, or turn it off and retry.";
+                  break;
+                case ERROR_TETHERING_DISALLOWED:
+                  message = "This device doesn’t allow offline Wi-Fi. Use an existing shared network.";
+                  break;
+                case ERROR_NO_CHANNEL:
+                  message = "Android couldn’t find a Wi-Fi channel. Try again or use an existing network.";
+                  break;
+                default:
+                  message = "Android couldn’t create offline Wi-Fi. Try again or use your phone’s hotspot.";
+              }
               writeStatus();
             }
           }, handler);
     } catch (Exception e) {
       requesting = false;
-      message = "Offline Wi-Fi unavailable: " + e.getMessage()
-          + ". Check permissions and Location on Android 8–12, or use an ordinary hotspot.";
+      message = "Android couldn’t create offline Wi-Fi. Check Wi-Fi permissions or use an existing network.";
+      android.util.Log.w("crapstv", "Offline Wi-Fi request failed", e);
       writeStatus();
     }
   }
-  private synchronized void writeStatus() {
+  private static boolean lanAddress(InetAddress address) {
+    return address instanceof Inet4Address && !address.isLoopbackAddress()
+        && !address.isLinkLocalAddress() && !address.isAnyLocalAddress();
+  }
+  private static boolean accessPoint(String name) {
+    return name.startsWith("ap") || name.startsWith("softap") || name.startsWith("swlan");
+  }
+  private Map<String, String> interfaceAddresses() {
+    Map<String, String> addresses = new TreeMap<>();
     try {
-      List<String> addresses = new ArrayList<>();
-      String preferred = "";
       for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
         if (!ni.isUp() || ni.isLoopback())
           continue;
+        String name = ni.getName();
+        if (!(accessPoint(name) || name.startsWith("wlan")
+                || name.startsWith("wifi") || name.startsWith("eth")))
+          continue;
         for (InetAddress a : Collections.list(ni.getInetAddresses()))
-          if (a instanceof Inet4Address && a.isSiteLocalAddress()) {
-            String ip = a.getHostAddress();
-            addresses.add(ip);
-            String name = ni.getName();
-            if (name.startsWith("wlan") || name.startsWith("eth") || name.startsWith("ap")
-                || name.startsWith("swlan"))
-              preferred = ip;
-          }
+          if (lanAddress(a)) addresses.put(a.getHostAddress(), name);
       }
+    } catch (SocketException e) {
+      android.util.Log.w("crapstv", "Could not read Wi-Fi addresses", e);
+    }
+    return addresses;
+  }
+  private Set<String> connectedLanAddresses() {
+    Set<String> addresses = new LinkedHashSet<>();
+    ConnectivityManager manager = getSystemService(ConnectivityManager.class);
+    Network active = manager.getActiveNetwork();
+    List<Network> networks = new ArrayList<>();
+    if (active != null) networks.add(active);
+    networks.addAll(Arrays.asList(manager.getAllNetworks()));
+    for (Network network : networks) {
+      NetworkCapabilities caps = manager.getNetworkCapabilities(network);
+      if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)
+          || !(caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)))
+        continue;
+      LinkProperties links = manager.getLinkProperties(network);
+      if (links != null) links.getLinkAddresses().forEach(link -> {
+        InetAddress address = link.getAddress();
+        if (lanAddress(address)) addresses.add(address.getHostAddress());
+      });
+    }
+    return addresses;
+  }
+  private String preferredAddress(Map<String, String> interfaces, Set<String> lan) {
+    if (requesting) return "";
+    if (hotspot != null || systemHotspot) {
+      for (Map.Entry<String, String> entry : interfaces.entrySet())
+        if (accessPoint(entry.getValue()) && !lan.contains(entry.getKey()))
+          return entry.getKey();
+      for (String ip : interfaces.keySet())
+        if (!beforeHotspot.contains(ip) && !lan.contains(ip)) return ip;
+      return "";
+    }
+    if (!lan.isEmpty()) return lan.iterator().next();
+    for (Map.Entry<String, String> entry : interfaces.entrySet())
+      if (accessPoint(entry.getValue())) return entry.getKey();
+    return interfaces.keySet().stream().findFirst().orElse("");
+  }
+  private synchronized void writeStatus() {
+    try {
+      Map<String, String> interfaces = interfaceAddresses();
+      Set<String> lan = connectedLanAddresses();
+      Set<String> addresses = new LinkedHashSet<>(lan);
+      addresses.addAll(interfaces.keySet());
+      String preferred = preferredAddress(interfaces, lan);
       String override = getSharedPreferences("host", 0).getString("ip", "");
-      if (!override.isEmpty())
+      if (!requesting && addresses.contains(override))
         preferred = override;
       JSONObject s = new JSONObject();
-      s.put("mode", mode);
+      s.put("mode", requesting ? "starting" : systemHotspot ? "system-hotspot" : mode);
       s.put("ssid", ssid);
       s.put("password", password);
       s.put("ip", preferred);
       s.put("addresses", new JSONArray(addresses));
-      s.put("message", message);
+      s.put("message", systemHotspot && !preferred.isEmpty() ?
+            "Guests join your Android hotspot, then scan the game QR." : message);
       root.mkdirs();
       File temp = new File(root, "network.json.tmp");
       try (FileWriter writer = new FileWriter(temp)) {
