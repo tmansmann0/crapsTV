@@ -23,8 +23,10 @@ test("Drinking Mode starts humans at zero and only peer-verified drinks fund pla
   const { state, host, guest } = table();
   assert.equal(host.bank, 0);
   assert.equal(game.join(state, "Late guest").bank, 0);
-  const bot = game.addBot(state, host.id, { name: "Dealer bot" });
-  assert.equal(bot.bank, state.config.startingBank);
+  assert.throws(
+    () => game.addBot(state, host.id, { name: "Dealer bot" }),
+    /bots are unavailable/i,
+  );
   assert.throws(() => game.reup(state, host.id), /verified chips/);
   assert.throws(() => game.place(state, host.id, "pass", 500), /Not enough/);
   assert.throws(() => requestCredit(state, host, "finish", 1), /off/);
@@ -35,10 +37,6 @@ test("Drinking Mode starts humans at zero and only peer-verified drinks fund pla
   assert.throws(
     () => game.respondToDrink(state, host.id, id, "accept"),
     /another player/i,
-  );
-  assert.throws(
-    () => game.respondToDrink(state, bot.id, id, "accept"),
-    /human/,
   );
   game.respondToDrink(state, guest.id, id, "accept");
   assert.deepEqual([host.bank, host.buyIn, game.net(host)], [1000, 1000, 0]);
@@ -111,6 +109,8 @@ test("host pricing, finish option, and markups apply to the correct transactions
   assert.equal(state.drinkRequests[0].amount, 3600);
   assert.equal(game.net(host), 3620);
   assert.equal(host.bank, 8420);
+  game.setDrinkingRules(state, host.id, { ...rules, finishEnabled: false });
+  assert.throws(() => requestCredit(state, guest, "finish", 1), /off/);
   game.changeConnection(state, host.id, false);
   game.respondToDrink(state, guest.id, finish, "complete");
   game.changeConnection(state, host.id, true);
@@ -121,6 +121,41 @@ test("host pricing, finish option, and markups apply to the correct transactions
   assert.throws(() => offer("sip", 1), /available chips/);
   assert.equal(host.bank, 420);
   assert.equal(state.drinkRequests.length, 0);
+});
+
+test("switching a lobby to Drinking Mode clears bot seats and keeps a human shooter", () => {
+  const state = game.createState("DRINKS");
+  const host = game.join(state, "Host");
+  const bot = game.addBot(state, host.id, { name: "Dealer bot" });
+  const guest = game.join(state, "Guest");
+  assert.equal(bot.bank, state.config.startingBank);
+  game.rotateShooter(state);
+  assert.equal(state.shooterId, bot.id);
+
+  game.configure(state, host.id, {
+    drinkingMode: true,
+    minBet: state.config.startingBank + 100,
+  });
+  assert.deepEqual(
+    state.players.map(({ id }) => id),
+    [host.id, guest.id],
+  );
+  assert.equal(state.adminId, host.id);
+  assert.equal(state.shooterId, host.id);
+  assert.equal(state.botRollAt, null);
+  assert.equal(state.config.minBet, 100100);
+  assert.throws(
+    () => game.addBot(state, host.id, { name: "Bot" }),
+    /unavailable/,
+  );
+  assert.throws(() => game.join(state, "Bot", bot.bot), /unavailable/);
+  assert.equal(game.join(state, "Next guest").seat, bot.seat);
+
+  // In-memory rooms created under the older rules may still have a lobby bot.
+  state.players.push(bot);
+  game.start(state, host.id);
+  assert(state.players.every((player) => !player.bot));
+  assert(state.players.every((player) => player.bank === 0));
 });
 
 test("the shared room takes the requester and prices from authoritative state", () => {
@@ -143,6 +178,23 @@ test("the shared room takes the requester and prices from authoritative state", 
   const request = hub.state.drinkRequests[0];
   assert.equal(request.amount, 500);
   assert.equal(request.from, host.id);
+  const nextRules = { ...DEFAULT_DRINKING_RULES, sipValue: 600 };
+  hub.receive("guest", { type: "drinking-rules", rules: nextRules });
+  assert.match(inbox.guest.at(-1).message, /table host/);
+  assert.equal(hub.state.config.drinkingRules.sipValue, 500);
+  hub.receive("host", {
+    type: "drinking-rules",
+    rules: { ...nextRules, shotValue: null },
+  });
+  assert.match(inbox.host.at(-1).message, /enter drink values/i);
+  hub.state.rolling = true;
+  hub.receive("host", { type: "drinking-rules", rules: nextRules });
+  assert.match(inbox.host.at(-1).message, /dice to land/);
+  assert.equal(hub.state.config.drinkingRules.sipValue, 500);
+  hub.state.rolling = false;
+  hub.receive("host", { type: "drinking-rules", rules: nextRules });
+  assert.deepEqual(inbox.guest.at(-1).state.config.drinkingRules, nextRules);
+  assert.equal(hub.state.drinkRequests[0].amount, 500);
   hub.receive("host", {
     type: "drink-response",
     requestId: request.id,
@@ -157,5 +209,14 @@ test("the shared room takes the requester and prices from authoritative state", 
     response: "accept",
   });
   assert.equal(host.bank, 500);
+  requestCredit(hub.state, host, "sip", 1);
+  assert.equal(hub.state.drinkRequests[0].amount, 600);
+  hub.receive("host", { type: "end" });
+  hub.receive("host", {
+    type: "drinking-rules",
+    rules: DEFAULT_DRINKING_RULES,
+  });
+  assert.match(inbox.host.at(-1).message, /session has ended/);
+  assert.deepEqual(hub.state.config.drinkingRules, nextRules);
   hub.close();
 });
