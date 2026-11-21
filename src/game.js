@@ -9,6 +9,11 @@ import {
 } from "./betting-window.js";
 import { normalizeBotOptions } from "./bot-options.js";
 import {
+  DEFAULT_DRINKING_RULES,
+  drinkPrice,
+  validDrinkingRules,
+} from "./drinking-mode.js";
+import {
   DEFAULT_GRAPHICS,
   mergeGraphics,
   normalizeGraphics,
@@ -123,6 +128,7 @@ export function createState(code = "LOCAL") {
     status: "lobby",
     config: {
       mode: "craps",
+      drinkingMode: false,
       startingBank: 100000,
       minBet: 500,
       teach: false,
@@ -137,6 +143,7 @@ export function createState(code = "LOCAL") {
       revision: 0,
     },
     players: [],
+    drinkRequests: [],
     adminId: null,
     shooterId: null,
     point: null,
@@ -160,6 +167,12 @@ export function equity(p) {
 }
 export function net(p) {
   return equity(p) - p.buyIn;
+}
+export function drinkOfferBudget(player) {
+  return Math.max(0, Math.min(player.bank, net(player)));
+}
+export function drinkOfferLimit(player, price) {
+  return price > 0 ? Math.floor(drinkOfferBudget(player) / price) : 0;
 }
 export function snapshot(state) {
   return structuredClone(state);
@@ -462,7 +475,7 @@ function log(s, text, type = "info") {
   s.log.unshift({ id: uid(), text, type, at: Date.now() });
   s.log = s.log.slice(0, 50);
 }
-export function join(s, name) {
+export function join(s, name, bot = null) {
   assert(s.status !== "ended", "This session has ended. Start a new table.");
   assert(
     s.players.filter((p) => !p.left).length < 12,
@@ -476,6 +489,8 @@ export function join(s, name) {
           .slice(0, 20)
       : "";
   assert(name.length > 0, "Give us a name for the table.");
+  const startingBank =
+    s.config.drinkingMode && !bot ? 0 : s.config.startingBank;
   const p = {
     id: uid(),
     name,
@@ -486,8 +501,9 @@ export function join(s, name) {
     dice: { color: "red", finish: "solid" },
     betPreview: null,
     color: COLORS[s.players.length % COLORS.length],
-    bank: s.config.startingBank,
-    buyIn: s.config.startingBank,
+    bank: startingBank,
+    buyIn: startingBank,
+    ...(bot ? { bot } : {}),
     bets: [],
     connected: true,
     left: false,
@@ -507,7 +523,7 @@ export function join(s, name) {
     history: [
       {
         roll: s.rolls.length,
-        equity: s.config.startingBank,
+        equity: startingBank,
         net: 0,
         event: "Joined",
       },
@@ -524,9 +540,7 @@ export function addBot(s, id, options = {}) {
   const host = active(s, id);
   assert(!host.bot, "Only a human host can add bots.");
   const bot = normalizeBotOptions(options);
-  const p = join(s, options.name);
-  p.bot = bot;
-  return p;
+  return join(s, options.name, bot);
 }
 export function removeBot(s, id, playerId) {
   admin(s, id);
@@ -553,6 +567,8 @@ export function configure(s, id, changes) {
     startingBank = s.config.startingBank,
     minBet = s.config.minBet,
     mode = s.config.mode,
+    drinkingMode = s.config.drinkingMode ?? false,
+    drinkingRules = s.config.drinkingRules ?? DEFAULT_DRINKING_RULES,
     teach = s.config.teach,
     rollCooldownSeconds = s.config.rollCooldownSeconds ??
       DEFAULT_ROLL_COOLDOWN_SECONDS,
@@ -560,6 +576,14 @@ export function configure(s, id, changes) {
       DEFAULT_BOT_ROLL_DELAY_SECONDS,
   } = changes;
   assert(["craps", "crapless"].includes(mode), "Choose craps or crapless.");
+  assert(
+    typeof drinkingMode === "boolean",
+    "Choose whether to enable Drinking Mode.",
+  );
+  assert(
+    validDrinkingRules(drinkingRules),
+    "Enter drink values from $1 to $1,000,000 and a whole markup from 0% to 1000%.",
+  );
   assert(
     Number.isSafeInteger(startingBank) &&
       startingBank >= 1000 &&
@@ -577,14 +601,24 @@ export function configure(s, id, changes) {
     startingBank,
     minBet,
     mode,
+    drinkingMode,
+    ...(drinkingMode && {
+      drinkingRules: Object.fromEntries(
+        Object.keys(DEFAULT_DRINKING_RULES).map((key) => [
+          key,
+          drinkingRules[key],
+        ]),
+      ),
+    }),
     teach,
     rollCooldownSeconds,
     botRollDelaySeconds,
   };
-  for (const p of s.players) {
-    p.bank = startingBank;
-    p.buyIn = startingBank;
-    p.history = [{ roll: 0, equity: startingBank, net: 0, event: "Joined" }];
+  for (const p of s.players.filter((player) => !player.left)) {
+    const bank = drinkingMode && !p.bot ? 0 : startingBank;
+    p.bank = bank;
+    p.buyIn = bank;
+    p.history = [{ roll: 0, equity: bank, net: 0, event: "Joined" }];
   }
 }
 export function start(s, id) {
@@ -728,6 +762,7 @@ export function remove(s, id, betId) {
 export function reup(s, id) {
   betting(s);
   const p = active(s, id);
+  assert(!s.config.drinkingMode || p.bot, "Request verified chips in Drinks.");
   assert(
     equity(p) < minimumPlayableBet(s, p),
     "Re-up after your stack falls below the table minimum.",
@@ -744,6 +779,114 @@ export function reup(s, id) {
     event: "Re-up",
   });
   log(s, `${p.name} is back in the game.`, "reup");
+}
+function drinkPlayer(s, id) {
+  const player = active(s, id);
+  assert(!player.bot && player.connected, "Choose a connected human player.");
+  return player;
+}
+
+export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
+  assert(s.config.drinkingMode, "Drinking Mode is off.");
+  betting(s);
+  const player = drinkPlayer(s, id);
+  assert(kind === "credit" || kind === "offer", "Unknown drink action.");
+  const price = drinkPrice(
+    s.config.drinkingRules ?? DEFAULT_DRINKING_RULES,
+    unit,
+    kind,
+  );
+  assert(price !== null, "That drink option is off.");
+  const amount = quantity * price;
+  assert(
+    Number.isSafeInteger(quantity) &&
+      quantity > 0 &&
+      Number.isSafeInteger(amount) &&
+      (unit !== "finish" || quantity === 1),
+    "Enter a valid whole number.",
+  );
+  const requests = (s.drinkRequests ??= []);
+  const pending = requests.some(
+    (request) => request.from === id && request.kind === kind,
+  );
+  if (kind === "credit") {
+    assert(!pending, "You already have a pending top-up.");
+    assert(
+      s.players.some((p) => p.id !== id && p.connected && !p.left && !p.bot),
+      "Another connected player must verify your top-up.",
+    );
+    assert(to === null, "Top-ups can be verified by any other player.");
+  } else {
+    assert(!pending, "Your last drink assignment is still open.");
+    assert(to !== id, "Choose someone else for the drink assignment.");
+    const recipient = drinkPlayer(s, to);
+    assert(
+      quantity <= drinkOfferLimit(player, price),
+      "Drink assignments must fit your winnings and available chips.",
+    );
+    player.bank -= amount;
+    player.betPreview = null;
+    recordDrinkChange(s, player, "Assigned a drink");
+    log(
+      s,
+      `${player.name} assigned a drink to ${recipient.name}.`,
+      "drink-offer",
+    );
+  }
+  requests.push({ id: uid(), kind, unit, quantity, amount, from: id, to });
+}
+
+export function respondToDrink(s, id, requestId, response) {
+  assert(s.config.drinkingMode, "Drinking Mode is off.");
+  betting(s);
+  const responder = drinkPlayer(s, id);
+  const index =
+    s.drinkRequests?.findIndex((request) => request.id === requestId) ?? -1;
+  assert(index >= 0, "That request has already been closed.");
+  const { kind, from, to, amount } = s.drinkRequests[index];
+  if (kind === "offer") {
+    assert(id === to, "Only the assigned player can complete this drink.");
+    assert(response === "complete", "Assigned drinks must be completed.");
+    log(
+      s,
+      `${responder.name} completed their assigned drink.`,
+      "drink-completed",
+    );
+  } else if (response === "cancel") {
+    assert(id === from, "Only the sender can cancel this request.");
+  } else {
+    assert(
+      response === "accept" || response === "decline",
+      "Unknown drink response.",
+    );
+    assert(id !== from, "Another player must answer this top-up.");
+    if (response === "accept") {
+      const sender = drinkPlayer(s, from);
+      assert(
+        Number.isSafeInteger(equity(sender) + amount) &&
+          Number.isSafeInteger(sender.buyIn + amount),
+        "That top-up is too large.",
+      );
+      sender.bank += amount;
+      sender.buyIn += amount;
+      recordDrinkChange(s, sender, "Verified chip top-up");
+      log(
+        s,
+        `${responder.name} verified ${money(amount)} in chips for ${sender.name}.`,
+        "drink-credit",
+      );
+    }
+  }
+  s.drinkRequests.splice(index, 1);
+}
+
+function recordDrinkChange(s, player, event) {
+  player.history.push({
+    roll: s.rolls.length,
+    equity: equity(player),
+    net: net(player),
+    event,
+  });
 }
 export function setDiceAppearance(s, id, appearance) {
   const p = active(s, id);
@@ -1133,6 +1276,10 @@ export function leave(s, id) {
   p.betPreview = null;
   p.left = true;
   p.connected = false;
+  if (s.drinkRequests?.length)
+    s.drinkRequests = s.drinkRequests.filter((request) =>
+      request.kind === "credit" ? request.from !== id : request.to !== id,
+    );
   p.leftAt = Date.now();
   p.history.push({
     roll: s.rolls.length,
@@ -1158,6 +1305,7 @@ export function end(s, id) {
     p.bets = [];
   }
   s.status = "ended";
+  s.drinkRequests = [];
   s.botRollAt = null;
   s.aim = null;
   for (const player of s.players) player.betPreview = null;

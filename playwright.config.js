@@ -5,6 +5,9 @@ export default defineConfig({
   timeout: 180000,
   expect: { timeout: process.env.CI ? 20000 : 5000 },
   fullyParallel: false,
+  // Two real tables can saturate the software renderer and starve both
+  // animation timelines on a shared runner. Keep their full assertions.
+  workers: process.env.CI ? 1 : undefined,
   // A retry would inherit this session's in-memory table; fail the original case instead.
   retries: 0,
   use: {

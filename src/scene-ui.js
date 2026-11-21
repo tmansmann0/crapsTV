@@ -280,6 +280,7 @@ export function createSceneUI(renderer, onAction) {
       ["graphics", "Graphics", "›"],
       ["ui-size", "UI size", uiSize === "large" ? "LARGE" : "COMPACT"],
       ["labels", "Labels", labelMotion.toUpperCase()],
+      ["audio", "Table audio", "›"],
     ];
     rows.forEach(([action, label, value], i) => {
       const y = 92 + i * 76;
@@ -585,6 +586,8 @@ export function createSceneUI(renderer, onAction) {
         : bettingSeconds > 0
           ? `Betting open · ${bettingSeconds}s${layout.compact ? "" : ` · ${shooter} next`}`
           : `${shooter} to roll · Betting open`;
+      if (state.config.drinkingMode && !state.rolling)
+        detail += " · Drinking Mode";
       const focus = current.cameraFocus;
       if (!state.rolling && focus?.phase === "outcome-player") {
         const delta = focus.delta || 0;
@@ -797,6 +800,7 @@ export function createSceneUI(renderer, onAction) {
       next.introReducedMotion,
       next.fallbackJoinURL,
       next.state?.status,
+      next.state?.config.drinkingMode,
       next.state?.point,
       next.state?.rolling,
       current.bettingSeconds,

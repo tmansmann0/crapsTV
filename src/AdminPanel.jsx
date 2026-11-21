@@ -16,6 +16,8 @@ import {
   X,
 } from "lucide-react";
 import { money } from "./game.js";
+import DrinkIcon from "./DrinkIcon.jsx";
+import { DEFAULT_DRINKING_RULES, DRINK_UNITS } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import {
   BOT_STRATEGIES,
@@ -88,6 +90,79 @@ function SecondsField({ label, value, onChange, disabled }) {
         </button>
       </span>
     </label>
+  );
+}
+
+function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
+  const update = (key, value) =>
+    setRules((current) => ({ ...current, [key]: value }));
+  return (
+    <fieldset className="ha-drinking" disabled={!connected}>
+      <legend>Drinking Mode</legend>
+      <button
+        type="button"
+        className="ha-drinking-toggle"
+        aria-pressed={enabled}
+        onClick={() => setEnabled(!enabled)}
+      >
+        <DrinkIcon name="mode" size={30} />
+        <span>
+          <strong>Drinking Mode</strong>
+          <small>
+            Verified chip top-ups and drink assignments from winnings.
+          </small>
+        </span>
+        <b>{enabled ? "On" : "Off"}</b>
+      </button>
+      {enabled && (
+        <>
+          <div className="ha-money-grid ha-drinking-prices">
+            {DRINK_UNITS.filter(
+              ({ id }) => id !== "finish" || rules.finishEnabled,
+            ).map(({ id, label, valueKey }) => (
+              <label key={id}>
+                {label} value ($)
+                <input
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  step="0.01"
+                  required
+                  value={rules[valueKey]}
+                  onChange={(event) => update(valueKey, event.target.value)}
+                />
+              </label>
+            ))}
+            <label>
+              Drink assignment markup (%)
+              <input
+                type="number"
+                min="0"
+                max="1000"
+                step="1"
+                required
+                value={rules.offerMarkup}
+                onChange={(event) => update("offerMarkup", event.target.value)}
+              />
+            </label>
+          </div>
+          <label className="ha-drinking-finish">
+            <input
+              type="checkbox"
+              checked={rules.finishEnabled}
+              onChange={(event) =>
+                update("finishEnabled", event.target.checked)
+              }
+            />
+            Enable “Finish drink”
+          </label>
+          <small>
+            Markup changes the price of assignments. Top-ups use the listed
+            drink values.
+          </small>
+        </>
+      )}
+    </fieldset>
   );
 }
 
@@ -451,6 +526,14 @@ export default function AdminPanel({
   serverError,
 }) {
   const id = useId();
+  const savedDrinkRules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
+  const [drinkingMode, setDrinkingMode] = useState(!!state.config.drinkingMode);
+  const [drinkingRules, setDrinkingRules] = useState(() => ({
+    ...savedDrinkRules,
+    sipValue: savedDrinkRules.sipValue / 100,
+    shotValue: savedDrinkRules.shotValue / 100,
+    finishValue: savedDrinkRules.finishValue / 100,
+  }));
   const [tab, setTab] = useState("table"),
     [bank, setBank] = useState(state.config.startingBank / 100),
     [minimum, setMinimum] = useState(state.config.minBet / 100),
@@ -481,6 +564,18 @@ export default function AdminPanel({
         startingBank: Math.round(Number(bank) * 100),
         minBet: Math.round(Number(minimum) * 100),
         mode,
+        drinkingMode,
+        ...(drinkingMode && {
+          drinkingRules: {
+            sipValue: Math.round(Number(drinkingRules.sipValue) * 100),
+            shotValue: Math.round(Number(drinkingRules.shotValue) * 100),
+            finishValue: drinkingRules.finishEnabled
+              ? Math.round(Number(drinkingRules.finishValue) * 100)
+              : DEFAULT_DRINKING_RULES.finishValue,
+            finishEnabled: drinkingRules.finishEnabled,
+            offerMarkup: Number(drinkingRules.offerMarkup),
+          },
+        }),
         teach,
         rollCooldownSeconds: Number(seconds),
         botRollDelaySeconds: Number(botDelay),
@@ -592,9 +687,18 @@ export default function AdminPanel({
                     ))}
                   </div>
                 </fieldset>
+                <DrinkingSettings
+                  enabled={drinkingMode}
+                  setEnabled={setDrinkingMode}
+                  rules={drinkingRules}
+                  setRules={setDrinkingRules}
+                  connected={connected}
+                />
                 <div className="ha-money-grid">
                   <label>
-                    Starting chips ($)
+                    {drinkingMode
+                      ? "Bot starting chips ($)"
+                      : "Starting chips ($)"}
                     <input
                       type="number"
                       min="10"
@@ -665,7 +769,11 @@ export default function AdminPanel({
                       : "Classic craps"}
                   </span>
                   <span>{money(state.config.minBet)} minimum</span>
-                  <span>{money(state.config.startingBank)} starting</span>
+                  <span>
+                    {state.config.drinkingMode
+                      ? "Drinking Mode"
+                      : `${money(state.config.startingBank)} starting`}
+                  </span>
                 </div>
                 <form className="ha-timing" onSubmit={saveTiming}>
                   <h3>

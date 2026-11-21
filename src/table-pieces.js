@@ -133,7 +133,11 @@ function wagerFlightTargets(plan, state, current = []) {
   });
 }
 
-export function createTablePieces(scene, renderer, { software = false } = {}) {
+export function createTablePieces(
+  scene,
+  renderer,
+  { software = false, onChipLanding } = {},
+) {
   let alive = true,
     chipFactory = null,
     dealerRoot = null,
@@ -1756,9 +1760,23 @@ export function createTablePieces(scene, renderer, { software = false } = {}) {
         seats: seatLayout,
         wagerSources,
       });
-    flows = flows.filter(
-      (f) => now < Math.min(f.startAt + f.duration, f.cutAt ?? Infinity),
-    );
+    flows = flows.filter((flow) => {
+      if (now < flowEnd(flow)) return true;
+      const group = flightObjects.get(flow.id);
+      const plan = bankDisplay.plans.get(flow.id);
+      // A slow frame can go directly from source to destination before a
+      // flight mesh is rendered. The chips still land in this update.
+      const count =
+        group?.userData.flightSpecs?.length ??
+        plan?.chips.length ??
+        (flow.amount >= 100
+          ? pileSpecs(flow.amount, { max: 6, seed: flow.id }).length
+          : 0);
+      if (count) {
+        onChipLanding?.(count, routePosition(flow.to, state)[0]);
+      }
+      return false;
+    });
     if (chipFactory) {
       buildStatic(state, players, now);
       updatePreviews(state, players);
