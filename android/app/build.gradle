@@ -1,0 +1,38 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.jtmedia.crapstv'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.jtmedia.crapstv'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.17.0-offline-preview'
+    }
+    buildTypes { release { minifyEnabled false } }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    androidResources { noCompress += ["zip"] }
+    packaging { jniLibs { useLegacyPackaging true } }
+}
+
+tasks.register("verifyOfflinePayload") {
+    doLast {
+        def source = file("src/main")
+        if (!new File(source, "assets/payload.zip").isFile()) {
+            throw new GradleException("Missing offline assets. Run npm run build and node android/prepare.mjs from the repository root.")
+        }
+        for (abi in ["arm64-v8a", "armeabi-v7a", "x86_64"]) {
+            for (library in ["libnode.so", "libc++_shared.so", "libcrapstv-host.so"]) {
+                if (!new File(source, "jniLibs/${abi}/${library}").isFile()) {
+                    throw new GradleException("Missing ${abi}/${library}. Run node android/prepare.mjs from the repository root.")
+                }
+            }
+        }
+    }
+}
+tasks.named("preBuild") {
+    dependsOn("verifyOfflinePayload")
+}

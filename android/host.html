@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>CrapsTV · Hosting</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font:
+          16px system-ui,
+          sans-serif;
+        background: #0a1c16;
+        color: #f8efd9;
+        --gold: #eacc8d;
+        --mint: #a9dbc5;
+        --muted: #c5d4cb;
+        --edge: #4b6458;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+      }
+      main {
+        max-width: 780px;
+        padding: 0 18px 22px;
+        margin: auto;
+      }
+      header {
+        position: sticky;
+        z-index: 1;
+        top: 0;
+        padding: 10px 0;
+        background: #0a1c16;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: 1.12rem;
+      }
+      h2 {
+        font-size: clamp(1.55rem, 6vw, 2.2rem);
+        line-height: 1.15;
+      }
+      p {
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      button,
+      select,
+      summary {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        color: inherit;
+      }
+      button:focus-visible,
+      summary:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--mint);
+        outline-offset: 3px;
+      }
+      .button {
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        margin-top: 10px;
+        padding: 8px 14px;
+        border: 1px solid var(--edge);
+        border-radius: 10px;
+        background: #18362a;
+        font-weight: 700;
+      }
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.6;
+      }
+      .primary {
+        background: var(--gold);
+        border-color: var(--gold);
+        color: #182920;
+      }
+      .done {
+        width: auto;
+        min-width: 76px;
+        min-height: 44px;
+        margin: 0;
+      }
+      .card {
+        padding: clamp(14px, 3vw, 24px);
+        border: 1px solid var(--edge);
+        border-radius: 16px;
+        background: #132b21;
+      }
+      .card h2 + p {
+        margin: 8px 0 12px;
+      }
+      .connected {
+        color: var(--mint);
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+      .share {
+        display: grid;
+        gap: 16px;
+        text-align: center;
+        align-items: center;
+      }
+      .qr {
+        display: block;
+        width: min(100%, 63vh, 380px);
+        height: auto;
+        margin: auto;
+        border-radius: 12px;
+        background: white;
+      }
+      .room {
+        display: block;
+        margin: 10px 0;
+        font-size: 1.45rem;
+        letter-spacing: 0.12em;
+        font-weight: 800;
+      }
+      details {
+        margin-top: 12px;
+      }
+      summary {
+        cursor: pointer;
+        color: var(--gold);
+        padding: 8px 0;
+      }
+      .manual {
+        text-align: start;
+        padding-top: 10px;
+        border-top: 1px solid var(--edge);
+      }
+      .manual p + p {
+        margin-top: 6px;
+      }
+      .code {
+        overflow-wrap: anywhere;
+        user-select: all;
+      }
+      .notice {
+        margin-top: 12px;
+        padding: 10px 12px;
+        border-left: 3px solid var(--gold);
+        background: #1a372a;
+      }
+      .danger {
+        color: #ffe4d9;
+        background: #552b28;
+        border-color: #a86b60;
+      }
+      .address-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        cursor: pointer;
+      }
+      .address-option input {
+        appearance: none;
+        margin: 0;
+        width: 18px;
+        height: 18px;
+        border: 2px solid var(--gold);
+        border-radius: 50%;
+      }
+      .address-option input:checked {
+        background: var(--gold);
+        box-shadow: inset 0 0 0 3px #132b21;
+      }
+      @media (min-aspect-ratio: 4/3) and (min-width: 540px) {
+        .share {
+          grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr);
+          text-align: start;
+        }
+        .qr {
+          width: min(100%, 70vh, 380px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1 id="title">Wi-Fi &amp; hosting</h1>
+        <button type="button" class="button done" id="done">Done</button>
+      </header>
+
+      <section class="card" id="setup" hidden>
+        <h2>Get everyone connected</h2>
+        <p id="setup-copy">
+          Create a local Wi-Fi network for the table, or connect to one nearby.
+        </p>
+        <button
+          type="button"
+          class="button primary"
+          id="create"
+          data-action="offline"
+        >
+          Create offline Wi-Fi
+        </button>
+        <details>
+          <summary>Other ways to connect</summary>
+          <button type="button" class="button" data-action="wifi">
+            Open Wi-Fi settings
+          </button>
+          <button type="button" class="button" data-action="hotspot">
+            Use Android hotspot
+          </button>
+        </details>
+        <div class="notice" id="help" hidden>
+          <p id="help-copy"></p>
+          <button
+            type="button"
+            class="button"
+            data-action="location"
+            id="location"
+            hidden
+          >
+            Open Location settings
+          </button>
+          <button
+            type="button"
+            class="button"
+            data-action="app-settings"
+            id="permission"
+            hidden
+          >
+            Open app permissions
+          </button>
+        </div>
+      </section>
+
+      <section class="card share" id="wifi-share" hidden>
+        <div>
+          <p class="connected">1 · Join Wi-Fi</p>
+          <h2>Scan to join Wi-Fi</h2>
+          <p>
+            Choose Stay connected if your phone says this network has no
+            internet.
+          </p>
+          <button type="button" class="button primary" id="next">
+            Show game QR
+          </button>
+          <p id="waiting" class="notice" hidden>
+            Waiting for the host’s Wi-Fi address.
+          </p>
+          <details class="manual">
+            <summary>Enter Wi-Fi details manually</summary>
+            <p>Network <code id="ssid" class="code"></code></p>
+            <p id="password-row">
+              Password <code id="password" class="code"></code>
+            </p>
+          </details>
+        </div>
+        <img
+          class="qr"
+          id="wifi-qr"
+          alt="Scan to join the offline Wi-Fi"
+          width="1024"
+          height="1024"
+        />
+      </section>
+
+      <section class="card share" id="game-share" hidden>
+        <div>
+          <p id="game-step" class="connected" hidden>2 · Join the game</p>
+          <h2>Scan to join the table</h2>
+          <p>Open your phone camera while connected to the same Wi-Fi.</p>
+          <strong id="room" class="room"></strong>
+          <details class="manual">
+            <summary>Enter the link manually</summary>
+            <p>Player controller <code id="join-url" class="code"></code></p>
+            <p>TV display <code id="table-url" class="code"></code></p>
+          </details>
+          <button type="button" class="button" id="back-to-wifi" hidden>
+            Show Wi-Fi QR
+          </button>
+        </div>
+        <img
+          class="qr"
+          id="game-qr"
+          alt="Scan to join the CrapsTV table"
+          width="1024"
+          height="1024"
+        />
+      </section>
+
+      <section class="card" id="hosting" hidden>
+        <p class="connected" id="connection"></p>
+        <h2>Host a table</h2>
+        <p>Keep CrapsTV running while friends are playing.</p>
+        <button type="button" class="button primary" id="pair">
+          Show game QR
+        </button>
+        <button type="button" class="button" id="show-wifi" hidden>
+          Show Wi-Fi QR
+        </button>
+      </section>
+      <section class="card" id="utilities" hidden>
+        <details id="advanced" hidden>
+          <summary>Host address</summary>
+          <div
+            id="addresses"
+            role="radiogroup"
+            aria-label="Address for the game link"
+          ></div>
+          <button type="button" class="button" id="save-address">
+            Use this address
+          </button>
+        </details>
+        <details class="manual">
+          <summary>Stop hosting</summary>
+          <p>Ending this session disconnects all players.</p>
+          <button type="button" class="button danger" data-action="stop">
+            End session
+          </button>
+        </details>
+      </section>
+      <p id="loading" role="status">Opening hosting controls…</p>
+    </main>
+    <script>
+      const get = (id) => document.getElementById(id);
+      const show = (id, visible) => {
+        get(id).hidden = !visible;
+      };
+      const text = (id, value) => {
+        if (get(id).textContent !== value) get(id).textContent = value;
+      };
+      const query = new URLSearchParams(location.search);
+      const initialView =
+        query.get("view") ||
+        (location.pathname === "/android-network" ? "settings" : "game");
+      const embedded = parent !== window;
+      let view = initialView,
+        state,
+        signature,
+        revision = 0,
+        qrValues = {};
+      function close() {
+        if (embedded)
+          parent.postMessage(
+            { type: "crapstv:close-host-panel" },
+            location.origin,
+          );
+        else location.assign("/");
+      }
+      function action(action, address) {
+        if (!embedded) return;
+        const destination = new URL("crapstv://host/" + action);
+        if (action === "address")
+          destination.searchParams.set("ip", address || "");
+        parent.location.assign(destination.href);
+      }
+      get("done").onclick = close;
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.onclick = () => action(button.dataset.action);
+      });
+      get("save-address").onclick = () =>
+        action(
+          "address",
+          document.querySelector("[name=host-address]:checked")?.value,
+        );
+      get("pair").onclick = get("next").onclick = () => {
+        view = "game";
+        render();
+      };
+      get("back-to-wifi").onclick = get("show-wifi").onclick = () => {
+        view = "wifi";
+        render();
+      };
+      window.addEventListener("message", (event) => {
+        if (
+          event.origin !== location.origin ||
+          event.source !== parent ||
+          event.data?.type !== "crapstv:network-help"
+        )
+          return;
+        const locationRequired = event.data.reason === "location";
+        show("help", true);
+        show("location", locationRequired);
+        show("permission", !locationRequired);
+        text(
+          "help-copy",
+          locationRequired
+            ? "This version of Android needs Location on to create offline Wi-Fi."
+            : "Allow the Wi-Fi permission for CrapsTV, then try again.",
+        );
+      });
+      function updateQR(id, kind, key) {
+        if (qrValues[id] === key) return;
+        qrValues[id] = key;
+        get(id).src = "/android/qr.svg?kind=" + kind + "&rev=" + ++revision;
+      }
+      function render() {
+        if (!state) return;
+        const ready = !!state.joinURL;
+        const offline = state.mode === "local-only" && !!state.ssid;
+        const starting = state.mode === "starting";
+        // If Android joined an existing network in the first-run setup,
+        // return to the same table. A local hotspot still needs both QR steps.
+        if (embedded && view === "setup" && ready && !offline) {
+          close();
+          return;
+        }
+        const page = starting
+          ? "setup"
+          : offline && view !== "game" && (view !== "settings" || !ready)
+            ? "wifi-share"
+            : !ready
+              ? "setup"
+              : view === "settings"
+                ? "hosting"
+                : "game-share";
+        for (const section of ["setup", "wifi-share", "game-share", "hosting"])
+          show(section, page === section);
+        show("utilities", view === "settings");
+        if (view === "settings") {
+          const addresses = state.addresses || [];
+          show("advanced", addresses.length > 0);
+          const key = addresses.join(",");
+          const group = get("addresses");
+          if (group.dataset.addresses !== key) {
+            group.dataset.addresses = key;
+            group.replaceChildren(
+              ...["", ...addresses].map((address) => {
+                const label = document.createElement("label");
+                label.className = "address-option";
+                const input = document.createElement("input");
+                input.type = "radio";
+                input.name = "host-address";
+                input.value = address;
+                input.checked = address === (state.override || "");
+                label.append(
+                  input,
+                  document.createTextNode(address || "Automatic"),
+                );
+                return label;
+              }),
+            );
+          }
+        }
+        show("loading", false);
+        text(
+          "title",
+          page === "hosting"
+            ? "Wi-Fi & hosting"
+            : page === "game-share"
+              ? "Pair players"
+              : "Network setup",
+        );
+        if (page === "setup") {
+          text(
+            "setup-copy",
+            state.message ||
+              "Create a local Wi-Fi network for the table, or connect to one nearby.",
+          );
+          get("create").disabled = starting;
+          text(
+            "create",
+            starting ? "Creating offline Wi-Fi…" : "Create offline Wi-Fi",
+          );
+        } else if (page === "wifi-share") {
+          updateQR(
+            "wifi-qr",
+            "wifi",
+            JSON.stringify([state.ssid, state.password]),
+          );
+          text("ssid", state.ssid);
+          text("password", state.password || "");
+          show("password-row", !!state.password);
+          show("next", ready);
+          show("waiting", !ready);
+        } else if (page === "game-share") {
+          updateQR("game-qr", "game", state.joinURL);
+          text("room", state.code);
+          text("join-url", state.joinURL);
+          text("table-url", new URL("/", state.joinURL).href);
+          show("game-step", offline);
+          show("back-to-wifi", offline);
+        } else {
+          show("show-wifi", offline);
+          text(
+            "connection",
+            state.mode === "system-hotspot"
+              ? "Android hotspot ready"
+              : "Shared network ready",
+          );
+        }
+      }
+      async function poll() {
+        try {
+          const response = await fetch("/android/status", {
+            cache: "no-store",
+          });
+          if (!response.ok) throw new Error("Host not ready");
+          const next = await response.json();
+          const key = JSON.stringify(next);
+          if (key !== signature) {
+            state = next;
+            signature = key;
+            render();
+          }
+        } catch {
+          text("loading", "Waiting for the local host…");
+          show("loading", true);
+        } finally {
+          setTimeout(poll, 1200);
+        }
+      }
+      poll();
+    </script>
+  </body>
+</html>
