@@ -42,17 +42,39 @@ test("quick color and finish choices preserve each other before a state echo", (
   assert.deepEqual(a.dice, { color: "green", finish: "solid" });
   assert.throws(() => game.setDiceAppearance(s, a.id, { color: null }));
 });
-test("TV settings are admin-only and validate camera/sound values", () => {
+test("TV settings are admin-only and validate camera, sound, and player colors", () => {
   const s = game.createState(),
     a = game.join(s, "A"),
     b = game.join(s, "B");
   assert.throws(() => game.setDisplaySettings(s, b.id, { sound: true }));
+  assert.equal(s.display.playerChipColors, false);
+  assert.throws(() =>
+    game.setDisplaySettings(s, b.id, { playerChipColors: true }),
+  );
+  assert.throws(() =>
+    game.setDisplaySettings(s, a.id, { playerChipColors: "on" }),
+  );
   assert.throws(() => game.setDisplaySettings(s, a.id, { sound: "yes" }));
   assert.throws(() => game.setDisplaySettings(s, a.id, { camera: "invalid" }));
   game.setDisplaySettings(s, a.id, { sound: true, camera: "room" });
   assert.equal(s.display.sound, true);
   assert.equal(s.display.camera, "room");
   assert.equal(s.display.revision, 1);
+  game.setDisplaySettings(s, a.id, { playerChipColors: true });
+  game.setDisplaySettings(s, a.id, { camera: "auto" });
+  assert.equal(game.snapshot(s).display.playerChipColors, true);
+  game.setDisplaySettings(s, a.id, { playerChipColors: false });
+  assert.equal(s.display.playerChipColors, false);
+});
+test("all seats have unique colors even after a player leaves and rejoins", () => {
+  const s = game.createState();
+  const players = Array.from({ length: 12 }, (_, index) =>
+    game.join(s, `Player ${index + 1}`),
+  );
+  assert.equal(new Set(players.map((p) => p.color)).size, 12);
+  game.leave(s, players[7].id);
+  const replacement = game.join(s, "Replacement");
+  assert.equal(replacement.color, players[7].color);
 });
 test("seat positions are stable and released seats can be reused", () => {
   const s = game.createState(),

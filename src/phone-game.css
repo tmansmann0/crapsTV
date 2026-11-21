@@ -107,6 +107,14 @@ body:has(.pg-shell) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.pg-identity .pg-owner-name {
+  justify-self: start;
+  max-width: 100%;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--player);
+  background: var(--pg-felt-deep);
+}
 .pg-identity small {
   display: flex;
   gap: 4px;

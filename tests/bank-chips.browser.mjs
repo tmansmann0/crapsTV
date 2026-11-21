@@ -99,6 +99,24 @@ try {
     ),
     "The actual spent bank chips are on the felt",
   );
+  const readHighlights = () => page.evaluate(() => window.bankQA.highlights());
+  const changeHighlights = async (enabled) => {
+    await page.evaluate((value) => window.bankQA.highlight(value), enabled);
+    await settle();
+    return readHighlights();
+  };
+  assert.deepEqual((await readHighlights()).wagerRims, []);
+  const highlights = await changeHighlights(true);
+  assert.equal(highlights.bankRims, false);
+  assert(highlights.matchingNamePixels > 0);
+  assert.deepEqual(
+    highlights.wagerRims,
+    seven.wagers.map(() => highlights.playerColor),
+  );
+  assert.deepEqual((await read()).wagers, seven.wagers);
+  const disabled = await changeHighlights(false);
+  assert.deepEqual(disabled.wagerRims, []);
+  assert.equal(disabled.matchingNamePixels, 0);
   const plan = await page.evaluate(() => window.bankQA.win());
   const flow = plan.transfers.find((f) => f.to.kind === "bank");
   assert(flow);

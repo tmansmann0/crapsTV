@@ -8,6 +8,7 @@ function fixture(
     { position: [0, 0, -6], diameter: 1 },
     { position: [0, 0, -100], diameter: 1 },
   ],
+  ownerRim,
 ) {
   const material = new THREE.MeshStandardMaterial();
   material.name = "ChipBase";
@@ -20,6 +21,7 @@ function fixture(
     [source],
     () => material,
     new Map([[material.name, low]]),
+    ownerRim,
   );
   const camera = new THREE.PerspectiveCamera(45, 16 / 9, 0.1, 500);
   camera.updateMatrixWorld(true);
@@ -30,6 +32,37 @@ function closeMatrix(actual, expected) {
     assert.ok(Math.abs(value - expected.elements[i]) < 1e-5),
   );
 }
+
+test("each colored rim tracks its chip pose independently of LOD", () => {
+  const ownerRim = {
+    geometry: new THREE.CylinderGeometry(0.5, 0.5, 0.02),
+    material: new THREE.MeshBasicMaterial(),
+  };
+  const { group, batch, camera } = fixture(
+    [
+      { position: [0, 0, -6], diameter: 1, ownerColor: "#f2bd68" },
+      { position: [0, 0, -100], diameter: 1 },
+      { position: [1, 0, -6], diameter: 1, ownerColor: "#77c9b4" },
+    ],
+    ownerRim,
+  );
+  const rim = group.getObjectByName("Player color chip rims");
+  assert.equal(rim.count, 2);
+  const color = new THREE.Color();
+  rim.getColorAt(0, color);
+  assert.equal(color.getHexString(), "f2bd68");
+  rim.getColorAt(1, color);
+  assert.equal(color.getHexString(), "77c9b4");
+  const moved = new THREE.Matrix4().makeTranslation(0, 1, -100);
+  batch.setMatrixAt(0, moved);
+  batch.update(camera, 1080);
+  const actual = new THREE.Matrix4();
+  rim.getMatrixAt(0, actual);
+  closeMatrix(actual, moved);
+  rim.getMatrixAt(1, actual);
+  closeMatrix(actual, batch.getMatrixAt(2, new THREE.Matrix4()));
+  assert.deepEqual(batch.stats(), { high: 1, low: 2 });
+});
 
 test("near and far chips in one material batch independently select their geometry", () => {
   const { group, batch, camera, source, low } = fixture();

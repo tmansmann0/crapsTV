@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Scene, Matrix4 } from "three";
+import { Scene, Matrix4, Color } from "three";
 import Table3D from "../../src/Table3D.jsx";
 import * as game from "../../src/game.js";
 import "../../src/style.css";
 
 let banks,
   wagers,
+  labels,
   transfers,
   publish,
   clock = 100000,
@@ -16,6 +17,7 @@ Scene.prototype.add = function (...objects) {
   objects.forEach((object) => {
     if (object.name === "Player bankrolls") banks = object;
     if (object.name === "Live wagers") wagers = object;
+    if (object.name === "Player names and bankrolls") labels = object;
     if (object.name === "Chip transfers") transfers = object;
   });
   return add.apply(this, objects);
@@ -48,6 +50,38 @@ state.clockOffsetMs = 0;
 const snapshot = () => ({ ...structuredClone(state), snapshotAt: clock });
 const update = () => publish(snapshot());
 window.bankQA = {
+  highlight(enabled) {
+    game.setDisplaySettings(state, state.adminId, {
+      playerChipColors: enabled,
+    });
+    update();
+  },
+  highlights() {
+    const nameCanvas = labels?.children.find(
+      (label) => label.userData.playerId === player.id,
+    )?.material.map.image;
+    const namePixels = nameCanvas
+      ?.getContext("2d")
+      .getImageData(12, 14, 488, 84).data;
+    const color = new Color();
+    const rims = wagers?.getObjectByName("Player color chip rims");
+    const rgb = Number.parseInt(player.color.slice(1), 16);
+    let matchingNamePixels = 0;
+    for (let i = 0; i < (namePixels?.length || 0); i += 4) {
+      const pixel =
+        (namePixels[i] << 16) + (namePixels[i + 1] << 8) + namePixels[i + 2];
+      matchingNamePixels += Number(pixel === rgb);
+    }
+    return {
+      playerColor: player.color,
+      matchingNamePixels,
+      bankRims: !!banks?.getObjectByName("Player color chip rims"),
+      wagerRims: Array.from({ length: rims?.count || 0 }, (_, index) => {
+        rims.getColorAt(index, color);
+        return `#${color.getHexString()}`;
+      }),
+    };
+  },
   metadata() {
     const specs = Object.values(banks?.userData.layouts || {}).flat();
     const batch = banks?.children.find((group) => group.userData.chipBatch)

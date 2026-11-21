@@ -2030,7 +2030,18 @@ export default function PhoneGame({
             {player.name[0]?.toUpperCase()}
           </span>
           <div className="pg-identity">
-            <b>{player.name}</b>
+            <b
+              className={
+                state.display?.playerChipColors ? "pg-owner-name" : undefined
+              }
+              style={
+                state.display?.playerChipColors
+                  ? { "--player": player.color }
+                  : undefined
+              }
+            >
+              {player.name}
+            </b>
             <small>
               <i
                 className={connected ? "is-live" : "is-down"}

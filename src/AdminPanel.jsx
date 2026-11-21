@@ -410,6 +410,24 @@ function TVSettings({
           }
         />
       </label>
+      <label className="toggle-label">
+        <span>
+          Player chip colors
+          <small>Match each wager chip’s rim to the player’s name.</small>
+        </span>
+        <input
+          aria-label="Player chip colors"
+          type="checkbox"
+          checked={state.display?.playerChipColors === true}
+          disabled={!connected}
+          onChange={(event) =>
+            send({
+              type: "display",
+              settings: { playerChipColors: event.target.checked },
+            })
+          }
+        />
+      </label>
       <label>
         TV camera
         <select
