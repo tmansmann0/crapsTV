@@ -106,6 +106,22 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await expect(offer.getByText(/awaiting completion/)).toHaveCount(0);
     expect(alice.bank).toBe(4250);
     expect(hub.state.drinkRequests).toHaveLength(0);
+
+    const guestTopUp = guest.locator(".pg-drink-card").filter({
+      has: guest.getByRole("heading", { name: "Add chips" }),
+    });
+    const guestDrink = guestTopUp.getByLabel("Drink", { exact: true });
+    await guestDrink.selectOption("finish");
+    hub.receive("Alice", {
+      type: "drinking-rules",
+      rules: { ...hub.state.config.drinkingRules, finishEnabled: false },
+    });
+    await expect(guestDrink).toHaveValue("sip");
+    await expect(guestTopUp.getByLabel("Quantity")).toBeVisible();
+    await expect(
+      guestTopUp.getByRole("button", { name: /Request verification/ }),
+    ).toBeEnabled();
+
     // A delayed payout can have returned the controller to its Play view.
     await host.getByRole("tab", { name: "Drinks", exact: true }).click();
     await expect(host.locator(".pg-drinks svg.drink-icon")).toHaveCount(3);

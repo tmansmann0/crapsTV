@@ -5,7 +5,9 @@ import {
   Bot,
   Check,
   ChevronDown,
+  ChevronRight,
   Clock3,
+  Coins,
   Crown,
   Dices,
   LogOut,
@@ -13,11 +15,16 @@ import {
   Plus,
   Settings2,
   Users,
+  Volume2,
   X,
 } from "lucide-react";
 import { money } from "./game.js";
 import DrinkIcon from "./DrinkIcon.jsx";
-import { DEFAULT_DRINKING_RULES, DRINK_UNITS } from "./drinking-mode.js";
+import {
+  DEFAULT_DRINKING_RULES,
+  DRINK_UNITS,
+  validDrinkingRules,
+} from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import {
   BOT_STRATEGIES,
@@ -93,80 +100,172 @@ function SecondsField({ label, value, onChange, disabled }) {
   );
 }
 
-function DrinkingSettings({ enabled, setEnabled, rules, setRules, connected }) {
+function RollTimingFields({
+  seconds,
+  setSeconds,
+  botDelay,
+  setBotDelay,
+  botsAllowed,
+  disabled,
+}) {
+  return (
+    <>
+      <h3>
+        <Clock3 size={17} /> Time to bet
+      </h3>
+      <SecondsField
+        label="Betting window"
+        value={seconds}
+        onChange={setSeconds}
+        disabled={disabled}
+      />
+      {botsAllowed && (
+        <>
+          <SecondsField
+            label="Bot roll delay"
+            value={botDelay}
+            onChange={setBotDelay}
+            disabled={disabled}
+          />
+          <p>
+            Bot shooters wait {Number(seconds || 0) + Number(botDelay || 0)}s in
+            total.
+          </p>
+        </>
+      )}
+    </>
+  );
+}
+
+function drinkRuleDraft(saved) {
+  return {
+    ...saved,
+    sipValue: saved.sipValue / 100,
+    shotValue: saved.shotValue / 100,
+    finishValue: saved.finishValue / 100,
+  };
+}
+
+function readDrinkRules(draft) {
+  const finishValue = Math.round(Number(draft.finishValue) * 100);
+  const rules = {
+    sipValue: Math.round(Number(draft.sipValue) * 100),
+    shotValue: Math.round(Number(draft.shotValue) * 100),
+    finishValue:
+      !draft.finishEnabled && !(finishValue >= 100 && finishValue <= 100000000)
+        ? DEFAULT_DRINKING_RULES.finishValue
+        : finishValue,
+    finishEnabled: draft.finishEnabled,
+    offerMarkup: draft.offerMarkup === "" ? NaN : Number(draft.offerMarkup),
+  };
+  return validDrinkingRules(rules) ? rules : null;
+}
+
+function DrinkPriceFields({ rules, setRules }) {
   const update = (key, value) =>
     setRules((current) => ({ ...current, [key]: value }));
   return (
-    <fieldset className="ha-drinking" disabled={!connected}>
-      <legend>Drinking Mode</legend>
+    <>
+      <div className="ha-money-grid ha-drinking-prices">
+        {DRINK_UNITS.filter(
+          ({ id }) => id !== "finish" || rules.finishEnabled,
+        ).map(({ id, label, valueKey }) => (
+          <label key={id}>
+            {label} value ($)
+            <input
+              type="number"
+              inputMode="decimal"
+              min="1"
+              max="1000000"
+              step="0.01"
+              required
+              value={rules[valueKey]}
+              onChange={(event) => update(valueKey, event.target.value)}
+            />
+          </label>
+        ))}
+        <label>
+          Drink assignment markup (%)
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            max="1000"
+            step="1"
+            required
+            value={rules.offerMarkup}
+            onChange={(event) => update("offerMarkup", event.target.value)}
+          />
+        </label>
+      </div>
+      <label className="toggle-label ha-drinking-finish">
+        <span>Enable “Finish drink”</span>
+        <input
+          type="checkbox"
+          checked={rules.finishEnabled}
+          onChange={(event) => update("finishEnabled", event.target.checked)}
+        />
+      </label>
+      <p className="ha-rule-help">
+        Chip top-ups use the listed values. Markup applies to drink assignments.
+      </p>
+    </>
+  );
+}
+
+function DrinkingSettings({ enabled, setEnabled, rules, setRules, disabled }) {
+  return (
+    <fieldset className="ha-drinking" disabled={disabled}>
       <button
         type="button"
-        className="ha-drinking-toggle"
+        className="ha-drinking-toggle ha-control-row"
+        aria-label="Drinking Mode"
         aria-pressed={enabled}
         onClick={() => setEnabled(!enabled)}
       >
-        <DrinkIcon name="mode" size={30} />
+        <DrinkIcon name="mode" size={24} />
         <span>
           <strong>Drinking Mode</strong>
-          <small>
-            Verified chip top-ups and drink assignments from winnings.
-          </small>
+          <small>Verified chip top-ups and drink assignments.</small>
         </span>
         <b>{enabled ? "On" : "Off"}</b>
       </button>
-      {enabled && (
-        <>
-          <div className="ha-money-grid ha-drinking-prices">
-            {DRINK_UNITS.filter(
-              ({ id }) => id !== "finish" || rules.finishEnabled,
-            ).map(({ id, label, valueKey }) => (
-              <label key={id}>
-                {label} value ($)
-                <input
-                  type="number"
-                  min="1"
-                  max="1000000"
-                  step="0.01"
-                  required
-                  value={rules[valueKey]}
-                  onChange={(event) => update(valueKey, event.target.value)}
-                />
-              </label>
-            ))}
-            <label>
-              Drink assignment markup (%)
-              <input
-                type="number"
-                min="0"
-                max="1000"
-                step="1"
-                required
-                value={rules.offerMarkup}
-                onChange={(event) => update("offerMarkup", event.target.value)}
-              />
-            </label>
-          </div>
-          <label className="ha-drinking-finish">
-            <input
-              type="checkbox"
-              checked={rules.finishEnabled}
-              onChange={(event) =>
-                update("finishEnabled", event.target.checked)
-              }
-            />
-            Enable “Finish drink”
-          </label>
-          <small>
-            Markup changes the price of assignments. Top-ups use the listed
-            drink values.
-          </small>
-        </>
-      )}
+      {enabled && <DrinkPriceFields rules={rules} setRules={setRules} />}
     </fieldset>
   );
 }
 
-function BotSeats({
+function LiveDrinkPrices({ saved, disabled, send }) {
+  const [draft, setDraft] = useState(() => drinkRuleDraft(saved));
+  const rules = readDrinkRules(draft);
+  const unchanged =
+    rules && Object.keys(rules).every((key) => rules[key] === saved[key]);
+  return (
+    <form
+      className="ha-drinking"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (rules && !disabled && !unchanged)
+          send({ type: "drinking-rules", rules });
+      }}
+    >
+      <fieldset disabled={disabled}>
+        <legend className="ha-card-title">Drink prices</legend>
+        <DrinkPriceFields rules={draft} setRules={setDraft} />
+        <p className="ha-rule-help">Changes apply to new requests.</p>
+        <button
+          type="submit"
+          className="button outline small"
+          disabled={!rules || unchanged}
+        >
+          Save drink prices
+        </button>
+      </fieldset>
+    </form>
+  );
+}
+
+function PlayerSeats({
   state,
   connected,
   send,
@@ -174,7 +273,7 @@ function BotSeats({
   onNotice,
   onFormChange,
   serverError,
-  delay,
+  botsAllowed,
 }) {
   const [adding, setAdding] = useState(false),
     [name, setName] = useState(""),
@@ -182,7 +281,9 @@ function BotSeats({
     [difficulty, setDifficulty] = useState(DEFAULT_BOT_OPTIONS.difficulty),
     [pending, setPending] = useState(false);
   const previousIds = useRef(new Set());
-  const players = state.players.filter((p) => !p.left);
+  const players = state.players.filter(
+    (p) => !p.left && (botsAllowed || !p.bot),
+  );
   const full = players.length >= 12;
   const disabled = !connected || state.rolling;
   const selected = BOT_STRATEGIES.find((option) => option.id === strategy);
@@ -212,7 +313,7 @@ function BotSeats({
   }, [pending]);
   function add(event) {
     event.preventDefault();
-    if (disabled || full || pending || !name.trim()) return;
+    if (!botsAllowed || disabled || full || pending || !name.trim()) return;
     previousIds.current = new Set(players.map((p) => p.id));
     setPending(true);
     send({ type: "add-bot", name: name.trim(), strategy, difficulty });
@@ -220,12 +321,9 @@ function BotSeats({
   return (
     <div className="ha-players">
       <div className="ha-section-heading">
-        <div>
-          <h3>At the table</h3>
-          <p>People and bots share the same chips and rules.</p>
-        </div>
+        <h3>At the table</h3>
       </div>
-      {!adding && (
+      {(!adding || !botsAllowed) && (
         <ul className="ha-roster" aria-label="Table players">
           {players.map((p) => (
             <li key={p.id}>
@@ -265,7 +363,7 @@ function BotSeats({
           ))}
         </ul>
       )}
-      {!adding ? (
+      {botsAllowed && !adding && (
         <button
           type="button"
           className="ha-add button outline"
@@ -278,7 +376,8 @@ function BotSeats({
           <Plus size={17} />
           {full ? "Table full (12/12)" : "Add bot"}
         </button>
-      ) : (
+      )}
+      {botsAllowed && adding && (
         <form className="ha-bot-form" onSubmit={add}>
           <header>
             <h3>Add a bot</h3>
@@ -355,17 +454,21 @@ function BotSeats({
           </button>
         </form>
       )}
-      <p className="ha-note">
-        <Clock3 size={15} />
-        <span>
-          Bots wait an extra {state.config.botRollDelaySeconds ?? 5}s before
-          rolling.{" "}
-          <button type="button" onClick={openTiming}>
-            Change timing
-          </button>
-        </span>
-      </p>
-      <p className="ha-fair-play">{BOT_FAIR_PLAY_NOTE}</p>
+      {botsAllowed && (
+        <>
+          <p className="ha-note">
+            <Clock3 size={15} />
+            <span>
+              Bots wait an extra {state.config.botRollDelaySeconds ?? 5}s before
+              rolling.{" "}
+              <button type="button" onClick={openTiming}>
+                Change timing
+              </button>
+            </span>
+          </p>
+          <p className="ha-fair-play">{BOT_FAIR_PLAY_NOTE}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -375,6 +478,7 @@ function TVSettings({
   send,
   connected,
   onDisplayAction,
+  onTableAudio,
   fallbackJoinURL,
 }) {
   const graphicsSummary = ["fps", "resolution"]
@@ -410,6 +514,20 @@ function TVSettings({
           }
         />
       </label>
+      <button
+        type="button"
+        className="ha-control-row ha-table-audio"
+        aria-label="Table audio"
+        onClick={onTableAudio}
+        disabled={!connected || !onTableAudio}
+      >
+        <Volume2 size={20} />
+        <span>
+          <strong>Table audio</strong>
+          <small>Music, ambience and sound effects.</small>
+        </span>
+        <ChevronRight size={18} />
+      </button>
       <label>
         TV camera
         <select
@@ -522,18 +640,16 @@ export default function AdminPanel({
   connected,
   confirm,
   onDisplayAction,
+  onTableAudio,
   fallbackJoinURL,
   serverError,
 }) {
   const id = useId();
   const savedDrinkRules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
   const [drinkingMode, setDrinkingMode] = useState(!!state.config.drinkingMode);
-  const [drinkingRules, setDrinkingRules] = useState(() => ({
-    ...savedDrinkRules,
-    sipValue: savedDrinkRules.sipValue / 100,
-    shotValue: savedDrinkRules.shotValue / 100,
-    finishValue: savedDrinkRules.finishValue / 100,
-  }));
+  const [drinkingRules, setDrinkingRules] = useState(() =>
+    drinkRuleDraft(savedDrinkRules),
+  );
   const [tab, setTab] = useState("table"),
     [bank, setBank] = useState(state.config.startingBank / 100),
     [minimum, setMinimum] = useState(state.config.minBet / 100),
@@ -545,8 +661,12 @@ export default function AdminPanel({
     [botFormOpen, setBotFormOpen] = useState(false);
   const lobby = state.status !== "playing",
     disabled = !connected || state.rolling;
-  const players = state.players.filter((p) => !p.left),
+  const botsAllowed = !(lobby ? drinkingMode : state.config.drinkingMode);
+  const players = state.players.filter(
+      (p) => !p.left && (botsAllowed || !p.bot),
+    ),
     humans = players.filter((p) => !p.bot && p.id !== player.id);
+  const rules = drinkingMode ? readDrinkRules(drinkingRules) : undefined;
   useEffect(
     () => setSeconds(state.config.rollCooldownSeconds ?? 10),
     [state.config.rollCooldownSeconds],
@@ -558,49 +678,58 @@ export default function AdminPanel({
   useEffect(() => setTeach(state.config.teach), [state.config.teach]);
   function start(event) {
     event.preventDefault();
+    if (disabled || !validSetup) return;
     send({
       type: "start",
       config: {
-        startingBank: Math.round(Number(bank) * 100),
+        ...(botsAllowed && { startingBank: Math.round(Number(bank) * 100) }),
         minBet: Math.round(Number(minimum) * 100),
         mode,
         drinkingMode,
-        ...(drinkingMode && {
-          drinkingRules: {
-            sipValue: Math.round(Number(drinkingRules.sipValue) * 100),
-            shotValue: Math.round(Number(drinkingRules.shotValue) * 100),
-            finishValue: drinkingRules.finishEnabled
-              ? Math.round(Number(drinkingRules.finishValue) * 100)
-              : DEFAULT_DRINKING_RULES.finishValue,
-            finishEnabled: drinkingRules.finishEnabled,
-            offerMarkup: Number(drinkingRules.offerMarkup),
-          },
-        }),
+        ...(rules && { drinkingRules: rules }),
         teach,
         rollCooldownSeconds: Number(seconds),
-        botRollDelaySeconds: Number(botDelay),
+        ...(botsAllowed && { botRollDelaySeconds: Number(botDelay) }),
       },
     });
   }
   function saveTiming(event) {
     event.preventDefault();
+    if (disabled || !validTiming) return;
     send({ type: "cooldown", seconds: Number(seconds) });
-    send({ type: "bot-delay", seconds: Number(botDelay) });
+    if (botsAllowed) send({ type: "bot-delay", seconds: Number(botDelay) });
     setNotice("Timing saved.");
   }
-  const valid =
+  const validTiming =
     seconds !== "" &&
-    botDelay !== "" &&
-    Number(bank) >= 10 &&
-    Number(bank) <= 1000000 &&
-    Number(minimum) >= 1 &&
-    Number(minimum) <= Number(bank) &&
     Number.isInteger(Number(seconds)) &&
-    Number.isInteger(Number(botDelay)) &&
     Number(seconds) >= 0 &&
     Number(seconds) <= 60 &&
-    Number(botDelay) >= 0 &&
-    Number(botDelay) <= 60;
+    (!botsAllowed ||
+      (botDelay !== "" &&
+        Number.isInteger(Number(botDelay)) &&
+        Number(botDelay) >= 0 &&
+        Number(botDelay) <= 60));
+  const validSetup =
+    validTiming &&
+    Number.isInteger(Number(minimum)) &&
+    Number(minimum) >= 1 &&
+    Number(minimum) <= (botsAllowed ? Number(bank) : 1000000) &&
+    (botsAllowed
+      ? Number.isInteger(Number(bank)) &&
+        Number(bank) >= 10 &&
+        Number(bank) <= 1000000
+      : !!rules);
+  const timingFields = (
+    <RollTimingFields
+      seconds={seconds}
+      setSeconds={setSeconds}
+      botDelay={botDelay}
+      setBotDelay={setBotDelay}
+      botsAllowed={botsAllowed}
+      disabled={disabled}
+    />
+  );
   return (
     <section
       className={`ha-panel ${lobby ? "is-lobby setup" : ""}`}
@@ -657,8 +786,43 @@ export default function AdminPanel({
           <>
             {lobby ? (
               <form id={`${id}-setup`} onSubmit={start} className="ha-rules">
-                <fieldset disabled={!connected}>
-                  <legend>Game</legend>
+                <fieldset className="ha-stakes" disabled={disabled}>
+                  <legend className="ha-card-title">
+                    <Coins size={17} aria-hidden="true" /> Table stakes
+                  </legend>
+                  <div className={botsAllowed ? "ha-money-grid" : ""}>
+                    <label>
+                      Table minimum ($)
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        max={botsAllowed ? bank : 1000000}
+                        step="1"
+                        required
+                        value={minimum}
+                        onChange={(e) => setMinimum(e.target.value)}
+                      />
+                    </label>
+                    {botsAllowed && (
+                      <label>
+                        Starting chips ($)
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min="10"
+                          max="1000000"
+                          step="1"
+                          required
+                          value={bank}
+                          onChange={(e) => setBank(e.target.value)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </fieldset>
+                <fieldset className="ha-game-rules" disabled={disabled}>
+                  <legend className="ha-card-title">Game rules</legend>
                   <div className="ha-mode-grid">
                     {[
                       [
@@ -692,57 +856,9 @@ export default function AdminPanel({
                   setEnabled={setDrinkingMode}
                   rules={drinkingRules}
                   setRules={setDrinkingRules}
-                  connected={connected}
+                  disabled={disabled}
                 />
-                <div className="ha-money-grid">
-                  <label>
-                    {drinkingMode
-                      ? "Bot starting chips ($)"
-                      : "Starting chips ($)"}
-                    <input
-                      type="number"
-                      min="10"
-                      max="1000000"
-                      step="1"
-                      required
-                      value={bank}
-                      disabled={!connected}
-                      onChange={(e) => setBank(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Table minimum ($)
-                    <input
-                      type="number"
-                      min="1"
-                      max={bank}
-                      step="1"
-                      required
-                      value={minimum}
-                      disabled={!connected}
-                      onChange={(e) => setMinimum(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <div className="ha-timing">
-                  <SecondsField
-                    label="Betting window"
-                    value={seconds}
-                    onChange={setSeconds}
-                    disabled={!connected}
-                  />
-                  <SecondsField
-                    label="Bot roll delay"
-                    value={botDelay}
-                    onChange={setBotDelay}
-                    disabled={!connected}
-                  />
-                  <p>
-                    Bots roll after{" "}
-                    {Number(seconds || 0) + Number(botDelay || 0)}s: the betting
-                    window, plus their extra wait.
-                  </p>
-                </div>
+                <div className="ha-timing">{timingFields}</div>
                 <label className="toggle-label ha-teach">
                   <span>
                     <BookOpen size={18} />
@@ -775,30 +891,20 @@ export default function AdminPanel({
                       : `${money(state.config.startingBank)} starting`}
                   </span>
                 </div>
+                {state.config.drinkingMode && (
+                  <LiveDrinkPrices
+                    key={JSON.stringify(savedDrinkRules)}
+                    saved={savedDrinkRules}
+                    disabled={disabled}
+                    send={send}
+                  />
+                )}
                 <form className="ha-timing" onSubmit={saveTiming}>
-                  <h3>
-                    <Clock3 size={17} /> Time to bet
-                  </h3>
-                  <SecondsField
-                    label="Betting window"
-                    value={seconds}
-                    onChange={setSeconds}
-                    disabled={!connected}
-                  />
-                  <SecondsField
-                    label="Bot roll delay"
-                    value={botDelay}
-                    onChange={setBotDelay}
-                    disabled={!connected}
-                  />
-                  <p>
-                    Extra time for people before a bot shooter rolls. Total
-                    wait: {Number(seconds || 0) + Number(botDelay || 0)}s.
-                  </p>
+                  {timingFields}
                   <button
                     type="submit"
                     className="button outline small"
-                    disabled={!connected || !valid}
+                    disabled={disabled || !validTiming}
                   >
                     Save timing
                   </button>
@@ -855,7 +961,7 @@ export default function AdminPanel({
         )}
         {tab === "players" && (
           <>
-            <BotSeats
+            <PlayerSeats
               state={state}
               connected={connected}
               send={send}
@@ -863,6 +969,7 @@ export default function AdminPanel({
               onNotice={setNotice}
               onFormChange={setBotFormOpen}
               serverError={serverError}
+              botsAllowed={botsAllowed}
             />
             {!botFormOpen && (
               <details className="ha-disclosure">
@@ -900,8 +1007,7 @@ export default function AdminPanel({
                     </label>
                   ) : (
                     <p className="ha-fair-play">
-                      Another person can take over as host when they join. Bots
-                      cannot host.
+                      Another player can take over as host after joining.
                     </p>
                   )}
                 </div>
@@ -915,6 +1021,7 @@ export default function AdminPanel({
             send={send}
             connected={connected}
             onDisplayAction={onDisplayAction}
+            onTableAudio={onTableAudio}
             fallbackJoinURL={fallbackJoinURL}
           />
         )}
@@ -934,7 +1041,7 @@ export default function AdminPanel({
             type="submit"
             form={`${id}-setup`}
             className="button dark jumbo"
-            disabled={!connected || !valid}
+            disabled={disabled || !validSetup}
             onClick={tab !== "table" ? start : undefined}
           >
             Open the table

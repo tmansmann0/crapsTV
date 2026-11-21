@@ -54,6 +54,41 @@ test("TV settings are admin-only and validate camera/sound values", () => {
   assert.equal(s.display.camera, "room");
   assert.equal(s.display.revision, 1);
 });
+test("table audio updates are admin-only, validated and independent of other display settings", () => {
+  const s = game.createState(),
+    host = game.join(s, "Host"),
+    guest = game.join(s, "Guest");
+  assert.throws(() =>
+    game.setDisplaySettings(s, guest.id, { audio: { effects: 0 } }),
+  );
+  game.setDisplaySettings(s, host.id, {
+    audio: { ambience: 0.5, music: "moil" },
+  });
+  game.setDisplaySettings(s, host.id, { audio: { effects: 0 } });
+  game.setDisplaySettings(s, host.id, { camera: "room" });
+  assert.equal(s.display.audioRevision, 2);
+  assert.deepEqual(s.display.audio, {
+    effects: 0,
+    ambience: 0.5,
+    music: "moil",
+    musicVolume: 0.4,
+  });
+  const before = structuredClone(s.display);
+  for (const audio of [
+    null,
+    [],
+    { music: "other" },
+    { effects: -1 },
+    { ambience: 2 },
+    { musicVolume: "loud" },
+    JSON.parse('{"__proto__":{"polluted":true}}'),
+  ]) {
+    assert.throws(() =>
+      game.setDisplaySettings(s, host.id, { audio, camera: "table" }),
+    );
+    assert.deepEqual(s.display, before);
+  }
+});
 test("seat positions are stable and released seats can be reused", () => {
   const s = game.createState(),
     a = game.join(s, "A"),

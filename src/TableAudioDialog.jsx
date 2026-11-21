@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Play, X } from "lucide-react";
-import { MUSIC_TRACKS } from "./table-audio.js";
+import { MUSIC_TRACKS } from "./table-audio-settings.js";
 
 function Level({ label, value, onChange }) {
   const percent = Math.round(value * 100);
@@ -27,6 +27,8 @@ export default function TableAudioDialog({
   ready,
   onChange,
   onPreview,
+  onApply,
+  canApply = true,
   onClose,
 }) {
   const dialog = useRef(null);
@@ -52,6 +54,7 @@ export default function TableAudioDialog({
           <X size={22} aria-hidden="true" />
         </button>
       </header>
+      {onApply && <p>Adjust the sound on the table display.</p>}
       <Level
         label="Dice and chips"
         value={settings.effects}
@@ -83,10 +86,17 @@ export default function TableAudioDialog({
         />
       )}
       <footer>
-        <button type="button" onClick={onPreview}>
-          <Play size={16} aria-hidden="true" /> Test effects
-        </button>
-        {!ready && (
+        {onApply && (
+          <button type="button" disabled={!canApply} onClick={onApply}>
+            Apply to table
+          </button>
+        )}
+        {onPreview && (
+          <button type="button" onClick={onPreview}>
+            <Play size={16} aria-hidden="true" /> Test effects
+          </button>
+        )}
+        {onPreview && !ready && (
           <span role="status">Press Test effects to enable sound.</span>
         )}
       </footer>

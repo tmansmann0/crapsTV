@@ -30,11 +30,34 @@ try {
   await page.getByRole("heading", { name: "Table setup" }).waitFor();
   await expect(page.getByLabel("Teach mode")).not.toBeChecked();
   await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveValue("5");
+  await expect(page.locator(".ha-rules fieldset").first()).toContainText(
+    "Table minimum ($)",
+  );
   await mkdir("artifacts/admin-ux", { recursive: true });
   await page.screenshot({
     path: "artifacts/admin-ux/table-375.png",
     fullPage: true,
   });
+  const drinkingMode = page.getByRole("button", {
+    name: "Drinking Mode",
+    exact: true,
+  });
+  await drinkingMode.click();
+  await expect(
+    page.getByLabel("Table minimum ($)", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel(/starting chips/i)).toHaveCount(0);
+  await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveCount(0);
+  await expect(page.getByLabel("Sip value ($)", { exact: true })).toHaveValue(
+    "5",
+  );
+  await openAdminSection(page, "Players");
+  await expect(
+    page.getByRole("button", { name: "Add bot", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator(".ha-roster")).not.toContainText("Ruby");
+  await openAdminSection(page, "Table");
+  await drinkingMode.click();
   await page.getByLabel("Starting chips ($)", { exact: true }).fill("2500");
   await page.getByLabel("Table minimum ($)", { exact: true }).fill("10");
   await page.getByLabel("Betting window (seconds)").fill("12");
@@ -94,6 +117,12 @@ try {
     botRollDelaySeconds: 7,
   });
   await openAdminSection(page, "TV", { graphics: true });
+  await page.getByRole("button", { name: "Table audio", exact: true }).click();
+  assert(
+    await page.evaluate(() =>
+      window.adminQA.actions.some((action) => action.display === "table-audio"),
+    ),
+  );
   await expect(page.getByLabel("TV graphics frame rate")).toHaveValue("auto");
   await page.getByLabel("TV graphics frame rate").selectOption("30");
   await expect(page.getByLabel("TV graphics frame rate")).toHaveValue("30");
@@ -146,6 +175,49 @@ try {
     { type: "cooldown", seconds: 9 },
     { type: "bot-delay", seconds: 6 },
   ]);
+  await page.evaluate(() => window.adminQA.drinking());
+  const savePrices = page.getByRole("button", {
+    name: "Save drink prices",
+    exact: true,
+  });
+  await expect(
+    page.getByRole("group", { name: "Drink prices", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveCount(0);
+  await expect(savePrices).toBeDisabled();
+  await page.getByLabel("Sip value ($)", { exact: true }).fill("7.25");
+  await page
+    .getByLabel("Drink assignment markup (%)", { exact: true })
+    .fill("20");
+  await page.getByLabel(/Enable .Finish drink./).check();
+  await page.getByLabel("Finish drink value ($)", { exact: true }).fill("60");
+  await page.evaluate(() => window.adminQA.rolling(true));
+  await expect(savePrices).toBeDisabled();
+  await page.evaluate(() => window.adminQA.rolling(false));
+  await savePrices.click();
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.adminQA.actions.find((action) => action.type === "drinking-rules"),
+    ),
+    {
+      type: "drinking-rules",
+      rules: {
+        sipValue: 725,
+        shotValue: 2500,
+        finishValue: 6000,
+        finishEnabled: true,
+        offerMarkup: 20,
+      },
+    },
+  );
+  await expect(savePrices).toBeDisabled();
+  await expect(page.getByLabel("Sip value ($)", { exact: true })).toHaveValue(
+    "7.25",
+  );
+  await page.screenshot({
+    path: "artifacts/admin-ux/drink-prices-320.png",
+    fullPage: true,
+  });
   assert.deepEqual(errors, []);
   const report = {
     widths: [375, 320],
@@ -157,6 +229,8 @@ try {
       "bot removal and12-seat capacity",
       "bot delay and live total",
       "all eight graphics controls",
+      "table minimum first, bots hidden in drinking setup",
+      "host audio entry and live drink pricing with roll guard",
       "no horizontal overflow or sub16px fields",
     ],
     errors,

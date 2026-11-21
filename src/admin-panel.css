@@ -207,6 +207,112 @@
 .ha-money-grid input {
   font-weight: 700 !important;
 }
+.ha-panel .ha-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ha-green);
+  font:
+    800 13px Manrope,
+    sans-serif;
+}
+.ha-panel .ha-stakes {
+  padding: 9px 12px 12px;
+  margin-bottom: 20px;
+  border: 1px solid #c9d5c8;
+  border-radius: 12px;
+  background: #e6ece2;
+}
+.ha-stakes .ha-card-title {
+  padding-inline: 4px;
+}
+.ha-stakes .ha-money-grid,
+.ha-drinking .ha-money-grid {
+  margin-top: 0;
+}
+.ha-panel .ha-stakes label,
+.ha-panel .ha-drinking-prices label {
+  margin: 0;
+  justify-content: space-between;
+}
+.ha-rules > .ha-game-rules {
+  margin-bottom: 16px;
+}
+.ha-control-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid #cfc6b4;
+  border-radius: 10px;
+  background: #fbf7ee;
+  color: var(--ha-green);
+  text-align: left;
+}
+.ha-control-row > svg {
+  flex-shrink: 0;
+}
+.ha-control-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.ha-control-row strong {
+  display: block;
+  font-size: 13px;
+}
+.ha-control-row small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #586153;
+}
+.ha-drinking-toggle[aria-pressed="true"] {
+  border-color: #81988a;
+  background: #e6ece2;
+}
+.ha-drinking-toggle > b {
+  border-radius: 20px;
+  background: #ede7d9;
+  padding: 4px 9px;
+  font-size: 11px;
+}
+.ha-drinking-toggle[aria-pressed="true"] > b {
+  background: var(--ha-green);
+  color: #fff7e6;
+}
+.ha-drinking-toggle + .ha-drinking-prices {
+  margin-top: 12px;
+}
+.ha-panel .ha-drinking-finish {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  margin: 4px 0 0;
+  border: 0;
+}
+.ha-rule-help {
+  margin: 4px 0 10px;
+  color: var(--ha-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.ha-tab-content form.ha-drinking {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid #c9d5c8;
+  border-radius: 12px;
+  background: #e6ece2;
+}
+.ha-tab-content form.ha-drinking fieldset {
+  margin-bottom: 0;
+}
+.ha-table-audio {
+  margin-bottom: 15px;
+}
 .ha-rule-summary {
   display: flex;
   gap: 6px;
@@ -608,13 +714,10 @@
   margin: 10px 0;
 }
 .ha-start {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  padding: 10px 0 max(9px, env(safe-area-inset-bottom));
-  background: var(--paper, #f5f0e4);
-  border-top: 1px solid #d4cbb9;
-  box-shadow: 0 -8px 12px -12px #261e1270;
+  display: block;
+  margin: 12px 0 0;
+  padding: 0 0 max(9px, env(safe-area-inset-bottom));
+  border: 0;
 }
 .ha-start > .button {
   width: 100%;
@@ -716,10 +819,6 @@
   min-height: 44px;
   text-align: left;
   padding-top: 6px;
-}
-.ha-start {
-  border-top: 0;
-  box-shadow: 0 -8px 14px -12px #261e1233;
 }
 .ha-roster small {
   font-size: 11px;

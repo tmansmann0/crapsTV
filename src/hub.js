@@ -38,6 +38,7 @@ export class RoomHub {
     }
   }
   broadcast() {
+    game.removeDrinkingBots(this.state);
     this.scheduleBots();
     const message = {
       type: "state",
@@ -86,7 +87,7 @@ export class RoomHub {
       if (type === "join") {
         if (message.code !== s.code)
           throw Error("That room code doesn’t match.");
-        if (c.playerId && !s.players.find((p) => p.id === c.playerId)?.left) {
+        if (s.players.some((p) => p.id === c.playerId && !p.left && !p.bot)) {
           this.send(id, {
             type: "welcome",
             playerId: c.playerId,
@@ -98,7 +99,7 @@ export class RoomHub {
           typeof message.token === "string"
             ? this.tokens.get(message.token)
             : null;
-        if (pid && s.players.some((p) => p.id === pid && !p.left)) {
+        if (pid && s.players.some((p) => p.id === pid && !p.left && !p.bot)) {
           c.playerId = pid;
           game.changeConnection(s, pid, true);
           this.send(id, {
@@ -146,6 +147,8 @@ export class RoomHub {
           game.place(s, pid, message.betId, message.amount);
         else if (type === "remove") game.remove(s, pid, message.betId);
         else if (type === "reup") game.reup(s, pid);
+        else if (type === "drinking-rules")
+          game.setDrinkingRules(s, pid, message.rules);
         else if (type === "drink-request")
           game.requestDrink(s, pid, {
             kind: message.kind,
@@ -202,6 +205,7 @@ export class RoomHub {
     return (
       !this.closed &&
       this.state.status === "playing" &&
+      !this.state.config.drinkingMode &&
       !this.state.rolling &&
       !this.state.aim?.active &&
       this.state.players.some((p) => !p.left && !p.bot && p.connected)

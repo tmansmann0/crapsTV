@@ -10,11 +10,14 @@ import {
 import "./drinks-panel.css";
 
 function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
-  const [unit, setUnit] = useState("sip");
+  const [selectedUnit, setUnit] = useState("sip");
   const [quantity, setQuantity] = useState("1");
   const [recipient, setRecipient] = useState("");
   const isOffer = kind === "offer";
   const to = peers.find((p) => p.id === recipient)?.id ?? peers[0]?.id;
+  const units = drinkUnits(rules);
+  const unit =
+    units.find((option) => option.id === selectedUnit)?.id ?? units[0].id;
   const price = drinkPrice(rules, unit, kind);
   const count = unit === "finish" ? 1 : Number(quantity);
   const max = isOffer ? drinkOfferLimit(player, price) : undefined;
@@ -112,7 +115,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
                 disabled={disabled}
                 onChange={(event) => setUnit(event.target.value)}
               >
-                {drinkUnits(rules).map((option) => (
+                {units.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label} · {money(drinkPrice(rules, option.id, kind))}
                   </option>

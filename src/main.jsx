@@ -37,6 +37,7 @@ import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
 import AdminPanel from "./AdminPanel.jsx";
 import TableAudioDialog from "./TableAudioDialog.jsx";
+import { normalizeTableAudio } from "./table-audio-settings.js";
 import AndroidHostPanel from "./AndroidHostPanel.jsx";
 import {
   createTableAudio,
@@ -188,6 +189,7 @@ function App() {
     [sound, setSound] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
     [audioOpen, setAudioOpen] = useState(false),
+    [adminAudio, setAdminAudio] = useState(null),
     [androidPanel, setAndroidPanel] = useState(null),
     [audioReady, setAudioReady] = useState(false),
     [audioSettings, setAudioSettings] = useState(loadTableAudioSettings),
@@ -372,6 +374,11 @@ function App() {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
   useAnnouncer(state, sound && view === "tv");
+  const audioRevision = state?.display?.audioRevision;
+  useEffect(() => {
+    if (view === "tv" && audioRevision)
+      setAudioSettings(normalizeTableAudio(state.display.audio));
+  }, [view, session?.code, audioRevision]);
   useEffect(() => {
     tableAudio.configure(audioSettings);
     saveTableAudioSettings(audioSettings);
@@ -575,7 +582,7 @@ function App() {
   return (
     <>
       {(!player || state?.status !== "playing" || player.left) && (
-        <header className="header">
+        <header className={player ? "header" : "header join-header"}>
           <Brand />
           <nav>
             <span className="desktop-only tagline">PHONE CONTROLLER</span>
@@ -646,7 +653,6 @@ function App() {
           code={joinCode}
           setCode={setJoinCode}
           join={join}
-          setView={setView}
         />
       ) : state.status === "ended" || player.left ? (
         <main className="recap-page">
@@ -680,8 +686,23 @@ function App() {
           confirm={setConfirm}
           connected={status === "connected"}
           onDisplayAction={sceneAction}
+          onTableAudio={() =>
+            setAdminAudio(normalizeTableAudio(state.display?.audio))
+          }
           serverError={error}
           fallbackJoinURL={fallbackJoinLink}
+        />
+      )}
+      {adminAudio && isAdmin && player && !player.left && state?.status !== "ended" && (
+        <TableAudioDialog
+          settings={adminAudio}
+          onChange={setAdminAudio}
+          canApply={status === "connected"}
+          onApply={() => {
+            send({ type: "display", settings: { audio: adminAudio } });
+            setAdminAudio(null);
+          }}
+          onClose={() => setAdminAudio(null)}
         />
       )}
       {confirm && (
@@ -722,51 +743,57 @@ function App() {
 function Join({ state, name, setName, code, setCode, join }) {
   return (
     <main className="join-page">
-      <div className="join-art">
-        <Dices size={50} />
-        <span>CONTROLLER</span>
-      </div>
-      <h1>Join table</h1>
-      <p>Enter the code shown on the main screen.</p>
-      {state?.status === "ended" ? (
-        <div className="notice">
-          This table has closed. Ask the host to open a new one.
+      <section className="join-ticket" aria-labelledby="join-title">
+        <div className="join-intro">
+          <h1 id="join-title">Join table</h1>
+          <span className="join-symbol" aria-hidden="true">
+            <Dices size={22} />
+          </span>
         </div>
-      ) : (
-        <form onSubmit={join}>
-          <label>
-            Your name
-            <input
-              autoComplete="nickname"
-              value={name}
-              maxLength={20}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="What should we call you?"
-              required
-            />
-          </label>
-          <label>
-            Room code
-            <input
-              className="code-input"
-              value={code}
-              maxLength={6}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder={state?.code || "ABCDEF"}
-              required
-            />
-          </label>
-          <button className="button dark jumbo" type="submit">
-            Join <ArrowRight size={18} />
-          </button>
-        </form>
-      )}
-      <button
-        className="text-button"
-        onClick={() => (location.href = document.baseURI)}
-      >
-        Show main screen <Monitor size={16} />
-      </button>
+        {state?.status === "ended" ? (
+          <div className="notice">
+            This table has closed. Ask the host to open a new one.
+          </div>
+        ) : (
+          <form onSubmit={join}>
+            <label>
+              Your name
+              <input
+                autoComplete="nickname"
+                value={name}
+                maxLength={20}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Alex"
+                required
+              />
+            </label>
+            <div className="join-code-field">
+              <label>
+                Room code
+                <input
+                  className="code-input"
+                  aria-describedby="join-code-help"
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={code}
+                  maxLength={6}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder={state?.code || "ABCDEF"}
+                  required
+                />
+              </label>
+              <p id="join-code-help">Shown on the main screen.</p>
+            </div>
+            <button className="button dark join-submit" type="submit">
+              Join <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </form>
+        )}
+      </section>
+      <a className="text-button" href={document.baseURI}>
+        <Monitor size={16} aria-hidden="true" /> Show main screen
+      </a>
     </main>
   );
 }
@@ -778,6 +805,7 @@ function Phone({
   confirm,
   connected,
   onDisplayAction,
+  onTableAudio,
   serverError,
   fallbackJoinURL,
 }) {
@@ -789,6 +817,7 @@ function Phone({
     connected,
     confirm,
     onDisplayAction,
+    onTableAudio,
     fallbackJoinURL,
     serverError,
   };

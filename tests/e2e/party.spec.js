@@ -178,6 +178,37 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       phone.locator('.setup input[type="checkbox"]'),
     ).not.toBeChecked();
     await capture(phone, { path: "artifacts/phone-setup.png", fullPage: true });
+    await openAdminSection(phone, "TV");
+    await phone
+      .getByRole("button", { name: "Table audio", exact: true })
+      .click();
+    const audio = phone.getByRole("dialog", { name: "Table audio" });
+    await audio
+      .getByRole("combobox", { name: "Music", exact: true })
+      .selectOption("moil");
+    await audio.getByRole("button", { name: "Apply to table" }).click();
+    const savedMusic = () =>
+      tv.evaluate(
+        () => JSON.parse(localStorage.getItem("crapstv.table-audio"))?.music,
+      );
+    await expect.poll(savedMusic).toBe("moil");
+    await expect
+      .poll(() =>
+        tv.evaluate(
+          () =>
+            window.audioLayers.get("/audio/table/moil.mp3")?.paused === false,
+        ),
+      )
+      .toBe(true);
+    await phone
+      .getByRole("button", { name: "Table audio", exact: true })
+      .click();
+    const track = audio.getByRole("combobox", { name: "Music", exact: true });
+    await expect(track).toHaveValue("moil");
+    await track.selectOption("off");
+    await audio.getByRole("button", { name: "Apply to table" }).click();
+    await expect.poll(savedMusic).toBe("off");
+    await openAdminSection(phone, "Table");
     const bob = await controllers.newPage({
       viewport: { width: 390, height: 844 },
       isMobile: true,

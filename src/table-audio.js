@@ -1,17 +1,10 @@
+import {
+  DEFAULT_TABLE_AUDIO,
+  normalizeTableAudio,
+} from "./table-audio-settings.js";
+
 const ROOT = `${import.meta.env.BASE_URL}audio/table/`;
 const STORAGE_KEY = "crapstv.table-audio";
-export const MUSIC_TRACKS = {
-  off: "Off",
-  moil: "Moil · Jazz",
-  ladada: "LaDaDa Guitar · Acoustic",
-  bossa: "Bossa Nova · Chiptune",
-};
-export const DEFAULT_TABLE_AUDIO = {
-  effects: 0.75,
-  ambience: 0,
-  music: "off",
-  musicVolume: 0.4,
-};
 
 const clips = {
   felt: ["felt-1", "felt-2"],
@@ -27,16 +20,7 @@ const unit = (n) => Math.max(0, Math.min(1, n));
 
 export function loadTableAudioSettings() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!saved) return { ...DEFAULT_TABLE_AUDIO };
-    const level = (key) =>
-      Number.isFinite(saved[key]) ? unit(saved[key]) : DEFAULT_TABLE_AUDIO[key];
-    return {
-      effects: level("effects"),
-      ambience: level("ambience"),
-      music: Object.hasOwn(MUSIC_TRACKS, saved.music) ? saved.music : "off",
-      musicVolume: level("musicVolume"),
-    };
+    return normalizeTableAudio(JSON.parse(localStorage.getItem(STORAGE_KEY)));
   } catch {
     return { ...DEFAULT_TABLE_AUDIO };
   }

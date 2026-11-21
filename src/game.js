@@ -1,5 +1,6 @@
 import { planOutcomeTour } from "./round-presentation.js";
 import { puckHome } from "./puck-layout.js";
+import { mergeTableAudio } from "./table-audio-settings.js";
 import { wagerStackLayout } from "./wager-layout.js";
 import {
   DEFAULT_ROLL_COOLDOWN_SECONDS,
@@ -478,6 +479,10 @@ function log(s, text, type = "info") {
 export function join(s, name, bot = null) {
   assert(s.status !== "ended", "This session has ended. Start a new table.");
   assert(
+    !bot || !s.config.drinkingMode,
+    "Bots are unavailable in Drinking Mode.",
+  );
+  assert(
     s.players.filter((p) => !p.left).length < 12,
     "This table is full (12 players).",
   );
@@ -489,8 +494,7 @@ export function join(s, name, bot = null) {
           .slice(0, 20)
       : "";
   assert(name.length > 0, "Give us a name for the table.");
-  const startingBank =
-    s.config.drinkingMode && !bot ? 0 : s.config.startingBank;
+  const startingBank = s.config.drinkingMode ? 0 : s.config.startingBank;
   const p = {
     id: uid(),
     name,
@@ -560,6 +564,28 @@ function betting(s) {
   assert(s.status === "playing", "The table isn’t taking bets yet.");
   assert(!s.rolling, "Dice are out. Wait for the next betting window.");
 }
+function normalizeDrinkingRules(rules) {
+  assert(
+    validDrinkingRules(rules),
+    "Enter drink values from $1 to $1,000,000 and a whole markup from 0% to 1000%.",
+  );
+  return Object.fromEntries(
+    Object.keys(DEFAULT_DRINKING_RULES).map((key) => [key, rules[key]]),
+  );
+}
+export function removeDrinkingBots(s) {
+  if (!s.config.drinkingMode || s.rolling || s.status === "ended") return;
+  const humans = s.players.filter((player) => !player.bot);
+  if (humans.length === s.players.length) return;
+  s.players = humans;
+  if (!humans.some((player) => player.id === s.shooterId && !player.left)) {
+    rotateShooter(s);
+    s.shooterId ??= humans.find((player) => !player.left)?.id ?? null;
+  }
+  if (s.aim && !humans.some((player) => player.id === s.aim.playerId))
+    s.aim = null;
+  s.botRollAt = null;
+}
 export function configure(s, id, changes) {
   admin(s, id);
   assert(s.status === "lobby", "Rules are set when the session starts.");
@@ -580,10 +606,7 @@ export function configure(s, id, changes) {
     typeof drinkingMode === "boolean",
     "Choose whether to enable Drinking Mode.",
   );
-  assert(
-    validDrinkingRules(drinkingRules),
-    "Enter drink values from $1 to $1,000,000 and a whole markup from 0% to 1000%.",
-  );
+  const normalizedDrinkRules = normalizeDrinkingRules(drinkingRules);
   assert(
     Number.isSafeInteger(startingBank) &&
       startingBank >= 1000 &&
@@ -591,8 +614,12 @@ export function configure(s, id, changes) {
     "Starting chips must be $10–$1,000,000.",
   );
   assert(
-    Number.isSafeInteger(minBet) && minBet >= 100 && minBet <= startingBank,
-    "Minimum must be $1 or more and fit the starting stack.",
+    Number.isSafeInteger(minBet) &&
+      minBet >= 100 &&
+      minBet <= (drinkingMode ? 100000000 : startingBank),
+    drinkingMode
+      ? "Minimum must be $1–$1,000,000."
+      : "Minimum must be $1 or more and fit the starting stack.",
   );
   assert(typeof teach === "boolean", "Teach mode must be on or off.");
   validateCooldown(rollCooldownSeconds);
@@ -602,28 +629,31 @@ export function configure(s, id, changes) {
     minBet,
     mode,
     drinkingMode,
-    ...(drinkingMode && {
-      drinkingRules: Object.fromEntries(
-        Object.keys(DEFAULT_DRINKING_RULES).map((key) => [
-          key,
-          drinkingRules[key],
-        ]),
-      ),
-    }),
+    ...(drinkingMode && { drinkingRules: normalizedDrinkRules }),
     teach,
     rollCooldownSeconds,
     botRollDelaySeconds,
   };
+  removeDrinkingBots(s);
   for (const p of s.players.filter((player) => !player.left)) {
-    const bank = drinkingMode && !p.bot ? 0 : startingBank;
+    const bank = drinkingMode ? 0 : startingBank;
     p.bank = bank;
     p.buyIn = bank;
     p.history = [{ roll: 0, equity: bank, net: 0, event: "Joined" }];
   }
 }
+export function setDrinkingRules(s, id, rules) {
+  admin(s, id);
+  assert(!active(s, id).bot, "Only a human host can change drink rules.");
+  assert(s.status !== "ended", "The session has ended.");
+  assert(s.config.drinkingMode, "Drinking Mode is off.");
+  assert(!s.rolling, "Wait for the dice to land before changing drink rules.");
+  s.config.drinkingRules = normalizeDrinkingRules(rules);
+}
 export function start(s, id) {
   admin(s, id);
   assert(s.status === "lobby", "This session has already started.");
+  removeDrinkingBots(s);
   s.status = "playing";
   openBettingWindow(s);
   log(s, "Table is open. Place your bets!", "start");
@@ -762,7 +792,7 @@ export function remove(s, id, betId) {
 export function reup(s, id) {
   betting(s);
   const p = active(s, id);
-  assert(!s.config.drinkingMode || p.bot, "Request verified chips in Drinks.");
+  assert(!s.config.drinkingMode, "Request verified chips in Drinks.");
   assert(
     equity(p) < minimumPlayableBet(s, p),
     "Re-up after your stack falls below the table minimum.",
@@ -926,7 +956,7 @@ export function setDisplaySettings(s, id, options) {
     Reflect.ownKeys(options).every(
       (key) =>
         typeof key === "string" &&
-        ["sound", "camera", "graphics"].includes(key),
+        ["sound", "camera", "graphics", "audio"].includes(key),
     ),
     "Unknown display setting.",
   );
@@ -943,6 +973,10 @@ export function setDisplaySettings(s, id, options) {
   const graphics = Object.hasOwn(options, "graphics")
     ? mergeGraphics(current.graphics, options.graphics)
     : normalizeGraphics(current.graphics);
+  const hasAudio = Object.hasOwn(options, "audio");
+  const audio = hasAudio
+    ? mergeTableAudio(current.audio, options.audio)
+    : current.audio;
   s.display = {
     sound,
     camera,
@@ -950,13 +984,21 @@ export function setDisplaySettings(s, id, options) {
     graphicsRevision:
       (current.graphicsRevision || 0) +
       (Object.hasOwn(options, "graphics") ? 1 : 0),
+    ...(audio && {
+      audio,
+      audioRevision: (current.audioRevision || 0) + (hasAudio ? 1 : 0),
+    }),
     revision: current.revision + 1,
   };
 }
 
 function throwController(s, id) {
   betting(s);
-  active(s, id);
+  const player = active(s, id);
+  assert(
+    !player.bot || !s.config.drinkingMode,
+    "Bots are unavailable in Drinking Mode.",
+  );
   assert(id === s.shooterId, "Only the current shooter can throw the dice.");
   const remaining = Math.ceil(((s.nextRollAt ?? 0) - Date.now()) / 1000);
   assert(
@@ -1260,7 +1302,9 @@ export function finishRoll(s, dice = s.throw?.dice) {
   return s.lastRoll;
 }
 export function rotateShooter(s) {
-  const eligible = s.players.filter((p) => !p.left && p.connected);
+  const eligible = s.players.filter(
+    (p) => !p.left && p.connected && !(s.config.drinkingMode && p.bot),
+  );
   if (!eligible.length) {
     s.shooterId = null;
     return;

@@ -232,6 +232,51 @@ test("a human shooter holding aim pauses bot betting until the gesture is cancel
   assert.equal(hub.state.rolling, false);
 });
 
+test("a legacy bot cannot stay shooter or act in Drinking Mode", (t) => {
+  const { hub, time, bot, human, messages } = hubTable(t, { cooldown: 0 });
+  giveBotDice(hub);
+  assert(hub.state.botRollAt > time.now());
+  hub.state.rolling = true;
+  hub.state.config.drinkingMode = true;
+  hub.broadcast();
+  assert(
+    hub.state.players.includes(bot),
+    "Keep the roll's players until settlement",
+  );
+  assert.equal(hub.state.botRollAt, null);
+  assert.equal(time.pending, 0);
+  hub.state.rolling = false;
+  assert.throws(() => game.beginRoll(hub.state, bot.id), /unavailable/);
+  hub.broadcast();
+  assert(!hub.state.players.includes(bot));
+  assert.equal(hub.state.shooterId, human.id);
+  hub.receive("host", { type: "add-bot", name: "Another bot" });
+  assert.match(messages.at(-1).message, /unavailable/);
+  time.advance(60000);
+  assert.equal(bot.bets.length, 0);
+  assert.equal(hub.state.rolling, false);
+});
+
+test("a room token cannot resume a bot seat", (t) => {
+  const { hub, bot } = hubTable(t, { start: false });
+  const messages = [];
+  hub.connect("guest", (message) => messages.push(message));
+  hub.tokens.set("obsolete-bot-token", bot.id);
+  hub.receive("guest", {
+    type: "join",
+    code: "BOTQA",
+    token: "obsolete-bot-token",
+    name: "Guest",
+  });
+  const welcome = messages.find((message) => message.type === "welcome");
+  assert.notEqual(welcome.playerId, bot.id);
+  assert(
+    hub.state.players.some(
+      (player) => player.id === welcome.playerId && !player.bot,
+    ),
+  );
+});
+
 test("leaving/transfer never grants host to a bot; removal and session close cancel automatic work", (t) => {
   const { hub, time, human, bot } = hubTable(t);
   giveBotDice(hub);

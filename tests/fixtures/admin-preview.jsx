@@ -20,6 +20,16 @@ window.adminQA = {
     initial.status = "playing";
     setCurrent(structuredClone(initial));
   },
+  drinking() {
+    initial.status = "lobby";
+    game.configure(initial, host.id, { drinkingMode: true });
+    game.start(initial, host.id);
+    setCurrent(structuredClone(initial));
+  },
+  rolling(value) {
+    initial.rolling = value;
+    setCurrent(structuredClone(initial));
+  },
   full() {
     while (initial.players.filter((p) => !p.left).length < 12) {
       const next = game.join(initial, `Bot ${initial.players.length}`);
@@ -50,6 +60,8 @@ function App() {
         graphics: { ...initial.display.graphics, ...message.settings.graphics },
       };
     if (message.type === "teach") initial.config.teach = message.value;
+    if (message.type === "drinking-rules")
+      game.setDrinkingRules(initial, host.id, message.rules);
     setState(structuredClone(initial));
   };
   return (
@@ -69,6 +81,7 @@ function App() {
         connected={true}
         confirm={(type) => actions.push({ confirm: type })}
         onDisplayAction={(type) => actions.push({ display: type })}
+        onTableAudio={() => actions.push({ display: "table-audio" })}
         fallbackJoinURL="http://127.0.0.1/join"
       />
     </main>
