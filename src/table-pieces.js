@@ -1761,11 +1761,14 @@ export function createTablePieces(
         wagerSources,
       });
     flows = flows.filter((flow) => {
-      const lateBy = now - flowEnd(flow);
-      if (lateBy < 0) return true;
+      if (now < flowEnd(flow)) return true;
       const group = flightObjects.get(flow.id);
-      if (lateBy < 150 && group?.visible) {
-        const count = group.userData.flightSpecs?.length ?? 1;
+      const plan = bankDisplay.plans.get(flow.id);
+      // A slow frame can go directly from source to destination before a
+      // flight mesh is rendered. The chips still land in this update.
+      if (group?.visible || (plan?.arrived && plan.chips.length)) {
+        const count =
+          group?.userData.flightSpecs?.length ?? plan?.chips.length ?? 1;
         onChipLanding?.(count, routePosition(flow.to, state)[0]);
       }
       return false;

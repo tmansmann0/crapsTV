@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import { RoomHub } from "../../src/hub.js";
 import { clickTV } from "../helpers/tv-actions.mjs";
 
+test.use({ viewport: { width: 720, height: 480 } });
+
 test("the TV plays chip landings and dice contacts and saves its mix", async ({
   page,
 }) => {
@@ -11,6 +13,19 @@ test("the TV plays chip landings and dice contacts and saves its mix", async ({
   page.on("pageerror", (error) => errors.push(error.message));
   try {
     await page.addInitScript(() => {
+      // Exercise a supported low-cost profile on software WebGL runners.
+      localStorage.setItem(
+        "crapstv-graphics-v1",
+        JSON.stringify({
+          resolution: "75",
+          modelDetail: "optimized",
+          textures: "1k",
+          antialias: "off",
+          lensFlares: "off",
+          localReflections: "off",
+          contactShadows: "off",
+        }),
+      );
       window.playedEffects = [];
       window.audioLayers = new Map();
       const start = AudioBufferSourceNode.prototype.start;

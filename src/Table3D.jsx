@@ -1045,9 +1045,10 @@ export default function Table3D(props) {
       }
       const throwTime = Date.now() + (s?.clockOffsetMs || 0);
       const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
-      current.tableAudio?.updateThrow(
-        introSample || current.status === "connected" ? s?.throw : null,
+      current.tableAudio?.updateIntroThrow(
+        introSample?.state.throw,
         throwTime,
+        !!introSample,
       );
       if (s !== launchState) {
         launchState = s;

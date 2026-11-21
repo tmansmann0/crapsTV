@@ -254,12 +254,15 @@ function App() {
               ),
             );
         }
+        const now = Date.now();
+        const clockOffsetMs =
+          clockOffset ?? (typeof m.sentAt === "number" ? m.sentAt - now : 0);
+        if (m.state.rolling)
+          tableAudio.scheduleLiveThrow(m.state.throw, now + clockOffsetMs);
         setState({
           ...m.state,
-          snapshotAt: m.sentAt || Date.now(),
-          clockOffsetMs:
-            clockOffset ??
-            (typeof m.sentAt === "number" ? m.sentAt - Date.now() : 0),
+          snapshotAt: m.sentAt || now,
+          clockOffsetMs,
         });
       } else if (m.type === "clock") {
         const now = Date.now(),
@@ -283,6 +286,7 @@ function App() {
     };
     const onStatus = (value) => {
       setStatus(value);
+      if (value !== "connected") tableAudio.scheduleLiveThrow(null);
       if (value === "connected") {
         clockStarted = false;
         const saved = getSaved(key);
@@ -307,6 +311,7 @@ function App() {
           );
     return () => {
       clockTimers.forEach(clearTimeout);
+      tableAudio.scheduleLiveThrow(null);
       transport.current?.close();
       transport.current = null;
     };

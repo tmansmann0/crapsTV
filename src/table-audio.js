@@ -59,11 +59,14 @@ export function createTableAudio() {
     throwId,
     throwStart,
     nextContact = 0,
+    liveThrowId,
+    showingIntro = false,
     lastLandingAt = -Infinity,
     previewUntil = 0;
   const buffers = new Map();
   const loops = new Map();
   const lastHitAt = new Map();
+  const liveSources = new Set();
 
   function setLoop(layer, name, volume) {
     const current = loops.get(layer);
@@ -171,9 +174,11 @@ export function createTableAudio() {
       gain.connect(pan).connect(output);
     } else gain.connect(output);
     source.start(when);
+    return source;
   }
 
-  function updateThrow(roll, now) {
+  function updateIntroThrow(roll, now, active) {
+    showingIntro = active;
     if (!roll?.audioContacts?.length) return;
     if (roll.id !== throwId || roll.startAt !== throwStart) {
       throwId = roll.id;
@@ -197,6 +202,52 @@ export function createTableAudio() {
         continue;
       lastHitAt.set(contact.material, contact.time);
       play(contact.material, 0.18 + 0.64 * unit(contact.speed / 6), contact.x);
+    }
+  }
+
+  function clearLiveThrow() {
+    for (const source of liveSources) source.stop();
+    liveSources.clear();
+  }
+
+  function scheduleLiveThrow(roll, now) {
+    if (!roll) {
+      clearLiveThrow();
+      return;
+    }
+    if (
+      roll.id === liveThrowId ||
+      showingIntro ||
+      context?.state !== "running" ||
+      document.hidden ||
+      !roll.audioContacts?.length
+    )
+      return;
+    clearLiveThrow();
+    liveThrowId = roll.id;
+    const elapsed = now - roll.startAt;
+    const clock = context.currentTime;
+    const lastHit = new Map();
+    // Start from the same room clock as the visual throw, even when WebGL
+    // misses a frame. Ignore contacts that already passed on this display.
+    for (const contact of roll.audioContacts) {
+      if (
+        elapsed - contact.time > freshImpactMs ||
+        !Object.hasOwn(clips, contact.material) ||
+        contact.time - (lastHit.get(contact.material) ?? -Infinity) < 35
+      )
+        continue;
+      lastHit.set(contact.material, contact.time);
+      const source = play(
+        contact.material,
+        0.18 + 0.64 * unit(contact.speed / 6),
+        contact.x,
+        clock + Math.max(0, contact.time - elapsed) / 1000,
+      );
+      if (source) {
+        liveSources.add(source);
+        source.onended = () => liveSources.delete(source);
+      }
     }
   }
 
@@ -230,14 +281,25 @@ export function createTableAudio() {
   }
 
   function dispose() {
+    clearLiveThrow();
     for (const layer of loops.keys()) setLoop(layer, null, 0);
     context?.close().catch(() => {});
     context = null;
     prepared = null;
+    liveThrowId = undefined;
+    showingIntro = false;
     buffers.clear();
     lastLandingAt = -Infinity;
     previewUntil = 0;
   }
 
-  return { enable, configure, updateThrow, chipLanding, preview, dispose };
+  return {
+    enable,
+    configure,
+    updateIntroThrow,
+    scheduleLiveThrow,
+    chipLanding,
+    preview,
+    dispose,
+  };
 }
