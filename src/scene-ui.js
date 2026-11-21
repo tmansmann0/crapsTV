@@ -590,7 +590,8 @@ export function createSceneUI(renderer, onAction) {
     p.mesh.visible =
       !settingsOpen &&
       !introActive &&
-      (state?.status === "playing" ||
+      (state?.pausedAt ||
+        state?.status === "playing" ||
         state?.status === "ended" ||
         !!error ||
         status !== "connected" ||
@@ -599,7 +600,11 @@ export function createSceneUI(renderer, onAction) {
       detail = "",
       headingColor = C.ink,
       icon = "connection";
-    if (state?.status === "playing") {
+    if (state?.pausedAt) {
+      icon = "closed";
+      heading = "TABLE SAVED";
+      detail = "The host can resume play";
+    } else if (state?.status === "playing") {
       const roll = state.lastRoll;
       const outcome = {
         natural: { label: "WINNER", icon: "win" },
@@ -836,6 +841,7 @@ export function createSceneUI(renderer, onAction) {
       next.introReducedMotion,
       next.fallbackJoinURL,
       next.state?.status,
+      next.state?.pausedAt,
       next.state?.point,
       next.state?.rolling,
       current.bettingSeconds,

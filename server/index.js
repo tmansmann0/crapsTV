@@ -9,17 +9,19 @@ import { RoomHub } from "../src/hub.js";
 import { createLocalDiscovery } from "./local-discovery.js";
 import { runtimeOptions } from "./runtime-options.js";
 import { serveBuiltApp } from "./static-app.js";
+import { desktopSavePath, fileRoomSave } from "./room-save-file.js";
 const { kiosk } = runtimeOptions();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.PORT || 3000),
   app = express(),
   server = createServer(app);
 const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const code = Array.from(
-  randomBytes(6),
-  (b) => alphabet[b % alphabet.length],
-).join("");
-const hub = new RoomHub(code);
+const saveStore = fileRoomSave(desktopSavePath(port));
+const restored = saveStore.load();
+const code =
+  restored?.state.code ??
+  Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
+const hub = new RoomHub(code, { saveStore, restored });
 let devServer;
 const devAllowedHosts = [];
 let resolveAppReady;

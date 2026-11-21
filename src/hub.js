@@ -1,13 +1,20 @@
 import * as game from "./game.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
+import { captureRoomSave } from "./room-save.js";
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
-  constructor(code, { rollDelay = 2500, timers = {} } = {}) {
-    this.state = game.createState(code);
+  constructor(
+    code,
+    { rollDelay = 2500, timers = {}, saveStore = null, restored = null } = {},
+  ) {
+    this.saveStore = saveStore;
+    this.state = restored?.state ?? this.newState(code);
+    if (saveStore) this.state.saveSessionAvailable = true;
+    this.bettingRemainingMs = restored?.bettingRemainingMs ?? 0;
     this.clients = new Map();
-    this.tokens = new Map();
+    this.tokens = new Map(restored?.tokens);
     this.rollDelay = rollDelay;
     this.timer = null;
     this.botTimer = null;
@@ -16,6 +23,12 @@ export class RoomHub {
     this.closed = false;
     this.setTimer = timers.setTimeout ?? globalThis.setTimeout;
     this.clearTimer = timers.clearTimeout ?? globalThis.clearTimeout;
+    if (restored) this.restoreBotDecisions(restored.completedBots);
+  }
+  newState(code) {
+    const state = game.createState(code);
+    if (this.saveStore) state.saveSessionAvailable = true;
+    return state;
   }
   connect(id, send) {
     this.clients.set(id, {
@@ -38,7 +51,7 @@ export class RoomHub {
     }
   }
   broadcast() {
-    game.removeDrinkingBots(this.state);
+    if (!this.state.pausedAt) game.removeDrinkingBots(this.state);
     this.scheduleBots();
     const message = {
       type: "state",
@@ -108,6 +121,14 @@ export class RoomHub {
             token: message.token,
           });
         } else {
+          if (message.reclaim === true)
+            throw Error(
+              "That reconnect code did not match a seat at this table.",
+            );
+          if (s.pausedAt)
+            throw Error(
+              "This table is saved. Wait for the host to resume play.",
+            );
           const p = game.join(s, message.name);
           const token = game.uid();
           this.tokens.set(token, p.id);
@@ -119,7 +140,12 @@ export class RoomHub {
       } else {
         const pid = c.playerId;
         if (!pid) throw Error("Join the table first.");
-        if (type === "configure") game.configure(s, pid, message.config || {});
+        if (type === "save-session") this.saveSession(pid);
+        else if (type === "resume-session") this.resumeSession(pid);
+        else if (s.pausedAt)
+          throw Error("The table is saved. The host can resume play.");
+        else if (type === "configure")
+          game.configure(s, pid, message.config || {});
         else if (type === "start") {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
@@ -170,7 +196,7 @@ export class RoomHub {
         } else if (type === "reset") {
           if (pid !== s.adminId || s.status !== "ended")
             throw Error("Only the host can open a new table after the recap.");
-          this.state = game.createState(s.code);
+          this.state = this.newState(s.code);
           this.botWindows.clear();
           this.botTurn = null;
           this.tokens.clear();
@@ -185,6 +211,68 @@ export class RoomHub {
       if (message?.type === "bet-preview") return;
       this.send(id, { type: "error", message: error.message });
     }
+  }
+  requireSaveHost(id) {
+    const s = this.state;
+    if (
+      s.adminId !== id ||
+      !s.players.some((p) => p.id === id && !p.left && !p.bot && p.connected)
+    )
+      throw Error("Only the table host can do that.");
+    if (!this.saveStore)
+      throw Error("This host does not support saving tables.");
+  }
+  completedBotDecisions() {
+    const key = this.botWindowKey();
+    return [...this.botWindows]
+      .filter(([, entry]) => entry.key === key && entry.done)
+      .map(([id]) => id);
+  }
+  restoreBotDecisions(ids) {
+    const key = this.botWindowKey();
+    const bots = new Set(
+      this.state.players.filter((p) => p.bot && !p.left).map((p) => p.id),
+    );
+    this.botWindows.clear();
+    for (const id of ids)
+      if (bots.has(id)) this.botWindows.set(id, { key, done: true, at: 0 });
+  }
+  saveSession(id) {
+    this.requireSaveHost(id);
+    const s = this.state;
+    if (s.pausedAt) return;
+    if (s.status === "ended") throw Error("This table has already closed.");
+    if (s.rolling) throw Error("Wait for the dice to land before saving.");
+    const save = captureRoomSave(s, this.tokens, this.completedBotDecisions());
+    try {
+      this.saveStore.write(save);
+    } catch {
+      throw Error(
+        "The table could not be saved. Check the host’s storage and try again.",
+      );
+    }
+    this.state = save.state;
+    this.bettingRemainingMs = save.bettingRemainingMs;
+  }
+  resumeSession(id) {
+    this.requireSaveHost(id);
+    const s = this.state;
+    if (!s.pausedAt) return;
+    try {
+      this.saveStore.remove();
+    } catch {
+      throw Error(
+        "The table could not be resumed. Check the host’s storage and try again.",
+      );
+    }
+    const now = Date.now();
+    const completed = this.completedBotDecisions();
+    if (Number.isFinite(s.bettingOpenedAt))
+      s.bettingOpenedAt += Math.max(0, now - s.pausedAt);
+    if (s.status === "playing") s.nextRollAt = now + this.bettingRemainingMs;
+    delete s.pausedAt;
+    this.bettingRemainingMs = 0;
+    this.restoreBotDecisions(completed);
   }
   beginRoll(playerId, gesture) {
     const state = this.state;
@@ -206,6 +294,7 @@ export class RoomHub {
   botsCanAct() {
     return (
       !this.closed &&
+      !this.state.pausedAt &&
       this.state.status === "playing" &&
       !this.state.config.drinkingMode &&
       !this.state.rolling &&

@@ -1,6 +1,24 @@
 import { Peer } from "peerjs";
 import { RoomHub } from "./hub.js";
+import { readRoomSave } from "./room-save.js";
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const SAVED_ONLINE_ROOM = "crapstv:saved-online-room";
+const onlineRoomStore = {
+  load() {
+    return readRoomSave(localStorage.getItem(SAVED_ONLINE_ROOM));
+  },
+  write(save) {
+    if (localStorage.getItem(SAVED_ONLINE_ROOM) !== null)
+      throw Error("This browser already has a saved table.");
+    localStorage.setItem(SAVED_ONLINE_ROOM, JSON.stringify(save));
+  },
+  remove() {
+    if (localStorage.getItem(SAVED_ONLINE_ROOM) === null)
+      throw Error("The saved table is unavailable.");
+    localStorage.removeItem(SAVED_ONLINE_ROOM);
+  },
+};
+export const readOnlineRoomSave = () => onlineRoomStore.load();
 export const newCode = () =>
   Array.from(
     crypto.getRandomValues(new Uint8Array(6)),
@@ -59,7 +77,13 @@ export function localTransport(onMessage, onStatus) {
     },
   };
 }
-export function onlineTransport(code, hosting, onMessage, onStatus) {
+export function onlineTransport(
+  code,
+  hosting,
+  onMessage,
+  onStatus,
+  { restored = null, canSave = true } = {},
+) {
   const peer = new Peer(hosting ? `crapstv-v1-${code}` : undefined, {
     debug: 0,
   });
@@ -90,7 +114,10 @@ export function onlineTransport(code, hosting, onMessage, onStatus) {
   onStatus("connecting");
   peer.on("open", () => {
     if (hosting) {
-      hub = new RoomHub(code);
+      hub = new RoomHub(code, {
+        restored,
+        saveStore: canSave ? onlineRoomStore : null,
+      });
       hub.connect("display", onMessage);
       peer.on("connection", (c) => {
         c.on("open", () => {

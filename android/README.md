@@ -27,6 +27,15 @@ Players enter names and the first player opens the table. Use **Settings →
 Wi-Fi & hosting → Stop hosting** when finished. Wi-Fi credentials are served only to the host’s pairing
 screen over the device’s loopback connection.
 
+To continue a game after closing the app or replacing the APK, choose
+**Host controls → Table → Host & session → Save and close** on the admin’s phone
+between rolls. Wait for **Table saved** before stopping hosting or updating.
+After reopening the app, reconnect the same controller and choose **Resume table**.
+An APK update preserves the save as long as the existing app’s data is retained.
+If reopening the hotspot changes the controller address, copy your private
+reconnect code from the saved screen first. Use **Reconnect a seat** at the new
+address to reclaim your original seat.
+
 If a guest cannot load the link, check that both devices are on the same network.
 Some guest networks isolate devices. Try the host’s offline Wi-Fi or a different
 shared network. **Settings → Wi-Fi & hosting → Host address** can override the detected

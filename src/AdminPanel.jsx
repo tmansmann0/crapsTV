@@ -1052,6 +1052,16 @@ export default function AdminPanel({
                 <ChevronDown size={16} />
               </summary>
               <div>
+                {state.saveSessionAvailable && (
+                  <button
+                    type="button"
+                    className="button outline"
+                    disabled={disabled}
+                    onClick={() => confirm("save-session")}
+                  >
+                    Save and close
+                  </button>
+                )}
                 {!lobby && (
                   <button
                     type="button"
