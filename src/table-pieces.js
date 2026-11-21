@@ -1766,9 +1766,13 @@ export function createTablePieces(
       const plan = bankDisplay.plans.get(flow.id);
       // A slow frame can go directly from source to destination before a
       // flight mesh is rendered. The chips still land in this update.
-      if (group?.visible || (plan?.arrived && plan.chips.length)) {
-        const count =
-          group?.userData.flightSpecs?.length ?? plan?.chips.length ?? 1;
+      const count =
+        group?.userData.flightSpecs?.length ??
+        plan?.chips.length ??
+        (flow.amount >= 100
+          ? pileSpecs(flow.amount, { max: 6, seed: flow.id }).length
+          : 0);
+      if (count) {
         onChipLanding?.(count, routePosition(flow.to, state)[0]);
       }
       return false;

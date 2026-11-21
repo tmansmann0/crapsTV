@@ -106,6 +106,8 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await expect(offer.getByText(/awaiting completion/)).toHaveCount(0);
     expect(alice.bank).toBe(4250);
     expect(hub.state.drinkRequests).toHaveLength(0);
+    // A delayed payout can have returned the controller to its Play view.
+    await host.getByRole("tab", { name: "Drinks", exact: true }).click();
     await expect(host.locator(".pg-drinks svg.drink-icon")).toHaveCount(3);
     await expect(
       host

@@ -8,7 +8,7 @@ test("the TV plays chip landings and dice contacts and saves its mix", async ({
   page,
 }) => {
   const code = "AUDIOT";
-  const hub = new RoomHub(code);
+  const hub = new RoomHub(code, { rollDelay: 4000 });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   try {
