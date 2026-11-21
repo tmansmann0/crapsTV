@@ -265,6 +265,14 @@ export function createThrowTimeline({
     position: contact.position.map(rounded),
     velocity: contact.velocity.map(rounded),
   }));
+  const audioContacts = physics.audioContacts.map(
+    ({ material, elapsed, speed, x }) => ({
+      material,
+      time: rounded((elapsed / (steps / 120)) * settleOffset),
+      speed: rounded(speed),
+      x: rounded(x),
+    }),
+  );
   const wagerChipFrames = [...rawWager.entries()]
     .filter(([, { track }]) => track.hit)
     .map(([id, { firstFrame, frames: poses, track }]) => {
@@ -297,6 +305,7 @@ export function createThrowTimeline({
       stacks: structuredClone(stacks),
     },
     propContacts,
+    audioContacts,
     stackContacts: propContacts
       .filter((contact) => contact.kind === "stack")
       .map((contact) => ({ ...contact, stackId: contact.id })),

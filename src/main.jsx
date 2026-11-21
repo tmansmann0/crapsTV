@@ -36,6 +36,12 @@ import Recap from "./recap.jsx";
 import PhoneGame from "./PhoneGame.jsx";
 import DiceThrow from "./DiceThrow.jsx";
 import AdminPanel from "./AdminPanel.jsx";
+import TableAudioDialog from "./TableAudioDialog.jsx";
+import {
+  createTableAudio,
+  loadTableAudioSettings,
+  saveTableAudioSettings,
+} from "./table-audio.js";
 import { catalogue, describeBet, money, equity, net } from "./game.js";
 import { PHYSICS_VERSION } from "./throw-motion.js";
 import {
@@ -180,6 +186,10 @@ function App() {
     [dismissedHostCode, setDismissedHostCode] = useState(""),
     [sound, setSound] = useState(false),
     [settingsOpen, setSettingsOpen] = useState(false),
+    [audioOpen, setAudioOpen] = useState(false),
+    [audioReady, setAudioReady] = useState(false),
+    [audioSettings, setAudioSettings] = useState(loadTableAudioSettings),
+    [tableAudio] = useState(createTableAudio),
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
@@ -244,12 +254,15 @@ function App() {
               ),
             );
         }
+        const now = Date.now();
+        const clockOffsetMs =
+          clockOffset ?? (typeof m.sentAt === "number" ? m.sentAt - now : 0);
+        if (m.state.rolling)
+          tableAudio.scheduleLiveThrow(m.state.throw, now + clockOffsetMs);
         setState({
           ...m.state,
-          snapshotAt: m.sentAt || Date.now(),
-          clockOffsetMs:
-            clockOffset ??
-            (typeof m.sentAt === "number" ? m.sentAt - Date.now() : 0),
+          snapshotAt: m.sentAt || now,
+          clockOffsetMs,
         });
       } else if (m.type === "clock") {
         const now = Date.now(),
@@ -273,6 +286,7 @@ function App() {
     };
     const onStatus = (value) => {
       setStatus(value);
+      if (value !== "connected") tableAudio.scheduleLiveThrow(null);
       if (value === "connected") {
         clockStarted = false;
         const saved = getSaved(key);
@@ -297,6 +311,7 @@ function App() {
           );
     return () => {
       clockTimers.forEach(clearTimeout);
+      tableAudio.scheduleLiveThrow(null);
       transport.current?.close();
       transport.current = null;
     };
@@ -305,6 +320,30 @@ function App() {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
   useAnnouncer(state, sound && view === "tv");
+  useEffect(() => {
+    tableAudio.configure(audioSettings);
+    saveTableAudioSettings(audioSettings);
+  }, [tableAudio, audioSettings]);
+  useEffect(() => {
+    if (view !== "tv") return;
+    let active = true;
+    const enable = () => {
+      tableAudio.enable().then((ready) => {
+        if (active && ready) setAudioReady(true);
+      });
+    };
+    // Permissive kiosk displays can play immediately. Other browsers may
+    // require the first interaction on this display before resuming audio.
+    enable();
+    window.addEventListener("pointerdown", enable);
+    window.addEventListener("keydown", enable);
+    return () => {
+      active = false;
+      window.removeEventListener("pointerdown", enable);
+      window.removeEventListener("keydown", enable);
+      tableAudio.dispose();
+    };
+  }, [tableAudio, view]);
   const send = (message) => {
       if (message.type === "bet") {
         clearTimeout(errorTimer.current);
@@ -380,8 +419,9 @@ function App() {
       ? controllerURL(roomCode, session.lanOrigin)
       : null;
   const sceneAction = async (action) => {
-    if (kiosk && action === "settings") return;
+    if (kiosk && (action === "settings" || action === "audio")) return;
     if (action === "settings") setSettingsOpen((v) => !v);
+    if (action === "audio") setAudioOpen(true);
     if (action === "join") window.open(joinLink, "_blank", "noopener");
     if (action === "sound") setSound((value) => !value);
     if (action === "fullscreen") {
@@ -418,13 +458,17 @@ function App() {
           hideSettings={kiosk}
           joinURL={joinLink}
           fallbackJoinURL={fallbackJoinLink}
+          tableAudio={tableAudio}
           onAction={sceneAction}
         />
         <div className="scene-accessibility" aria-label="Table controls">
           {!kiosk && (
-            <button onClick={() => sceneAction("settings")}>
-              Table settings
-            </button>
+            <>
+              <button onClick={() => sceneAction("settings")}>
+                Table settings
+              </button>
+              <button onClick={() => sceneAction("audio")}>Table audio</button>
+            </>
           )}
           <p role="status">
             {status}. Room {roomCode}.{" "}
@@ -445,6 +489,15 @@ function App() {
             Fullscreen table
           </button>
         </div>
+        {audioOpen && !kiosk && (
+          <TableAudioDialog
+            settings={audioSettings}
+            ready={audioReady}
+            onChange={setAudioSettings}
+            onPreview={() => tableAudio.preview()}
+            onClose={() => setAudioOpen(false)}
+          />
+        )}
       </main>
     );
   return (

@@ -19,9 +19,72 @@ async function swipeDice(page) {
   await page.mouse.up();
 }
 
+async function observeTableAudio(page) {
+  await page.addInitScript(() => {
+    window.playedEffects = [];
+    window.audioLayers = new Map();
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args) {
+      start.apply(this, args);
+      if (this.buffer) window.playedEffects.push(this.buffer.duration);
+    };
+    const play = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      window.audioLayers.set(new URL(this.src).pathname, this);
+      return play.call(this);
+    };
+  });
+}
+
+async function checkAudioMixer(tv) {
+  await clickTV(tv, "audio");
+  const dialog = tv.getByRole("dialog", { name: "Table audio" });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("slider", { name: "Dice and chips" }),
+  ).toHaveValue("75");
+  const music = dialog.getByRole("combobox", { name: "Music", exact: true });
+  await expect(music).toHaveValue("off");
+  await dialog.getByRole("button", { name: "Test effects" }).click();
+  await expect
+    .poll(() => tv.evaluate(() => window.playedEffects.length))
+    .toBeGreaterThanOrEqual(7);
+  await dialog.getByRole("slider", { name: "Room ambience" }).press("End");
+  await music.selectOption("moil");
+  await expect
+    .poll(() =>
+      tv.evaluate(() =>
+        ["/audio/table/room.mp3", "/audio/table/moil.mp3"].every(
+          (path) => window.audioLayers.get(path)?.currentTime > 0,
+        ),
+      ),
+    )
+    .toBe(true);
+  await music.selectOption("off");
+  await expect
+    .poll(() =>
+      tv.evaluate(
+        () => window.audioLayers.get("/audio/table/moil.mp3")?.paused,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      tv.evaluate(
+        () => JSON.parse(localStorage.getItem("crapstv.table-audio")).ambience,
+      ),
+    )
+    .toBe(1);
+  await dialog.getByRole("slider", { name: "Room ambience" }).press("Home");
+  await dialog.getByRole("button", { name: "Close table audio" }).click();
+  await expect(dialog).toBeHidden();
+  await tv.evaluate(() => (window.playedEffects.length = 0));
+}
+
 test("TV and phones complete a session, reconnect and export a recap", async ({
   browser,
 }, testInfo) => {
+  test.setTimeout(240000);
   // Independent browser GPU processes mirror the physical TV and phones.
   const controllers = await browser
     .browserType()
@@ -36,6 +99,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
         : { width: 1280, height: 800 },
     });
     tv.on("pageerror", (e) => errors.push(e.message));
+    await observeTableAudio(tv);
     let rejectedOnce = false;
     const interceptWagers = (ws) => {
       const server = ws.connectToServer();
@@ -81,6 +145,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       "data-settings-open",
       "true",
     );
+    await checkAudioMixer(tv);
     await clickTV(tv, "camera");
     await expect(tv.locator(".table-canvas")).toHaveAttribute(
       "data-camera",
@@ -238,6 +303,13 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
         Number(await tv.locator(".table-canvas").getAttribute("data-chips")),
       )
       .toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        tv.evaluate(() =>
+          window.playedEffects.some((duration) => duration > 0.15),
+        ),
+      )
+      .toBe(true);
     await bob.bringToFront();
     await bob.locator('[data-bet-id="field"]').click();
     await bob.getByRole("button", { name: /Place \$5/ }).click();
@@ -359,8 +431,16 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect(
       phone.getByRole("button", { name: "Roll the dice", exact: true }),
     ).toBeEnabled();
+    await tv.evaluate(() => (window.playedEffects.length = 0));
     await swipeDice(phone);
     await expect(phone.locator(".pg-strip.is-rolling")).toBeVisible();
+    await expect
+      .poll(() =>
+        tv.evaluate(() =>
+          window.playedEffects.some((duration) => duration < 0.15),
+        ),
+      )
+      .toBe(true);
     await expect(phone.getByTestId("phone-dice")).toHaveAttribute(
       "data-throw-id",
       /.+/,

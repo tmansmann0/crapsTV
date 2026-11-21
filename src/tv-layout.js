@@ -68,7 +68,7 @@ export function normalizeLabelMotion(value) {
 const PANEL_SIZES = {
   brand: [256, 96],
   settingsButton: [88, 88],
-  settings: [540, 722],
+  settings: [540, 798],
   graphics: [640, 710],
   join: [600, 210],
   status: [1100, 160],

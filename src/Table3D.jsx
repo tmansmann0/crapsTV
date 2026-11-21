@@ -491,7 +491,11 @@ export default function Table3D(props) {
       reflectionLedger = null;
     let reflectionState = null;
     let reflectionEnvironment = null;
-    const pieces = createTablePieces(scene, renderer, { software });
+    const pieces = createTablePieces(scene, renderer, {
+      software,
+      onChipLanding: (...args) =>
+        latest.current.tableAudio?.chipLanding(...args),
+    });
     pieces.ready
       .then(() => {
         if (alive) piecesLoaded = true;
@@ -1041,6 +1045,11 @@ export default function Table3D(props) {
       }
       const throwTime = Date.now() + (s?.clockOffsetMs || 0);
       const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
+      current.tableAudio?.updateIntroThrow(
+        introSample?.state.throw,
+        throwTime,
+        !!introSample,
+      );
       if (s !== launchState) {
         launchState = s;
         launchProps = {
