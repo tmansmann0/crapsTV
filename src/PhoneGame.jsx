@@ -1741,6 +1741,7 @@ export default function PhoneGame({
         : [],
     );
   const [presentation, setPresentation] = useState(null);
+  const [drinkDrafts, setDrinkDrafts] = useState({});
   const previousSnapshot = useRef(null);
   const reconnectBaseline = useRef(null);
   const amount = sum(bundle);
@@ -1794,16 +1795,18 @@ export default function PhoneGame({
       (!previous?.rolling || state.throw?.id !== previous.throw?.id)
     ) {
       setPresentation(null);
-      if (rollArea) setTab("dice");
+      if (rollArea)
+        setTab((current) => (current === "drinks" ? current : "dice"));
     }
     const fresh = freshMobileSettlement(previous, state, player.id);
-    if (fresh) setPresentation({ ...fresh, active: false, landed: [] });
-  }, [state, connected, player.id, !!rollArea]);
+    if (tab === "drinks") setPresentation(null);
+    else if (fresh) setPresentation({ ...fresh, active: false, landed: [] });
+  }, [state, connected, player.id, !!rollArea, tab]);
   useEffect(() => {
     if (!presentation || presentation.active) return;
     const id = presentation.id;
     const timer = setTimeout(() => {
-      setTab("play");
+      setTab((current) => (current === "drinks" ? current : "play"));
       setDetailOpen(false);
       setPresentation((current) =>
         current?.id === id && current.entries.length
@@ -2160,6 +2163,8 @@ export default function PhoneGame({
               player={player}
               connected={connected}
               send={send}
+              drafts={drinkDrafts}
+              setDrafts={setDrinkDrafts}
             />
           )}
           {tab === "learn" && (

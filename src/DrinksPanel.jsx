@@ -1,4 +1,3 @@
-import { useState } from "react";
 import DrinkIcon from "./DrinkIcon.jsx";
 import { drinkOfferLimit, money } from "./game.js";
 import {
@@ -9,10 +8,18 @@ import {
 } from "./drinking-mode.js";
 import "./drinks-panel.css";
 
-function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
-  const [selectedUnit, setUnit] = useState("sip");
-  const [quantity, setQuantity] = useState("1");
-  const [recipient, setRecipient] = useState("");
+function DrinkForm({
+  kind,
+  rules,
+  player,
+  peers,
+  pending,
+  locked,
+  send,
+  draft = {},
+  updateDraft,
+}) {
+  const { unit: selectedUnit = "sip", quantity = "1", recipient = "" } = draft;
   const isOffer = kind === "offer";
   const to = peers.find((p) => p.id === recipient)?.id ?? peers[0]?.id;
   const units = drinkUnits(rules);
@@ -92,8 +99,10 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
               To
               <select
                 value={to ?? ""}
-                disabled={disabled}
-                onChange={(event) => setRecipient(event.target.value)}
+                disabled={!peers.length}
+                onChange={(event) =>
+                  updateDraft({ recipient: event.target.value })
+                }
               >
                 {!peers.length && (
                   <option value="">No other players online</option>
@@ -112,8 +121,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
               <select
                 value={unit}
                 aria-label="Drink"
-                disabled={disabled}
-                onChange={(event) => setUnit(event.target.value)}
+                onChange={(event) => updateDraft({ unit: event.target.value })}
               >
                 {units.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -133,8 +141,9 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
                   inputMode="numeric"
                   required
                   value={quantity}
-                  disabled={disabled}
-                  onChange={(event) => setQuantity(event.target.value)}
+                  onChange={(event) =>
+                    updateDraft({ quantity: event.target.value })
+                  }
                 />
               </label>
             )}
@@ -164,7 +173,14 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
   );
 }
 
-export default function DrinksPanel({ state, player, connected, send }) {
+export default function DrinksPanel({
+  state,
+  player,
+  connected,
+  send,
+  drafts,
+  setDrafts,
+}) {
   const rules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
   const peers = state.players.filter(
     (p) => p.id !== player.id && !p.left && !p.bot && p.connected,
@@ -199,7 +215,8 @@ export default function DrinksPanel({ state, player, connected, send }) {
       </header>
       {state.rolling && (
         <p className="pg-drink-notice">
-          Drink actions reopen when the dice land.
+          You can edit your drink while the dice roll. Submit or verify when the
+          dice land.
         </p>
       )}
       {!peers.length && (
@@ -267,6 +284,13 @@ export default function DrinksPanel({ state, player, connected, send }) {
           peers={peers}
           locked={locked}
           send={send}
+          draft={drafts[kind]}
+          updateDraft={(change) =>
+            setDrafts((current) => ({
+              ...current,
+              [kind]: { ...current[kind], ...change },
+            }))
+          }
           pending={requests.find(
             (request) => request.from === player.id && request.kind === kind,
           )}

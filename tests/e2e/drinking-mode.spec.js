@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { RoomHub } from "../../src/hub.js";
+import { MOBILE_DICE_HOLD_MS } from "../../src/mobile-settlement.js";
 
 test("two phones verify top-ups and complete a required drink assignment", async ({
   browser,
@@ -132,7 +133,6 @@ test("two phones verify top-ups and complete a required drink assignment", async
         .locator(".pg-drinks")
         .evaluate((el) => el.scrollWidth <= el.clientWidth),
     ).toBe(true);
-    expect(errors).toEqual([]);
     if (!process.env.CI) {
       await mkdir("artifacts", { recursive: true });
       await expect(host.locator("[data-bank-value]")).toHaveAttribute(
@@ -142,6 +142,47 @@ test("two phones verify top-ups and complete a required drink assignment", async
       await host.locator(".pg-drinks").evaluate((el) => el.scrollTo(0, 0));
       await host.screenshot({ path: "artifacts/drinking-mode-phone.png" });
     }
+
+    const addDrink = add.getByLabel("Drink", { exact: true });
+    const addQuantity = add.getByLabel("Quantity");
+    const offerDrink = offer.getByLabel("Drink", { exact: true });
+    const offerQuantity = offer.getByLabel("Quantity");
+    const requestVerification = add.getByRole("button", {
+      name: /Request verification/,
+    });
+    const hostDrinksTab = host.getByRole("tab", { name: "Drinks", exact: true });
+    await addDrink.selectOption("shot");
+    await addQuantity.fill("2");
+    await offerDrink.selectOption("sip");
+    await offerQuantity.fill("4");
+    await host.getByRole("tab", { name: "Play", exact: true }).click();
+    await hostDrinksTab.click();
+    await expect(addDrink).toHaveValue("shot");
+    await expect(addQuantity).toHaveValue("2");
+    await expect(offerDrink).toHaveValue("sip");
+    await expect(offerQuantity).toHaveValue("4");
+
+    hub.receive("Alice", { type: "roll" });
+    await expect(host.locator(".pg-strip.is-rolling")).toBeVisible();
+    await expect(hostDrinksTab).toHaveAttribute("aria-selected", "true");
+    await expect(requestVerification).toBeDisabled();
+    await expect(addDrink).toHaveValue("shot");
+    await expect(addQuantity).toHaveValue("2");
+    await addQuantity.fill("3");
+    await expect(requestVerification).toBeEnabled({ timeout: 15000 });
+    // The result display normally moves controllers back to Play after its hold.
+    await host.waitForTimeout(MOBILE_DICE_HOLD_MS + 100);
+    await requestVerification.click();
+    await expect(guest.getByText(/3 shots · \$60 in chips/)).toBeVisible();
+    await guest.getByRole("button", { name: "Verify top-up" }).click();
+    await expect(host.locator("[data-bank-value]")).toHaveAttribute(
+      "data-bank-value",
+      "6500",
+    );
+    await expect(addDrink).toHaveValue("shot");
+    await expect(addQuantity).toHaveValue("3");
+    await expect(offerQuantity).toHaveValue("4");
+    expect(errors).toEqual([]);
   } finally {
     await Promise.all(contexts.map((context) => context.close()));
     hub.close();
