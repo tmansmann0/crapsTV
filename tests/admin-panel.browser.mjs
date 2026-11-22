@@ -229,7 +229,7 @@ try {
       type: "drinking-rules",
       rules: {
         sipValue: 725,
-        shotValue: 2500,
+        shotValue: 10000,
         finishValue: 6000,
         finishEnabled: true,
         offerMarkup: 20,

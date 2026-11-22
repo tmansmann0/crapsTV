@@ -37,13 +37,16 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await expect(mode).toHaveAttribute("aria-pressed", "false");
     await mode.click();
     await expect(host.getByLabel("Sip value ($)")).toHaveValue("5");
-    await expect(host.getByLabel("Shot value ($)")).toHaveValue("25");
+    await expect(host.getByLabel("Shot value ($)")).toHaveValue("100");
+    await expect(host.getByLabel("Drink assignment markup (%)")).toHaveValue(
+      "25",
+    );
     await expect(host.getByLabel(/Enable.*Finish drink/)).not.toBeChecked();
     await expect(host.getByLabel("Finish drink value ($)")).toHaveCount(0);
     await host.getByLabel("Sip value ($)").fill("6");
     await host.getByLabel("Shot value ($)").fill("20");
-    await host.getByLabel("Drink assignment markup (%)").fill("25");
     await host.getByLabel(/Enable.*Finish drink/).check();
+    await expect(host.getByLabel("Finish drink value ($)")).toHaveValue("75");
     await host.getByLabel("Finish drink value ($)").fill("30");
     await host.getByLabel("Betting window (seconds)").fill("0");
     const guest = await join(contexts[1], "Jordan");

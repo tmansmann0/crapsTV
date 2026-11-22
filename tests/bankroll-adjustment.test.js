@@ -81,7 +81,7 @@ test("drink assignments can use host-added chips but cannot spend withdrawn or w
 
   game.adjustBankroll(state, host.id, guest.id, 2000);
   game.place(state, guest.id, "pass", 2000);
-  game.adjustBankroll(state, host.id, guest.id, -500);
+  game.adjustBankroll(state, host.id, guest.id, -375);
   assert.equal(game.net(guest), 0);
   const send = (quantity) =>
     game.requestDrink(state, guest.id, {
@@ -95,5 +95,5 @@ test("drink assignments can use host-added chips but cannot spend withdrawn or w
   assert.equal(guest.bank, 0);
   assert.equal(guest.bets[0].amount, 2000);
   assert.equal(guest.buyIn, verified);
-  assert.equal(state.drinkRequests[0].amount, 500);
+  assert.equal(state.drinkRequests[0].amount, 625);
 });
