@@ -55,7 +55,7 @@ export const WAYS = {
 };
 export const POINTS = [4, 5, 6, 8, 9, 10];
 export const ALL_POINTS = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
-const ODDS_MULTIPLIERS = { 4: 10, 5: 4, 6: 3, 8: 3, 9: 4, 10: 10 };
+const ODDS_MULTIPLIERS = { 4: 5, 5: 4, 6: 3, 8: 3, 9: 4, 10: 5 };
 export const BONUS_NUMBERS = {
   "bonus-small": [2, 3, 4, 5, 6],
   "bonus-tall": [8, 9, 10, 11, 12],
@@ -205,12 +205,14 @@ export function betConflict(player, betId) {
     return "Take down the opposing bet on this number first.";
   return "";
 }
-/** Pass/Come contracts lock at their point; bonus contracts lock once play starts. */
-export function canRemoveBet(bet) {
-  return (
-    !(bet.point && ["pass", "come"].includes(bet.type)) &&
-    !(BONUS_NUMBERS[bet.type] && bet.started)
-  );
+export function betRemovalLock(bet, bets = []) {
+  if (bet.point && ["pass", "come"].includes(bet.type))
+    return "Locked until its point resolves";
+  if (BONUS_NUMBERS[bet.type] && bet.started)
+    return "Locked until bonus resolves";
+  if (bet.type === "pass" && bets.some((bet) => bet.type.startsWith("buy-")))
+    return "Take down your Buy bets first";
+  return "";
 }
 export function catalogue(state, player) {
   const crapless = state.config.mode === "crapless",
@@ -809,12 +811,8 @@ export function remove(s, id, betId) {
   const p = active(s, id),
     b = p.bets.find((b) => b.id === betId);
   assert(b, "Bet not found.");
-  assert(
-    canRemoveBet(b),
-    BONUS_NUMBERS[b.type]
-      ? "That bonus bet is locked until it resolves."
-      : "That line bet is locked until its point resolves.",
-  );
+  const lock = betRemovalLock(b, p.bets);
+  assert(!lock, `${lock}.`);
   const removed = p.bets.filter((x) => x.id === b.id || x.parent === b.id);
   p.bank += removed.reduce((n, b) => n + b.amount, 0);
   p.bets = p.bets.filter((x) => !removed.includes(x));

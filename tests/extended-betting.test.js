@@ -140,10 +140,10 @@ test("bonus cycles persist across point hits, pay once, prevent late entry and r
       game.place(state, player.id, id, 500);
     roll(state, [1, 1]);
     assert.deepEqual(state.bonus.hits, [2]);
-    assert(player.bets.every((bet) => !game.canRemoveBet(bet)));
+    assert(player.bets.every((bet) => game.betRemovalLock(bet)));
     assert.throws(
       () => game.remove(state, player.id, player.bets[0].id),
-      /bonus bet is locked/,
+      /Locked until bonus resolves/,
     );
     assert.throws(
       () => game.place(state, player.id, "bonus-all", 500),
@@ -230,7 +230,7 @@ test("take-down refunds each eligible wager and linked odds without releasing li
       .catalogue(state, player)
       .filter((row) => row.available)) {
       game.place(state, player.id, row.id, row.minimum);
-      assert(game.canRemoveBet(player.bets[0]));
+      assert.equal(game.betRemovalLock(player.bets[0], player.bets), "");
       game.remove(state, player.id, player.bets[0].id);
       assert.equal(player.bank, 100000);
     }
@@ -239,10 +239,10 @@ test("take-down refunds each eligible wager and linked odds without releasing li
     const line = player.bets[0];
     const odds = rowFor(state, player, `odds:${line.id}`);
     game.place(state, player.id, odds.id, odds.minimum);
-    assert(!game.canRemoveBet(line));
+    assert(game.betRemovalLock(line, player.bets));
     assert.throws(
       () => game.remove(state, player.id, line.id),
-      /line bet is locked/,
+      /Locked until its point resolves/,
     );
     game.remove(
       state,
@@ -262,6 +262,29 @@ test("take-down refunds each eligible wager and linked odds without releasing li
   assert.equal(player.bets.length, 0);
 });
 
+test("each player must take down their own Buy bets before removing an open Pass Line", () => {
+  for (const mode of ["craps", "crapless"]) {
+    const { state, player } = table(mode);
+    const guest = game.join(state, "Guest");
+    game.place(state, guest.id, "buy-5", 600);
+    game.place(state, player.id, "pass", 2500);
+    const pass = player.bets[0].id;
+    game.place(state, player.id, "buy-4", 500);
+    game.place(state, player.id, "buy-10", 500);
+    const firstBuy = player.bets[1].id;
+    const secondBuy = player.bets[2].id;
+    const bank = player.bank;
+    assert.throws(() => game.remove(state, player.id, pass), /Buy bets first/);
+    assert.equal(player.bank, bank);
+    game.remove(state, player.id, firstBuy);
+    assert.throws(() => game.remove(state, player.id, pass), /Buy bets first/);
+    game.remove(state, player.id, secondBuy);
+    game.remove(state, player.id, pass);
+    assert.equal(player.bank, 100000);
+    assert.equal(guest.bets.length, 1);
+  }
+});
+
 test("bonus progress and contract removal rules survive wire snapshots and authenticated reconnect", (t) => {
   const hub = new RoomHub("RULES");
   t.after(() => hub.close());
@@ -278,7 +301,7 @@ test("bonus progress and contract removal rules survive wire snapshots and authe
   assert.equal(saved.players[0].bets[0].started, true);
   assert.throws(
     () => game.remove(saved, welcome.playerId, saved.players[0].bets[0].id),
-    /locked/,
+    /Locked until bonus resolves/,
   );
   hub.disconnect("one");
   const reconnected = [];
