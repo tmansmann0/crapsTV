@@ -33,7 +33,7 @@ import {
 import { validBetChoices } from "./bet-options.js";
 import {
   catalogue,
-  betRemovalLock,
+  canRemoveBet,
   describeBet,
   equity,
   money,
@@ -826,12 +826,15 @@ function WagerActions({ row, bets, locked, teach, send }) {
   const matches = matchingWagers(row, bets);
   const bet = matches.find((item) => item.id === chosen) || matches[0];
   if (!bet) return null;
-  const lock = betRemovalLock(bet, bets);
-  const removable = !lock;
+  const removable = canRemoveBet(bet);
   const refund = bets
     .filter((item) => item.id === bet.id || item.parent === bet.id)
     .reduce((total, item) => total + item.amount, 0);
-  const reason = lock || "Refund to bank";
+  const reason = !removable
+    ? bet.type.startsWith("bonus-")
+      ? "Locked until bonus resolves"
+      : "Locked until its point resolves"
+    : "Refund to bank";
   return (
     <div
       className="pg-wager-actions"
@@ -1200,8 +1203,13 @@ function PlayPanel({
 
 function betStatus(state, player, bet) {
   const parent = player.bets.find((b) => b.id === bet.parent);
-  const lock = betRemovalLock(bet, player.bets);
-  if (lock) return { text: lock, locked: true };
+  if (!canRemoveBet(bet))
+    return {
+      text: bet.type.startsWith("bonus-")
+        ? "Locked until bonus resolves"
+        : "Locked until its point resolves",
+      locked: true,
+    };
   if (
     !state.point &&
     (bet.type.startsWith("place") ||

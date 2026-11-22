@@ -6,7 +6,7 @@ Money is represented as integer cents. Placing a bet transfers its stake from ca
 
 The minimum is at least $1. Starting chips are $10–$1,000,000. Bets must be integers, fit the cash balance, and respect a proper denomination. For example, place 6/8 uses $6 increments, place 3/11 uses $4 increments, and a pass-odds bet at point 6 uses $5 increments. A $5 bundle on place 6 offers an explicit $6 option; irregular bundles show legal lower/higher choices before placing anything. Odds require your own matching line or Come bet with an established point. The total odds cap is 3× that stake on 6/8, 4× on 5/9, and 5× on 4/10. The additional crapless points (2, 3, 11 and 12) have a 5× cap. Bets never borrow chips.
 
-The base pass/come contract cannot be removed after it travels to a point. To remove a Pass Line bet during come-out, take down your own Buy bets first. Odds can be removed independently. Don’t bets and their odds can be taken down. Cashing out intentionally closes the player's entire session and returns all unresolved stakes; closing the table does this for everyone.
+The base pass/come contract cannot be removed after it travels to a point. Before the come-out roll, a player can remove Pass Line and leave their Buy bets on the table. Odds can be removed independently. Don’t bets and their odds can be taken down. Cashing out intentionally closes the player's entire session and returns all unresolved stakes; closing the table does this for everyone.
 
 ## Supported house rules
 

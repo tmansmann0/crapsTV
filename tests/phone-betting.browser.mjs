@@ -142,23 +142,17 @@ try {
       window.bettingFixture.place("buy-4", 500);
     });
     await tile("pass").click();
-    await expect(page.locator(".pg-wager-actions")).toContainText(
-      "Take down your Buy bets first",
-    );
-    await expect(
-      page.getByRole("button", { name: /Pass line locked/ }),
-    ).toBeDisabled();
+    const removePass = page.getByRole("button", {
+      name: "Take down Pass line, refund $5",
+      exact: true,
+    });
+    await expect(removePass).toBeEnabled();
     await page.getByRole("tab", { name: /^Bets/ }).click();
+    await removePass.click();
+    assert.equal(await bank(), initialBank - 500);
     await expect(
-      page.getByRole("button", { name: "Pass line is locked", exact: true }),
-    ).toBeDisabled();
-    await page
-      .getByRole("button", { name: "Take down Buy 4, refund $5", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Take down Pass line, refund $5", exact: true })
-      .click();
-    assert.equal(await bank(), initialBank);
+      page.getByRole("button", { name: "Take down Buy 4, refund $5", exact: true }),
+    ).toBeEnabled();
 
     // All 21 unique pairs are reachable through actual die-face controls.
     await page.evaluate(() => window.bettingFixture.reset());
@@ -273,7 +267,7 @@ try {
         "zero-bank take-down refund",
         "locked Pass contract",
         "capped odds take-down",
-        "Pass Line stays up with an active Buy bet",
+        "Pass Line comes down before the point with a Buy bet still up",
         "all 21 hop pairs",
         "ATS placement, progress, and contract lock",
         "specific travelled wager + child odds refund",
