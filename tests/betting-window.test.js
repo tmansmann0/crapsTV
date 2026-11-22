@@ -5,6 +5,7 @@ import { RoomHub } from "../src/hub.js";
 import {
   bettingSecondsRemaining,
   botRollSecondsRemaining,
+  rollCooldownSecondsFor,
 } from "../src/betting-window.js";
 
 function table() {
@@ -87,6 +88,38 @@ test("admin changes use the existing window origin, including zero and next-roll
   assert.throws(() => game.setRollCooldown(s, a.id, 5), /ended/);
 });
 
+test("come-out and point-on betting windows follow the next roll's phase", (t) => {
+  let now = 200000;
+  t.mock.method(Date, "now", () => now);
+  const s = game.createState("WINDOW");
+  const host = game.join(s, "Host");
+  game.configure(s, host.id, {
+    rollCooldownSeconds: 12,
+    pointRollCooldownSeconds: 4,
+  });
+  game.start(s, host.id);
+  assert.equal(s.nextRollAt, now + 12000);
+
+  function settle(dice) {
+    now = Math.max(now, s.nextRollAt) + 2500;
+    s.rolling = true;
+    game.finishRoll(s, dice);
+  }
+
+  settle([3, 3]);
+  assert.equal(s.point, 6);
+  assert.equal(s.nextRollAt, now + 4000);
+  assert.throws(() => game.setRollCooldown(s, host.id, 8, 61), /whole number/);
+  assert.equal(s.config.rollCooldownSeconds, 12);
+  now += 1000;
+  game.setRollCooldown(s, host.id, 8, 3);
+  assert.equal(s.nextRollAt, now + 2000);
+  settle([3, 3]);
+  assert.equal(s.point, null);
+  assert.equal(s.nextRollAt, now + 8000);
+  assert.equal(rollCooldownSecondsFor({ rollCooldownSeconds: 7 }, true), 7);
+});
+
 test("hub rejects repeated/forged throws and preserves cooldown through reconnect", (t) => {
   let now = 300000;
   t.mock.method(Date, "now", () => now);
@@ -115,6 +148,9 @@ test("hub rejects repeated/forged throws and preserves cooldown through reconnec
   hub.receive("two", { type: "cooldown", seconds: 0 });
   assert.equal(hub.state.nextRollAt, hub.state.bettingOpenedAt);
   assert.equal(hub.state.config.rollCooldownSeconds, 0);
+  assert.equal(hub.state.config.pointRollCooldownSeconds, 0);
+  hub.receive("two", { type: "cooldown", seconds: 0, pointSeconds: 7 });
+  assert.equal(hub.state.config.pointRollCooldownSeconds, 7);
 });
 
 test("lobby configuration validates cooldown and shared countdown corrects device clocks", () => {

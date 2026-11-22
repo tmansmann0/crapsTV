@@ -3,6 +3,11 @@ export const MAX_ROLL_COOLDOWN_SECONDS = 60;
 export const DEFAULT_BOT_ROLL_DELAY_SECONDS = 5;
 export const MAX_BOT_ROLL_DELAY_SECONDS = 60;
 
+export function rollCooldownSecondsFor(config, pointIsOn) {
+  const comeOut = config.rollCooldownSeconds ?? DEFAULT_ROLL_COOLDOWN_SECONDS;
+  return pointIsOn ? config.pointRollCooldownSeconds ?? comeOut : comeOut;
+}
+
 /** UI only: the room authority independently checks its own clock. */
 export function bettingSecondsRemaining(state, now = Date.now()) {
   if (state?.status !== "playing" || state.rolling) return 0;

@@ -151,7 +151,7 @@ export class RoomHub {
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
         else if (type === "cooldown")
-          game.setRollCooldown(s, pid, message.seconds);
+          game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")
           game.setBotRollDelay(s, pid, message.seconds);
         else if (type === "add-bot")

@@ -26,6 +26,7 @@ import {
   validDrinkingRules,
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { rollCooldownSecondsFor } from "./betting-window.js";
 import {
   BOT_STRATEGIES,
   BOT_DIFFICULTIES,
@@ -103,6 +104,8 @@ function SecondsField({ label, value, onChange, disabled }) {
 function RollTimingFields({
   seconds,
   setSeconds,
+  pointSeconds,
+  setPointSeconds,
   botDelay,
   setBotDelay,
   botsAllowed,
@@ -114,9 +117,15 @@ function RollTimingFields({
         <Clock3 size={17} /> Time to bet
       </h3>
       <SecondsField
-        label="Betting window"
+        label="Come-out window"
         value={seconds}
         onChange={setSeconds}
+        disabled={disabled}
+      />
+      <SecondsField
+        label="Point-on window"
+        value={pointSeconds}
+        onChange={setPointSeconds}
         disabled={disabled}
       />
       {botsAllowed && (
@@ -127,10 +136,7 @@ function RollTimingFields({
             onChange={setBotDelay}
             disabled={disabled}
           />
-          <p>
-            Bot shooters wait {Number(seconds || 0) + Number(botDelay || 0)}s in
-            total.
-          </p>
+          <p>Bot shooters wait {Number(botDelay || 0)}s extra.</p>
         </>
       )}
     </>
@@ -762,6 +768,8 @@ export default function AdminPanel({
 }) {
   const id = useId();
   const savedDrinkRules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
+  const savedComeOut = rollCooldownSecondsFor(state.config, false);
+  const savedPointOn = rollCooldownSecondsFor(state.config, true);
   const [drinkingMode, setDrinkingMode] = useState(!!state.config.drinkingMode);
   const [drinkingRules, setDrinkingRules] = useState(() =>
     drinkRuleDraft(savedDrinkRules),
@@ -771,7 +779,8 @@ export default function AdminPanel({
     [minimum, setMinimum] = useState(state.config.minBet / 100),
     [mode, setMode] = useState(state.config.mode),
     [teach, setTeach] = useState(state.config.teach),
-    [seconds, setSeconds] = useState(state.config.rollCooldownSeconds ?? 10),
+    [seconds, setSeconds] = useState(savedComeOut),
+    [pointSeconds, setPointSeconds] = useState(savedPointOn),
     [botDelay, setBotDelay] = useState(state.config.botRollDelaySeconds ?? 5),
     [notice, setNotice] = useState(""),
     [botFormOpen, setBotFormOpen] = useState(false);
@@ -783,10 +792,8 @@ export default function AdminPanel({
     ),
     humans = players.filter((p) => !p.bot && p.id !== player.id);
   const rules = drinkingMode ? readDrinkRules(drinkingRules) : undefined;
-  useEffect(
-    () => setSeconds(state.config.rollCooldownSeconds ?? 10),
-    [state.config.rollCooldownSeconds],
-  );
+  useEffect(() => setSeconds(savedComeOut), [savedComeOut]);
+  useEffect(() => setPointSeconds(savedPointOn), [savedPointOn]);
   useEffect(
     () => setBotDelay(state.config.botRollDelaySeconds ?? 5),
     [state.config.botRollDelaySeconds],
@@ -805,6 +812,7 @@ export default function AdminPanel({
         ...(rules && { drinkingRules: rules }),
         teach,
         rollCooldownSeconds: Number(seconds),
+        pointRollCooldownSeconds: Number(pointSeconds),
         ...(botsAllowed && { botRollDelaySeconds: Number(botDelay) }),
       },
     });
@@ -812,20 +820,25 @@ export default function AdminPanel({
   function saveTiming(event) {
     event.preventDefault();
     if (disabled || !validTiming) return;
-    send({ type: "cooldown", seconds: Number(seconds) });
+    send({
+      type: "cooldown",
+      seconds: Number(seconds),
+      pointSeconds: Number(pointSeconds),
+    });
     if (botsAllowed) send({ type: "bot-delay", seconds: Number(botDelay) });
     setNotice("Timing saved.");
   }
-  const validTiming =
-    seconds !== "" &&
-    Number.isInteger(Number(seconds)) &&
-    Number(seconds) >= 0 &&
-    Number(seconds) <= 60 &&
-    (!botsAllowed ||
-      (botDelay !== "" &&
-        Number.isInteger(Number(botDelay)) &&
-        Number(botDelay) >= 0 &&
-        Number(botDelay) <= 60));
+  const validTiming = [
+    seconds,
+    pointSeconds,
+    ...(botsAllowed ? [botDelay] : []),
+  ].every(
+    (value) =>
+      value !== "" &&
+      Number.isInteger(Number(value)) &&
+      Number(value) >= 0 &&
+      Number(value) <= 60,
+  );
   const validSetup =
     validTiming &&
     Number.isInteger(Number(minimum)) &&
@@ -840,6 +853,8 @@ export default function AdminPanel({
     <RollTimingFields
       seconds={seconds}
       setSeconds={setSeconds}
+      pointSeconds={pointSeconds}
+      setPointSeconds={setPointSeconds}
       botDelay={botDelay}
       setBotDelay={setBotDelay}
       botsAllowed={botsAllowed}

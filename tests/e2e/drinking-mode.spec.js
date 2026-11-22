@@ -48,7 +48,8 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await host.getByLabel(/Enable.*Finish drink/).check();
     await expect(host.getByLabel("Finish drink value ($)")).toHaveValue("75");
     await host.getByLabel("Finish drink value ($)").fill("30");
-    await host.getByLabel("Betting window (seconds)").fill("0");
+    await host.getByLabel("Come-out window (seconds)").fill("0");
+    await host.getByLabel("Point-on window (seconds)").fill("0");
     const guest = await join(contexts[1], "Jordan");
     await host.getByRole("button", { name: "Open the table" }).click();
     await host.getByRole("button", { name: "Add chips in Drinks" }).click();

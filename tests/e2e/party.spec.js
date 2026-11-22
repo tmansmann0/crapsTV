@@ -259,7 +259,8 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     // The rest of this multi-roll fixture deliberately uses immediate throws.
     await phone.getByRole("button", { name: "Open settings" }).click();
     await openAdminSection(phone, "Table");
-    await phone.getByLabel("Betting window (seconds)").fill("0");
+    await phone.getByLabel("Come-out window (seconds)").fill("0");
+    await phone.getByLabel("Point-on window (seconds)").fill("0");
     await phone.getByRole("button", { name: "Save timing" }).click();
     await phone.getByRole("button", { name: "Close settings" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).click();

@@ -7,6 +7,7 @@ import {
   MAX_ROLL_COOLDOWN_SECONDS,
   DEFAULT_BOT_ROLL_DELAY_SECONDS,
   MAX_BOT_ROLL_DELAY_SECONDS,
+  rollCooldownSecondsFor,
 } from "./betting-window.js";
 import { normalizeBotOptions } from "./bot-options.js";
 import {
@@ -597,6 +598,9 @@ export function configure(s, id, changes) {
     teach = s.config.teach,
     rollCooldownSeconds = s.config.rollCooldownSeconds ??
       DEFAULT_ROLL_COOLDOWN_SECONDS,
+    pointRollCooldownSeconds = changes.rollCooldownSeconds === undefined
+      ? rollCooldownSecondsFor(s.config, true)
+      : rollCooldownSeconds,
     botRollDelaySeconds = s.config.botRollDelaySeconds ??
       DEFAULT_BOT_ROLL_DELAY_SECONDS,
   } = changes;
@@ -622,6 +626,7 @@ export function configure(s, id, changes) {
   );
   assert(typeof teach === "boolean", "Teach mode must be on or off.");
   validateCooldown(rollCooldownSeconds);
+  validateCooldown(pointRollCooldownSeconds);
   validateBotDelay(botRollDelaySeconds);
   s.config = {
     startingBank,
@@ -631,6 +636,7 @@ export function configure(s, id, changes) {
     ...(drinkingMode && { drinkingRules: normalizedDrinkRules }),
     teach,
     rollCooldownSeconds,
+    pointRollCooldownSeconds,
     botRollDelaySeconds,
   };
   removeDrinkingBots(s);
@@ -670,7 +676,7 @@ function openBettingWindow(s) {
   s.bettingOpenedAt = Date.now();
   s.nextRollAt =
     s.bettingOpenedAt +
-    (s.config.rollCooldownSeconds ?? DEFAULT_ROLL_COOLDOWN_SECONDS) * 1000;
+    rollCooldownSecondsFor(s.config, !!s.point) * 1000;
 }
 function validateBotDelay(seconds) {
   assert(
@@ -686,13 +692,17 @@ export function setBotRollDelay(s, id, seconds) {
   validateBotDelay(seconds);
   s.config.botRollDelaySeconds = seconds;
 }
-export function setRollCooldown(s, id, seconds) {
+export function setRollCooldown(s, id, seconds, pointSeconds = seconds) {
   admin(s, id);
   assert(s.status !== "ended", "The session has ended.");
   validateCooldown(seconds);
+  validateCooldown(pointSeconds);
   s.config.rollCooldownSeconds = seconds;
+  s.config.pointRollCooldownSeconds = pointSeconds;
   if (s.status === "playing" && !s.rolling) {
-    s.nextRollAt = (s.bettingOpenedAt ?? Date.now()) + seconds * 1000;
+    s.nextRollAt =
+      (s.bettingOpenedAt ?? Date.now()) +
+      rollCooldownSecondsFor(s.config, !!s.point) * 1000;
     if (Date.now() < s.nextRollAt) s.aim = null;
   }
 }
