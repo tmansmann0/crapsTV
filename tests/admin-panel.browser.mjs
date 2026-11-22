@@ -51,6 +51,7 @@ try {
   await expect(page.getByLabel("Sip value ($)", { exact: true })).toHaveValue(
     "5",
   );
+  await expect(page.getByLabel("Juice payouts (%)")).toHaveValue("0");
   await openAdminSection(page, "Players");
   await expect(
     page.getByRole("button", { name: "Add bot", exact: true }),
@@ -205,25 +206,26 @@ try {
     { type: "bot-delay", seconds: 6 },
   ]);
   await page.evaluate(() => window.adminQA.drinking());
-  const savePrices = page.getByRole("button", {
-    name: "Save drink prices",
+  const saveDrinkRules = page.getByRole("button", {
+    name: "Save drink rules",
     exact: true,
   });
   await expect(
-    page.getByRole("group", { name: "Drink prices", exact: true }),
+    page.getByRole("group", { name: "Drinking Mode rules", exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveCount(0);
-  await expect(savePrices).toBeDisabled();
+  await expect(saveDrinkRules).toBeDisabled();
   await page.getByLabel("Sip value ($)", { exact: true }).fill("7.25");
   await page
     .getByLabel("Drink assignment markup (%)", { exact: true })
     .fill("20");
   await page.getByLabel(/Enable .Finish drink./).check();
   await page.getByLabel("Finish drink value ($)", { exact: true }).fill("60");
+  await page.getByLabel("Juice payouts (%)").fill("175");
   await page.evaluate(() => window.adminQA.rolling(true));
-  await expect(savePrices).toBeDisabled();
+  await expect(saveDrinkRules).toBeDisabled();
   await page.evaluate(() => window.adminQA.rolling(false));
-  await savePrices.click();
+  await saveDrinkRules.click();
   assert.deepEqual(
     await page.evaluate(() =>
       window.adminQA.actions.find((action) => action.type === "drinking-rules"),
@@ -236,10 +238,11 @@ try {
         finishValue: 6000,
         finishEnabled: true,
         offerMarkup: 20,
+        payoutBoost: 175,
       },
     },
   );
-  await expect(savePrices).toBeDisabled();
+  await expect(saveDrinkRules).toBeDisabled();
   await expect(page.getByLabel("Sip value ($)", { exact: true })).toHaveValue(
     "7.25",
   );

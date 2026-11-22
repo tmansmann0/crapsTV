@@ -12,6 +12,7 @@ import {
 import { normalizeBotOptions } from "./bot-options.js";
 import {
   DEFAULT_DRINKING_RULES,
+  MAX_PAYOUT_BOOST,
   drinkPrice,
   validDrinkingRules,
 } from "./drinking-mode.js";
@@ -573,13 +574,16 @@ function betting(s) {
   assert(s.status === "playing", "The table isn’t taking bets yet.");
   assert(!s.rolling, "Dice are out. Wait for the next betting window.");
 }
-function normalizeDrinkingRules(rules) {
+function normalizeDrinkingRules(rules, previous = DEFAULT_DRINKING_RULES) {
   assert(
     validDrinkingRules(rules),
-    "Enter drink values from $1 to $1,000,000 and a whole markup from 0% to 1000%.",
+    `Enter drink values from $1 to $1,000,000, a whole markup from 0% to 1000%, and Juice payouts from 0% to ${MAX_PAYOUT_BOOST}%.`,
   );
   return Object.fromEntries(
-    Object.keys(DEFAULT_DRINKING_RULES).map((key) => [key, rules[key]]),
+    Object.keys(DEFAULT_DRINKING_RULES).map((key) => [
+      key,
+      rules[key] ?? previous[key] ?? DEFAULT_DRINKING_RULES[key],
+    ]),
   );
 }
 export function removeDrinkingBots(s) {
@@ -618,7 +622,10 @@ export function configure(s, id, changes) {
     typeof drinkingMode === "boolean",
     "Choose whether to enable Drinking Mode.",
   );
-  const normalizedDrinkRules = normalizeDrinkingRules(drinkingRules);
+  const normalizedDrinkRules = normalizeDrinkingRules(
+    drinkingRules,
+    s.config.drinkingRules,
+  );
   assert(
     Number.isSafeInteger(startingBank) &&
       startingBank >= 1000 &&
@@ -662,7 +669,7 @@ export function setDrinkingRules(s, id, rules) {
   assert(s.status !== "ended", "The session has ended.");
   assert(s.config.drinkingMode, "Drinking Mode is off.");
   assert(!s.rolling, "Wait for the dice to land before changing drink rules.");
-  s.config.drinkingRules = normalizeDrinkingRules(rules);
+  s.config.drinkingRules = normalizeDrinkingRules(rules, s.config.drinkingRules);
 }
 export function start(s, id) {
   admin(s, id);
@@ -1136,9 +1143,10 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   for (const player of s.players) player.betPreview = null;
   return timeline;
 }
-function settle(p, b, result, multiplier = 1, stay = false) {
+function settle(p, b, result, multiplier, stay, payoutBoost) {
   if (result === "win") {
-    const profit = Math.floor(b.amount * multiplier + 1e-7);
+    const baseProfit = Math.floor(b.amount * multiplier + 1e-7);
+    const profit = baseProfit + Math.floor((baseProfit * payoutBoost) / 100);
     p.bank += profit + (stay ? 0 : b.amount);
     p.stats.wins++;
     p.stats.biggestWin = Math.max(p.stats.biggestWin, profit);
@@ -1171,6 +1179,9 @@ export function finishRoll(s, dice = s.throw?.dice) {
   const total = dice[0] + dice[1],
     oldPoint = s.point,
     crapless = s.config.mode === "crapless";
+  const payoutBoost = s.config.drinkingMode
+    ? s.config.drinkingRules?.payoutBoost ?? DEFAULT_DRINKING_RULES.payoutBoost
+    : 0;
   s.bonus ??= { hits: [] };
   s.bonus.hits =
     total === 7
@@ -1196,7 +1207,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
         sourceBet,
         standing: result === "win" && stay,
       };
-      settle(p, bet, result, multiplier, stay);
+      settle(p, bet, result, multiplier, stay, payoutBoost);
       settlements.push({
         betId: bet.id,
         label: labels.get(bet.id),

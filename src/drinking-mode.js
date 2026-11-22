@@ -4,7 +4,10 @@ export const DEFAULT_DRINKING_RULES = Object.freeze({
   finishValue: 7500,
   finishEnabled: false,
   offerMarkup: 25,
+  payoutBoost: 0,
 });
+
+export const MAX_PAYOUT_BOOST = 1000;
 
 export const DRINK_UNITS = [
   { id: "sip", label: "Sip", plural: "sips", valueKey: "sipValue" },
@@ -43,6 +46,10 @@ export function validDrinkingRules(rules) {
     typeof rules.finishEnabled === "boolean" &&
     Number.isSafeInteger(rules.offerMarkup) &&
     rules.offerMarkup >= 0 &&
-    rules.offerMarkup <= 1000
+    rules.offerMarkup <= 1000 &&
+    (rules.payoutBoost === undefined ||
+      (Number.isSafeInteger(rules.payoutBoost) &&
+        rules.payoutBoost >= 0 &&
+        rules.payoutBoost <= MAX_PAYOUT_BOOST))
   );
 }

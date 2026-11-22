@@ -39,6 +39,7 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await mode.click();
     await expect(host.getByLabel("Sip value ($)")).toHaveValue("5");
     await expect(host.getByLabel("Shot value ($)")).toHaveValue("100");
+    await expect(host.getByLabel("Juice payouts (%)")).toHaveValue("0");
     await expect(host.getByLabel("Drink assignment markup (%)")).toHaveValue(
       "25",
     );
@@ -49,6 +50,7 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await host.getByLabel(/Enable.*Finish drink/).check();
     await expect(host.getByLabel("Finish drink value ($)")).toHaveValue("75");
     await host.getByLabel("Finish drink value ($)").fill("30");
+    await host.getByLabel("Juice payouts (%)").fill("150");
     await host.getByLabel("Come-out window (seconds)").fill("0");
     await host.getByLabel("Point-on window (seconds)").fill("0");
     const guest = await join(contexts[1], "Jordan");
@@ -56,6 +58,7 @@ test("two phones verify top-ups and complete a required drink assignment", async
     await host.getByRole("button", { name: "Add chips in Drinks" }).click();
 
     const [alice, jordan] = hub.state.players;
+    expect(hub.state.config.drinkingRules.payoutBoost).toBe(150);
     expect([alice.bank, jordan.bank]).toEqual([0, 0]);
     const add = host
       .locator(".pg-drink-card")

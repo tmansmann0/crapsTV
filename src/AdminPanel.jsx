@@ -23,6 +23,7 @@ import DrinkIcon from "./DrinkIcon.jsx";
 import {
   DEFAULT_DRINKING_RULES,
   DRINK_UNITS,
+  MAX_PAYOUT_BOOST,
   validDrinkingRules,
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
@@ -149,6 +150,7 @@ function drinkRuleDraft(saved) {
     sipValue: saved.sipValue / 100,
     shotValue: saved.shotValue / 100,
     finishValue: saved.finishValue / 100,
+    payoutBoost: saved.payoutBoost ?? DEFAULT_DRINKING_RULES.payoutBoost,
   };
 }
 
@@ -163,11 +165,12 @@ function readDrinkRules(draft) {
         : finishValue,
     finishEnabled: draft.finishEnabled,
     offerMarkup: draft.offerMarkup === "" ? NaN : Number(draft.offerMarkup),
+    payoutBoost: draft.payoutBoost === "" ? NaN : Number(draft.payoutBoost),
   };
   return validDrinkingRules(rules) ? rules : null;
 }
 
-function DrinkPriceFields({ rules, setRules }) {
+function DrinkingRuleFields({ rules, setRules }) {
   const update = (key, value) =>
     setRules((current) => ({ ...current, [key]: value }));
   return (
@@ -203,6 +206,19 @@ function DrinkPriceFields({ rules, setRules }) {
             onChange={(event) => update("offerMarkup", event.target.value)}
           />
         </label>
+        <label>
+          Juice payouts (%)
+          <input
+            type="number"
+            inputMode="numeric"
+            min="0"
+            max={MAX_PAYOUT_BOOST}
+            step="1"
+            required
+            value={rules.payoutBoost}
+            onChange={(event) => update("payoutBoost", event.target.value)}
+          />
+        </label>
       </div>
       <label className="toggle-label ha-drinking-finish">
         <span>Enable “Finish drink”</span>
@@ -214,6 +230,7 @@ function DrinkPriceFields({ rules, setRules }) {
       </label>
       <p className="ha-rule-help">
         Chip top-ups use the listed values. Markup applies to drink assignments.
+        At 100% Juice, winning bets earn twice the usual profit.
       </p>
     </>
   );
@@ -236,12 +253,12 @@ function DrinkingSettings({ enabled, setEnabled, rules, setRules, disabled }) {
         </span>
         <b>{enabled ? "On" : "Off"}</b>
       </button>
-      {enabled && <DrinkPriceFields rules={rules} setRules={setRules} />}
+      {enabled && <DrinkingRuleFields rules={rules} setRules={setRules} />}
     </fieldset>
   );
 }
 
-function LiveDrinkPrices({ saved, disabled, send }) {
+function LiveDrinkingRules({ saved, disabled, send }) {
   const [draft, setDraft] = useState(() => drinkRuleDraft(saved));
   const rules = readDrinkRules(draft);
   const unchanged =
@@ -256,15 +273,17 @@ function LiveDrinkPrices({ saved, disabled, send }) {
       }}
     >
       <fieldset disabled={disabled}>
-        <legend className="ha-card-title">Drink prices</legend>
-        <DrinkPriceFields rules={draft} setRules={setDraft} />
-        <p className="ha-rule-help">Changes apply to new requests.</p>
+        <legend className="ha-card-title">Drinking Mode rules</legend>
+        <DrinkingRuleFields rules={draft} setRules={setDraft} />
+        <p className="ha-rule-help">
+          Price changes apply to new requests. Juice takes effect on the next roll.
+        </p>
         <button
           type="submit"
           className="button outline small"
           disabled={!rules || unchanged}
         >
-          Save drink prices
+          Save drink rules
         </button>
       </fieldset>
     </form>
@@ -1023,7 +1042,7 @@ export default function AdminPanel({
                   </span>
                 </div>
                 {state.config.drinkingMode && (
-                  <LiveDrinkPrices
+                  <LiveDrinkingRules
                     key={JSON.stringify(savedDrinkRules)}
                     saved={savedDrinkRules}
                     disabled={disabled}

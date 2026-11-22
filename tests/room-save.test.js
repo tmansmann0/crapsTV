@@ -146,6 +146,7 @@ test("older saves keep the ledger and gains defaults without restoring motion or
     host.bankrollAdjustments,
   );
   assert(migrated.state.config.drinkingRules.sipValue > 0);
+  assert.equal(migrated.state.config.drinkingRules.payoutBoost, 0);
   assert(migrated.state.display.graphics);
   assert(migrated.state.physicsVersion > 1);
   assert.equal(migrated.state.aim, null);
