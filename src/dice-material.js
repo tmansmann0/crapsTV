@@ -18,15 +18,15 @@ function addOpaqueResinFill(material) {
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <lights_fragment_maps>",
       `#include <lights_fragment_maps>
-// Low broad bounce from the room at table level. Light the perturbed resin
+// Broad bounce from the room at table level. Light the perturbed resin
 // normal so scratches and the beveled edges still shape the diffuse response.
 vec3 resinWorldNormal = inverseTransformDirection( geometryNormal, viewMatrix );
 float resinSide = 1.0 - abs( resinWorldNormal.y );
-float resinBounce = 0.23 + 0.94 * resinSide * resinSide;
+float resinBounce = 0.54 + 1.38 * resinSide * resinSide;
 irradiance += vec3( 0.98, 1.0, 1.03 ) * resinBounce;`,
     );
   };
-  material.customProgramCacheKey = () => "opaque-resin-fill-v1";
+  material.customProgramCacheKey = () => "opaque-resin-fill-v2";
 }
 
 export function createDiceMaterial(
