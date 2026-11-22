@@ -54,6 +54,7 @@ export const WAYS = {
 };
 export const POINTS = [4, 5, 6, 8, 9, 10];
 export const ALL_POINTS = [2, 3, 4, 5, 6, 8, 9, 10, 11, 12];
+const ODDS_MULTIPLIERS = { 4: 10, 5: 4, 6: 3, 8: 3, 9: 4, 10: 10 };
 export const BONUS_NUMBERS = {
   "bonus-small": [2, 3, 4, 5, 6],
   "bonus-tall": [8, 9, 10, 11, 12],
@@ -420,10 +421,16 @@ export function catalogue(state, player) {
   ];
   if (player)
     for (const b of player.bets.filter(
-      (b) => ["pass", "dont", "come", "dontcome"].includes(b.type) && b.point,
+      (b) =>
+        points.includes(b.point) &&
+        (b.type === "come" ||
+          (!crapless && b.type === "dontcome") ||
+          (b.point === point &&
+            (b.type === "pass" || (!crapless && b.type === "dont")))),
     )) {
       const against = ["dont", "dontcome"].includes(b.type),
-        w = WAYS[b.point];
+        w = WAYS[b.point],
+        oddsMultiplier = ODDS_MULTIPLIERS[b.point] ?? 5;
       rows.push({
         id: `odds:${b.id}`,
         name: `${against ? "Lay" : "Take"} odds · ${b.type === "pass" ? "pass" : b.type === "dont" ? "don’t pass" : b.type === "dontcome" ? "don’t come" : "come"} ${b.point}`,
@@ -431,11 +438,13 @@ export function catalogue(state, player) {
         payout: against ? oddsRatio(w, 6) : oddsRatio(6, w),
         prob: against ? 6 / (6 + w) : w / (6 + w),
         edge: 0,
-        description: `Back your ${b.point} with true odds, up to 5× the line stake.${b.type === "come" ? " Off on come-out rolls." : ""}`,
+        description: `Add true odds to your ${b.point} bet, up to ${oddsMultiplier}× its stake.${b.type === "come" ? " Off on come-out rolls." : ""}`,
         available: true,
         quantum: ((against ? 6 : w) / gcd(6, w)) * 100,
         parent: b.id,
-        max: b.amount * 5,
+        point: b.point,
+        oddsMultiplier,
+        max: b.amount * oddsMultiplier,
       });
     }
   return rows.map((b) => ({
@@ -746,8 +755,13 @@ export function previewBet(s, id, amount, betId = null, now = Date.now()) {
 }
 export function place(s, id, betId, amount) {
   betting(s);
-  const p = active(s, id),
-    item = catalogue(s, p).find((b) => b.id === betId);
+  const p = active(s, id);
+  const item = catalogue(s, p).find((b) => b.id === betId);
+  if (
+    typeof betId === "string" &&
+    (betId === "odds" || betId.startsWith("odds:"))
+  )
+    assert(item?.parent, "Odds require your own line or Come bet with a point.");
   assert(
     item && item.available,
     item?.unavailableReason || "That bet is not available on this roll.",
@@ -759,23 +773,23 @@ export function place(s, id, betId, amount) {
     `Bet at least ${money(item.minimum)}, in ${money(item.quantum)} increments.`,
   );
   assert(p.bank >= amount, "Not enough chips for that bet.");
-  const existing = p.bets.find((b) =>
-    item.parent ? b.parent === item.parent : b.type === betId && !b.point,
-  );
   if (item.parent)
     assert(
-      (existing?.amount || 0) + amount <= item.max,
-      "Odds are limited to 5× the line stake.",
+      validBetChoices(item, amount, p).valid,
+      `Odds on ${item.point} are limited to ${item.oddsMultiplier}× the line stake (${money(item.max)} total).`,
     );
+  const existing = p.bets.find((b) =>
+    item.parent
+      ? b.type === "odds" && b.parent === item.parent
+      : b.type === betId && !b.point,
+  );
   if (existing) existing.amount += amount;
   else
     p.bets.push({
       id: uid(),
       type: item.parent ? "odds" : betId,
       amount,
-      point: item.parent
-        ? p.bets.find((b) => b.id === item.parent).point
-        : null,
+      point: item.point ?? null,
       parent: item.parent || null,
       ...(BONUS_NUMBERS[betId] ? { started: false } : {}),
     });

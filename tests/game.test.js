@@ -113,20 +113,74 @@ test("hardways off come-out then double pays, easy loses", () => {
   roll(s, p, 2, 4);
   assert.equal(p.bets.length, 0);
 });
-test("true odds at all points, 5x cap and proper denominations", () => {
-  for (const n of g.ALL_POINTS) {
-    const [s, p] = table("crapless");
-    g.place(s, p.id, "pass", 500);
-    const dice = n <= 7 ? [1, n - 1] : [6, n - 6];
-    roll(s, p, ...dice);
-    const base = p.bets[0];
-    const option = g.catalogue(s, p).find((b) => b.parent === base.id);
-    const amount = option.minimum;
-    g.place(s, p.id, option.id, amount);
-    assert.throws(() => g.place(s, p.id, option.id, 30000));
-    roll(s, p, ...dice);
-    assert.equal(p.bank, 100500 + (amount * 6) / g.WAYS[n]);
+test("true odds at each point use the matching total cap and denominations", () => {
+  const limits = {
+    2: 5,
+    3: 5,
+    4: 10,
+    5: 4,
+    6: 3,
+    8: 3,
+    9: 4,
+    10: 10,
+    11: 5,
+    12: 5,
+  };
+  for (const mode of ["craps", "crapless"]) {
+    for (const n of mode === "craps" ? g.POINTS : g.ALL_POINTS) {
+      const [s, p] = table(mode);
+      g.place(s, p.id, "pass", 500);
+      const dice = n < 7 ? [1, n - 1] : [6, n - 6];
+      roll(s, p, ...dice);
+      const option = g.catalogue(s, p).find((b) => b.parent === p.bets[0].id);
+      const limit = 500 * limits[n];
+      assert.equal(option.max, limit);
+      assert.throws(
+        () => g.place(s, p.id, option.id, option.minimum + 1),
+        /increments/,
+      );
+      assert.throws(
+        () => g.place(s, p.id, option.id, limit + option.minimum),
+        /limited to/,
+      );
+      g.place(s, p.id, option.id, option.minimum);
+      g.place(s, p.id, option.id, limit - option.minimum);
+      assert.throws(
+        () => g.place(s, p.id, option.id, option.minimum),
+        /limited to/,
+      );
+      roll(s, p, ...dice);
+      assert.equal(p.bank, 100500 + (limit * 6) / g.WAYS[n]);
+    }
   }
+});
+test("odds require a player's own eligible contract even if the table has a point", () => {
+  const [s, host] = table();
+  const guest = g.join(s, "Guest");
+  g.place(s, host.id, "pass", 500);
+  const pass = host.bets[0];
+  const odds = `odds:${pass.id}`;
+  const missingLine = /require your own line or Come bet with a point/;
+  assert.throws(() => g.place(s, host.id, odds, 500), missingLine);
+  g.remove(s, host.id, pass.id);
+  assert.throws(() => g.place(s, host.id, odds, 500), missingLine);
+  g.place(s, host.id, "pass", 500);
+  const activePassOdds = `odds:${host.bets[0].id}`;
+  roll(s, host, 3, 3);
+  g.place(s, guest.id, "place-6", 600);
+  const bank = guest.bank;
+  for (const betId of [
+    "odds",
+    odds,
+    activePassOdds,
+    `odds:${guest.bets[0].id}`,
+  ])
+    assert.throws(() => g.place(s, guest.id, betId, 500), missingLine);
+  assert.equal(guest.bank, bank);
+  assert.equal(guest.bets.length, 1);
+  assert.ok(g.catalogue(s, guest).every((row) => !row.parent));
+  roll(s, host, 3, 3);
+  assert.throws(() => g.place(s, host.id, activePassOdds, 500), missingLine);
 });
 test("come point is independent; come odds off on come-out and returned on seven", () => {
   const [s, p] = table();

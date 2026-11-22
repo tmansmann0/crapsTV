@@ -721,7 +721,7 @@ function MoreBets({ extra, tile }) {
         className={`pg-more-group ${active === "Exact dice · one roll" ? "is-hops" : active === "Bonus bets" ? "is-bonus" : ""}`}
         aria-label={active}
       >
-        <h3>{active}</h3>
+        <h3>{active === "True odds" ? labels[active] : active}</h3>
         {active === "Exact dice · one roll" && (
           <>
             <p>
@@ -1158,7 +1158,7 @@ function PlayPanel({
         >
           More bets
           {moreStake > 0 && <b>{compact(moreStake)}</b>}
-          {oddsCount > 0 && <em>Odds</em>}
+          {oddsCount > 0 && <em>Come odds</em>}
         </button>
         <select
           className="pg-number-mode"

@@ -176,7 +176,7 @@ function lessonsFor(mode, branch) {
     {
       id: "odds",
       title: "Taking odds",
-      copy: "After a Pass point is set, add odds behind the line. This table allows up to 5× your Pass stake.",
+      copy: "Once your Pass Line bet has a point, you can add odds behind it. The point determines your odds limit.",
       steps: [
         frame("A $10 Pass bet has a point of 6.", {
           dice: [3, 3],

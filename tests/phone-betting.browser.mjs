@@ -121,13 +121,13 @@ try {
     await page.evaluate(() =>
       window.bettingFixture.reset({ hasLine: true, point: 4 }),
     );
-    await page.evaluate(() => window.bettingFixture.placeOdds(2400));
+    await page.evaluate(() => window.bettingFixture.placeOdds(4900));
     const odds = page.locator(".pg-tile-odds");
     await expect(odds).toBeEnabled();
     await expect(odds).toContainText("At odds limit");
     await odds.click();
     await page
-      .getByRole("button", { name: /Take down Take odds.*refund \$24/ })
+      .getByRole("button", { name: /Take down Take odds.*refund \$49/ })
       .click();
     await tile("pass").click();
     await expect(page.locator(".pg-wager-actions")).toContainText(
