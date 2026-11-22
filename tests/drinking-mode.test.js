@@ -52,6 +52,42 @@ test("Drinking Mode starts humans at zero and top-ups require peer verification"
   assert.equal(host.bank, 0);
 });
 
+test("Juice boosts winning profit on line, odds and standing bets", () => {
+  for (const payoutBoost of [0, 100, 150]) {
+    const { state, host, guest } = table({
+      ...DEFAULT_DRINKING_RULES,
+      payoutBoost,
+    });
+    const topUp = requestCredit(state, host, "shot", 1);
+    game.respondToDrink(state, guest.id, topUp, "accept");
+    assert.equal(host.bank, 10000);
+    game.place(state, host.id, "pass", 500);
+    state.rolling = true;
+    game.finishRoll(state, [3, 3]);
+    game.place(state, host.id, `odds:${host.bets[0].id}`, 500);
+    game.place(state, host.id, "place-6", 600);
+    game.place(state, host.id, "field", 500);
+    state.rolling = true;
+    const result = game.finishRoll(state, [3, 3]);
+    const factor = 1 + payoutBoost / 100;
+    assert.deepEqual(
+      result.events[0].bets.map(({ delta }) => delta),
+      [500 * factor, 600 * factor, 700 * factor, -500],
+    );
+    assert.equal(host.bank, 10000 - 600 - 500 + 1800 * factor);
+    assert.deepEqual(host.bets.map(({ type, amount }) => [type, amount]), [
+      ["place-6", 600],
+    ]);
+    assert.equal(host.stats.biggestWin, 700 * factor);
+
+    game.place(state, host.id, "dont", 500);
+    const bankBeforePush = host.bank;
+    state.rolling = true;
+    game.finishRoll(state, [6, 6]);
+    assert.equal(host.bank, bankBeforePush + 500);
+  }
+});
+
 test("host pricing, finish option, and markups apply to the correct transactions", () => {
   const rules = {
     sipValue: 650,
@@ -61,6 +97,7 @@ test("host pricing, finish option, and markups apply to the correct transactions
     offerMarkup: 20,
   };
   const { state, host, guest, observer } = table(rules);
+  assert.equal(state.config.drinkingRules.payoutBoost, 0);
   assert.throws(() => requestCredit(state, host, "finish", 2), /whole number/);
   const topUp = requestCredit(state, host, "finish", 1);
   game.respondToDrink(state, guest.id, topUp, "accept");
@@ -170,7 +207,11 @@ test("the shared room takes the requester and prices from authoritative state", 
   const request = hub.state.drinkRequests[0];
   assert.equal(request.amount, 500);
   assert.equal(request.from, host.id);
-  const nextRules = { ...DEFAULT_DRINKING_RULES, sipValue: 600 };
+  const nextRules = {
+    ...DEFAULT_DRINKING_RULES,
+    sipValue: 600,
+    payoutBoost: 150,
+  };
   hub.receive("guest", { type: "drinking-rules", rules: nextRules });
   assert.match(inbox.guest.at(-1).message, /table host/);
   assert.equal(hub.state.config.drinkingRules.sipValue, 500);
@@ -179,6 +220,11 @@ test("the shared room takes the requester and prices from authoritative state", 
     rules: { ...nextRules, shotValue: null },
   });
   assert.match(inbox.host.at(-1).message, /enter drink values/i);
+  hub.receive("host", {
+    type: "drinking-rules",
+    rules: { ...nextRules, payoutBoost: -1 },
+  });
+  assert.match(inbox.host.at(-1).message, /Juice payouts/);
   hub.state.rolling = true;
   hub.receive("host", { type: "drinking-rules", rules: nextRules });
   assert.match(inbox.host.at(-1).message, /dice to land/);
@@ -186,6 +232,10 @@ test("the shared room takes the requester and prices from authoritative state", 
   hub.state.rolling = false;
   hub.receive("host", { type: "drinking-rules", rules: nextRules });
   assert.deepEqual(inbox.guest.at(-1).state.config.drinkingRules, nextRules);
+  const oldClient = { ...nextRules };
+  delete oldClient.payoutBoost;
+  hub.receive("host", { type: "drinking-rules", rules: oldClient });
+  assert.equal(hub.state.config.drinkingRules.payoutBoost, 150);
   assert.equal(hub.state.drinkRequests[0].amount, 500);
   hub.receive("host", {
     type: "drink-response",

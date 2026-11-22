@@ -262,6 +262,31 @@ test("take-down refunds each eligible wager and linked odds without releasing li
   assert.equal(player.bets.length, 0);
 });
 
+test("Buy bets stay on the table when a player removes their Pass Line before the point", () => {
+  for (const mode of ["craps", "crapless"]) {
+    const { state, player } = table(mode);
+    game.place(state, player.id, "pass", 2500);
+    const [pass] = player.bets;
+    game.place(state, player.id, "buy-4", 500);
+    game.place(state, player.id, "buy-10", 500);
+    const buys = player.bets.slice(1);
+    const bank = player.bank;
+    game.remove(state, player.id, pass.id);
+    assert.equal(player.bank, bank + 2500);
+    assert.deepEqual(player.bets, buys);
+
+    game.place(state, player.id, "pass", 2500);
+    const nextPass = player.bets.at(-1);
+    roll(state, [3, 3]);
+    game.remove(state, player.id, buys[0].id);
+    assert.throws(
+      () => game.remove(state, player.id, nextPass.id),
+      /line bet is locked/,
+    );
+    assert.deepEqual(player.bets, [buys[1], nextPass]);
+  }
+});
+
 test("bonus progress and contract removal rules survive wire snapshots and authenticated reconnect", (t) => {
   const hub = new RoomHub("RULES");
   t.after(() => hub.close());

@@ -117,23 +117,23 @@ test("true odds at each point use the matching total cap and denominations", () 
   const limits = {
     2: 5,
     3: 5,
-    4: 10,
+    4: 5,
     5: 4,
     6: 3,
     8: 3,
     9: 4,
-    10: 10,
+    10: 5,
     11: 5,
     12: 5,
   };
   for (const mode of ["craps", "crapless"]) {
     for (const n of mode === "craps" ? g.POINTS : g.ALL_POINTS) {
       const [s, p] = table(mode);
-      g.place(s, p.id, "pass", 500);
+      g.place(s, p.id, "pass", 2500);
       const dice = n < 7 ? [1, n - 1] : [6, n - 6];
       roll(s, p, ...dice);
       const option = g.catalogue(s, p).find((b) => b.parent === p.bets[0].id);
-      const limit = 500 * limits[n];
+      const limit = 2500 * limits[n];
       assert.equal(option.max, limit);
       assert.throws(
         () => g.place(s, p.id, option.id, option.minimum + 1),
@@ -150,7 +150,7 @@ test("true odds at each point use the matching total cap and denominations", () 
         /limited to/,
       );
       roll(s, p, ...dice);
-      assert.equal(p.bank, 100500 + (limit * 6) / g.WAYS[n]);
+      assert.equal(p.bank, 102500 + (limit * 6) / g.WAYS[n]);
     }
   }
 });
