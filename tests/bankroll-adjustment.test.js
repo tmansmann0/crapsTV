@@ -65,7 +65,7 @@ test("only the host can move available chips without rewriting existing wagers o
   assert.match(hostMessages.at(-1).message, /isn.t taking bets/i);
 });
 
-test("manual adjustments preserve verified top-ups and cannot pay for a drink with withdrawn winnings", () => {
+test("drink assignments can use host-added chips but cannot spend withdrawn or wagered chips", () => {
   const state = game.createState();
   const host = game.join(state, "Host"),
     guest = game.join(state, "Guest");
@@ -80,24 +80,20 @@ test("manual adjustments preserve verified top-ups and cannot pay for a drink wi
   const verified = guest.buyIn;
 
   game.adjustBankroll(state, host.id, guest.id, 2000);
-  assert.equal(game.drinkOfferBudget(guest), 0);
-  game.place(state, guest.id, "pass", state.config.minBet);
-  state.rolling = true;
-  game.finishRoll(state, [3, 4]);
-  assert.equal(game.drinkOfferBudget(guest), 500);
-  game.adjustBankroll(state, host.id, guest.id, -500);
-  game.adjustBankroll(state, host.id, guest.id, 500);
-  assert.equal(game.drinkOfferBudget(guest), 0);
-  assert.equal(game.net(guest), 500);
+  game.place(state, guest.id, "pass", 2000);
+  game.adjustBankroll(state, host.id, guest.id, -375);
+  assert.equal(game.net(guest), 0);
+  const send = (quantity) =>
+    game.requestDrink(state, guest.id, {
+      kind: "offer",
+      unit: "sip",
+      quantity,
+      to: host.id,
+    });
+  assert.throws(() => send(2), /available chips/);
+  send(1);
+  assert.equal(guest.bank, 0);
+  assert.equal(guest.bets[0].amount, 2000);
   assert.equal(guest.buyIn, verified);
-  assert.throws(
-    () =>
-      game.requestDrink(state, guest.id, {
-        kind: "offer",
-        unit: "sip",
-        quantity: 1,
-        to: host.id,
-      }),
-    /fit your winnings/,
-  );
+  assert.equal(state.drinkRequests[0].amount, 625);
 });

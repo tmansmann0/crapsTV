@@ -43,7 +43,7 @@ test("remaining odds limit includes odds already on the board", () => {
   game.beginRoll(s, p.id);
   game.finishRoll(s, [3, 3]);
   let row = game.catalogue(s, p).find((b) => b.parent);
-  game.place(s, p.id, row.id, 2000);
+  game.place(s, p.id, row.id, 1000);
   row = game.catalogue(s, p).find((b) => b.parent);
   const choices = validBetChoices(row, 900, p);
   assert.equal(choices.maximum, 500);

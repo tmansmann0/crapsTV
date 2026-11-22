@@ -5,7 +5,7 @@ export function validBetChoices(row, requested, player) {
   const bank = Math.max(0, player?.bank || 0);
   const existing = row?.parent
     ? (player?.bets || [])
-        .filter((b) => b.parent === row.parent)
+        .filter((b) => b.type === "odds" && b.parent === row.parent)
         .reduce((n, b) => n + b.amount, 0)
     : 0;
   const room = row?.parent ? Math.max(0, row.max - existing) : bank;

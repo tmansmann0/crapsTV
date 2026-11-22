@@ -160,7 +160,8 @@ try {
     ["Human host", "Ada", "Bea", "Human guest"],
   );
   await openAdminSection(host, "Table");
-  await host.getByLabel("Betting window (seconds)").fill("0");
+  await host.getByLabel("Come-out window (seconds)").fill("0");
+  await host.getByLabel("Point-on window (seconds)").fill("0");
   await expect(host.getByLabel("Bot roll delay (seconds)")).toHaveValue("5");
   await host
     .getByRole("button", { name: "Open the table", exact: true })

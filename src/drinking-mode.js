@@ -1,9 +1,9 @@
 export const DEFAULT_DRINKING_RULES = Object.freeze({
   sipValue: 500,
-  shotValue: 2500,
-  finishValue: 5000,
+  shotValue: 10000,
+  finishValue: 7500,
   finishEnabled: false,
-  offerMarkup: 0,
+  offerMarkup: 25,
 });
 
 export const DRINK_UNITS = [

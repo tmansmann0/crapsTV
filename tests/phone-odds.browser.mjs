@@ -59,6 +59,10 @@ try {
     await expect(cue).toContainText("Open once the point is set");
     await page.evaluate(() => window.oddsFixture.reset({ point: 4 }));
     await expect(cue).toContainText("Need a Pass Line bet from the come-out");
+    await expect(page.locator('[data-bet-id^="odds:"]')).toHaveCount(0);
+    await page.getByRole("button", { name: /^More bets/ }).click();
+    await expect(page.getByRole("button", { name: "Come odds" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Table", exact: true }).click();
 
     await page.evaluate(() =>
       window.oddsFixture.reset({ point: 4, hasLine: true }),
@@ -71,9 +75,9 @@ try {
     const odds = page.locator(`[data-bet-id="odds:${parent}"]`);
     await expect(odds).toBeEnabled();
     await expect(odds).toContainText("Pass Odds · 4");
-    await expect(odds).toContainText("$25");
+    await expect(odds).toContainText("$50");
     await expect(odds).toContainText("Min $5 · $1 steps");
-    await expect(odds).toHaveAccessibleName(/Pays 2:1.*Total odds limit \$25/);
+    await expect(odds).toHaveAccessibleName(/Pays 2:1.*Total odds limit \$50/);
     assert(
       (await odds.boundingBox()).height >= 43.5,
       "active odds row meets a 44px tap target",
@@ -161,7 +165,7 @@ try {
     await page.evaluate(() =>
       window.oddsFixture.reset({ point: 4, hasLine: true }),
     );
-    await page.evaluate(() => window.oddsFixture.placeOdds(2400));
+    await page.evaluate(() => window.oddsFixture.placeOdds(4900));
     await expect(page.locator(".pg-tile-odds")).toBeEnabled();
     await expect(page.locator(".pg-tile-odds")).toContainText("At odds limit");
     await page.evaluate(() =>

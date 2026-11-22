@@ -15,6 +15,7 @@ import {
 import { wagerStackLayout, wagerPosition } from "../src/wager-layout.js";
 import { chipStackPose } from "../src/chip-character.js";
 import { createThrowTimeline, sampleThrow } from "../src/throw-motion.js";
+import { BOUNDS } from "../src/dice-physics.js";
 import {
   THROW_CAMERA_RIGS,
   RESULT_CAMERA_HOLD_MS,
@@ -951,6 +952,46 @@ test("finite detail visits vary low, overhead and bank angles and elevate for ta
         roundId: `empty${i}`,
       }).shotVariant.startsWith("bank-"),
     );
+});
+
+test("fourth-seat hop close-ups keep the lens on the felt side of the far rail", () => {
+  const player = {
+    id: "fourth",
+    seat: 3,
+    bank: 99500,
+    bets: [{ id: "hop", type: "hop-1-1", amount: 500 }],
+  };
+  const state = { players: [player], config: { mode: "craps" } };
+  const slot = { startAt: 1000, endAt: 4000 };
+  const camera = new PerspectiveCamera();
+  const variants = new Set();
+  for (const aspect of [16 / 9, 9 / 16])
+    for (let seed = 0; seed < 12; seed++)
+      for (const now of [1000, 2500, 3999]) {
+        const shot = samplePlayerAreaCamera({
+          player,
+          state,
+          slot,
+          now,
+          roundId: `far-hop-${seed}`,
+          aspect,
+        });
+        if (!shot.shotVariant.startsWith("bet-")) continue;
+        variants.add(shot.shotVariant);
+        assert(shot.position[2] > -BOUNDS.z + 0.1, shot.shotVariant);
+        camera.position.fromArray(shot.position);
+        camera.lookAt(new Vector3(...shot.target));
+        camera.aspect = aspect;
+        camera.fov = shot.fov;
+        camera.updateProjectionMatrix();
+        camera.updateMatrixWorld();
+        for (const point of shot.focusPoints) {
+          const projected = new Vector3(...point).project(camera);
+          assert(Math.abs(projected.x) < 0.9 && Math.abs(projected.y) < 0.8);
+        }
+      }
+  assert(variants.has("bet-low-glide"));
+  assert(variants.has("bet-cross-sweep"));
 });
 
 test("actual persistent bank bounds lift the lens and stay framed across every bank angle", () => {

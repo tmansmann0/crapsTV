@@ -27,7 +27,11 @@ async function observeTableAudio(page) {
     const start = AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start = function (...args) {
       start.apply(this, args);
-      if (this.buffer) window.playedEffects.push(this.buffer.duration);
+      if (!this.buffer) return;
+      let peak = 0;
+      for (const sample of this.buffer.getChannelData(0))
+        peak = Math.max(peak, Math.abs(sample));
+      window.playedEffects.push({ duration: this.buffer.duration, peak });
     };
     const play = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function () {
@@ -50,6 +54,25 @@ async function checkAudioMixer(tv) {
   await expect
     .poll(() => tv.evaluate(() => window.playedEffects.length))
     .toBeGreaterThanOrEqual(7);
+  const quietDiceClips = await tv.evaluate(async () => {
+    const decoder = new OfflineAudioContext(1, 1, 44100);
+    const clips = ["felt", "rail", "dice"].flatMap((kind) =>
+      [1, 2].map((variant) => `${kind}-${variant}`),
+    );
+    const quiet = await Promise.all(
+      clips.map(async (clip) => {
+        const response = await fetch(`/audio/table/${clip}.mp3`);
+        const buffer = await decoder.decodeAudioData(
+          await response.arrayBuffer(),
+        );
+        const samples = buffer.getChannelData(0);
+        const energy = samples.reduce((sum, value) => sum + value * value, 0);
+        return Math.sqrt(energy / samples.length) < 0.025 ? clip : null;
+      }),
+    );
+    return quiet.filter(Boolean);
+  });
+  expect(quietDiceClips).toEqual([]);
   await dialog.getByRole("slider", { name: "Room ambience" }).press("End");
   await music.selectOption("moil");
   await expect
@@ -259,7 +282,8 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     // The rest of this multi-roll fixture deliberately uses immediate throws.
     await phone.getByRole("button", { name: "Open settings" }).click();
     await openAdminSection(phone, "Table");
-    await phone.getByLabel("Betting window (seconds)").fill("0");
+    await phone.getByLabel("Come-out window (seconds)").fill("0");
+    await phone.getByLabel("Point-on window (seconds)").fill("0");
     await phone.getByRole("button", { name: "Save timing" }).click();
     await phone.getByRole("button", { name: "Close settings" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).click();
@@ -338,7 +362,7 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect
       .poll(() =>
         tv.evaluate(() =>
-          window.playedEffects.some((duration) => duration > 0.15),
+          window.playedEffects.some(({ duration }) => duration > 0.15),
         ),
       )
       .toBe(true);
@@ -469,7 +493,9 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await expect
       .poll(() =>
         tv.evaluate(() =>
-          window.playedEffects.some((duration) => duration < 0.15),
+          window.playedEffects.some(
+            ({ duration, peak }) => duration < 0.15 && peak > 0.3,
+          ),
         ),
       )
       .toBe(true);

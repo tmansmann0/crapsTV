@@ -49,8 +49,10 @@ function App() {
     }
     if (message.type === "remove-bot")
       initial.players.find((p) => p.id === message.playerId).left = true;
-    if (message.type === "cooldown")
+    if (message.type === "cooldown") {
       initial.config.rollCooldownSeconds = message.seconds;
+      initial.config.pointRollCooldownSeconds = message.pointSeconds;
+    }
     if (message.type === "bot-delay")
       initial.config.botRollDelaySeconds = message.seconds;
     if (message.type === "display")

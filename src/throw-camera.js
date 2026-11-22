@@ -9,6 +9,7 @@ import { chipPoseBounds, chipStackBounds } from "./chip-character.js";
 import { createBankChipInventory } from "./bank-chip-inventory.js";
 import { bankPhysicalSpecs } from "./bank-chip-presentation.js";
 import { BOARD_BET_SHIFT_Z } from "./board-layout.js";
+import { BOUNDS } from "./dice-physics.js";
 import { wagerPlacementMap, wagerPileLayout } from "./wager-layout.js";
 import {
   planOutcomeTour,
@@ -427,6 +428,16 @@ export const CHIP_CAMERA_VARIANTS = Object.freeze([
   "bet-cross-sweep",
 ]);
 
+function insideCushion([x, , z]) {
+  const { x: halfWidth, z: halfDepth, cornerRadius } = BOUNDS;
+  return (
+    Math.hypot(
+      Math.max(0, Math.abs(x) - (halfWidth - cornerRadius)),
+      Math.max(0, Math.abs(z) - (halfDepth - cornerRadius)),
+    ) < cornerRadius - 0.12
+  );
+}
+
 /** Fit the actual current chip bounds. Large stacks raise both eye and pitch. */
 function fitChipCamera({
   points,
@@ -498,13 +509,12 @@ function fitChipCamera({
     }
     return distance;
   };
-  let distance = fitDistance(
-    direction,
-    traveling ? 2.1 : variant === "bank-macro" ? 0.96 : 1.18,
-  );
-  let position = target.map(
-    (value, axis) => value + direction[axis] * distance,
-  );
+  let minimum = traveling ? 2.1 : variant === "bank-macro" ? 0.96 : 1.18;
+  const placeCamera = (direction) => {
+    const distance = fitDistance(direction, minimum);
+    return target.map((value, axis) => value + direction[axis] * distance);
+  };
+  let position = placeCamera(direction);
   // The camera may follow flying payouts across the rail. Clear its top rather
   // than looking through the cushion; source bet macros remain inside it.
   if (!bet || railClearance > 0) {
@@ -515,9 +525,33 @@ function fitChipCamera({
     const delta = position.map((value, axis) => value - target[axis]);
     const length = Math.hypot(...delta);
     direction = delta.map((value) => value / length);
-    distance = fitDistance(direction, length);
-    position = target.map((value, axis) => value + direction[axis] * distance);
+    minimum = length;
+    position = placeCamera(direction);
     pitch = Math.asin(direction[1]);
+  }
+  if (bet && insideCushion(target) && !insideCushion(position)) {
+    // Low views can overshoot the rail when a subject is near the far edge.
+    // Keep the shot's heading and aim, and refit at the shallowest pitch that
+    // keeps both the lens and its path to the felt inside the cushion.
+    const heading = Math.atan2(direction[0], direction[2]);
+    const placeAtPitch = (angle) =>
+      placeCamera([
+        Math.sin(heading) * Math.cos(angle),
+        Math.sin(angle),
+        Math.cos(heading) * Math.cos(angle),
+      ]);
+    let low = pitch,
+      high = Math.PI / 2 - 0.0001;
+    position = placeAtPitch(high);
+    for (let i = 0; i < 10; i++) {
+      const angle = (low + high) / 2;
+      const eye = placeAtPitch(angle);
+      if (insideCushion(eye)) {
+        high = angle;
+        position = eye;
+      } else low = angle;
+    }
+    pitch = high;
   }
   return {
     position,

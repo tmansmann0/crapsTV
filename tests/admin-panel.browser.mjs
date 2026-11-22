@@ -60,7 +60,8 @@ try {
   await drinkingMode.click();
   await page.getByLabel("Starting chips ($)", { exact: true }).fill("2500");
   await page.getByLabel("Table minimum ($)", { exact: true }).fill("10");
-  await page.getByLabel("Betting window (seconds)").fill("12");
+  await page.getByLabel("Come-out window (seconds)").fill("12");
+  await page.getByLabel("Point-on window (seconds)").fill("7");
   await page.getByLabel("Bot roll delay (seconds)").fill("7");
   await openAdminSection(page, "Players");
   await page.getByRole("button", { name: "Add bot", exact: true }).click();
@@ -114,6 +115,7 @@ try {
     mode: "craps",
     teach: false,
     rollCooldownSeconds: 12,
+    pointRollCooldownSeconds: 7,
     botRollDelaySeconds: 7,
   });
   await openAdminSection(page, "TV", { graphics: true });
@@ -189,7 +191,8 @@ try {
     [2535, -4050],
   );
   await openAdminSection(page, "Table");
-  await page.getByLabel("Betting window (seconds)").fill("9");
+  await page.getByLabel("Come-out window (seconds)").fill("9");
+  await page.getByLabel("Point-on window (seconds)").fill("4");
   await page.getByLabel("Bot roll delay (seconds)").fill("6");
   await page.getByRole("button", { name: "Save timing", exact: true }).click();
   const timing = await page.evaluate(() =>
@@ -198,7 +201,7 @@ try {
     ),
   );
   assert.deepEqual(timing.slice(-2), [
-    { type: "cooldown", seconds: 9 },
+    { type: "cooldown", seconds: 9, pointSeconds: 4 },
     { type: "bot-delay", seconds: 6 },
   ]);
   await page.evaluate(() => window.adminQA.drinking());
@@ -229,7 +232,7 @@ try {
       type: "drinking-rules",
       rules: {
         sipValue: 725,
-        shotValue: 2500,
+        shotValue: 10000,
         finishValue: 6000,
         finishEnabled: true,
         offerMarkup: 20,
@@ -253,7 +256,7 @@ try {
       "named strategy/difficulty payload",
       "human-only host transfer",
       "bot removal and12-seat capacity",
-      "bot delay and live total",
+      "separate come-out, point-on and bot delays",
       "all eight graphics controls",
       "table minimum first, bots hidden in drinking setup",
       "host audio entry and live drink pricing with roll guard",
