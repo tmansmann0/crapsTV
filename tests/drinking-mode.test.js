@@ -19,7 +19,7 @@ function requestCredit(state, player, unit, quantity) {
   return state.drinkRequests.at(-1).id;
 }
 
-test("Drinking Mode starts humans at zero and only peer-verified drinks fund play", () => {
+test("Drinking Mode starts humans at zero and top-ups require peer verification", () => {
   const { state, host, guest } = table();
   assert.equal(host.bank, 0);
   assert.equal(game.join(state, "Late guest").bank, 0);
@@ -76,17 +76,12 @@ test("host pricing, finish option, and markups apply to the correct transactions
     });
     return state.drinkRequests.at(-1).id;
   };
-  assert.throws(() => offer("sip", 1), /winnings/);
-
-  game.place(state, host.id, "field", 4000);
-  state.rolling = true;
-  game.finishRoll(state, [1, 1]); // Field 2 pays double.
-  assert.equal(game.net(host), 8000);
+  assert.equal(game.net(host), 0);
   assert.throws(() => offer("finish", 3), /whole number/);
-  assert.throws(() => offer("shot", 4), /winnings/);
+  assert.throws(() => offer("shot", 3), /available chips/);
   const assigned = offer("sip", 1);
   assert.equal(state.drinkRequests[0].amount, 780);
-  assert.equal(game.net(host), 7220);
+  assert.equal(host.bank, 4020);
   assert.throws(
     () => game.respondToDrink(state, observer.id, assigned, "complete"),
     /Only the assigned player/,
@@ -103,21 +98,18 @@ test("host pricing, finish option, and markups apply to the correct transactions
   );
   assert.throws(() => offer("sip", 1), /still open/);
   game.respondToDrink(state, guest.id, assigned, "complete");
-  assert.equal(game.net(host), 7220);
+  assert.equal(host.bank, 4020);
 
   const finish = offer("finish", 1);
   assert.equal(state.drinkRequests[0].amount, 3600);
-  assert.equal(game.net(host), 3620);
-  assert.equal(host.bank, 8420);
+  assert.equal(host.bank, 420);
   game.setDrinkingRules(state, host.id, { ...rules, finishEnabled: false });
   assert.throws(() => requestCredit(state, guest, "finish", 1), /off/);
   game.changeConnection(state, host.id, false);
   game.respondToDrink(state, guest.id, finish, "complete");
   game.changeConnection(state, host.id, true);
-  assert.equal(host.bank, 8420);
+  assert.equal(host.bank, 420);
   assert.equal(guest.bank, 0);
-  assert.throws(() => offer("shot", 2), /winnings/);
-  game.place(state, host.id, "field", 8000);
   assert.throws(() => offer("sip", 1), /available chips/);
   assert.equal(host.bank, 420);
   assert.equal(state.drinkRequests.length, 0);

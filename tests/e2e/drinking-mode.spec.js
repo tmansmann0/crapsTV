@@ -1,6 +1,5 @@
 import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
-import { finishRoll } from "../../src/game.js";
 import { RoomHub } from "../../src/hub.js";
 
 test("two phones verify top-ups and complete a required drink assignment", async ({
@@ -79,20 +78,12 @@ test("two phones verify top-ups and complete a required drink assignment", async
       "3000",
     );
 
-    // Settle a known Field win through the regular game rules.
-    hub.receive("Alice", { type: "bet", betId: "field", amount: 2500 });
-    hub.state.rolling = true;
-    finishRoll(hub.state, [1, 1]);
-    hub.broadcast();
-    await expect(host.locator("[data-bank-value]")).toHaveAttribute(
-      "data-bank-value",
-      "8000",
-    );
-    await host.getByRole("tab", { name: "Drinks", exact: true }).click();
-    await guest.getByRole("tab", { name: "Drinks", exact: true }).click();
+    expect(hub.state.rolls).toHaveLength(0);
     const sendDrink = offer.getByRole("button", { name: /Send a drink/ });
     await offer.getByLabel("Drink", { exact: true }).selectOption("finish");
-    await expect(sendDrink).toHaveText(/\$37\.50/);
+    await expect(sendDrink).toBeDisabled();
+    await offer.getByLabel("Drink", { exact: true }).selectOption("shot");
+    await expect(sendDrink).toHaveText(/\$25/);
     await sendDrink.click();
     await expect(offer.getByText(/awaiting completion/)).toBeVisible();
     await expect(guest.getByText(/Required drink/)).toBeVisible();
@@ -100,11 +91,15 @@ test("two phones verify top-ups and complete a required drink assignment", async
       guest.getByRole("button", { name: /Accept|Decline/ }),
     ).toHaveCount(0);
     await expect(offer.getByRole("button", { name: /Cancel/ })).toHaveCount(0);
-    await expect(host.locator(".pg-drink-hero")).toContainText("$12.50");
-    expect([alice.bank, alice.buyIn, jordan.bank]).toEqual([4250, 3000, 0]);
+    await expect(
+      host
+        .locator(".pg-drink-hero dl > div")
+        .filter({ hasText: "Available chips" }),
+    ).toContainText("$5");
+    expect([alice.bank, alice.buyIn, jordan.bank]).toEqual([500, 3000, 0]);
     await guest.getByRole("button", { name: "Mark drink complete" }).click();
     await expect(offer.getByText(/awaiting completion/)).toHaveCount(0);
-    expect(alice.bank).toBe(4250);
+    expect(alice.bank).toBe(500);
     expect(hub.state.drinkRequests).toHaveLength(0);
 
     const guestTopUp = guest.locator(".pg-drink-card").filter({
@@ -122,8 +117,6 @@ test("two phones verify top-ups and complete a required drink assignment", async
       guestTopUp.getByRole("button", { name: /Request verification/ }),
     ).toBeEnabled();
 
-    // A delayed payout can have returned the controller to its Play view.
-    await host.getByRole("tab", { name: "Drinks", exact: true }).click();
     await expect(host.locator(".pg-drinks svg.drink-icon")).toHaveCount(3);
     await expect(
       host
@@ -140,7 +133,7 @@ test("two phones verify top-ups and complete a required drink assignment", async
       await mkdir("artifacts", { recursive: true });
       await expect(host.locator("[data-bank-value]")).toHaveAttribute(
         "data-bank-value",
-        "4250",
+        "500",
       );
       await host.locator(".pg-drinks").evaluate((el) => el.scrollTo(0, 0));
       await host.screenshot({ path: "artifacts/drinking-mode-phone.png" });

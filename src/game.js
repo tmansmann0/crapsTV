@@ -171,13 +171,8 @@ export function net(p) {
   const { added = 0, removed = 0 } = p.bankrollAdjustments ?? {};
   return equity(p) - p.buyIn - added + removed;
 }
-export function drinkOfferBudget(player) {
-  // Withdrawn winnings no longer fund drinks, while the recap still records them.
-  const hostWithdrawals = player.bankrollAdjustments?.removed ?? 0;
-  return Math.max(0, Math.min(player.bank, net(player) - hostWithdrawals));
-}
 export function drinkOfferLimit(player, price) {
-  return price > 0 ? Math.floor(drinkOfferBudget(player) / price) : 0;
+  return price > 0 ? Math.floor(player.bank / price) : 0;
 }
 export function snapshot(state) {
   return structuredClone(state);
@@ -902,7 +897,7 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
     const recipient = drinkPlayer(s, to);
     assert(
       quantity <= drinkOfferLimit(player, price),
-      "Drink assignments must fit your winnings and available chips.",
+      "Drink assignments must fit your available chips.",
     );
     player.bank -= amount;
     player.betPreview = null;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import DrinkIcon from "./DrinkIcon.jsx";
-import { drinkOfferBudget, drinkOfferLimit, money } from "./game.js";
+import { drinkOfferLimit, money } from "./game.js";
 import {
   DEFAULT_DRINKING_RULES,
   drinkDescription,
@@ -39,7 +39,7 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
           <h3>{title}</h3>
           <p>
             {isOffer
-              ? "Spend available winnings to send a drink."
+              ? "Use available chips to send a drink."
               : "Log a drink after taking it. Another player verifies the top-up."}
           </p>
         </div>
@@ -145,8 +145,8 @@ function DrinkForm({ kind, rules, player, peers, pending, locked, send }) {
           {isOffer && count > max && (
             <p>
               {max
-                ? `Available winnings cover up to ${drinkDescription(unit, max)}.`
-                : "Available winnings don’t cover this option."}
+                ? `Your chips cover up to ${drinkDescription(unit, max)}.`
+                : "You don’t have enough available chips for this option."}
             </p>
           )}
           <button className="pg-drink-primary" disabled={disabled || !valid}>
@@ -192,8 +192,8 @@ export default function DrinksPanel({ state, player, connected, send }) {
             <dd>{money(player.buyIn)}</dd>
           </div>
           <div>
-            <dt>Available winnings</dt>
-            <dd>{money(drinkOfferBudget(player))}</dd>
+            <dt>Available chips</dt>
+            <dd>{money(player.bank)}</dd>
           </div>
         </dl>
       </header>
