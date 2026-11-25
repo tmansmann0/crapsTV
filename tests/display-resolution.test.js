@@ -49,6 +49,28 @@ test("75% 3D keeps 4K UI pixels and supersampling resolves back to native UI", (
   assert.deepEqual([superSampled.uiWidth, superSampled.uiHeight], [3840, 2160]);
 });
 
+test("fullscreen presets cap physical 3D pixels across different display scaling", () => {
+  for (const [width, height, dpr, preset, expected] of [
+    [3840, 2160, 1, "1080p", [1920, 1080]],
+    [1920, 1080, 2, "1440p", [2560, 1440]],
+    [2560, 1600, 1, "720p", [1152, 720]],
+    [1024, 576, 1, "1080p", [1024, 576]],
+  ]) {
+    const quality = resolveGraphics({ resolution: preset }, undefined, {
+      viewportWidth: width,
+      viewportHeight: height,
+      devicePixelRatio: dpr,
+    });
+    const plan = planDisplayBuffers({
+      width,
+      height,
+      devicePixelRatio: dpr,
+      scenePixelRatio: quality.pixelRatio,
+    });
+    assert.deepEqual([plan.sceneWidth, plan.sceneHeight], expected);
+  }
+});
+
 test("4K automatic texture caps preserve real source detail without forcing it on low-memory devices", () => {
   const cap = {
     viewportWidth: 1920,

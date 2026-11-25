@@ -1,7 +1,8 @@
 import { assetURL } from "./asset-url.js";
 import * as THREE from "three";
 import QRCode from "qrcode";
-import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
+import { DESKTOP_DISPLAY, DISPLAY_GRAPHICS_OPTIONS } from "./display-build.js";
 import {
   bettingSecondsRemaining,
   botRollSecondsRemaining,
@@ -365,16 +366,17 @@ export function createSceneUI(renderer, onAction) {
           resolution: "Resolution",
           modelDetail: "Model detail",
           textures: "Textures",
+          ...(DESKTOP_DISPLAY ? { upscaling: "Upscaling" } : {}),
         };
     Object.entries(labels).forEach(([key, label], i) => {
-      const rowHeight = effectsPage ? 110 : 64;
+      const rowHeight = effectsPage ? 110 : DESKTOP_DISPLAY ? 53 : 64;
       const y = 91 + i * rowHeight;
       c.strokeStyle = C.line;
       c.beginPath();
       c.moveTo(26, y - 10);
       c.lineTo(p.w - 26, y - 10);
       c.stroke();
-      const option = GRAPHICS_OPTIONS[key].find(
+      const option = DISPLAY_GRAPHICS_OPTIONS[key].find(
         (o) => o.value === (graphics[key] ?? DEFAULT_GRAPHICS[key]),
       );
       text(c, label, 28, y + 31, TV_TYPE.setting);
@@ -477,7 +479,7 @@ export function createSceneUI(renderer, onAction) {
     );
     fittedText(
       c,
-      `UI ${graphicsInfo.uiResolution || "Native"} · Maps ${graphicsInfo.textureLabel || "Auto"}`,
+      `UI ${graphicsInfo.uiResolution || "Native"} · ${graphicsInfo.upscaling === "fsr1" ? "FSR 1" : `Maps ${graphicsInfo.textureLabel || "Auto"}`}`,
       28,
       586,
       36,
@@ -829,6 +831,7 @@ export function createSceneUI(renderer, onAction) {
       Math.round(next.graphicsInfo?.fps || 0),
       next.graphicsInfo?.resolution,
       next.graphicsInfo?.uiResolution,
+      next.graphicsInfo?.upscaling,
       next.graphicsInfo?.device,
       next.graphicsInfo?.autoEffects?.phase,
       next.graphicsInfo?.autoEffects?.flags,

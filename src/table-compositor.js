@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { planDisplayBuffers } from "./display-resolution.js";
+import { createSpatialUpscaler } from "./spatial-upscaler.js";
 
 /** Native-resolution WebGL UI over an independently sized linear-HDR 3D scene. */
 export function createTableCompositor(renderer) {
@@ -21,6 +22,7 @@ export function createTableCompositor(renderer) {
   scene.add(quad);
   const depthMaterial = new THREE.MeshBasicMaterial({ colorWrite: false });
   let nativeSurface = null;
+  let upscaler = null;
   let target = null,
     plan = null;
   function resize(options) {
@@ -59,6 +61,18 @@ export function createTableCompositor(renderer) {
       material.map = null;
       material.needsUpdate = true;
     }
+    if (
+      import.meta.env.MODE === "desktop" &&
+      target &&
+      options.upscaling === "fsr1" &&
+      plan.sceneRatio < plan.uiRatio
+    ) {
+      upscaler ??= createSpatialUpscaler(renderer, scene, camera, quad);
+      upscaler.resize(plan);
+    } else if (upscaler) {
+      upscaler.dispose();
+      upscaler = null;
+    }
     return plan;
   }
   function compile(world, worldCamera) {
@@ -69,7 +83,8 @@ export function createTableCompositor(renderer) {
       renderer.setRenderTarget(null);
       // This single inexpensive program can change map presence on resize.
       // Do not leave an async material poll alive across that transition.
-      if (target) renderer.compile(scene, camera);
+      if (upscaler) upscaler.compile(target);
+      else if (target) renderer.compile(scene, camera);
     } finally {
       renderer.setRenderTarget(null);
     }
@@ -134,7 +149,8 @@ export function createTableCompositor(renderer) {
     if (target) {
       renderer.setRenderTarget(null);
       renderer.clear();
-      renderer.render(scene, camera);
+      if (upscaler) upscaler.render(target);
+      else renderer.render(scene, camera);
       if (world) renderNativeSurface(world, worldCamera);
     }
   }
@@ -151,7 +167,11 @@ export function createTableCompositor(renderer) {
     get splitSupported() {
       return splitSupported;
     },
+    get upscaling() {
+      return upscaler ? "fsr1" : "off";
+    },
     dispose() {
+      upscaler?.dispose();
       target?.dispose();
       depthMaterial.dispose();
       quad.geometry.dispose();

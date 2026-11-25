@@ -4,9 +4,10 @@ The Home Assistant helper `input_boolean.living_room_craps_night` appears as
 **craps night** in the Living Room dashboard. Its controller runs on the TV's
 Linux machine as the desktop user.
 
-On checks GitHub for the configured app ref, builds only a new revision, starts
-the local server with `--kiosk`, opens a dedicated fullscreen Chrome/Chromium
-window, then raises and focuses it. The TV settings button is hidden; phones
+On opens a fullscreen update splash in the dedicated Chrome/Chromium window.
+The controller checks GitHub for the configured app ref, builds only a new
+revision, then starts the local server with `--kiosk` and advances the window
+to the game once the server responds. The TV settings button is hidden. Phones
 retain their admin controls. The browser uses one persistent profile, preserving
 graphics calibration and preferences between nights.
 
@@ -34,7 +35,8 @@ release directories are retained; a failed build never replaces the current one.
   are never sent to the game or copied into its public repository.
 
 The controller subscribes to HA's websocket and reconciles the helper on boot
-and reconnect. It opens no extra listening API. It uses `windowraise` and
+and reconnect. The splash listener binds to a dynamic loopback port and closes
+when the button is switched off. It uses `windowraise` and
 `windowfocus`, because the TV's minimal Xorg desktop has no window-manager
 activation support.
 

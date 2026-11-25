@@ -13,6 +13,7 @@ const viewport = process.env.CI
   : { width: 1280, height: 800 };
 const scaledResolution = `${Math.floor(viewport.width * 0.75)}x${Math.floor(viewport.height * 0.75)}`;
 const nativeResolution = `${viewport.width}x${viewport.height}`;
+const desktop = process.env.CRAPSTV_TEST_DESKTOP === "1";
 const port = 4449;
 const server = spawn(process.execPath, ["server/index.js"], {
   env: {
@@ -55,7 +56,7 @@ try {
   page.on("pageerror", (e) => errors.push(e.stack || e.message));
   page.on("console", (message) => {
     if (
-      /GL_INVALID|INVALID_OPERATION|INVALID_VALUE|texSubImage.*error/i.test(
+      /GL_INVALID|INVALID_OPERATION|INVALID_VALUE|texSubImage.*error|Shader Error/i.test(
         message.text(),
       )
     )
@@ -182,6 +183,24 @@ try {
     scaledResolution,
   );
   await expect(table).toHaveAttribute("data-ui-resolution", nativeResolution);
+  if (desktop) {
+    await click("graphics:upscaling");
+    await requested("upscaling", "fsr1");
+    await expect(table).toHaveAttribute("data-upscaling", "fsr1");
+    await expect(table).toHaveAttribute(
+      "data-scene-resolution",
+      scaledResolution,
+    );
+    await expect(table).toHaveAttribute("data-ui-resolution", nativeResolution);
+    await page.screenshot();
+    await click("graphics:upscaling");
+    await requested("upscaling", "off");
+    await expect(table).toHaveAttribute("data-upscaling", "off");
+  } else {
+    const actions = JSON.parse(await table.getAttribute("data-ui-actions"));
+    assert(!actions["graphics:upscaling"]);
+    await expect(table).toHaveAttribute("data-upscaling", "off");
+  }
   await click("graphics:modelDetail");
   await requested("modelDetail", "full");
   await click("graphics:modelDetail"); // auto -> full -> optimized
@@ -277,6 +296,14 @@ try {
           .resolution,
     )
     .toBe("auto");
+  ws.send(
+    JSON.stringify({
+      type: "display",
+      settings: { graphics: { resolution: "720p", upscaling: "fsr1" } },
+    }),
+  );
+  await requested("resolution", desktop ? "720p" : "auto");
+  await requested("upscaling", desktop ? "fsr1" : "off");
   await expect(table).toHaveAttribute("data-scene-ready", "true", {
     timeout: 45000,
   });
@@ -298,6 +325,7 @@ try {
         "real antialias context recreation",
         "menu retained after recreation",
         "resolution render size",
+        desktop ? "desktop FSR rendering" : "web excludes desktop controls",
         "forced model detail",
         "texture cap",
         "retest preserves overrides",

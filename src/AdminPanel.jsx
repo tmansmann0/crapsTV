@@ -25,7 +25,12 @@ import {
   DRINK_UNITS,
   validDrinkingRules,
 } from "./drinking-mode.js";
-import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
+import {
+  DESKTOP_DISPLAY,
+  DISPLAY_GRAPHICS_OPTIONS,
+  graphicsForDisplay,
+} from "./display-build.js";
 import { rollCooldownSecondsFor } from "./betting-window.js";
 import {
   BOT_PERSONALITIES,
@@ -641,13 +646,12 @@ function TVSettings({
   onTableAudio,
   fallbackJoinURL,
 }) {
+  const graphics = graphicsForDisplay(state.display?.graphics ?? {});
   const graphicsSummary = ["fps", "resolution"]
     .map(
       (key) =>
-        GRAPHICS_OPTIONS[key].find(
-          (option) =>
-            option.value ===
-            (state.display?.graphics?.[key] ?? DEFAULT_GRAPHICS[key]),
+        DISPLAY_GRAPHICS_OPTIONS[key].find(
+          (option) => option.value === graphics[key],
         )?.label || "Auto",
     )
     .join(" · ");
@@ -721,6 +725,7 @@ function TVSettings({
               fps: "Frame rate",
               antialias: "Antialiasing",
               resolution: "Resolution",
+              ...(DESKTOP_DISPLAY ? { upscaling: "Upscaling" } : {}),
               modelDetail: "Model detail",
               textures: "Textures",
               lensFlares: "Lens flares",
@@ -731,9 +736,7 @@ function TVSettings({
                 {label}
                 <select
                   aria-label={`TV graphics ${label.toLowerCase()}`}
-                  value={
-                    state.display?.graphics?.[key] ?? DEFAULT_GRAPHICS[key]
-                  }
+                  value={graphics[key]}
                   disabled={!connected}
                   onChange={(event) =>
                     send({
@@ -749,7 +752,7 @@ function TVSettings({
                     })
                   }
                 >
-                  {GRAPHICS_OPTIONS[key].map((option) => (
+                  {DISPLAY_GRAPHICS_OPTIONS[key].map((option) => (
                     <option key={String(option.value)} value={option.value}>
                       {option.label}
                     </option>
