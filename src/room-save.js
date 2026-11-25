@@ -1,4 +1,5 @@
 import { createState } from "./game.js";
+import { botPersonalityOptions } from "./bot-options.js";
 import { DEFAULT_DRINKING_RULES } from "./drinking-mode.js";
 import { normalizeGraphics } from "./graphics-settings.js";
 import { puckHome } from "./puck-layout.js";
@@ -119,6 +120,7 @@ export function readRoomSave(serialized) {
     puck,
     players: previous.players.map((player) => ({
       ...player,
+      ...(player.bot && { bot: botPersonalityOptions(player.bot) }),
       dice: { color: "red", finish: "solid", ...player.dice },
       connected: !!player.bot && !player.left,
     })),

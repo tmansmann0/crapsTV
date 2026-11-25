@@ -43,10 +43,9 @@ function App() {
   setCurrent = setState;
   const send = (message) => {
     actions.push(message);
-    if (message.type === "add-bot") {
-      const next = game.join(initial, message.name);
-      next.bot = { strategy: message.strategy, difficulty: message.difficulty };
-    }
+    if (message.type === "add-bot") game.addBot(initial, host.id, message);
+    if (message.type === "update-bot")
+      game.updateBot(initial, host.id, message.playerId, message);
     if (message.type === "remove-bot")
       initial.players.find((p) => p.id === message.playerId).left = true;
     if (message.type === "cooldown") {

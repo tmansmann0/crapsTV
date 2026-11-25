@@ -28,10 +28,11 @@ import {
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import { rollCooldownSecondsFor } from "./betting-window.js";
 import {
-  BOT_STRATEGIES,
-  BOT_DIFFICULTIES,
-  DEFAULT_BOT_OPTIONS,
+  BOT_PERSONALITIES,
+  BOT_SLIDERS,
   BOT_FAIR_PLAY_NOTE,
+  botPersonalityOptions,
+  normalizeBotOptions,
 } from "./bot-options.js";
 import "./admin-panel.css";
 
@@ -49,15 +50,11 @@ const NAMES = [
   "Seven",
   "Sunny",
 ];
-const STRATEGY_ICONS = {
-  line: "↗",
-  "six-eight": "6 · 8",
-  "iron-cross": "+",
-  press: "↑",
-  "dark-side": "↘",
+const BOT_CONTROLS = {
+  risk: "Risk",
+  variety: "Bet variety",
+  generosity: "Drink generosity",
 };
-const optionName = (options, id) =>
-  options.find((option) => option.id === id)?.name || id;
 const nextName = (players) =>
   NAMES.find((name) => !players.some((p) => p.name === name)) || "New bot";
 
@@ -108,7 +105,6 @@ function RollTimingFields({
   setPointSeconds,
   botDelay,
   setBotDelay,
-  botsAllowed,
   disabled,
 }) {
   return (
@@ -128,17 +124,13 @@ function RollTimingFields({
         onChange={setPointSeconds}
         disabled={disabled}
       />
-      {botsAllowed && (
-        <>
-          <SecondsField
-            label="Bot roll delay"
-            value={botDelay}
-            onChange={setBotDelay}
-            disabled={disabled}
-          />
-          <p>Bot shooters wait {Number(botDelay || 0)}s extra.</p>
-        </>
-      )}
+      <SecondsField
+        label="Bot roll delay"
+        value={botDelay}
+        onChange={setBotDelay}
+        disabled={disabled}
+      />
+      <p>Bot shooters wait {Number(botDelay || 0)}s extra.</p>
     </>
   );
 }
@@ -358,32 +350,42 @@ function PlayerSeats({
   onNotice,
   onFormChange,
   serverError,
-  botsAllowed,
+  drinkingMode,
 }) {
   const adjustmentId = useId();
   const [adding, setAdding] = useState(false),
     [adjusting, setAdjusting] = useState(null),
+    [editing, setEditing] = useState(null),
     [name, setName] = useState(""),
-    [strategy, setStrategy] = useState(DEFAULT_BOT_OPTIONS.strategy),
-    [difficulty, setDifficulty] = useState(DEFAULT_BOT_OPTIONS.difficulty),
+    [personality, setPersonality] = useState(() => normalizeBotOptions()),
     [pending, setPending] = useState(false);
   const previousIds = useRef(new Set());
-  const players = state.players.filter(
-    (p) => !p.left && (botsAllowed || !p.bot),
-  );
+  const players = state.players.filter((p) => !p.left);
   const full = players.length >= 12;
   const disabled = !connected || state.rolling;
   const canAdjust = state.status === "playing";
-  const selected = BOT_STRATEGIES.find((option) => option.id === strategy);
+  const selected = BOT_PERSONALITIES.find(
+    (p) => p.id === personality.personality,
+  );
   useEffect(() => {
     if (!pending) return;
-    const added = players.find((p) => p.bot && !previousIds.current.has(p.id));
-    if (added) {
+    const updated = editing
+      ? players.find(
+          (p) =>
+            p.id === editing &&
+            JSON.stringify(p.bot) === JSON.stringify(personality),
+        )
+      : players.find((p) => p.bot && !previousIds.current.has(p.id));
+    if (updated) {
       setPending(false);
       setAdding(false);
-      onNotice(`${added.name} joined the table.`);
+      onNotice(
+        editing
+          ? `${updated.name}’s personality saved.`
+          : `${updated.name} joined the table.`,
+      );
     }
-  }, [state.players, pending]);
+  }, [state.players, pending, editing, personality]);
   useEffect(() => {
     if (!connected) setPending(false);
   }, [connected]);
@@ -401,17 +403,21 @@ function PlayerSeats({
   }, [pending]);
   function add(event) {
     event.preventDefault();
-    if (!botsAllowed || disabled || full || pending || !name.trim()) return;
+    if (disabled || pending || (!editing && (full || !name.trim()))) return;
     previousIds.current = new Set(players.map((p) => p.id));
     setPending(true);
-    send({ type: "add-bot", name: name.trim(), strategy, difficulty });
+    send(
+      editing
+        ? { type: "update-bot", playerId: editing, ...personality }
+        : { type: "add-bot", name: name.trim(), ...personality },
+    );
   }
   return (
     <div className="ha-players">
       <div className="ha-section-heading">
         <h3>At the table</h3>
       </div>
-      {(!adding || !botsAllowed) && (
+      {!adding && (
         <ul className="ha-roster" aria-label="Table players">
           {players.map((p) => (
             <Fragment key={p.id}>
@@ -431,13 +437,33 @@ function PlayerSeats({
                   </strong>
                   <small>
                     {p.bot
-                      ? `${optionName(BOT_STRATEGIES, p.bot.strategy)} · ${optionName(BOT_DIFFICULTIES, p.bot.difficulty)}`
+                      ? BOT_PERSONALITIES.find(
+                          ({ id }) =>
+                            id === botPersonalityOptions(p.bot).personality,
+                        )?.name
                       : p.connected
                         ? "Player"
                         : "Reconnecting"}
                     {canAdjust && ` · ${money(p.bank)} available`}
                   </small>
                 </div>
+                {p.bot && (
+                  <button
+                    type="button"
+                    className="ha-remove"
+                    aria-label={`Edit ${p.name}’s personality`}
+                    disabled={disabled}
+                    onClick={() => {
+                      setAdjusting(null);
+                      setEditing(p.id);
+                      setName(p.name);
+                      setPersonality(botPersonalityOptions(p.bot));
+                      setAdding(true);
+                    }}
+                  >
+                    <Settings2 size={16} />
+                  </button>
+                )}
                 {canAdjust && (
                   <button
                     type="button"
@@ -484,14 +510,16 @@ function PlayerSeats({
           ))}
         </ul>
       )}
-      {botsAllowed && !adding && (
+      {!adding && (
         <button
           type="button"
           className="ha-add button outline"
           disabled={full || disabled}
           onClick={() => {
             setAdjusting(null);
+            setEditing(null);
             setName(nextName(players));
+            setPersonality(normalizeBotOptions());
             setAdding(true);
           }}
         >
@@ -499,45 +527,50 @@ function PlayerSeats({
           {full ? "Table full (12/12)" : "Add bot"}
         </button>
       )}
-      {botsAllowed && adding && (
+      {adding && (
         <form className="ha-bot-form" onSubmit={add}>
           <header>
-            <h3>Add a bot</h3>
+            <h3>{editing ? `Edit ${name}` : "Add a bot"}</h3>
             <button
               type="button"
               className="ha-remove"
-              aria-label="Cancel add bot"
+              aria-label={editing ? "Cancel bot edit" : "Cancel add bot"}
               disabled={pending}
               onClick={() => setAdding(false)}
             >
               <X size={19} />
             </button>
           </header>
-          <label>
-            Bot name
-            <input
-              autoComplete="off"
-              maxLength={20}
-              value={name}
-              disabled={pending}
-              required
-              onChange={(event) => setName(event.target.value)}
-            />
-          </label>
+          {!editing && (
+            <label>
+              Bot name
+              <input
+                autoComplete="off"
+                maxLength={20}
+                value={name}
+                disabled={pending}
+                required
+                onChange={(event) => setName(event.target.value)}
+              />
+            </label>
+          )}
           <fieldset disabled={pending}>
-            <legend>Bot strategy</legend>
-            <div className="ha-strategy-grid">
-              {BOT_STRATEGIES.map((option) => (
+            <legend>Personality preset</legend>
+            <div className="ha-personality-grid">
+              {BOT_PERSONALITIES.map((option) => (
                 <button
                   type="button"
                   key={option.id}
-                  aria-pressed={strategy === option.id}
+                  aria-pressed={personality.personality === option.id}
                   aria-label={option.name}
-                  onClick={() => setStrategy(option.id)}
+                  onClick={() =>
+                    setPersonality(
+                      normalizeBotOptions({ personality: option.id }),
+                    )
+                  }
                 >
-                  <span aria-hidden="true">{STRATEGY_ICONS[option.id]}</span>
                   <strong>{option.name}</strong>
-                  {strategy === option.id && <Check size={13} />}
+                  {personality.personality === option.id && <Check size={13} />}
                 </button>
               ))}
             </div>
@@ -545,52 +578,57 @@ function PlayerSeats({
           <p className="ha-choice-description" aria-live="polite">
             {selected?.description}
           </p>
-          <fieldset disabled={pending}>
-            <legend>Difficulty</legend>
-            <div className="ha-difficulty">
-              {BOT_DIFFICULTIES.map((option) => (
-                <button
-                  type="button"
-                  key={option.id}
-                  aria-pressed={difficulty === option.id}
-                  onClick={() => setDifficulty(option.id)}
-                >
-                  {option.name}
-                </button>
-              ))}
-            </div>
+          <fieldset className="ha-bot-sliders" disabled={pending || disabled}>
+            <legend>Behavior</legend>
+            {BOT_SLIDERS.filter(
+              (key) => drinkingMode || key !== "generosity",
+            ).map((key) => (
+              <label key={key}>
+                <span>
+                  {BOT_CONTROLS[key]}{" "}
+                  <b aria-hidden="true">{personality[key]}%</b>
+                </span>
+                <input
+                  type="range"
+                  aria-label={BOT_CONTROLS[key]}
+                  min="0"
+                  max="100"
+                  value={personality[key]}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    setPersonality((current) => ({ ...current, [key]: value }));
+                  }}
+                />
+              </label>
+            ))}
           </fieldset>
-          <p className="ha-choice-description" aria-live="polite">
-            {
-              BOT_DIFFICULTIES.find((option) => option.id === difficulty)
-                ?.description
-            }
-          </p>
           <button
             type="submit"
             className="button dark"
-            disabled={disabled || full || pending || !name.trim()}
+            disabled={
+              disabled || pending || (!editing && (full || !name.trim()))
+            }
           >
-            {pending ? "Seating bot…" : "Add to table"}
+            {editing
+              ? "Save personality"
+              : pending
+                ? "Seating bot…"
+                : "Add to table"}
             <ArrowRight size={17} />
           </button>
         </form>
       )}
-      {botsAllowed && (
-        <>
-          <p className="ha-note">
-            <Clock3 size={15} />
-            <span>
-              Bots wait an extra {state.config.botRollDelaySeconds ?? 5}s before
-              rolling.{" "}
-              <button type="button" onClick={openTiming}>
-                Change timing
-              </button>
-            </span>
-          </p>
-          <p className="ha-fair-play">{BOT_FAIR_PLAY_NOTE}</p>
-        </>
-      )}
+      <p className="ha-note">
+        <Clock3 size={15} />
+        <span>
+          Bots wait an extra {state.config.botRollDelaySeconds ?? 5}s before
+          rolling.{" "}
+          <button type="button" onClick={openTiming}>
+            Change timing
+          </button>
+        </span>
+      </p>
+      <p className="ha-fair-play">{BOT_FAIR_PLAY_NOTE}</p>
     </div>
   );
 }
@@ -786,10 +824,7 @@ export default function AdminPanel({
     [botFormOpen, setBotFormOpen] = useState(false);
   const lobby = state.status !== "playing",
     disabled = !connected || state.rolling;
-  const botsAllowed = !(lobby ? drinkingMode : state.config.drinkingMode);
-  const players = state.players.filter(
-      (p) => !p.left && (botsAllowed || !p.bot),
-    ),
+  const players = state.players.filter((p) => !p.left),
     humans = players.filter((p) => !p.bot && p.id !== player.id);
   const rules = drinkingMode ? readDrinkRules(drinkingRules) : undefined;
   useEffect(() => setSeconds(savedComeOut), [savedComeOut]);
@@ -805,7 +840,7 @@ export default function AdminPanel({
     send({
       type: "start",
       config: {
-        ...(botsAllowed && { startingBank: Math.round(Number(bank) * 100) }),
+        ...(!drinkingMode && { startingBank: Math.round(Number(bank) * 100) }),
         minBet: Math.round(Number(minimum) * 100),
         mode,
         drinkingMode,
@@ -813,7 +848,7 @@ export default function AdminPanel({
         teach,
         rollCooldownSeconds: Number(seconds),
         pointRollCooldownSeconds: Number(pointSeconds),
-        ...(botsAllowed && { botRollDelaySeconds: Number(botDelay) }),
+        botRollDelaySeconds: Number(botDelay),
       },
     });
   }
@@ -825,14 +860,10 @@ export default function AdminPanel({
       seconds: Number(seconds),
       pointSeconds: Number(pointSeconds),
     });
-    if (botsAllowed) send({ type: "bot-delay", seconds: Number(botDelay) });
+    send({ type: "bot-delay", seconds: Number(botDelay) });
     setNotice("Timing saved.");
   }
-  const validTiming = [
-    seconds,
-    pointSeconds,
-    ...(botsAllowed ? [botDelay] : []),
-  ].every(
+  const validTiming = [seconds, pointSeconds, botDelay].every(
     (value) =>
       value !== "" &&
       Number.isInteger(Number(value)) &&
@@ -843,8 +874,8 @@ export default function AdminPanel({
     validTiming &&
     Number.isInteger(Number(minimum)) &&
     Number(minimum) >= 1 &&
-    Number(minimum) <= (botsAllowed ? Number(bank) : 1000000) &&
-    (botsAllowed
+    Number(minimum) <= (drinkingMode ? 1000000 : Number(bank)) &&
+    (!drinkingMode
       ? Number.isInteger(Number(bank)) &&
         Number(bank) >= 10 &&
         Number(bank) <= 1000000
@@ -857,7 +888,6 @@ export default function AdminPanel({
       setPointSeconds={setPointSeconds}
       botDelay={botDelay}
       setBotDelay={setBotDelay}
-      botsAllowed={botsAllowed}
       disabled={disabled}
     />
   );
@@ -921,21 +951,21 @@ export default function AdminPanel({
                   <legend className="ha-card-title">
                     <Coins size={17} aria-hidden="true" /> Table stakes
                   </legend>
-                  <div className={botsAllowed ? "ha-money-grid" : ""}>
+                  <div className={drinkingMode ? "" : "ha-money-grid"}>
                     <label>
                       Table minimum ($)
                       <input
                         type="number"
                         inputMode="numeric"
                         min="1"
-                        max={botsAllowed ? bank : 1000000}
+                        max={drinkingMode ? 1000000 : bank}
                         step="1"
                         required
                         value={minimum}
                         onChange={(e) => setMinimum(e.target.value)}
                       />
                     </label>
-                    {botsAllowed && (
+                    {!drinkingMode && (
                       <label>
                         Starting chips ($)
                         <input
@@ -1110,7 +1140,7 @@ export default function AdminPanel({
               onNotice={setNotice}
               onFormChange={setBotFormOpen}
               serverError={serverError}
-              botsAllowed={botsAllowed}
+              drinkingMode={lobby ? drinkingMode : state.config.drinkingMode}
             />
             {!botFormOpen && (
               <details className="ha-disclosure">

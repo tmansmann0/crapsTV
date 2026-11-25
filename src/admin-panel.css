@@ -643,12 +643,12 @@
 .ha-bot-form > header .ha-remove {
   margin-right: -8px;
 }
-.ha-strategy-grid {
+.ha-personality-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
-.ha-strategy-grid > button {
+.ha-personality-grid > button {
   position: relative;
   display: flex;
   align-items: center;
@@ -661,27 +661,18 @@
   background: #fbf8ef;
   color: #6f6757;
 }
-.ha-strategy-grid > button[aria-pressed="true"] {
+.ha-personality-grid > button[aria-pressed="true"] {
   border-color: var(--ha-green);
   background: #e2eadf;
   color: var(--ha-green);
   box-shadow: inset 0 0 0 1px var(--ha-green);
 }
-.ha-strategy-grid > button > span {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 29px;
-  font:
-    700 17px Manrope,
-    sans-serif;
-}
-.ha-strategy-grid > button > strong {
+.ha-personality-grid > button > strong {
   font-size: 10px;
   line-height: 1.35;
   font-weight: 700;
 }
-.ha-strategy-grid > button > svg {
+.ha-personality-grid > button > svg {
   position: absolute;
   right: 4px;
   top: 3px;
@@ -693,29 +684,26 @@
   line-height: 1.5;
   margin: 6px 0 10px;
 }
-.ha-difficulty {
+.ha-bot-sliders {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #c8bda7;
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 9px;
+  margin: 0 0 12px;
 }
-.ha-difficulty > button {
-  min-height: 44px;
-  padding: 8px 3px;
+.ha-bot-sliders label > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ha-bot-sliders label b {
+  color: var(--ha-green);
+  font-variant-numeric: tabular-nums;
+}
+.ha-panel .ha-bot-sliders input[type="range"] {
+  padding: 0;
+  height: 34px;
+  background: transparent;
   border: 0;
-  border-right: 1px solid #c8bda7;
-  background: #fbf7ee;
-  color: #716856;
-  font-size: 11px;
-  font-weight: 700;
-}
-.ha-difficulty > button:last-child {
-  border-right: 0;
-}
-.ha-difficulty > button[aria-pressed="true"] {
-  background: var(--ha-green);
-  color: #fff8e6;
+  accent-color: var(--ha-green);
 }
 .ha-bot-form > .button {
   width: 100%;
@@ -776,23 +764,15 @@
   .ha-panel .ha-seconds {
     font-size: 11px;
   }
-  .ha-strategy-grid > button {
+  .ha-personality-grid > button {
     gap: 4px;
     padding-left: 5px;
-  }
-  .ha-strategy-grid > button > span {
-    min-width: 24px;
-    font-size: 15px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .ha-disclosure > summary > svg:last-child {
     transition: none;
   }
-}
-/* Five strategies form a deliberate featured default plus two balanced rows. */
-.ha-strategy-grid > button:first-child {
-  grid-column: 1/-1;
 }
 .ha-panel .ha-graphics-grid label select {
   font-size: 16px;
@@ -811,15 +791,11 @@
   color: #586153;
   line-height: 1.5;
 }
-.ha-strategy-grid > button > strong {
+.ha-personality-grid > button > strong {
   font-size: 13px;
 }
-.ha-strategy-grid > button {
+.ha-personality-grid > button {
   min-height: 56px;
-}
-.ha-strategy-grid > button > span {
-  font-size: 17px;
-  min-width: 26px;
 }
 .ha-choice-description {
   font-size: 12px;
@@ -847,14 +823,10 @@
   .ha-panel .ha-seconds {
     font-size: 12px;
   }
-  .ha-strategy-grid > button > strong {
+  .ha-personality-grid > button > strong {
     font-size: 12px;
   }
-  .ha-strategy-grid > button {
+  .ha-personality-grid > button {
     padding: 8px;
-  }
-  .ha-strategy-grid > button > span {
-    font-size: 15px;
-    min-width: 20px;
   }
 }

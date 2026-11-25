@@ -71,12 +71,11 @@ async function join(page, name) {
   await page.getByLabel("Your name").fill(name);
   await page.getByRole("button", { name: "Join", exact: true }).click();
 }
-async function addBot(page, { name, strategy, difficulty }) {
+async function addBot(page, { name, personality }) {
   await openAdminSection(page, "Players");
   await page.getByRole("button", { name: "Add bot", exact: true }).click();
   await page.getByLabel("Bot name", { exact: true }).fill(name);
-  await page.getByRole("button", { name: strategy, exact: true }).click();
-  await page.getByRole("button", { name: difficulty, exact: true }).click();
+  await page.getByRole("button", { name: personality, exact: true }).click();
   await page.getByRole("button", { name: "Add to table", exact: true }).click();
   await expect(page.locator(".ha-roster")).toContainText(name);
 }
@@ -131,13 +130,11 @@ try {
   assert.equal(human.config.botRollDelaySeconds, 5);
   await addBot(host, {
     name: "Ada",
-    strategy: "Pass & odds",
-    difficulty: "Regular",
+    personality: "Balanced",
   });
   await addBot(host, {
     name: "Bea",
-    strategy: "Six & eight",
-    difficulty: "Advanced",
+    personality: "Steady",
   });
   const botsAdded = await waitState(
     (s) => s.players.filter((p) => p.bot && !p.left).length === 2,
@@ -145,8 +142,18 @@ try {
   );
   const ada = botsAdded.players.find((p) => p.name === "Ada"),
     bea = botsAdded.players.find((p) => p.name === "Bea");
-  assert.deepEqual(ada.bot, { strategy: "line", difficulty: "regular" });
-  assert.deepEqual(bea.bot, { strategy: "six-eight", difficulty: "expert" });
+  assert.deepEqual(ada.bot, {
+    personality: "balanced",
+    risk: 45,
+    variety: 55,
+    generosity: 30,
+  });
+  assert.deepEqual(bea.bot, {
+    personality: "steady",
+    risk: 20,
+    variety: 25,
+    generosity: 10,
+  });
   assert.equal(botsAdded.adminId, hostId);
   await join(guest, "Human guest");
   await guest.getByText("Your chips are waiting.", { exact: true }).waitFor();

@@ -119,8 +119,19 @@ test("older saves keep the ledger and gains defaults without restoring motion or
   const state = game.createState(room);
   const host = game.join(state, "Host"),
     guest = game.join(state, "Guest");
+  const legacy = game.addBot(state, host.id, {
+    name: "Legacy bot",
+    strategy: "six-eight",
+    difficulty: "expert",
+  });
+  const social = game.addBot(state, host.id, {
+    name: "Social bot",
+    personality: "social",
+    risk: 72,
+  });
   game.configure(state, host.id, { drinkingMode: true });
   game.start(state, host.id);
+  game.simulateBotDrink(state, social.id, "sip", 4);
   game.requestDrink(state, host.id, {
     kind: "credit",
     unit: "sip",
@@ -151,6 +162,14 @@ test("older saves keep the ledger and gains defaults without restoring motion or
   assert.equal(migrated.state.aim, null);
   assert.equal(migrated.state.throw, null);
   assert.equal(migrated.state.players[0].connected, false);
+  assert.equal(
+    migrated.state.players.find((p) => p.id === legacy.id).bot.personality,
+    "steady",
+  );
+  const restoredBot = migrated.state.players.find((p) => p.id === social.id);
+  assert.deepEqual(restoredBot.bot, social.bot);
+  assert.equal(restoredBot.botDrinkLoad, 4);
+  assert.equal(restoredBot.buyIn, social.buyIn);
   const hub = new RoomHub(room, {
     restored: migrated,
     saveStore: { remove() {} },
@@ -161,7 +180,7 @@ test("older saves keep the ledger and gains defaults without restoring motion or
   assert.equal(rejoined.welcome.token, "original-host");
   assert.equal(hub.state.adminId, host.id);
   assert.equal(hub.state.shooterId, host.id);
-  assert.equal(hub.state.players.length, 2);
+  assert.equal(hub.state.players.length, 4);
   assert.throws(
     () => readRoomSave(JSON.stringify({ ...before, version: 99 })),
     /newer version/,

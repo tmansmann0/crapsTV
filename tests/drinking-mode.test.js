@@ -23,15 +23,17 @@ test("Drinking Mode starts humans at zero and top-ups require peer verification"
   const { state, host, guest } = table();
   assert.equal(host.bank, 0);
   assert.equal(game.join(state, "Late guest").bank, 0);
-  assert.throws(
-    () => game.addBot(state, host.id, { name: "Dealer bot" }),
-    /bots are unavailable/i,
-  );
+  const bot = game.addBot(state, host.id, { name: "Dealer bot" });
+  assert.equal(bot.bank, 0);
   assert.throws(() => game.reup(state, host.id), /verified chips/);
   assert.throws(() => game.place(state, host.id, "pass", 500), /Not enough/);
   assert.throws(() => requestCredit(state, host, "finish", 1), /off/);
   assert.throws(() => requestCredit(state, host, "sip", 0.5), /whole number/);
   const id = requestCredit(state, host, "sip", 2);
+  assert.throws(
+    () => game.respondToDrink(state, bot.id, id, "accept"),
+    /Only another human/,
+  );
   assert.equal(host.bank, 0);
   assert.throws(() => requestCredit(state, host, "sip", 1), /pending/);
   assert.throws(
@@ -115,7 +117,7 @@ test("host pricing, finish option, and markups apply to the correct transactions
   assert.equal(state.drinkRequests.length, 0);
 });
 
-test("switching a lobby to Drinking Mode clears bot seats and keeps a human shooter", () => {
+test("switching a lobby to Drinking Mode keeps bot seats with zero starting chips", () => {
   const state = game.createState("DRINKS");
   const host = game.join(state, "Host");
   const bot = game.addBot(state, host.id, { name: "Dealer bot" });
@@ -130,24 +132,51 @@ test("switching a lobby to Drinking Mode clears bot seats and keeps a human shoo
   });
   assert.deepEqual(
     state.players.map(({ id }) => id),
-    [host.id, guest.id],
+    [host.id, bot.id, guest.id],
   );
   assert.equal(state.adminId, host.id);
-  assert.equal(state.shooterId, host.id);
+  assert.equal(state.shooterId, bot.id);
   assert.equal(state.botRollAt, null);
   assert.equal(state.config.minBet, 100100);
-  assert.throws(
-    () => game.addBot(state, host.id, { name: "Bot" }),
-    /unavailable/,
-  );
-  assert.throws(() => game.join(state, "Bot", bot.bot), /unavailable/);
-  assert.equal(game.join(state, "Next guest").seat, bot.seat);
-
-  // In-memory rooms created under the older rules may still have a lobby bot.
-  state.players.push(bot);
+  assert.equal(game.addBot(state, host.id, { name: "Second bot" }).bank, 0);
   game.start(state, host.id);
-  assert(state.players.every((player) => !player.bot));
   assert(state.players.every((player) => player.bank === 0));
+});
+
+test("bots drink for chips and can send drinks without verifying human top-ups", () => {
+  const { state, host, guest } = table();
+  const bot = game.addBot(state, host.id, {
+    name: "Ruby",
+    personality: "social",
+  });
+  assert.throws(() => requestCredit(state, bot, "sip", 1), /simulated/);
+  assert.throws(
+    () => game.simulateBotDrink(state, host.id, "sip", 1),
+    /Only bots/,
+  );
+  assert.throws(() => game.reup(state, bot.id), /verified chips/);
+  game.simulateBotDrink(state, bot.id, "sip", 2);
+  assert.deepEqual([bot.bank, bot.buyIn, bot.botDrinkLoad], [1000, 1000, 2]);
+  const send = (player, to) => {
+    game.requestDrink(state, player.id, {
+      kind: "offer",
+      unit: "sip",
+      quantity: 1,
+      to: to.id,
+    });
+    return state.drinkRequests.at(-1).id;
+  };
+  const fromBot = send(bot, guest);
+  assert.equal(bot.bank, 375);
+  assert.equal(guest.bank, 0);
+  game.respondToDrink(state, guest.id, fromBot, "complete");
+  const topUp = requestCredit(state, host, "sip", 2);
+  game.respondToDrink(state, guest.id, topUp, "accept");
+  const toBot = send(host, bot);
+  game.respondToDrink(state, bot.id, toBot, "complete");
+  assert.equal(bot.botDrinkLoad, 3);
+  assert.equal(bot.bank, 375);
+  assert.equal(state.drinkRequests.length, 0);
 });
 
 test("the shared room takes the requester and prices from authoritative state", () => {

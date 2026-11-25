@@ -47,15 +47,22 @@ try {
     page.getByLabel("Table minimum ($)", { exact: true }),
   ).toBeVisible();
   await expect(page.getByLabel(/starting chips/i)).toHaveCount(0);
-  await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveCount(0);
+  await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveValue("5");
   await expect(page.getByLabel("Sip value ($)", { exact: true })).toHaveValue(
     "5",
   );
   await openAdminSection(page, "Players");
   await expect(
     page.getByRole("button", { name: "Add bot", exact: true }),
-  ).toHaveCount(0);
-  await expect(page.locator(".ha-roster")).not.toContainText("Ruby");
+  ).toBeVisible();
+  await expect(page.locator(".ha-roster")).toContainText("Ruby");
+  await page.getByRole("button", { name: "Add bot", exact: true }).click();
+  await expect(
+    page.getByRole("slider", { name: "Drink generosity" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Cancel add bot", exact: true })
+    .click();
   await openAdminSection(page, "Table");
   await drinkingMode.click();
   await page.getByLabel("Starting chips ($)", { exact: true }).fill("2500");
@@ -69,28 +76,38 @@ try {
     page.getByRole("button", { name: "Open the table", exact: true }),
   ).toHaveCount(0);
   await page.getByLabel("Bot name", { exact: true }).fill("Gus");
+  await page.getByRole("button", { name: "Wild", exact: true }).click();
+  await page.getByRole("slider", { name: "Risk", exact: true }).press("Home");
   await page
-    .getByRole("button", { name: "Press & collect", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Advanced", exact: true }).click();
+    .getByRole("slider", { name: "Risk", exact: true })
+    .press("ArrowRight");
   await page.screenshot({
     path: "artifacts/admin-ux/add-bot-375.png",
     fullPage: true,
   });
   await page.getByRole("button", { name: "Add to table", exact: true }).click();
   await expect(page.locator(".ha-roster")).toContainText("Gus");
-  await expect(page.locator(".ha-roster")).toContainText(
-    "Press & collect · Advanced",
-  );
+  await expect(page.locator(".ha-roster")).toContainText("Wild");
   const add = await page.evaluate(() =>
     window.adminQA.actions.find((action) => action.type === "add-bot"),
   );
   assert.deepEqual(add, {
     type: "add-bot",
     name: "Gus",
-    strategy: "press",
-    difficulty: "expert",
+    personality: "wild",
+    risk: 1,
+    variety: 90,
+    generosity: 50,
   });
+  await page.getByRole("button", { name: "Edit Gus’s personality" }).click();
+  await expect(
+    page.getByRole("slider", { name: "Risk", exact: true }),
+  ).toHaveValue("1");
+  await page.getByRole("button", { name: "Steady", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save personality", exact: true })
+    .click();
+  await expect(page.locator(".ha-roster")).toContainText("Steady");
   await page
     .locator(".ha-disclosure>summary")
     .filter({ hasText: "Pass host controls" })
@@ -212,7 +229,7 @@ try {
   await expect(
     page.getByRole("group", { name: "Drink prices", exact: true }),
   ).toBeVisible();
-  await expect(page.getByLabel("Bot roll delay (seconds)")).toHaveCount(0);
+  await expect(page.getByLabel("Bot roll delay (seconds)")).toBeVisible();
   await expect(savePrices).toBeDisabled();
   await page.getByLabel("Sip value ($)", { exact: true }).fill("7.25");
   await page
@@ -253,12 +270,12 @@ try {
     checks: [
       "shared lobby/live host controls",
       "rule drafts survive bot/TV tabs",
-      "named strategy/difficulty payload",
+      "personality preset and slider payload",
       "human-only host transfer",
       "bot removal and12-seat capacity",
       "separate come-out, point-on and bot delays",
       "all eight graphics controls",
-      "table minimum first, bots hidden in drinking setup",
+      "table minimum first and Drinking Mode bot controls",
       "host audio entry and live drink pricing with roll guard",
       "live chip additions and withdrawals scoped to available balance",
       "no horizontal overflow or sub16px fields",
