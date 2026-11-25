@@ -1,6 +1,8 @@
 import * as THREE from "three";
 
-/*!
+// Keep the upstream notice in the shader string so it ships in minified builds.
+const fsrLicense = /* glsl */ `
+/*
  * EASU and RCAS adapted from AMD FidelityFX Super Resolution 1 ffx_fsr1.h.
  * https://github.com/GPUOpen-Effects/FidelityFX-FSR
  *
@@ -23,6 +25,7 @@ import * as THREE from "three";
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+`;
 
 const vertexShader = /* glsl */ `
   out vec2 sampleUV;
@@ -54,6 +57,7 @@ const sampling = /* glsl */ `
 `;
 
 const easu = /* glsl */ `
+  ${fsrLicense}
   ${sampling}
   in vec2 sampleUV;
 
