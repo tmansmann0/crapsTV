@@ -1,6 +1,19 @@
 export const TV_PIXEL_BUDGET = 3840 * 2160;
+export const RESOLUTION_PRESETS = Object.freeze({
+  "720p": [1280, 720],
+  "1080p": [1920, 1080],
+  "1440p": [2560, 1440],
+});
 const positive = (value, fallback) =>
   Number.isFinite(value) && value > 0 ? value : fallback;
+
+export function presetRenderScale(preset, capabilities) {
+  const [maxWidth, maxHeight] = RESOLUTION_PRESETS[preset];
+  const dpr = positive(capabilities.devicePixelRatio, 1);
+  const width = positive(capabilities.viewportWidth, 1) * dpr;
+  const height = positive(capabilities.viewportHeight, 1) * dpr;
+  return Math.min(1, maxWidth / width, maxHeight / height);
+}
 
 /** Pixel density follows actual display pixels, with a 4K automatic ceiling. */
 export function automaticRenderScale(capabilities = {}) {

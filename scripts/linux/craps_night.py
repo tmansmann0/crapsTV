@@ -15,6 +15,45 @@ import urllib.request
 from urllib.parse import urlparse
 
 
+UPDATE_SPLASH = """<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>CrapsTV</title>
+<style>
+  :root { color-scheme: dark; background: #101911; color: #f5ecd9; }
+  body { min-height: 100vh; margin: 0; display: grid; place-items: center;
+    font: 1rem system-ui, sans-serif;
+    background: radial-gradient(ellipse at center, #203b28, #101911 70%); }
+  main { text-align: center; padding: 2rem; }
+  h1 { margin: 0; color: #e4c486; font: 700 clamp(4rem, 10vw, 10rem) Georgia, serif; }
+  p { margin: 1rem 0 0; font-size: clamp(1.25rem, 2.7vw, 2.5rem); }
+  main::before { content: ""; display: block; width: 2rem; height: 2rem;
+    border: .2rem solid #665d47; border-top-color: #e4c486; border-radius: 50%;
+    margin: 0 auto 1.6rem; animation: spin 1.1s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  @media (prefers-reduced-motion: reduce) { main::before { animation: none; } }
+</style>
+<main><h1>CrapsTV</h1><p role="status">Checking for updates&hellip;</p></main>
+<script>
+  const status = document.querySelector('[role=status]');
+  const messages = {
+    checking: 'Checking for updates…',
+    building: 'Preparing the latest version…',
+    starting: 'Opening the table…'
+  };
+  async function refresh() {
+    try {
+      const response = await fetch('/status', { cache: 'no-store' });
+      const { state, url } = await response.json();
+      if (url) { location.replace(url); return; }
+      status.textContent = messages[state] || messages.checking;
+    } catch {}
+    setTimeout(refresh, 500);
+  }
+  refresh();
+</script></html>
+""".encode("utf-8")
+
+
 class Night:
     def __init__(self, config: dict):
         self.config = config
@@ -25,6 +64,8 @@ class Night:
         self.releases.mkdir(exist_ok=True)
         self.current = self.root / "current"
         self.app = self.browser = None
+        self.splash = None
+        self.splash_url = None
         self.task = None
         self.desired = False
         self.lock = asyncio.Lock()
@@ -36,6 +77,7 @@ class Night:
         self.status("off")
 
     def status(self, state: str, **extra):
+        self.splash_state = state
         record = {"state": state, "entity": self.entity, **extra}
         temporary = self.root / "status.tmp"
         temporary.write_text(json.dumps(record, indent=2) + "\n")
@@ -99,7 +141,9 @@ class Night:
                     await self.run("git", "--git-dir", self.mirror, "worktree", "remove", "--force", release)
                 await self.run("git", "--git-dir", self.mirror, "worktree", "add", "--detach", release, revision)
                 await self.run(self.config["npm"], "ci", "--no-audit", "--no-fund", cwd=release, timeout=300)
-                await self.run(self.config["npm"], "run", "build", cwd=release, timeout=300)
+                package = json.loads((release / "package.json").read_text())
+                build = "build:desktop" if "build:desktop" in package["scripts"] else "build"
+                await self.run(self.config["npm"], "run", build, cwd=release, timeout=300)
                 if not (release / "dist/index.html").is_file():
                     raise RuntimeError("Build produced no app")
                 marker.write_text(revision + "\n")
@@ -197,36 +241,39 @@ class Night:
                 await asyncio.sleep(0.2)
         raise RuntimeError("The game server did not become ready")
 
-    async def start(self):
-        if self.app and self.app.returncode is None and self.browser and self.browser.returncode is None:
-            windows = await self.windows("crapstv-night")
-            if windows:
-                await self.focus(windows[-1])
-            return
-        await self.stop(self.browser)
-        await self.stop(self.app)
-        release = await self.release()
-        port = int(self.config.get("port", 3000))
-        url = f"http://127.0.0.1:{port}/"
-        app_env = {**self.env, "PORT": str(port), "CRAPSTV_KIOSK": "1",
-                   "CRAPSTV_HOSTNAME": self.config.get("hostname", "crapstv-tv")}
-        self.status("starting", revision=release.name)
-        self.app = await asyncio.create_subprocess_exec(
-            self.config["node"], "server/index.js", "--kiosk", cwd=release,
-            env=app_env, start_new_session=True)
-        config = await self.health(url)
-        # Stop playback without terminating the existing viewer/service.
-        viewer = await self.windows("jellyfin")
-        if viewer:
-            try:
-                await self.xdo("key", "--window", viewer[-1], "--clearmodifiers", "x")
-            except RuntimeError:
-                logging.warning("Could not stop existing Jellyfin playback")
+    async def serve_splash(self, reader, writer):
+        try:
+            request = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 2)
+            path = request.split(b"\r\n", 1)[0].split()[1:2]
+            if path == [b"/status"]:
+                content_type = "application/json"
+                body = json.dumps({"state": self.splash_state, "url": self.splash_url}).encode()
+            elif path == [b"/"]:
+                content_type = "text/html"
+                body = UPDATE_SPLASH
+            else:
+                writer.write(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                await writer.drain()
+                return
+            writer.write((
+                f"HTTP/1.1 200 OK\r\nContent-Type: {content_type}; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+            ).encode() + body)
+            await writer.drain()
+        except (asyncio.TimeoutError, asyncio.IncompleteReadError, asyncio.LimitOverrunError, OSError):
+            pass
+        finally:
+            writer.close()
+
+    async def open_splash(self):
+        self.splash_url = None
+        self.splash = await asyncio.start_server(self.serve_splash, "127.0.0.1", 0, limit=8192)
+        splash_port = self.splash.sockets[0].getsockname()[1]
         profile = self.root / "browser-profile"
         args = [self.config["browser"], f"--user-data-dir={profile}", "--class=crapstv-night",
                 "--kiosk", "--no-first-run", "--no-default-browser-check",
                 "--disable-session-crashed-bubble", "--autoplay-policy=no-user-gesture-required",
-                f"--app={url}?kiosk=1"]
+                f"--app=http://127.0.0.1:{splash_port}/"]
         if self.config.get("debug_port"):
             args += [f"--remote-debugging-port={int(self.config['debug_port'])}", "--remote-debugging-address=127.0.0.1"]
         args += self.config.get("browser_args", [])
@@ -239,16 +286,56 @@ class Night:
                 await self.xdo("windowmove", windows[-1], "0", "0")
                 await self.xdo("windowsize", windows[-1], "100%", "100%")
                 await self.focus(windows[-1])
-                self.status("on", revision=release.name, url=config.get("localOrigin", url),
-                            room=config.get("code"), browser_pid=self.browser.pid)
                 return
             await asyncio.sleep(0.2)
         raise RuntimeError("Fullscreen browser window did not appear")
+
+    async def start(self):
+        if self.app and self.app.returncode is None and self.browser and self.browser.returncode is None and self.splash_url:
+            windows = await self.windows("crapstv-night")
+            if windows:
+                await self.focus(windows[-1])
+            return
+        await self.stop(self.browser)
+        await self.stop(self.app)
+        await self.close_splash()
+        self.status("checking")
+        await self.open_splash()
+        release = await self.release()
+        port = int(self.config.get("port", 3000))
+        url = f"http://127.0.0.1:{port}/"
+        app_env = {**self.env, "PORT": str(port), "CRAPSTV_KIOSK": "1",
+                   "CRAPSTV_HOSTNAME": self.config.get("hostname", "crapstv-tv")}
+        self.status("starting", revision=release.name)
+        self.app = await asyncio.create_subprocess_exec(
+            self.config["node"], "server/index.js", "--kiosk", cwd=release,
+            env=app_env, start_new_session=True)
+        config = await self.health(url)
+        if self.browser.returncode is not None:
+            raise RuntimeError("Fullscreen browser exited during the update")
+        # Stop playback without terminating the existing viewer/service.
+        viewer = await self.windows("jellyfin")
+        if viewer:
+            try:
+                await self.xdo("key", "--window", viewer[-1], "--clearmodifiers", "x")
+            except RuntimeError:
+                logging.warning("Could not stop existing Jellyfin playback")
+        self.splash_url = url + "?kiosk=1"
+        self.status("on", revision=release.name, url=config.get("localOrigin", url),
+                    room=config.get("code"), browser_pid=self.browser.pid)
+
+    async def close_splash(self):
+        if self.splash:
+            self.splash.close()
+            await self.splash.wait_closed()
+            self.splash = None
+        self.splash_url = None
 
     async def off(self):
         await self.stop(self.browser)
         await self.stop(self.app)
         self.browser = self.app = None
+        await self.close_splash()
         await self.restore_viewer()
         self.status("off")
 

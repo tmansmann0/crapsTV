@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 import io
 from craps_night import Night
 
@@ -57,6 +58,50 @@ class NightTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(stopped.is_set())
         self.assertFalse(self.night.desired)
 
+    async def test_update_splash_precedes_build_and_hands_off_to_healthy_game(self):
+        requests = []
+
+        async def splash_response(path):
+            port = self.night.splash.sockets[0].getsockname()[1]
+            reader, writer = await asyncio.open_connection("127.0.0.1", port)
+            try:
+                writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode())
+                await writer.drain()
+                return (await reader.read()).split(b"\r\n\r\n", 1)[1]
+            finally:
+                writer.close()
+                await writer.wait_closed()
+
+        async def release():
+            self.assertIn(b"Checking for updates", await splash_response("/"))
+            self.night.status("building")
+            self.assertEqual(json.loads(await splash_response("/status")),
+                             {"state": "building", "url": None})
+            return self.night.root / "built"
+
+        async def health(url):
+            self.assertEqual(json.loads(await splash_response("/status")),
+                             {"state": "starting", "url": None})
+            return {"kiosk": True, "code": "ROOM"}
+
+        async def spawn(*args, **kwargs):
+            requests.append(args)
+            return SimpleNamespace(returncode=None, pid=123)
+
+        self.night.windows = AsyncMock(return_value=["123"])
+        self.night.xdo = AsyncMock()
+        self.night.stop = AsyncMock()
+        self.night.release, self.night.health = release, health
+        self.addAsyncCleanup(self.night.close_splash)
+        with patch("asyncio.create_subprocess_exec", side_effect=spawn):
+            await self.night.start()
+        self.assertEqual([args[0] for args in requests], ["/runtime/chrome", "/runtime/bin/node"])
+        self.assertIn("--app=http://127.0.0.1:", " ".join(requests[0]))
+        self.assertEqual(json.loads(await splash_response("/status")),
+                         {"state": "on", "url": "http://127.0.0.1:3000/?kiosk=1"})
+        await self.night.off()
+        self.assertIsNone(self.night.splash)
+
     async def test_reuses_a_complete_build_but_checks_github_on_every_new_start(self):
         revision = "a" * 40
         calls = []
@@ -69,8 +114,10 @@ class NightTests(unittest.IsolatedAsyncioTestCase):
             if "rev-parse" in args:
                 return revision
             if "worktree" in args and "add" in args:
-                Path(args[-2]).mkdir()
-            if args[:3] == ["/runtime/bin/npm", "run", "build"]:
+                release = Path(args[-2])
+                release.mkdir()
+                (release / "package.json").write_text('{"scripts":{"build:desktop":"vite"}}')
+            if args[:3] == ["/runtime/bin/npm", "run", "build:desktop"]:
                 (cwd / "dist").mkdir(); (cwd / "dist/index.html").write_text("app")
             return ""
         self.night.run = run
@@ -79,6 +126,7 @@ class NightTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first, second)
         self.assertEqual(sum("fetch" in command for command in calls), 2)
         self.assertEqual(sum("ci" in command for command in calls), 1)
+        self.assertEqual(sum("build:desktop" in command for command in calls), 1)
         self.assertEqual(self.night.current.resolve(), first)
         async def fail(*args, **kwargs):
             if "get-url" in args:

@@ -18,7 +18,7 @@ Install [Node.js 22 or later](https://nodejs.org/), then:
 git clone https://github.com/tmansmann0/crapsTV.git
 cd crapsTV
 npm ci
-npm run build
+npm run build:desktop
 npm start
 ```
 
@@ -67,7 +67,8 @@ Place/hardway bets and come odds are **off on come-out**; traveled come bets the
 
 ```sh
 npm test                # deterministic rules and authority tests
-npm run build           # portable static bundle in dist/
+npm run build           # web and Android static bundle in dist/
+npm run build:desktop   # desktop bundle in dist/, with resolution caps and AMD FSR 1
 npx playwright install chromium
 npm run test:e2e        # starts an isolated local server; TV + two phones
 npm run test:odds       # isolated real-rules phone odds/layout checks

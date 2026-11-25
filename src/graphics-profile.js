@@ -1,5 +1,9 @@
 import { normalizeGraphics } from "./graphics-settings.js";
-import { automaticRenderScale } from "./display-resolution.js";
+import {
+  automaticRenderScale,
+  presetRenderScale,
+  RESOLUTION_PRESETS,
+} from "./display-resolution.js";
 
 const positive = (value, fallback) =>
   typeof value === "number" && Number.isFinite(value) && value > 0
@@ -94,10 +98,14 @@ export function calibrateGraphics(profile, frameIntervalsMs) {
 export function resolveGraphics(requested, profile, capabilities = {}) {
   const settings = normalizeGraphics(requested);
   const auto = safeProfile(profile, capabilities);
-  const resolutionScale =
-    settings.resolution === "auto"
-      ? Math.min(auto.resolutionScale, automaticRenderScale(capabilities))
-      : Number(settings.resolution) / 100;
+  let resolutionScale = Number(settings.resolution) / 100;
+  if (settings.resolution === "auto")
+    resolutionScale = Math.min(
+      auto.resolutionScale,
+      automaticRenderScale(capabilities),
+    );
+  else if (Object.hasOwn(RESOLUTION_PRESETS, settings.resolution))
+    resolutionScale = presetRenderScale(settings.resolution, capabilities);
   const wantedTexture =
     settings.textures === "auto"
       ? auto.textureLimit

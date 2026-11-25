@@ -8,11 +8,12 @@ import {
 } from "../src/graphics-settings.js";
 import * as game from "../src/game.js";
 
-test("graphics default to Auto and advertised options round-trip as exact wire values", () => {
+test("graphics defaults and advertised options round-trip as exact wire values", () => {
   assert.deepEqual(normalizeGraphics(), {
     fps: "auto",
     antialias: "auto",
     resolution: "auto",
+    upscaling: "off",
     modelDetail: "auto",
     textures: "auto",
     lensFlares: "auto",
@@ -29,13 +30,18 @@ test("graphics default to Auto and advertised options round-trip as exact wire v
 });
 
 test("partial graphics updates preserve all prior choices without mutating their input", () => {
-  const current = normalizeGraphics({ fps: 30, resolution: "150" });
+  const current = normalizeGraphics({
+    fps: 30,
+    resolution: "150",
+    upscaling: "fsr1",
+  });
   const before = { ...current };
   const changed = mergeGraphics(current, { textures: "1k", antialias: "off" });
   assert.deepEqual(current, before);
   assert.deepEqual(changed, {
     fps: 30,
     resolution: "150",
+    upscaling: "fsr1",
     textures: "1k",
     antialias: "off",
     modelDetail: "auto",
@@ -65,6 +71,7 @@ test("graphics reject malformed records, unknown keys and invalid option types",
     { antialias: "yes" },
     { resolution: 100 },
     { resolution: "50" },
+    { upscaling: "fsr3" },
     { modelDetail: "low" },
     { textures: 1024 },
     { textures: "8k" },

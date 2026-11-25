@@ -27,11 +27,12 @@ import {
   sampleCameraSlide,
 } from "./throw-camera.js";
 import { assetURL as asset } from "./asset-url.js";
+import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
 import {
-  DEFAULT_GRAPHICS,
-  GRAPHICS_OPTIONS,
-  normalizeGraphics,
-} from "./graphics-settings.js";
+  DESKTOP_DISPLAY,
+  DISPLAY_GRAPHICS_OPTIONS,
+  graphicsForDisplay,
+} from "./display-build.js";
 import { recommendGraphics, resolveGraphics } from "./graphics-profile.js";
 import {
   readGraphicsCalibration,
@@ -60,7 +61,7 @@ import {
 const GRAPHICS_STORAGE = "crapstv-graphics-v1";
 function savedGraphics() {
   try {
-    return normalizeGraphics(
+    return graphicsForDisplay(
       JSON.parse(localStorage.getItem(GRAPHICS_STORAGE) || "{}"),
     );
   } catch {
@@ -554,7 +555,7 @@ export default function Table3D(props) {
       renderer.shadowMap.needsUpdate = true;
     }
     function setGraphics(next) {
-      graphics = normalizeGraphics(next);
+      graphics = graphicsForDisplay(next);
       graphicsRef.current = graphics;
       try {
         localStorage.setItem(GRAPHICS_STORAGE, JSON.stringify(graphics));
@@ -630,7 +631,8 @@ export default function Table3D(props) {
         }
         return;
       }
-      const options = GRAPHICS_OPTIONS[key];
+      if (key === "upscaling" && !DESKTOP_DISPLAY) return;
+      const options = DISPLAY_GRAPHICS_OPTIONS[key];
       if (!options) return;
       const index = options.findIndex(
         (option) => option.value === graphics[key],
@@ -712,10 +714,12 @@ export default function Table3D(props) {
         devicePixelRatio: capabilities.devicePixelRatio,
         scenePixelRatio: quality.pixelRatio,
         antialias: quality.antialias,
+        upscaling: graphics.upscaling,
       });
       el.dataset.sceneResolution = `${buffers.sceneWidth}x${buffers.sceneHeight}`;
       el.dataset.uiResolution = `${buffers.uiWidth}x${buffers.uiHeight}`;
       el.dataset.splitResolution = String(buffers.split);
+      el.dataset.upscaling = compositor.upscaling;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       ui.resize(w, h);
@@ -1385,6 +1389,7 @@ export default function Table3D(props) {
           fps: Number(el.dataset.renderFps) || null,
           resolution: `${compositor.plan.sceneWidth} × ${compositor.plan.sceneHeight}`,
           uiResolution: `${compositor.plan.uiWidth} × ${compositor.plan.uiHeight}`,
+          upscaling: compositor.upscaling,
           device: String(deviceName),
           reflectionsSupported: localReflections.metrics.supported,
           contactShadowsSupported: renderer.shadowMap.enabled,
