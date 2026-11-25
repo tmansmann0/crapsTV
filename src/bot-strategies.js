@@ -1,6 +1,7 @@
 import { betConflict, catalogue, minimumPlayableBet } from "./game.js";
 import { validBetChoices } from "./bet-options.js";
 import { BOT_STRATEGIES, normalizeBotOptions } from "./bot-options.js";
+import { pickDrinkRecipient } from "./bot-social.js";
 import {
   DEFAULT_DRINKING_RULES,
   botDrinkLoadAfter,
@@ -266,12 +267,11 @@ export function planBotActions(state, playerId) {
     ) &&
     random() < ((options.generosity ?? 30) / 100) * (0.25 + instability * 0.2)
   ) {
-    const peers = state.players.filter((p) => !p.bot && !p.left && p.connected);
     const affordable = drinkUnits(rules).filter(
       ({ id }) => drinkPrice(rules, id, "offer") <= virtual.bank - min * 2,
     );
-    if (peers.length && affordable.length) {
-      const recipient = peers[Math.floor(random() * peers.length)];
+    const recipient = pickDrinkRecipient(state, player, random());
+    if (recipient && affordable.length) {
       const unit = affordable[Math.floor(random() * affordable.length)].id;
       actions.push({
         type: "drink-offer",

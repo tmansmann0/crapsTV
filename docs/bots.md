@@ -18,10 +18,16 @@ its actions from one roll to the next and uses the same wager rules, payouts,
 and physical throws as everyone else.
 
 In **Drinking Mode**, bots start at zero and take simulated drinks at the
-configured prices when they need chips. They can send drinks to people and
-complete drinks assigned to them. Only people can verify human top-ups.
+configured prices when they need chips. They can send drinks to people or other
+bots and complete drinks assigned to them. Only people can verify human top-ups.
 As a bot drinks, its choices and stake sizes vary more. That effect fades over
 subsequent rolls.
+
+Bots remember who rolled early craps or caused a big loss on a seven-out or
+come-out craps. Players who win them chips earn goodwill. Sending a bot repeated
+drinks makes it more likely to send one back, and a player who receives drinks
+from several different senders can draw more attention from the other bots.
+Grudges, goodwill, and group attention fade as the table rolls.
 
 **Bot roll delay** defaults to five seconds on top of the current betting
 window. The host can change it under **Table**. Bots pause when no human

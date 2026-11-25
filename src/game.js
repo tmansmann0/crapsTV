@@ -11,6 +11,11 @@ import {
 } from "./betting-window.js";
 import { normalizeBotOptions } from "./bot-options.js";
 import {
+  forgetDrinkPlayer,
+  rememberBotRoll,
+  rememberDrinkAssignment,
+} from "./bot-social.js";
+import {
   DEFAULT_DRINKING_RULES,
   botDrinkLoadAfter,
   drinkDescription,
@@ -921,6 +926,7 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
     );
     player.bank -= amount;
     player.betPreview = null;
+    rememberDrinkAssignment(s, player, recipient, quantity);
     recordDrinkChange(s, player, "Assigned a drink");
     log(
       s,
@@ -1181,6 +1187,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
       dice.every((n) => Number.isInteger(n) && n >= 1 && n <= 6),
     "Invalid dice.",
   );
+  const shooterId = s.throw?.shooterId ?? s.shooterId;
   if (s.throw && dice.some((n, i) => n !== s.throw.dice[i])) {
     // Explicit dice are a trusted rules-test fixture, never accepted from the
     // wire. Drop the unrelated visual throw instead of manufacturing its faces.
@@ -1189,6 +1196,14 @@ export function finishRoll(s, dice = s.throw?.dice) {
   const total = dice[0] + dice[1],
     oldPoint = s.point,
     crapless = s.config.mode === "crapless";
+  const roughRoll = oldPoint
+    ? total === 7
+    : !crapless && [2, 3, 12].includes(total);
+  const early =
+    s.rolls.length < 3 ||
+    s.rolls.slice(-3).some(
+      (roll) => roll.shooterId !== shooterId || roll.kind === "seven-out",
+    );
   s.bonus ??= { hits: [] };
   s.bonus.hits =
     total === 7
@@ -1322,6 +1337,8 @@ export function finishRoll(s, dice = s.throw?.dice) {
     }
     p.stats.rolls++;
     const delta = equity(p) - before;
+    if (s.config.drinkingMode && p.bot)
+      rememberBotRoll(s, p, shooterId, early, roughRoll, before, delta);
     if (settlements.length || delta)
       events.push({ playerId: p.id, name: p.name, delta, bets: settlements });
     p.history.push({
@@ -1375,6 +1392,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
     dice,
     total,
     kind,
+    shooterId,
     message,
     events,
     pointBefore: oldPoint,
@@ -1406,6 +1424,7 @@ export function leave(s, id) {
   p.betPreview = null;
   p.left = true;
   p.connected = false;
+  forgetDrinkPlayer(s, id);
   if (s.drinkRequests?.length)
     s.drinkRequests = s.drinkRequests.filter((request) =>
       request.kind === "credit" ? request.from !== id : request.to !== id,
