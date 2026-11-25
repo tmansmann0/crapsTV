@@ -30,6 +30,11 @@ export function drinkDescription(unit, quantity) {
   return `${quantity} ${quantity === 1 ? option.label.toLowerCase() : option.plural}`;
 }
 
+export function botDrinkLoadAfter(load, unit, quantity) {
+  const weight = { sip: 1, shot: 4, finish: 6 }[unit] ?? 0;
+  return Math.min(60, (load ?? 0) + weight * quantity);
+}
+
 export function validDrinkingRules(rules) {
   return (
     rules !== null &&

@@ -12,6 +12,8 @@ import {
 import { normalizeBotOptions } from "./bot-options.js";
 import {
   DEFAULT_DRINKING_RULES,
+  botDrinkLoadAfter,
+  drinkDescription,
   drinkPrice,
   validDrinkingRules,
 } from "./drinking-mode.js";
@@ -488,10 +490,6 @@ function log(s, text, type = "info") {
 export function join(s, name, bot = null) {
   assert(s.status !== "ended", "This session has ended. Start a new table.");
   assert(
-    !bot || !s.config.drinkingMode,
-    "Bots are unavailable in Drinking Mode.",
-  );
-  assert(
     s.players.filter((p) => !p.left).length < 12,
     "This table is full (12 players).",
   );
@@ -543,7 +541,7 @@ export function join(s, name, bot = null) {
     ],
   };
   s.players.push(p);
-  if (!s.adminId) s.adminId = p.id;
+  if (!s.adminId && !bot) s.adminId = p.id;
   if (!s.shooterId) s.shooterId = p.id;
   log(s, `${name} pulled up a chair.`, "player-joined");
   return p;
@@ -554,6 +552,13 @@ export function addBot(s, id, options = {}) {
   assert(!host.bot, "Only a human host can add bots.");
   const bot = normalizeBotOptions(options);
   return join(s, options.name, bot);
+}
+export function updateBot(s, id, playerId, options) {
+  admin(s, id);
+  assert(!s.rolling && s.status !== "ended", "Wait until the table is open.");
+  const bot = active(s, playerId);
+  assert(bot.bot, "Choose a bot to update.");
+  bot.bot = normalizeBotOptions(options);
 }
 export function removeBot(s, id, playerId) {
   admin(s, id);
@@ -581,19 +586,6 @@ function normalizeDrinkingRules(rules) {
   return Object.fromEntries(
     Object.keys(DEFAULT_DRINKING_RULES).map((key) => [key, rules[key]]),
   );
-}
-export function removeDrinkingBots(s) {
-  if (!s.config.drinkingMode || s.rolling || s.status === "ended") return;
-  const humans = s.players.filter((player) => !player.bot);
-  if (humans.length === s.players.length) return;
-  s.players = humans;
-  if (!humans.some((player) => player.id === s.shooterId && !player.left)) {
-    rotateShooter(s);
-    s.shooterId ??= humans.find((player) => !player.left)?.id ?? null;
-  }
-  if (s.aim && !humans.some((player) => player.id === s.aim.playerId))
-    s.aim = null;
-  s.botRollAt = null;
 }
 export function configure(s, id, changes) {
   admin(s, id);
@@ -648,7 +640,6 @@ export function configure(s, id, changes) {
     pointRollCooldownSeconds,
     botRollDelaySeconds,
   };
-  removeDrinkingBots(s);
   for (const p of s.players.filter((player) => !player.left)) {
     const bank = drinkingMode ? 0 : startingBank;
     p.bank = bank;
@@ -667,7 +658,6 @@ export function setDrinkingRules(s, id, rules) {
 export function start(s, id) {
   admin(s, id);
   assert(s.status === "lobby", "This session has already started.");
-  removeDrinkingBots(s);
   s.status = "playing";
   openBettingWindow(s);
   log(s, "Table is open. Place your bets!", "start");
@@ -881,15 +871,11 @@ export function adjustBankroll(s, id, playerId, amount) {
 }
 function drinkPlayer(s, id) {
   const player = active(s, id);
-  assert(!player.bot && player.connected, "Choose a connected human player.");
+  assert(player.connected, "Choose a connected player.");
   return player;
 }
 
-export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
-  assert(s.config.drinkingMode, "Drinking Mode is off.");
-  betting(s);
-  const player = drinkPlayer(s, id);
-  assert(kind === "credit" || kind === "offer", "Unknown drink action.");
+function drinkAmount(s, unit, quantity, kind) {
   const price = drinkPrice(
     s.config.drinkingRules ?? DEFAULT_DRINKING_RULES,
     unit,
@@ -904,11 +890,21 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
       (unit !== "finish" || quantity === 1),
     "Enter a valid whole number.",
   );
+  return amount;
+}
+
+export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
+  assert(s.config.drinkingMode, "Drinking Mode is off.");
+  betting(s);
+  const player = drinkPlayer(s, id);
+  assert(kind === "credit" || kind === "offer", "Unknown drink action.");
+  const amount = drinkAmount(s, unit, quantity, kind);
   const requests = (s.drinkRequests ??= []);
   const pending = requests.some(
     (request) => request.from === id && request.kind === kind,
   );
   if (kind === "credit") {
+    assert(!player.bot, "Bots earn chips from simulated drinks.");
     assert(!pending, "You already have a pending top-up.");
     assert(
       s.players.some((p) => p.id !== id && p.connected && !p.left && !p.bot),
@@ -920,7 +916,7 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
     assert(to !== id, "Choose someone else for the drink assignment.");
     const recipient = drinkPlayer(s, to);
     assert(
-      quantity <= drinkOfferLimit(player, price),
+      amount <= player.bank,
       "Drink assignments must fit your available chips.",
     );
     player.bank -= amount;
@@ -935,6 +931,36 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
   requests.push({ id: uid(), kind, unit, quantity, amount, from: id, to });
 }
 
+function recordBotDrink(bot, unit, quantity) {
+  bot.botDrinkLoad = botDrinkLoadAfter(bot.botDrinkLoad, unit, quantity);
+}
+
+function creditDrink(s, player, amount, event) {
+  assert(
+    Number.isSafeInteger(equity(player) + amount) &&
+      Number.isSafeInteger(player.buyIn + amount),
+    "That top-up is too large.",
+  );
+  player.bank += amount;
+  player.buyIn += amount;
+  recordDrinkChange(s, player, event);
+}
+
+export function simulateBotDrink(s, id, unit, quantity) {
+  assert(s.config.drinkingMode, "Drinking Mode is off.");
+  betting(s);
+  const bot = drinkPlayer(s, id);
+  assert(bot.bot, "Only bots can take simulated drinks.");
+  const amount = drinkAmount(s, unit, quantity, "credit");
+  creditDrink(s, bot, amount, "Simulated drink top-up");
+  recordBotDrink(bot, unit, quantity);
+  log(
+    s,
+    `${bot.name} took ${drinkDescription(unit, quantity)} in simulation for ${money(amount)} in chips.`,
+    "drink-credit",
+  );
+}
+
 export function respondToDrink(s, id, requestId, response) {
   assert(s.config.drinkingMode, "Drinking Mode is off.");
   betting(s);
@@ -942,10 +968,11 @@ export function respondToDrink(s, id, requestId, response) {
   const index =
     s.drinkRequests?.findIndex((request) => request.id === requestId) ?? -1;
   assert(index >= 0, "That request has already been closed.");
-  const { kind, from, to, amount } = s.drinkRequests[index];
+  const { kind, from, to, amount, unit, quantity } = s.drinkRequests[index];
   if (kind === "offer") {
     assert(id === to, "Only the assigned player can complete this drink.");
     assert(response === "complete", "Assigned drinks must be completed.");
+    if (responder.bot) recordBotDrink(responder, unit, quantity);
     log(
       s,
       `${responder.name} completed their assigned drink.`,
@@ -959,16 +986,11 @@ export function respondToDrink(s, id, requestId, response) {
       "Unknown drink response.",
     );
     assert(id !== from, "Another player must answer this top-up.");
+    assert(!responder.bot, "Only another human can verify a top-up.");
     if (response === "accept") {
       const sender = drinkPlayer(s, from);
-      assert(
-        Number.isSafeInteger(equity(sender) + amount) &&
-          Number.isSafeInteger(sender.buyIn + amount),
-        "That top-up is too large.",
-      );
-      sender.bank += amount;
-      sender.buyIn += amount;
-      recordDrinkChange(s, sender, "Verified chip top-up");
+      assert(!sender.bot, "Bots earn chips from simulated drinks.");
+      creditDrink(s, sender, amount, "Verified chip top-up");
       log(
         s,
         `${responder.name} verified ${money(amount)} in chips for ${sender.name}.`,
@@ -1063,11 +1085,7 @@ export function setDisplaySettings(s, id, options) {
 
 function throwController(s, id) {
   betting(s);
-  const player = active(s, id);
-  assert(
-    !player.bot || !s.config.drinkingMode,
-    "Bots are unavailable in Drinking Mode.",
-  );
+  active(s, id);
   assert(id === s.shooterId, "Only the current shooter can throw the dice.");
   const remaining = Math.ceil(((s.nextRollAt ?? 0) - Date.now()) / 1000);
   assert(
@@ -1179,6 +1197,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
   const events = [];
   const presentationSources = {};
   for (const p of s.players.filter((p) => !p.left)) {
+    if (p.botDrinkLoad) p.botDrinkLoad *= 0.84;
     const before = equity(p),
       pending = [...p.bets];
     // Capture labels while traveled parent bets are still present. Odds labels
@@ -1371,9 +1390,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
   return s.lastRoll;
 }
 export function rotateShooter(s) {
-  const eligible = s.players.filter(
-    (p) => !p.left && p.connected && !(s.config.drinkingMode && p.bot),
-  );
+  const eligible = s.players.filter((p) => !p.left && p.connected);
   if (!eligible.length) {
     s.shooterId = null;
     return;

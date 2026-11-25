@@ -51,7 +51,6 @@ export class RoomHub {
     }
   }
   broadcast() {
-    if (!this.state.pausedAt) game.removeDrinkingBots(this.state);
     this.scheduleBots();
     const message = {
       type: "state",
@@ -154,12 +153,9 @@ export class RoomHub {
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")
           game.setBotRollDelay(s, pid, message.seconds);
-        else if (type === "add-bot")
-          game.addBot(s, pid, {
-            name: message.name,
-            strategy: message.strategy,
-            difficulty: message.difficulty,
-          });
+        else if (type === "add-bot") game.addBot(s, pid, message);
+        else if (type === "update-bot")
+          game.updateBot(s, pid, message.playerId, message);
         else if (type === "remove-bot")
           game.removeBot(s, pid, message.playerId);
         else if (type === "dice")
@@ -296,7 +292,6 @@ export class RoomHub {
       !this.closed &&
       !this.state.pausedAt &&
       this.state.status === "playing" &&
-      !this.state.config.drinkingMode &&
       !this.state.rolling &&
       !this.state.aim?.active &&
       this.state.players.some((p) => !p.left && !p.bot && p.connected)
@@ -396,6 +391,12 @@ export class RoomHub {
           else if (action.type === "remove")
             game.remove(s, bot.id, action.betId);
           else if (action.type === "reup") game.reup(s, bot.id);
+          else if (action.type === "bot-drink")
+            game.simulateBotDrink(s, bot.id, action.unit, action.quantity);
+          else if (action.type === "drink-offer")
+            game.requestDrink(s, bot.id, { ...action, kind: "offer" });
+          else if (action.type === "complete-drink")
+            game.respondToDrink(s, bot.id, action.requestId, "complete");
         } catch {
           /* A current rule/bank change can invalidate a prepared choice. */
         }

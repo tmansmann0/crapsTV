@@ -232,29 +232,29 @@ test("a human shooter holding aim pauses bot betting until the gesture is cancel
   assert.equal(hub.state.rolling, false);
 });
 
-test("a legacy bot cannot stay shooter or act in Drinking Mode", (t) => {
-  const { hub, time, bot, human, messages } = hubTable(t, { cooldown: 0 });
+test("a bot funds its own Drinking Mode bets and can take its turn as shooter", (t) => {
+  const { hub, time, bot, human } = hubTable(t, { start: false });
+  hub.receive("host", {
+    type: "start",
+    config: { drinkingMode: true, rollCooldownSeconds: 0 },
+  });
+  assert.equal(bot.bank, 0);
+  assert.equal(bot.buyIn, 0);
+  time.advance(500);
+  assert(bot.botDrinkLoad > 0);
+  assert(bot.buyIn > 0);
+  assert(bot.bets.length > 0);
+  assert.equal(game.equity(bot), bot.buyIn);
+  assert.equal(hub.state.drinkRequests.length, 0);
+  assert.equal(hub.state.adminId, human.id);
   giveBotDice(hub);
+  assert.equal(hub.state.shooterId, bot.id);
   assert(hub.state.botRollAt > time.now());
-  hub.state.rolling = true;
-  hub.state.config.drinkingMode = true;
-  hub.broadcast();
-  assert(
-    hub.state.players.includes(bot),
-    "Keep the roll's players until settlement",
-  );
-  assert.equal(hub.state.botRollAt, null);
-  assert.equal(time.pending, 0);
-  hub.state.rolling = false;
-  assert.throws(() => game.beginRoll(hub.state, bot.id), /unavailable/);
-  hub.broadcast();
-  assert(!hub.state.players.includes(bot));
-  assert.equal(hub.state.shooterId, human.id);
-  hub.receive("host", { type: "add-bot", name: "Another bot" });
-  assert.match(messages.at(-1).message, /unavailable/);
-  time.advance(60000);
-  assert.equal(bot.bets.length, 0);
-  assert.equal(hub.state.rolling, false);
+  time.advance(5000);
+  assert(hub.state.rolling);
+  const load = bot.botDrinkLoad;
+  time.advance(2500);
+  assert(bot.botDrinkLoad < load);
 });
 
 test("a room token cannot resume a bot seat", (t) => {

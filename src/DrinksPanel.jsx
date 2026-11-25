@@ -183,8 +183,9 @@ export default function DrinksPanel({
 }) {
   const rules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
   const peers = state.players.filter(
-    (p) => p.id !== player.id && !p.left && !p.bot && p.connected,
+    (p) => p.id !== player.id && !p.left && p.connected,
   );
+  const humanPeers = peers.filter((p) => !p.bot);
   const requests = state.drinkRequests ?? [];
   const locked = !connected || state.rolling;
   const incoming = requests.filter(
@@ -219,9 +220,9 @@ export default function DrinksPanel({
           dice land.
         </p>
       )}
-      {!peers.length && (
+      {!humanPeers.length && (
         <p className="pg-drink-notice">
-          A second connected player can verify top-ups and receive drinks.
+          A second connected human player can verify top-ups.
         </p>
       )}
       {incoming.length > 0 && (
@@ -281,7 +282,7 @@ export default function DrinksPanel({
           kind={kind}
           rules={rules}
           player={player}
-          peers={peers}
+          peers={kind === "credit" ? humanPeers : peers}
           locked={locked}
           send={send}
           draft={drafts[kind]}

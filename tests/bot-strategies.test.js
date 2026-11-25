@@ -5,12 +5,12 @@ import { validBetChoices } from "../src/bet-options.js";
 import {
   BOT_STRATEGIES,
   BOT_DIFFICULTIES,
-  DEFAULT_BOT_OPTIONS,
   BOT_FAIR_PLAY_NOTE,
   normalizeBotOptions,
   planBotActions,
   MAX_BOT_ACTIONS,
 } from "../src/bot-strategies.js";
+import { BOT_PERSONALITIES } from "../src/bot-options.js";
 
 function table({
   strategy = "line",
@@ -37,6 +37,10 @@ function execute(state, bot, actions = planBotActions(state, bot.id)) {
   for (const action of actions) {
     if (action.type === "reup") game.reup(state, bot.id);
     else if (action.type === "remove") game.remove(state, bot.id, action.betId);
+    else if (action.type === "bot-drink")
+      game.simulateBotDrink(state, bot.id, action.unit, action.quantity);
+    else if (action.type === "drink-offer")
+      game.requestDrink(state, bot.id, { ...action, kind: "offer" });
     else {
       assert.equal(action.type, "bet");
       const row = game
@@ -73,8 +77,18 @@ test("bot options expose distinct named styles and validate room inputs strictly
     BOT_DIFFICULTIES.map((item) => item.id),
     ["casual", "regular", "expert"],
   );
-  assert.deepEqual(normalizeBotOptions(), DEFAULT_BOT_OPTIONS);
-  assert.match(BOT_FAIR_PLAY_NOTE, /never the dice/);
+  assert.deepEqual(normalizeBotOptions(), {
+    personality: "balanced",
+    risk: 45,
+    variety: 55,
+    generosity: 30,
+  });
+  assert.match(BOT_FAIR_PLAY_NOTE, /Dice and payouts use the table rules/);
+  for (const preset of BOT_PERSONALITIES)
+    assert.equal(
+      normalizeBotOptions({ personality: preset.id }).risk,
+      preset.risk,
+    );
   assert(Object.isFrozen(BOT_STRATEGIES) && Object.isFrozen(BOT_STRATEGIES[0]));
   for (const strategy of BOT_STRATEGIES)
     for (const difficulty of BOT_DIFFICULTIES)
@@ -95,8 +109,40 @@ test("bot options expose distinct named styles and validate room inputs strictly
     { difficulty: false },
     { strategy: null },
     { difficulty: null },
+    { personality: "unknown" },
+    { risk: 101 },
+    { variety: -1 },
+    { generosity: "80" },
   ])
     assert.throws(() => normalizeBotOptions(options));
+});
+
+test("personality and drink load change how widely a bot varies its bets", () => {
+  const { state, bot, host } = table();
+  state.status = "lobby";
+  game.configure(state, host.id, { drinkingMode: true });
+  game.start(state, host.id);
+  bot.bank = 100000;
+  bot.bot = normalizeBotOptions({
+    personality: "steady",
+    variety: 0,
+    generosity: 0,
+  });
+  const plans = (load) => {
+    bot.botDrinkLoad = load;
+    return new Set(
+      Array.from({ length: 48 }, (_, index) => {
+        state.rolls.length = index;
+        return JSON.stringify(planBotActions(state, bot.id));
+      }),
+    );
+  };
+  const composed = plans(0);
+  const unsteady = plans(35);
+  assert.equal(composed.size, 1);
+  assert(unsteady.size > 8);
+  bot.bot = normalizeBotOptions({ personality: "wild", generosity: 0 });
+  assert(plans(0).size > 8);
 });
 
 test("plans are pure, deterministic, bounded and never inspect future throw data", () => {
@@ -290,4 +336,45 @@ test("all styles stay legal and bounded through long real-rule runs across both 
           }
           assert.equal(bot.stats.rolls, 60);
         }
+});
+
+test("mixed personalities play and send drinks using the real ledger over many rolls", () => {
+  const dice = [
+    [2, 2],
+    [3, 3],
+    [2, 2],
+    [4, 4],
+    [4, 4],
+    [3, 4],
+    [5, 6],
+  ];
+  let offers = 0;
+  for (const mode of ["craps", "crapless"]) {
+    for (const preset of BOT_PERSONALITIES) {
+      const { state, host, bot } = table({ mode });
+      state.status = "lobby";
+      game.configure(state, host.id, { drinkingMode: true, minBet: 525 });
+      bot.bot = normalizeBotOptions({
+        personality: preset.id,
+        generosity: 100,
+      });
+      game.start(state, host.id);
+      for (let roll = 0; roll < 100; roll++) {
+        const actions = execute(state, bot);
+        assert(actions.every((action) => action.type !== "reup"));
+        assert(Number.isSafeInteger(game.equity(bot)));
+        for (const request of [...state.drinkRequests]) {
+          assert.equal(request.from, bot.id);
+          assert.equal(request.to, host.id);
+          game.respondToDrink(state, host.id, request.id, "complete");
+          offers++;
+        }
+        settle(state, dice[roll % dice.length]);
+      }
+      assert(bot.buyIn > 0);
+      assert(bot.stats.wagered > 0);
+      assert.equal(host.bank, 0);
+    }
+  }
+  assert(offers > 0);
 });
