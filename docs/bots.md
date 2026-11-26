@@ -19,7 +19,8 @@ and physical throws as everyone else.
 
 In **Drinking Mode**, bots start at zero and take simulated drinks at the
 configured prices when they need chips. They can send drinks to people or other
-bots and complete drinks assigned to them. Only people can verify human top-ups.
+bots and immediately complete drinks assigned to them. A seated bot automatically
+approves human chip top-ups. Human-only tables use peer verification.
 As a bot drinks, its choices and stake sizes vary more. That effect fades over
 subsequent rolls.
 

@@ -64,13 +64,6 @@ export function planBotActions(state, playerId) {
   let load = drinking ? (player.botDrinkLoad ?? 0) : 0;
   let refilled = false;
   if (drinking) {
-    const incoming = state.drinkRequests?.find(
-      (request) => request.kind === "offer" && request.to === player.id,
-    );
-    if (incoming) {
-      actions.push({ type: "complete-drink", requestId: incoming.id });
-      load = botDrinkLoadAfter(load, incoming.unit, incoming.quantity);
-    }
     if (virtual.bank < min * 2) {
       const need = Math.max(min * 4, rules.sipValue * 2) - virtual.bank;
       const unit =

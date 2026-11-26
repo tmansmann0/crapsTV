@@ -20,6 +20,7 @@ import {
   botDrinkLoadAfter,
   drinkDescription,
   drinkPrice,
+  drinkVerificationBot,
   validDrinkingRules,
 } from "./drinking-mode.js";
 import {
@@ -956,11 +957,16 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
   if (kind === "credit") {
     assert(!player.bot, "Bots earn chips from simulated drinks.");
     assert(!pending, "You already have a pending top-up.");
+    assert(to === null, "Top-ups can be verified by any other player.");
+    const bot = drinkVerificationBot(s.players);
+    if (bot) {
+      verifyDrinkTopUp(s, player, bot, amount);
+      return;
+    }
     assert(
       s.players.some((p) => p.id !== id && p.connected && !p.left && !p.bot),
       "Another connected player must verify your top-up.",
     );
-    assert(to === null, "Top-ups can be verified by any other player.");
   } else {
     assert(!pending, "Your last drink assignment is still open.");
     assert(to !== id, "Choose someone else for the drink assignment.");
@@ -978,6 +984,10 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
       `${player.name} assigned a drink to ${recipient.name}.`,
       "drink-offer",
     );
+    if (recipient.bot) {
+      completeAssignedDrink(s, recipient, unit, quantity);
+      return;
+    }
   }
   requests.push({ id: uid(), kind, unit, quantity, amount, from: id, to });
 }
@@ -986,15 +996,78 @@ function recordBotDrink(bot, unit, quantity) {
   bot.botDrinkLoad = botDrinkLoadAfter(bot.botDrinkLoad, unit, quantity);
 }
 
-function creditDrink(s, player, amount, event) {
-  assert(
+function canCreditDrink(player, amount) {
+  return (
+    Number.isSafeInteger(amount) &&
+    amount > 0 &&
     Number.isSafeInteger(equity(player) + amount) &&
-      Number.isSafeInteger(player.buyIn + amount),
-    "That top-up is too large.",
+    Number.isSafeInteger(player.buyIn + amount)
   );
+}
+
+function creditDrink(s, player, amount, event) {
+  assert(canCreditDrink(player, amount), "That top-up is too large.");
   player.bank += amount;
   player.buyIn += amount;
   recordChipChange(s, player, event);
+}
+
+function verifyDrinkTopUp(s, player, verifier, amount) {
+  creditDrink(
+    s,
+    player,
+    amount,
+    verifier.bot ? "Automatic drink top-up" : "Verified chip top-up",
+  );
+  log(
+    s,
+    `${verifier.name} ${verifier.bot ? "automatically approved" : "verified"} ${money(amount)} in chips for ${player.name}.`,
+    "drink-credit",
+  );
+}
+
+function completeAssignedDrink(s, recipient, unit, quantity) {
+  if (recipient.bot) recordBotDrink(recipient, unit, quantity);
+  log(
+    s,
+    `${recipient.name} completed their assigned drink.`,
+    "drink-completed",
+  );
+}
+
+export function resolvePendingBotDrinks(s) {
+  if (
+    !s.config.drinkingMode ||
+    s.status !== "playing" ||
+    s.rolling ||
+    s.pausedAt ||
+    !s.drinkRequests?.length
+  )
+    return;
+  const bot = drinkVerificationBot(s.players);
+  if (!bot) return;
+  // A bot may have joined while verification was pending, or a saved table
+  // may still contain an assignment created before bots completed them at once.
+  const connected = s.players.filter(
+    (player) => player.connected && !player.left,
+  );
+  s.drinkRequests = s.drinkRequests.filter((request) => {
+    if (request.kind === "credit") {
+      const sender = connected.find(
+        (player) => player.id === request.from && !player.bot,
+      );
+      if (!sender || !canCreditDrink(sender, request.amount)) return true;
+      verifyDrinkTopUp(s, sender, bot, request.amount);
+      return false;
+    }
+    if (request.kind !== "offer") return true;
+    const recipient = connected.find(
+      (player) => player.id === request.to && player.bot,
+    );
+    if (!recipient) return true;
+    completeAssignedDrink(s, recipient, request.unit, request.quantity);
+    return false;
+  });
 }
 
 export function simulateBotDrink(s, id, unit, quantity) {
@@ -1023,12 +1096,7 @@ export function respondToDrink(s, id, requestId, response) {
   if (kind === "offer") {
     assert(id === to, "Only the assigned player can complete this drink.");
     assert(response === "complete", "Assigned drinks must be completed.");
-    if (responder.bot) recordBotDrink(responder, unit, quantity);
-    log(
-      s,
-      `${responder.name} completed their assigned drink.`,
-      "drink-completed",
-    );
+    completeAssignedDrink(s, responder, unit, quantity);
   } else if (response === "cancel") {
     assert(id === from, "Only the sender can cancel this request.");
   } else {
@@ -1041,12 +1109,7 @@ export function respondToDrink(s, id, requestId, response) {
     if (response === "accept") {
       const sender = drinkPlayer(s, from);
       assert(!sender.bot, "Bots earn chips from simulated drinks.");
-      creditDrink(s, sender, amount, "Verified chip top-up");
-      log(
-        s,
-        `${responder.name} verified ${money(amount)} in chips for ${sender.name}.`,
-        "drink-credit",
-      );
+      verifyDrinkTopUp(s, sender, responder, amount);
     }
   }
   s.drinkRequests.splice(index, 1);
