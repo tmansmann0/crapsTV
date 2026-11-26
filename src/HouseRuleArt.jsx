@@ -5,6 +5,8 @@ import { formatHouseRulePayout } from "./house-rules.js";
 // attributes on outer groups; CSS animates the inner groups, so the
 // unanimated (reduced-motion) styles are always the finished frame.
 
+const JACKPOT_RAY_RADIUS = 210;
+
 const PIPS = {
   1: [[50, 50]],
   2: [
@@ -73,6 +75,7 @@ function Defs() {
         <stop offset="0.15" stopColor="#ffe38a" stopOpacity="0.9" />
         <stop offset="1" stopColor="#ffe38a" stopOpacity="0" />
       </radialGradient>
+      <radialGradient id="tj-ray" href="#hr-ray" r={JACKPOT_RAY_RADIUS} />
       <radialGradient
         id="hr-ray-accent"
         gradientUnits="userSpaceOnUse"
@@ -784,13 +787,13 @@ function TableJackpot() {
       <circle
         cx="320"
         cy="165"
-        r="220"
+        r="205"
         fill="url(#hr-gold-glow)"
         className="tj-glow"
       />
       <g transform="translate(320 165)">
         <g className="tj-rays hr-c">
-          <Rays count={16} inner={90} outer={300} />
+          <Rays count={16} inner={90} outer={JACKPOT_RAY_RADIUS} />
         </g>
       </g>
       {pucks.map(([x, y], i) => (
