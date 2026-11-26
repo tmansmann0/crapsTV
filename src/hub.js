@@ -2,15 +2,33 @@ import * as game from "./game.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
+import { restoreJukeboxSettings } from "./jukebox-settings.js";
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
   constructor(
     code,
-    { rollDelay = 2500, timers = {}, saveStore = null, restored = null } = {},
+    {
+      rollDelay = 2500,
+      timers = {},
+      saveStore = null,
+      restored = null,
+      jukebox = null,
+    } = {},
   ) {
     this.saveStore = saveStore;
+    this.jukebox = jukebox;
     this.state = restored?.state ?? this.newState(code);
+    if (jukebox) {
+      if (this.state.jukeboxSettings)
+        jukebox.settings = restoreJukeboxSettings(this.state.jukeboxSettings);
+      jukebox.onBalance = (playerId, amount) =>
+        game.adjustSongChips(this.state, playerId, amount);
+      jukebox.onChange = (balanceChanged) => {
+        if (balanceChanged && !this.closed) this.broadcast();
+        for (const id of this.clients.keys()) this.sendJukebox(id);
+      };
+    }
     if (saveStore) this.state.saveSessionAvailable = true;
     this.bettingRemainingMs = restored?.bettingRemainingMs ?? 0;
     this.clients = new Map();
@@ -42,6 +60,64 @@ export class RoomHub {
       state: game.snapshot(this.state),
       sentAt: Date.now(),
     });
+    this.sendJukebox(id);
+  }
+  sendJukebox(id) {
+    if (!this.jukebox) return;
+    const playerId = this.clients.get(id)?.playerId;
+    const joined = this.state.players.some(
+      (player) => player.id === playerId && !player.left && !player.bot,
+    );
+    this.send(id, {
+      type: "jukebox-state",
+      jukebox: this.jukebox.snapshot(joined),
+    });
+  }
+  async receiveJukebox(id, message) {
+    const room = this.state;
+    const playerId = this.clients.get(id)?.playerId;
+    const player = room.players.find(
+      (seat) => seat.id === playerId && !seat.left && !seat.bot,
+    );
+    const stillJoined = () =>
+      this.state === room &&
+      !room.pausedAt &&
+      room.status !== "ended" &&
+      this.clients.get(id)?.playerId === playerId &&
+      player &&
+      !player.left;
+    try {
+      if (!this.jukebox) throw Error("The desktop jukebox is unavailable.");
+      if (!stillJoined()) throw Error("Join an open table to use the jukebox.");
+      if (message.type === "jukebox-search") {
+        const tracks = await this.jukebox.search(
+          player,
+          message.query,
+          stillJoined,
+        );
+        if (tracks) {
+          this.send(id, { type: "jukebox-results", tracks });
+        }
+      } else if (message.type === "jukebox-request") {
+        this.jukebox.request(
+          player,
+          message.trackId,
+          playerId === room.adminId,
+          message.cost,
+        );
+      } else {
+        if (playerId !== room.adminId)
+          throw Error("Only the table host can manage the jukebox.");
+        this.jukebox.control(message);
+      }
+    } catch (error) {
+      if (this.state === room)
+        this.send(id, {
+          type: "jukebox-error",
+          operation: message.type,
+          message: error.message,
+        });
+    }
   }
   send(id, message) {
     try {
@@ -83,6 +159,14 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (
+        type === "jukebox-search" ||
+        type === "jukebox-request" ||
+        type === "jukebox-control"
+      ) {
+        void this.receiveJukebox(id, message);
+        return;
+      }
       if (type === "clock") {
         if (
           typeof message.clientAt !== "number" ||
@@ -105,6 +189,7 @@ export class RoomHub {
             playerId: c.playerId,
             token: [...this.tokens].find(([, v]) => v === c.playerId)?.[0],
           });
+          this.sendJukebox(id);
           return;
         }
         let pid =
@@ -134,6 +219,7 @@ export class RoomHub {
           c.playerId = p.id;
           this.send(id, { type: "welcome", playerId: p.id, token });
         }
+        this.sendJukebox(id);
       } else if (type === "watch") {
         /* The display is a spectator and never claims the first admin seat. */
       } else {
@@ -149,6 +235,8 @@ export class RoomHub {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
+        else if (type === "house-rule")
+          game.setHouseRule(s, pid, message.rule, message.enabled);
         else if (type === "cooldown")
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")
@@ -182,9 +270,13 @@ export class RoomHub {
           });
         else if (type === "drink-response")
           game.respondToDrink(s, pid, message.requestId, message.response);
-        else if (type === "leave") game.leave(s, pid);
-        else if (type === "end") game.end(s, pid);
-        else if (type === "transfer") game.transfer(s, pid, message.playerId);
+        else if (type === "leave") {
+          game.leave(s, pid);
+          this.jukebox?.removePlayer(pid);
+        } else if (type === "end") {
+          game.end(s, pid);
+          this.jukebox?.reset();
+        } else if (type === "transfer") game.transfer(s, pid, message.playerId);
         else if (type === "aim") {
           if (!game.setAim(s, pid, message.aim)) return;
         } else if (type === "roll") {
@@ -199,6 +291,7 @@ export class RoomHub {
           for (const client of this.clients.values()) client.playerId = null;
           for (const clientId of this.clients.keys())
             this.send(clientId, { type: "reset" });
+          this.jukebox?.reset();
         } else throw Error("Unknown table action.");
       }
       this.broadcast();
@@ -240,6 +333,11 @@ export class RoomHub {
     if (s.status === "ended") throw Error("This table has already closed.");
     if (s.rolling) throw Error("Wait for the dice to land before saving.");
     const save = captureRoomSave(s, this.tokens, this.completedBotDecisions());
+    if (this.jukebox) {
+      save.state.jukeboxSettings = { ...this.jukebox.settings };
+      for (const track of this.jukebox.queue)
+        game.adjustSongChips(save.state, track.requesterId, track.cost);
+    }
     try {
       this.saveStore.write(save);
     } catch {
@@ -249,6 +347,7 @@ export class RoomHub {
     }
     this.state = save.state;
     this.bettingRemainingMs = save.bettingRemainingMs;
+    this.jukebox?.reset({ refund: false, restoreDefaults: false });
   }
   resumeSession(id) {
     this.requireSaveHost(id);
@@ -436,5 +535,6 @@ export class RoomHub {
     this.botTurn = null;
     this.state.botRollAt = null;
     this.clients.clear();
+    return this.jukebox?.close();
   }
 }

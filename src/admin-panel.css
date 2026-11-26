@@ -50,7 +50,7 @@
 }
 .ha-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   background: #e2ddcf;
@@ -78,6 +78,9 @@
   background: var(--ha-green);
   color: #fff9e9;
   box-shadow: 0 2px 4px #122b241a;
+}
+.ha-tabs button > svg {
+  flex: none;
 }
 .ha-panel button:focus-visible,
 .ha-panel input:focus-visible,
@@ -755,6 +758,7 @@
     font-size: 22px;
   }
   .ha-tabs button {
+    flex-direction: column;
     font-size: 12px;
     gap: 5px;
   }

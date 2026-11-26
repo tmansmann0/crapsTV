@@ -12,6 +12,7 @@ import {
   LogOut,
   Minus,
   Monitor,
+  Music2,
   Plus,
   RefreshCw,
   Smartphone,
@@ -22,7 +23,10 @@ import {
 } from "lucide-react";
 import { routeInfo, controllerURL } from "./routes.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { DESKTOP_DISPLAY } from "./display-build.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
+const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
+const EMPTY_MUSIC_SEARCH = { pending: false, tracks: null, error: "" };
 function Table3D(props) {
   return (
     <Suspense
@@ -215,6 +219,9 @@ function App() {
     [androidPanel, setAndroidPanel] = useState(null),
     [audioReady, setAudioReady] = useState(false),
     [audioSettings, setAudioSettings] = useState(loadTableAudioSettings),
+    [jukebox, setJukebox] = useState(null),
+    [jukeboxOpen, setJukeboxOpen] = useState(false),
+    [musicSearch, setMusicSearch] = useState(EMPTY_MUSIC_SEARCH),
     [tableAudio] = useState(createTableAudio),
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
@@ -365,14 +372,30 @@ function App() {
         setPlayerId(m.playerId);
         const old = getSaved(key) || {};
         save(key, { ...old, token: m.token, playerId: m.playerId });
+      } else if (DESKTOP_DISPLAY && m.type === "jukebox-state") {
+        setJukebox(m.jukebox);
+      } else if (DESKTOP_DISPLAY && m.type === "jukebox-results") {
+        setMusicSearch({ pending: false, tracks: m.tracks, error: "" });
+      } else if (DESKTOP_DISPLAY && m.type === "jukebox-error") {
+        setMusicSearch((current) => ({
+          ...current,
+          pending: m.operation === "jukebox-search" ? false : current.pending,
+          error: m.message,
+        }));
       } else if (m.type === "error") toast(m.message);
       else if (m.type === "reset") {
         setPlayerId(null);
+        if (DESKTOP_DISPLAY) {
+          setJukeboxOpen(false);
+          setMusicSearch(EMPTY_MUSIC_SEARCH);
+        }
         save(key, null);
       }
     };
     const onStatus = (value) => {
       setStatus(value);
+      if (DESKTOP_DISPLAY && value !== "connected")
+        setMusicSearch((current) => ({ ...current, pending: false }));
       if (value !== "connected") tableAudio.scheduleLiveThrow(null);
       if (value === "connected") {
         clockStarted = false;
@@ -413,10 +436,13 @@ function App() {
     if (view === "tv" && audioRevision)
       setAudioSettings(normalizeTableAudio(state.display.audio));
   }, [view, session?.code, audioRevision]);
+  const jukeboxPlaying = DESKTOP_DISPLAY && jukebox?.playing === true;
   useEffect(() => {
-    tableAudio.configure(audioSettings);
-    saveTableAudioSettings(audioSettings);
-  }, [tableAudio, audioSettings]);
+    tableAudio.configure(
+      jukeboxPlaying ? { ...audioSettings, musicVolume: 0 } : audioSettings,
+    );
+  }, [tableAudio, audioSettings, jukeboxPlaying]);
+  useEffect(() => saveTableAudioSettings(audioSettings), [audioSettings]);
   useEffect(() => {
     if (view !== "tv") return;
     let active = true;
@@ -510,6 +536,34 @@ function App() {
       ? "Older host: restart this server for current physics."
       : "";
   const visibleError = error || hostWarning;
+  const musicAvailable = DESKTOP_DISPLAY && Array.isArray(jukebox?.queue);
+  const musicEnabled = musicAvailable && jukebox.enabled;
+  const sendMusic = (message) => {
+    if (status !== "connected") return;
+    setMusicSearch((current) =>
+      message.type === "jukebox-search"
+        ? { tracks: null, pending: true, error: "" }
+        : { ...current, error: "" },
+    );
+    send(message);
+  };
+  const renderMusic = (inline) =>
+    Jukebox &&
+    musicEnabled && (
+      <Suspense fallback={<p className="pg-empty">Loading music requests…</p>}>
+        <Jukebox
+          state={jukebox}
+          search={musicSearch}
+          isHost={isAdmin}
+          connected={status === "connected"}
+          bank={player?.bank ?? 0}
+          playing={state?.status === "playing"}
+          inline={inline}
+          send={sendMusic}
+          onClose={() => setJukeboxOpen(false)}
+        />
+      </Suspense>
+    );
   const joinLink =
     androidHost && !session.joinOrigin
       ? ""
@@ -742,8 +796,21 @@ function App() {
           }
           serverError={error}
           fallbackJoinURL={fallbackJoinLink}
+          onMusic={musicEnabled ? () => setJukeboxOpen(true) : undefined}
+          musicArea={renderMusic(true)}
+          musicSettings={musicAvailable ? jukebox : null}
+          onMusicSettings={(settings) =>
+            sendMusic({ type: "jukebox-control", action: "settings", settings })
+          }
         />
       )}
+      {jukeboxOpen &&
+        musicEnabled &&
+        player &&
+        !player.left &&
+        !state?.pausedAt &&
+        state?.status === "lobby" &&
+        renderMusic(false)}
       {adminAudio &&
         isAdmin &&
         player &&
@@ -870,6 +937,10 @@ function Phone({
   connected,
   onDisplayAction,
   onTableAudio,
+  onMusic,
+  musicArea,
+  musicSettings,
+  onMusicSettings,
   serverError,
   fallbackJoinURL,
 }) {
@@ -882,6 +953,8 @@ function Phone({
     confirm,
     onDisplayAction,
     onTableAudio,
+    musicSettings,
+    onMusicSettings,
     fallbackJoinURL,
     serverError,
   };
@@ -916,6 +989,7 @@ function Phone({
         connected={connected}
         settingsArea={settingsArea}
         serverError={serverError}
+        musicArea={musicArea}
         rollArea={
           <DiceThrow
             state={state}
@@ -945,6 +1019,15 @@ function Phone({
               ))}
           </div>
         </section>
+      )}
+      {onMusic && (
+        <button
+          type="button"
+          className="button outline jukebox-lobby"
+          onClick={onMusic}
+        >
+          <Music2 size={18} /> Music requests
+        </button>
       )}
       {!isAdmin && settingsArea}
     </main>

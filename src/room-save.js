@@ -84,6 +84,12 @@ export function readRoomSave(serialized) {
     throw Error("The saved table is missing its host session.");
 
   const config = { ...defaults.config, ...previous.config };
+  config.houseRules = Object.fromEntries(
+    Object.keys(defaults.config.houseRules).map((key) => [
+      key,
+      previous.config.houseRules?.[key] === true,
+    ]),
+  );
   if (config.drinkingMode)
     config.drinkingRules = {
       ...DEFAULT_DRINKING_RULES,

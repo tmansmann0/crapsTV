@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { WebSocketServer } from "ws";
@@ -10,6 +11,7 @@ import { createLocalDiscovery } from "./local-discovery.js";
 import { runtimeOptions } from "./runtime-options.js";
 import { serveBuiltApp } from "./static-app.js";
 import { desktopSavePath, fileRoomSave } from "./room-save-file.js";
+import { DesktopJukebox, nativeMusic } from "./desktop-jukebox.js";
 const { kiosk } = runtimeOptions();
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const port = Number(process.env.PORT || 3000),
@@ -21,7 +23,20 @@ const restored = saveStore.load();
 const code =
   restored?.state.code ??
   Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
-const hub = new RoomHub(code, { saveStore, restored });
+const musicEnabled =
+  process.argv.includes("--jukebox") || process.env.CRAPSTV_JUKEBOX === "1";
+const desktopBuild = existsSync(path.join(root, "dist", ".crapstv-desktop"));
+const jukebox = desktopBuild
+  ? new DesktopJukebox(
+      nativeMusic({
+        mpv: process.env.CRAPSTV_MPV,
+        ytdlp: process.env.CRAPSTV_YTDLP,
+        volume: Number(process.env.CRAPSTV_JUKEBOX_VOLUME ?? 35),
+      }),
+      { enabled: musicEnabled },
+    )
+  : null;
+const hub = new RoomHub(code, { saveStore, restored, jukebox });
 let devServer;
 const devAllowedHosts = [];
 let resolveAppReady;
@@ -93,7 +108,7 @@ async function shutdown(exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(heartbeat);
-  hub.close();
+  const musicClosed = hub.close();
   for (const ws of wss.clients) ws.close();
   const closingServer = new Promise((resolve) => server.close(resolve));
   const forceClose = setTimeout(() => {
@@ -101,7 +116,12 @@ async function shutdown(exitCode = 0) {
     server.closeAllConnections();
   }, 1500);
   forceClose.unref();
-  await Promise.all([discovery.stop(), closingServer, devServer?.close()]);
+  await Promise.all([
+    discovery.stop(),
+    closingServer,
+    devServer?.close(),
+    musicClosed,
+  ]);
   clearTimeout(forceClose);
   process.exit(exitCode);
 }

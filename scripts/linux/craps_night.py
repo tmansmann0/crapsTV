@@ -306,6 +306,8 @@ class Night:
         url = f"http://127.0.0.1:{port}/"
         app_env = {**self.env, "PORT": str(port), "CRAPSTV_KIOSK": "1",
                    "CRAPSTV_HOSTNAME": self.config.get("hostname", "crapstv-tv")}
+        if self.config.get("jukebox") is True:
+            app_env["CRAPSTV_JUKEBOX"] = "1"
         self.status("starting", revision=release.name)
         self.app = await asyncio.create_subprocess_exec(
             self.config["node"], "server/index.js", "--kiosk", cwd=release,
