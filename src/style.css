@@ -1615,6 +1615,53 @@ footer span span {
 .jukebox-lobby {
   margin: 16px auto;
 }
+.jukebox-tv-status {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: max(12px, 5.55vh);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  width: max-content;
+  max-width: min(26vw, 460px);
+  padding: 5px 9px;
+  border: 1px solid #daba7945;
+  border-radius: 8px;
+  background: #091b15e8;
+  color: #f7eedb;
+  font:
+    500 clamp(11px, 0.85vw, 20px)/1.3 Manrope,
+    Arial,
+    sans-serif;
+  pointer-events: none;
+}
+.jukebox-tv-status > svg {
+  color: #daba79;
+}
+.jukebox-tv-status strong,
+.jukebox-tv-status span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jukebox-tv-status span,
+.jukebox-tv-status small {
+  color: #dccbaa;
+}
+.jukebox-tv-status small {
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .jukebox-tv-status {
+    inset-block-start: auto;
+    inset-block-end: min(105px, 16vh);
+    max-width: 80vw;
+  }
+}
 .recap-page {
   max-width: 550px;
   margin: 45px auto;

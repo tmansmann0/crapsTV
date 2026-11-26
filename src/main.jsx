@@ -27,6 +27,24 @@ import { DESKTOP_DISPLAY } from "./display-build.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
 const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
 const EMPTY_MUSIC_SEARCH = { pending: false, tracks: null, error: "" };
+function JukeboxTVStatus({ music }) {
+  return (
+    <div className="jukebox-tv-status" role="status" aria-label="Table music">
+      <Music2 size={16} aria-hidden="true" />
+      <div>
+        {music.title && <strong title={music.title}>{music.title}</strong>}
+        {music.next ? (
+          <span title={music.next}>Next · {music.next}</span>
+        ) : music.queued ? (
+          <span>Awaiting approval</span>
+        ) : music.failed && !music.title ? (
+          <span>Last song couldn’t play</span>
+        ) : null}
+      </div>
+      {music.queued > 0 && <small>{music.queued} queued</small>}
+    </div>
+  );
+}
 function Table3D(props) {
   return (
     <Suspense
@@ -621,6 +639,10 @@ function App() {
           tableAudio={tableAudio}
           onAction={sceneAction}
         />
+        {DESKTOP_DISPLAY &&
+          status === "connected" &&
+          !state?.pausedAt &&
+          jukebox?.tv && <JukeboxTVStatus music={jukebox.tv} />}
         <div className="scene-accessibility" aria-label="Table controls">
           {!kiosk && (
             <>

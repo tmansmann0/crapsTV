@@ -92,6 +92,12 @@ test("desktop jukebox protects transport controls, shares the queue and advances
   assert.equal(played.length, 0);
   assert.equal(guest.bank, initial - 1000);
   assert.equal(last("host", "jukebox-state").jukebox.queue[0].pending, true);
+  assert.deepEqual(last("tv", "jukebox-state").jukebox.tv, {
+    title: null,
+    next: null,
+    queued: 2,
+    failed: false,
+  });
 
   send("host", "jukebox-control", { action: "move-up", trackId: second.id });
   assert.deepEqual(
@@ -105,7 +111,10 @@ test("desktop jukebox protects transport controls, shares the queue and advances
     last("host", "jukebox-state").jukebox.current.title,
     second.title,
   );
-  assert.deepEqual(last("tv", "jukebox-state").jukebox, { playing: true });
+  assert.deepEqual(last("tv", "jukebox-state").jukebox, {
+    playing: true,
+    tv: { title: second.title, next: first.title, queued: 1, failed: false },
+  });
   send("host", "jukebox-control", { action: "skip" });
   assert.equal(played[0].stopped, true);
   assert.equal(played.length, 1);
@@ -124,7 +133,10 @@ test("desktop jukebox protects transport controls, shares the queue and advances
     /First track was skipped/,
   );
   assert.equal(guest.bank, initial - 500);
-  assert.deepEqual(last("tv", "jukebox-state").jukebox, { playing: false });
+  assert.deepEqual(last("tv", "jukebox-state").jukebox, {
+    playing: false,
+    tv: { title: null, next: null, queued: 0, failed: true },
+  });
 });
 
 test("clearing a room aborts an unfinished lookup and reports no stale results", async () => {

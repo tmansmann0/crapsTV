@@ -157,6 +157,16 @@ export class DesktopJukebox {
 
   snapshot(joined) {
     const state = { playing: !!this.current };
+    if (
+      this.settings.enabled &&
+      (this.current || this.queue.length || this.notice)
+    )
+      state.tv = {
+        title: this.current?.title ?? null,
+        next: this.queue.find((track) => !track.pending)?.title ?? null,
+        queued: this.queue.length,
+        failed: !!this.notice,
+      };
     if (joined)
       Object.assign(state, {
         ...this.settings,
