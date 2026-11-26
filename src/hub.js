@@ -48,10 +48,11 @@ export class RoomHub {
     if (this.saveStore) state.saveSessionAvailable = true;
     return state;
   }
-  connect(id, send) {
+  connect(id, send, { localDisplay = false } = {}) {
     this.clients.set(id, {
       send,
       playerId: null,
+      localDisplay,
       window: Date.now(),
       count: 0,
     });
@@ -70,7 +71,7 @@ export class RoomHub {
     );
     this.send(id, {
       type: "jukebox-state",
-      jukebox: this.jukebox.snapshot(joined),
+      jukebox: this.jukebox.snapshot(joined, id),
     });
   }
   async receiveJukebox(id, message) {
@@ -138,6 +139,7 @@ export class RoomHub {
   disconnect(id) {
     const client = this.clients.get(id);
     this.clients.delete(id);
+    if (client?.videoReady) this.updateJukeboxDisplay();
     if (
       client?.playerId &&
       ![...this.clients.values()].some((c) => c.playerId === client.playerId)
@@ -145,6 +147,10 @@ export class RoomHub {
       game.changeConnection(this.state, client.playerId, false);
       this.broadcast();
     }
+  }
+  updateJukeboxDisplay() {
+    const display = [...this.clients].find(([, client]) => client.videoReady);
+    this.jukebox?.setVideoDisplay(display?.[0] ?? null);
   }
   receive(id, message) {
     const c = this.clients.get(id);
@@ -159,6 +165,16 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (type === "jukebox-display" || type === "jukebox-video") {
+        if (!c.localDisplay || !this.jukebox) return;
+        if (type === "jukebox-display" && typeof message.ready === "boolean") {
+          c.videoReady = message.ready;
+          this.updateJukeboxDisplay();
+        } else if (type === "jukebox-video") {
+          this.jukebox.reportVideo(id, message.attempt, message.status);
+        }
+        return;
+      }
       if (
         type === "jukebox-search" ||
         type === "jukebox-request" ||

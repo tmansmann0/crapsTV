@@ -26,6 +26,9 @@ import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import { DESKTOP_DISPLAY } from "./display-build.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
 const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
+const JukeboxVideo = DESKTOP_DISPLAY
+  ? lazy(() => import("./JukeboxVideo.jsx"))
+  : null;
 const EMPTY_MUSIC_SEARCH = { pending: false, tracks: null, error: "" };
 function JukeboxTVStatus({ music }) {
   return (
@@ -446,6 +449,21 @@ function App() {
     };
   }, [session?.kind, session?.code]);
   useEffect(() => {
+    if (!DESKTOP_DISPLAY || session?.kind !== "local" || status !== "connected")
+      return;
+    let advertised;
+    const advertise = () => {
+      const ready = view === "tv" && innerWidth >= 320 && innerHeight >= 280;
+      if (ready === advertised) return;
+      advertised = ready;
+      transport.current?.send({ type: "jukebox-display", ready });
+    };
+    advertise();
+    if (view !== "tv") return;
+    window.addEventListener("resize", advertise);
+    return () => window.removeEventListener("resize", advertise);
+  }, [session?.kind, status, view]);
+  useEffect(() => {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
   useAnnouncer(state, sound && view === "tv");
@@ -643,6 +661,16 @@ function App() {
           status === "connected" &&
           !state?.pausedAt &&
           jukebox?.tv && <JukeboxTVStatus music={jukebox.tv} />}
+        {JukeboxVideo && status === "connected" && jukebox?.video && (
+          <Suspense fallback={null}>
+            <JukeboxVideo
+              video={jukebox.video}
+              onReport={(attempt, state) =>
+                send({ type: "jukebox-video", attempt, status: state })
+              }
+            />
+          </Suspense>
+        )}
         <div className="scene-accessibility" aria-label="Table controls">
           {!kiosk && (
             <>

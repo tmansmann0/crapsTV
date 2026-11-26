@@ -76,9 +76,18 @@ wss.on("connection", (ws, req) => {
     }
   }
   const id = randomBytes(16).toString("hex");
-  hub.connect(id, (message) => {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
-  });
+  const address = req.socket.remoteAddress;
+  const localDisplay =
+    !!address &&
+    (address === req.socket.localAddress ||
+      ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address));
+  hub.connect(
+    id,
+    (message) => {
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
+    },
+    { localDisplay },
+  );
   ws.on("message", (data) => {
     try {
       hub.receive(id, JSON.parse(data.toString()));

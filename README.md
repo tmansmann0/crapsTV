@@ -32,9 +32,9 @@ These commands are the same in macOS/Linux terminals, Windows PowerShell, and Wi
 
 ### Desktop music requests
 
-Install `mpv` and `yt-dlp` on the host and make both available on its `PATH`. After `npm run build:desktop`, run `npm start` and turn on **Music mode** under the host's **TV** settings. Players can open **Music**, search YouTube by song or artist, and request a result. The host can require approval, move queued songs up or down, skip a song, or pause requests. Audio plays through the host's default output while the table stays fullscreen. YouTube search and playback require internet access.
+Install `mpv` and `yt-dlp` on the host and make both available on its `PATH`. After `npm run build:desktop`, run `npm start` and turn on **Music mode** under the host's **TV** settings. Players can open **Music**, search YouTube by song or artist, and request a result. The host can require approval, move queued songs up or down, skip a song, or pause requests. Songs play audio-only through the host's default output first. If that fails, the desktop table tries the same song in a small YouTube player in the corner. YouTube search and playback require internet access.
 
-Requests cost $5 in play chips by default, with up to three queued songs per player. The host can change both values in **TV** settings, including setting the cost to $0. Paid requests open when play begins. Removing a queued song or a playback failure returns its original chip cost. Saved tables retain the music settings and return chips for tracks still in the queue.
+Requests cost $5 in play chips by default, with up to three queued songs per player. The host can change both values in **TV** settings, including setting the cost to $0. Paid requests open when play begins. Removing a queued song or exhausting its playback options returns its original chip cost. Saved tables retain the music settings and return chips for tracks still in the queue.
 
 Run `npm start -- --jukebox` or set `CRAPSTV_JUKEBOX=1` to start new rooms with Music mode enabled. Set `CRAPSTV_MPV` or `CRAPSTV_YTDLP` for custom executable paths, and `CRAPSTV_JUKEBOX_VOLUME` to a value from 0 to 100 (default 35). Use media you’re allowed to play through these tools.
 

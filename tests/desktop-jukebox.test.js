@@ -213,3 +213,84 @@ test("price and queue limits apply to new requests and saved tables refund queue
   assert.equal(saved.state.jukeboxSettings.cost, 900);
   assert.equal(saved.state.jukeboxSettings.limit, 1);
 });
+
+test("a failed audio-only request tries the same song on the local TV before advancing", async (t) => {
+  const native = [];
+  const jukebox = new DesktopJukebox(
+    {
+      search: async () => [first, second],
+      play(track) {
+        let end;
+        const done = new Promise((resolve) => {
+          end = resolve;
+        });
+        native.push({ id: track.id, end });
+        return { done, stop: () => end(null) };
+      },
+    },
+    { enabled: true },
+  );
+  const hub = new RoomHub("MUSIC3", { jukebox });
+  t.after(() => hub.close());
+  const messages = new Map();
+  for (const id of ["host", "untrusted", "tv"]) {
+    messages.set(id, []);
+    hub.connect(id, (message) => messages.get(id).push(message), {
+      localDisplay: id === "tv",
+    });
+  }
+  const send = (id, type, data = {}) => hub.receive(id, { type, ...data });
+  const music = (id) =>
+    messages.get(id).findLast((message) => message.type === "jukebox-state")
+      .jukebox;
+  send("untrusted", "jukebox-display", { ready: true });
+  send("tv", "jukebox-display", { ready: true });
+  send("host", "join", { name: "Host", code: "MUSIC3" });
+  send("host", "start");
+  send("host", "jukebox-search", { query: "songs" });
+  await next();
+  const player = hub.state.players[0];
+  const initial = player.bank;
+  for (const track of [first, second])
+    send("host", "jukebox-request", { trackId: track.id, cost: 500 });
+  assert.equal(native.length, 1);
+  assert.equal(music("tv").video, undefined);
+  native[0].end("Audio stream unavailable.");
+  await next();
+  const firstVideo = music("tv").video;
+  assert.equal(firstVideo.id, first.id);
+  assert.equal(music("host").current.id, first.id);
+  assert.equal(music("host").video, undefined);
+  assert.equal(music("untrusted").video, undefined);
+  assert.equal(player.bank, initial - 1000);
+  send("untrusted", "jukebox-video", {
+    attempt: firstVideo.attempt,
+    status: "ended",
+  });
+  send("tv", "jukebox-video", { attempt: "stale", status: "ended" });
+  await next();
+  assert.equal(native.length, 1);
+  send("tv", "jukebox-video", {
+    attempt: firstVideo.attempt,
+    status: "playing",
+  });
+  send("tv", "jukebox-video", { attempt: firstVideo.attempt, status: "ended" });
+  await next();
+  assert.deepEqual(
+    native.map(({ id }) => id),
+    [first.id, second.id],
+  );
+  assert.equal(music("tv").video, undefined);
+  native[1].end("Audio stream unavailable.");
+  await next();
+  const secondVideo = music("tv").video;
+  assert.equal(secondVideo.id, second.id);
+  send("tv", "jukebox-video", {
+    attempt: secondVideo.attempt,
+    status: "error",
+  });
+  await next();
+  assert.equal(player.bank, initial - 500);
+  assert.equal(music("host").current, null);
+  assert.match(music("host").notice, /Second track was skipped/);
+});
