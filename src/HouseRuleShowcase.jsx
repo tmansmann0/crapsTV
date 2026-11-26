@@ -1,31 +1,38 @@
 import { useEffect, useRef, useState } from "react";
-import { HOUSE_RULES } from "./house-rules.js";
+import { money } from "./game.js";
+import {
+  DEFAULT_HOUSE_RULES,
+  HOUSE_RULES,
+  formatHouseRulePayout,
+} from "./house-rules.js";
 import HouseRuleArt from "./HouseRuleArt.jsx";
 import "./house-rule-showcase.css";
 
 // Hold each reveal through the end of its bundled sound accent and voice.
 const showcaseDuration = {
   secondWind: 3700,
-  hardPoint: 4100,
+  hardPoint: 4500,
   hotHand: 4900,
   crapsCashback: 4500,
-  luckySeven: 4150,
+  luckySeven: 4250,
   passTheDice: 3650,
   tableJackpot: 4700,
 };
 const speakerCopy = {
-  secondWind:
+  secondWind: () =>
     "The first roll was a 7. Second Wind gives the shooter one reroll.",
-  hardPoint: "Doubles made the point. The Pass Line pays 5:4.",
-  hotHand:
-    "Three points in one turn. Players ahead on this roll get 25% extra profit.",
-  crapsCashback:
-    "Pass Line bettors get half their stake back on this come-out.",
-  luckySeven: "A 7 on the come-out pays 2:1 on the Pass Line.",
-  passTheDice:
+  hardPoint: (value) =>
+    `Doubles made the point. The Pass Line pays ${formatHouseRulePayout(value)}.`,
+  hotHand: (value) =>
+    `Three points in one turn. Players ahead on this roll get ${value}% extra profit.`,
+  crapsCashback: (value) =>
+    `Pass Line bettors get ${value}% of their stake back on this come-out.`,
+  luckySeven: (value) =>
+    `A 7 on the come-out pays ${formatHouseRulePayout(value)} on the Pass Line.`,
+  passTheDice: () =>
     "The shooter made a point and handed the dice to the next player.",
-  tableJackpot:
-    "Three different points made. Qualifying Pass Line winners get the jackpot.",
+  tableJackpot: (value) =>
+    `Three different points made. Each qualifying Pass Line winner gets ${money(value)}.`,
 };
 
 export function useHouseRuleShowcase(state, enabled) {
@@ -67,7 +74,12 @@ export function useHouseRuleShowcase(state, enabled) {
         )
           continue;
         if (HOUSE_RULES[rule])
-          additions.push({ id: `${roll.id}:${rule}`, room, rule });
+          additions.push({
+            id: `${roll.id}:${rule}`,
+            room,
+            rule,
+            value: roll.houseRuleValues?.[rule],
+          });
       }
     }
     if (pass && logId !== last.logId)
@@ -99,16 +111,15 @@ export function useHouseRuleShowcase(state, enabled) {
   return card;
 }
 
-export default function HouseRuleShowcase({ rule }) {
+export default function HouseRuleShowcase({ rule, value }) {
+  const { label, setting } = HOUSE_RULES[rule];
+  const revealedValue = value ?? DEFAULT_HOUSE_RULES[setting];
   return (
-    <aside
-      className={`house-rule-showcase is-${rule}`}
-      aria-label={HOUSE_RULES[rule].label}
-    >
+    <aside className={`house-rule-showcase is-${rule}`} aria-label={label}>
       <div className="house-rule-showcase-content">
-        <HouseRuleArt rule={rule} />
-        <h2>{HOUSE_RULES[rule].label}</h2>
-        <p>{speakerCopy[rule]}</p>
+        <HouseRuleArt rule={rule} value={revealedValue} />
+        <h2>{label}</h2>
+        <p>{speakerCopy[rule](revealedValue)}</p>
       </div>
     </aside>
   );

@@ -719,6 +719,7 @@ function App() {
           <HouseRuleShowcase
             key={houseRuleShowcase.id}
             rule={houseRuleShowcase.rule}
+            value={houseRuleShowcase.value}
           />
         )}
         <div className="scene-accessibility" aria-label="Table controls">

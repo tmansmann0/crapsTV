@@ -16,8 +16,13 @@ test("Second Wind starts off and is a host-only rule that survives setup and sav
   const { state, host } = table();
   const guest = game.join(state, "Guest");
   assert.deepEqual(state.config.houseRules, DEFAULT_HOUSE_RULES);
+  assert.equal(state.config.houseRules.secondWindChance, 25);
   assert.throws(
     () => game.setHouseRule(state, guest.id, "secondWind", true),
+    /Only the table host/,
+  );
+  assert.throws(
+    () => game.setHouseRule(state, guest.id, "secondWindChance", 75),
     /Only the table host/,
   );
   assert.throws(
@@ -25,21 +30,35 @@ test("Second Wind starts off and is a host-only rule that survives setup and sav
     /Choose a game rule/,
   );
   game.setHouseRule(state, host.id, "secondWind", true);
+  for (const value of [-1, 101, 12.5, "30"])
+    assert.throws(
+      () => game.setHouseRule(state, host.id, "secondWindChance", value),
+      /reroll chance/,
+    );
+  game.setHouseRule(state, host.id, "secondWindChance", 37);
   game.configure(state, host.id, { minBet: 1000 });
   assert.equal(state.config.houseRules.secondWind, true);
   const save = captureRoomSave(state, new Map([["host-token", host.id]]), []);
-  assert.equal(
-    readRoomSave(JSON.stringify(save)).state.config.houseRules.secondWind,
-    true,
-  );
+  const restored = () =>
+    readRoomSave(JSON.stringify(save)).state.config.houseRules;
+  assert.equal(restored().secondWind, true);
+  assert.equal(restored().secondWindChance, 37);
+  delete save.state.config.houseRules.secondWindChance;
+  assert.equal(restored().secondWind, true);
+  assert.equal(restored().secondWindChance, 25);
   delete save.state.config.houseRules;
-  assert.equal(
-    readRoomSave(JSON.stringify(save)).state.config.houseRules.secondWind,
-    false,
-  );
+  assert.deepEqual(restored(), DEFAULT_HOUSE_RULES);
 });
 
-for (const { name, enabled, draws, finalSeed, result, announce = true } of [
+for (const {
+  name,
+  enabled,
+  chance,
+  draws,
+  finalSeed,
+  result,
+  announce = true,
+} of [
   {
     name: "off keeps an initial seven",
     enabled: false,
@@ -55,22 +74,23 @@ for (const { name, enabled, draws, finalSeed, result, announce = true } of [
     result: 5,
   },
   {
-    name: "keeps the first seven on the upper half of the draw",
+    name: "keeps the first seven at the default 25% cutoff",
     enabled: true,
-    draws: [0, 0x80000000],
+    draws: [0, 0x40000000],
     finalSeed: 0,
     result: 7,
   },
   {
-    name: "replaces a seven on the lower half of the draw",
+    name: "replaces a seven below the default 25% cutoff",
     enabled: true,
-    draws: [0, 0x7fffffff, 2],
+    draws: [0, 0x3fffffff, 2],
     finalSeed: 2,
     result: 5,
   },
   {
     name: "rerolls invisibly when house announcements are off",
     enabled: true,
+    chance: 60,
     draws: [0, 0x7fffffff, 2],
     finalSeed: 2,
     result: 5,
@@ -79,14 +99,25 @@ for (const { name, enabled, draws, finalSeed, result, announce = true } of [
   {
     name: "keeps the replacement when it is another seven",
     enabled: true,
-    draws: [0, 0, 1],
+    chance: 100,
+    draws: [0, 0xffffffff, 1],
     finalSeed: 1,
+    result: 7,
+  },
+  {
+    name: "keeps an initial seven when configured to 0%",
+    enabled: true,
+    chance: 0,
+    draws: [0],
+    finalSeed: 0,
     result: 7,
   },
 ]) {
   test(`Second Wind ${name}`, (t) => {
     const { state, host } = table();
     game.setHouseRule(state, host.id, "secondWind", enabled);
+    if (chance !== undefined)
+      game.setHouseRule(state, host.id, "secondWindChance", chance);
     game.setHouseRule(state, host.id, "announce", announce);
     game.start(state, host.id);
     state.nextRollAt = 0;
@@ -105,7 +136,7 @@ for (const { name, enabled, draws, finalSeed, result, announce = true } of [
     assert.equal(state.throw, flight);
     assert.equal(state.rolls.length, 0);
     assert.throws(
-      () => game.setHouseRule(state, host.id, "secondWind", false),
+      () => game.setHouseRule(state, host.id, "secondWindChance", 50),
       /Wait for the dice/,
     );
     game.finishRoll(state);
@@ -185,6 +216,38 @@ test("Craps Cashback is inactive in Crapless", () => {
   assert.equal(state.point, 12);
   assert.equal(host.bets[0].point, 12);
   assert.equal(result.houseRulesTriggered, undefined);
+});
+
+test("custom house rule amounts are used for settlement and recorded with the outcome", () => {
+  const { state, host } = table();
+  for (const rule of ["hardPoint", "hotHand", "luckySeven", "crapsCashback"])
+    game.setHouseRule(state, host.id, rule, true);
+  game.setHouseRule(state, host.id, "hardPointPayout", 150);
+  game.setHouseRule(state, host.id, "hotHandBonus", 40);
+  game.setHouseRule(state, host.id, "luckySevenPayout", 225);
+  game.setHouseRule(state, host.id, "crapsCashbackPercent", 75);
+  game.start(state, host.id);
+
+  const bet = () => game.place(state, host.id, "pass", 500);
+  bet();
+  let result = roll(state, [3, 4]);
+  assert.equal(result.events[0].delta, 1125);
+  assert.deepEqual(result.houseRuleValues, { luckySeven: 225 });
+  game.setHouseRule(state, host.id, "luckySevenPayout", 300);
+  assert.equal(result.houseRuleValues.luckySeven, 225);
+
+  bet();
+  result = roll(state, [1, 1]);
+  assert.equal(result.events[0].bets[0].returnedStake, 375);
+  assert.deepEqual(result.houseRuleValues, { crapsCashback: 75 });
+
+  for (let made = 0; made < 3; made++) {
+    bet();
+    roll(state, [1, 3]);
+    result = roll(state, [2, 2]);
+  }
+  assert.equal(result.events[0].delta, 1050);
+  assert.deepEqual(result.houseRuleValues, { hardPoint: 150, hotHand: 40 });
 });
 
 test("Hot Hand uses net roll profit and Jackpot pays each qualifying player once", () => {

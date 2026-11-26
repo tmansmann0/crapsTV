@@ -28,10 +28,9 @@ import {
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
 import {
-  DEFAULT_JACKPOT_BONUS,
   HOUSE_RULES,
-  MAX_JACKPOT_BONUS,
-  validJackpotBonus,
+  HOUSE_RULE_SETTINGS,
+  validHouseRuleValue,
 } from "./house-rules.js";
 import { MAX_JUKEBOX_QUEUE, MAX_SONG_COST } from "./jukebox-settings.js";
 import {
@@ -892,14 +891,52 @@ function TVSettings({
   );
 }
 
+function HouseRuleSetting({ setting, saved, disabled, onSave }) {
+  const [draft, setDraft] = useState(null);
+  const { label, min, max, scale, defaultValue } = setting;
+  const current = saved ?? defaultValue;
+  const amount = draft ?? String(current / scale);
+  const value = Math.round(Number(amount) * scale);
+  const canSave =
+    !disabled &&
+    amount !== "" &&
+    validHouseRuleValue(setting, value) &&
+    value !== current;
+  return (
+    <form
+      className="ha-rule-value"
+      aria-label={label}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSave) return;
+        onSave(value);
+        setDraft(null);
+      }}
+    >
+      <label>
+        {label}
+        <input
+          type="number"
+          min={min / scale}
+          max={max / scale}
+          step={1 / scale}
+          required
+          disabled={disabled}
+          value={amount}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      </label>
+      <button type="submit" className="button outline" disabled={!canSave}>
+        Save
+      </button>
+    </form>
+  );
+}
+
 function GameRulesPanel({ rules, disabled, send }) {
-  const [jackpotDraft, setJackpotDraft] = useState(null);
-  const jackpotBonus = rules.jackpotBonus ?? DEFAULT_JACKPOT_BONUS;
-  const jackpotAmount = jackpotDraft ?? String(jackpotBonus / 100);
-  const cents = Math.round(Number(jackpotAmount) * 100);
   const setRule = (rule, value) => send({ type: "house-rule", rule, value });
   const toggle = (rule, label, detail) => (
-    <label className="toggle-label" key={rule}>
+    <label className="toggle-label">
       <span>
         {label}
         <small>{detail}</small>
@@ -920,44 +957,19 @@ function GameRulesPanel({ rules, disabled, send }) {
         "Announce house rules",
         "Show a full-screen animation and play a voice call when a house rule triggers.",
       )}
-      {Object.entries(HOUSE_RULES).map(([rule, { label, detail }]) =>
-        toggle(rule, label, detail),
-      )}
-      {rules.tableJackpot && (
-        <form
-          className="ha-jackpot"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (disabled || !validJackpotBonus(cents) || cents === jackpotBonus)
-              return;
-            setRule("jackpotBonus", cents);
-            setJackpotDraft(null);
-          }}
-        >
-          <label>
-            Jackpot bonus ($)
-            <input
-              type="number"
-              min="1"
-              max={MAX_JACKPOT_BONUS / 100}
-              step="0.01"
-              required
+      {Object.entries(HOUSE_RULES).map(([rule, { label, detail, setting }]) => (
+        <Fragment key={rule}>
+          {toggle(rule, label, detail)}
+          {setting && rules[rule] && (
+            <HouseRuleSetting
+              setting={HOUSE_RULE_SETTINGS[setting]}
+              saved={rules[setting]}
               disabled={disabled}
-              value={jackpotAmount}
-              onChange={(event) => setJackpotDraft(event.target.value)}
+              onSave={(value) => setRule(setting, value)}
             />
-          </label>
-          <button
-            type="submit"
-            className="button outline"
-            disabled={
-              disabled || !validJackpotBonus(cents) || cents === jackpotBonus
-            }
-          >
-            Save bonus
-          </button>
-        </form>
-      )}
+          )}
+        </Fragment>
+      ))}
     </div>
   );
 }

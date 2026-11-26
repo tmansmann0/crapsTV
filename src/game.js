@@ -32,9 +32,10 @@ import { validBetChoices } from "./bet-options.js";
 import {
   DEFAULT_HOUSE_RULES,
   HOUSE_RULES,
+  HOUSE_RULE_SETTINGS,
   canPassDice,
   newHouseHand,
-  validJackpotBonus,
+  validHouseRuleValue,
 } from "./house-rules.js";
 import {
   createThrowTimeline,
@@ -737,10 +738,13 @@ export function setHouseRule(s, id, rule, value) {
     typeof rule === "string" && Object.hasOwn(DEFAULT_HOUSE_RULES, rule),
     "Choose a game rule and turn it on or off.",
   );
-  if (rule === "jackpotBonus")
+  const setting = Object.hasOwn(HOUSE_RULE_SETTINGS, rule)
+    ? HOUSE_RULE_SETTINGS[rule]
+    : null;
+  if (setting)
     assert(
-      validJackpotBonus(value),
-      "Enter a jackpot bonus from $1 to $1,000,000.",
+      validHouseRuleValue(setting, value),
+      `Enter a value from ${setting.min / setting.scale} to ${setting.max / setting.scale} for ${setting.label.toLowerCase()}.`,
     );
   else
     assert(
@@ -1279,10 +1283,14 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   };
   let timeline = settledThrow(options);
   assert(timeline, "The dice did not settle. Please throw again.");
+  const chance =
+    s.config.houseRules?.secondWindChance ??
+    DEFAULT_HOUSE_RULES.secondWindChance;
   if (
     s.config.houseRules?.secondWind === true &&
+    chance > 0 &&
     timeline.dice[0] + timeline.dice[1] === 7 &&
-    throwSeed() < 0x80000000
+    throwSeed() * 100 < chance * 0x100000000
   ) {
     // Only the replacement is shown and settled. A second seven stands.
     const replacement = settledThrow(options);
@@ -1351,7 +1359,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
       : [...new Set([...s.bonus.hits, total])].sort((a, b) => a - b);
   const events = [];
   const presentationSources = {};
-  const rules = s.config.houseRules ?? DEFAULT_HOUSE_RULES;
+  const rules = { ...DEFAULT_HOUSE_RULES, ...s.config.houseRules };
   const triggered = new Set(s.throw?.secondWind ? ["secondWind"] : []);
   const players = s.players.filter((p) => !p.left);
   const pointHit = Boolean(oldPoint && total === oldPoint);
@@ -1436,7 +1444,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
             pointHit &&
             dice[0] === dice[1]
           ) {
-            multiplier = 1.25;
+            multiplier = rules.hardPointPayout / 100;
             triggered.add("hardPoint");
           } else if (
             result === "win" &&
@@ -1444,7 +1452,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
             !oldPoint &&
             total === 7
           ) {
-            multiplier = 2;
+            multiplier = rules.luckySevenPayout / 100;
             triggered.add("luckySeven");
           } else if (
             result === "lose" &&
@@ -1453,7 +1461,9 @@ export function finishRoll(s, dice = s.throw?.dice) {
             !crapless &&
             !b.point
           ) {
-            cashback = Math.floor(b.amount / 2);
+            cashback = Math.floor(
+              (b.amount * rules.crapsCashbackPercent) / 100,
+            );
             triggered.add("crapsCashback");
           }
         }
@@ -1546,12 +1556,13 @@ export function finishRoll(s, dice = s.throw?.dice) {
       });
       triggered.add(rule);
     };
-    if (hotHand) award("hotHand", Math.floor((equity(p) - before) / 4));
-    if (tableJackpot && hand.jackpotPlayers.includes(p.id))
+    if (hotHand)
       award(
-        "tableJackpot",
-        rules.jackpotBonus ?? DEFAULT_HOUSE_RULES.jackpotBonus,
+        "hotHand",
+        Math.floor(((equity(p) - before) * rules.hotHandBonus) / 100),
       );
+    if (tableJackpot && hand.jackpotPlayers.includes(p.id))
+      award("tableJackpot", rules.jackpotBonus);
     p.stats.rolls++;
     const delta = equity(p) - before;
     if (s.config.drinkingMode && p.bot)
@@ -1603,6 +1614,11 @@ export function finishRoll(s, dice = s.throw?.dice) {
   s.rolling = false;
   openBettingWindow(s);
   s.aim = null;
+  const houseRuleValues = {};
+  for (const rule of triggered) {
+    const key = HOUSE_RULES[rule].setting;
+    if (key) houseRuleValues[rule] = rules[key];
+  }
   s.lastRoll = {
     id: uid(),
     index: s.rolls.length + 1,
@@ -1612,7 +1628,10 @@ export function finishRoll(s, dice = s.throw?.dice) {
     shooterId,
     message,
     events,
-    ...(triggered.size && { houseRulesTriggered: [...triggered] }),
+    ...(triggered.size && {
+      houseRulesTriggered: [...triggered],
+      houseRuleValues,
+    }),
     pointBefore: oldPoint,
     throwId: s.throw?.id || null,
     at: Date.now(),

@@ -1,4 +1,5 @@
 import "./house-rule-art.css";
+import { formatHouseRulePayout } from "./house-rules.js";
 
 // Every reveal is one 640x400 SVG stage. Positions live in transform
 // attributes on outer groups; CSS animates the inner groups, so the
@@ -478,7 +479,8 @@ function HotHand() {
 }
 
 /* ---------------- Craps Cashback ---------------- */
-function CrapsCashback() {
+function CrapsCashback({ value }) {
+  const returned = Math.max(1, Math.round((6 * value) / 100));
   const chip = (i) => (
     <Chip key={i} top={-i * 16} fill="#2f6fc4" edge="#173a6e" />
   );
@@ -496,9 +498,11 @@ function CrapsCashback() {
         <path d="M-64 -84 V14 A64 24 0 0 0 64 14 V-84" fill="none" />
         <ellipse cy="-84" rx="64" ry="24" fill="none" />
       </g>
-      {/* lower half: lost to the house */}
+      {/* chips kept by the house */}
       <g transform="translate(170 300) scale(1.2)">
-        <g className="cb-lost">{[0, 1, 2].map(chip)}</g>
+        <g className="cb-lost">
+          {Array.from({ length: 6 - returned }, (_, i) => chip(i))}
+        </g>
       </g>
       {/* return path */}
       <path className="cb-path" d="M190 160 C 230 40, 420 40, 470 196" />
@@ -524,9 +528,11 @@ function CrapsCashback() {
         );
       })}
       <path d="M452 186 L470 214 L488 184 Z" className="cb-head" />
-      {/* the returned half travels the arc */}
+      {/* the refund travels the arc */}
       <g transform="translate(470 300) scale(1.2)">
-        <g className="cb-back">{[0, 1, 2].map(chip)}</g>
+        <g className="cb-back">
+          {Array.from({ length: returned }, (_, i) => chip(i))}
+        </g>
       </g>
       <g transform="translate(560 216)">
         <g className="cb-badge hr-c">
@@ -537,13 +543,13 @@ function CrapsCashback() {
             strokeWidth="3"
           />
           <text
-            y="14"
+            y={value === 50 ? 14 : 10}
             textAnchor="middle"
             className="hr-num"
-            fontSize="40"
+            fontSize={value === 50 ? 40 : 26}
             fill="#3a2506"
           >
-            ½
+            {value === 50 ? "½" : `${value}%`}
           </text>
         </g>
       </g>
@@ -581,7 +587,7 @@ function CrapsCashback() {
 /* ---------------- Lucky Seven ---------------- */
 const SEVEN = "M-92 -128 H96 V-86 L6 132 H-58 L28 -78 H-48 V-54 H-92 Z";
 
-function LuckySeven() {
+function LuckySeven({ value }) {
   return (
     <>
       <clipPath id="ls-clip">
@@ -668,7 +674,7 @@ function LuckySeven() {
             className="hr-pill"
           />
           <text y="9" textAnchor="middle" className="hr-label" fontSize="24">
-            2 : 1
+            {formatHouseRulePayout(value)}
           </text>
         </g>
       </g>
@@ -919,13 +925,13 @@ const SCENES = {
   tableJackpot: TableJackpot,
 };
 
-export default function HouseRuleArt({ rule }) {
+export default function HouseRuleArt({ rule, value }) {
   const Scene = SCENES[rule];
   return (
     <div className={`house-rule-art is-${rule}`} aria-hidden="true">
       <svg viewBox="0 0 640 400" focusable="false">
         <Defs />
-        {Scene && <Scene />}
+        {Scene && <Scene value={value} />}
       </svg>
     </div>
   );

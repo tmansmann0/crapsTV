@@ -442,14 +442,14 @@
 .ha-game-rules .toggle-label input {
   flex-shrink: 0;
 }
-.ha-jackpot {
+.ha-rule-value {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
   margin: 14px 0;
 }
-.ha-jackpot input {
+.ha-rule-value input {
   width: 100%;
 }
 .ha-disclosure {

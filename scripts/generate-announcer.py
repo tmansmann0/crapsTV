@@ -47,10 +47,10 @@ PHRASES = {
     "field-win": "Winner in the field!",
     "hardway": "The hard way! Nice roll!",
     "house-second-wind": "Second wind! The seven was rerolled.",
-    "house-hard-point": "Hard point! The pass line pays five to four.",
+    "house-hard-point": "Hard point! Doubles made the point. Pay the pass line!",
     "house-hot-hand": "Hot hand! Three points in one turn. Bonus for the winners!",
-    "house-craps-cashback": "Craps cashback! Half your pass line stake comes back.",
-    "house-lucky-seven": "Lucky seven! Double profit on the pass line.",
+    "house-craps-cashback": "Craps cashback! Get some of your pass line stake back.",
+    "house-lucky-seven": "Lucky seven! Bonus payout on the pass line.",
     "house-pass-the-dice": "Pass the dice. A new shooter steps up.",
     "house-table-jackpot": "Table jackpot! Three different points made. Pay the jackpot!",
 }

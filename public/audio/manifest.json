@@ -109,7 +109,7 @@
   },
   "house-hard-point": {
     "file": "house-hard-point.mp3",
-    "text": "Hard point! The pass line pays five to four."
+    "text": "Hard point! Doubles made the point. Pay the pass line!"
   },
   "house-hot-hand": {
     "file": "house-hot-hand.mp3",
@@ -117,11 +117,11 @@
   },
   "house-craps-cashback": {
     "file": "house-craps-cashback.mp3",
-    "text": "Craps cashback! Half your pass line stake comes back."
+    "text": "Craps cashback! Get some of your pass line stake back."
   },
   "house-lucky-seven": {
     "file": "house-lucky-seven.mp3",
-    "text": "Lucky seven! Double profit on the pass line."
+    "text": "Lucky seven! Bonus payout on the pass line."
   },
   "house-pass-the-dice": {
     "file": "house-pass-the-dice.mp3",

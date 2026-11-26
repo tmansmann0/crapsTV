@@ -424,7 +424,7 @@
   }
 }
 
-/* ---------------- Craps Cashback: half the stake rides home ---------------- */
+/* ---------------- Craps Cashback: part of the stake rides home ---------------- */
 .is-crapsCashback .cb-craps {
   animation: hp-stamp 320ms 120ms ease-out both;
 }
