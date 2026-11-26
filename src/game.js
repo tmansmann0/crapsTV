@@ -874,6 +874,27 @@ export function adjustBankroll(s, id, playerId, amount) {
     "bankroll-adjustment",
   );
 }
+
+export function adjustSongChips(s, id, amount) {
+  assert(Number.isSafeInteger(amount), "Invalid song price.");
+  if (!amount) return;
+  const player = s.players.find((seat) => seat.id === id && !seat.bot);
+  assert(player, "Join the table first.");
+  if (amount < 0) {
+    assert(s.status === "playing", "Open the table before buying a song.");
+    assert(!player.left && player.connected, "Join the table first.");
+    assert(
+      player.bank >= -amount,
+      "You need more available chips to request this song.",
+    );
+  }
+  const nextEquity = equity(player) + amount;
+  assert(Number.isSafeInteger(nextEquity), "That chip change is too large.");
+  player.bank += amount;
+  player.betPreview = null;
+  recordChipChange(s, player, amount < 0 ? "Queued a song" : "Song request refunded");
+}
+
 function drinkPlayer(s, id) {
   const player = active(s, id);
   assert(player.connected, "Choose a connected player.");
@@ -927,7 +948,7 @@ export function requestDrink(s, id, { kind, unit, quantity, to = null }) {
     player.bank -= amount;
     player.betPreview = null;
     rememberDrinkAssignment(s, player, recipient, quantity);
-    recordDrinkChange(s, player, "Assigned a drink");
+    recordChipChange(s, player, "Assigned a drink");
     log(
       s,
       `${player.name} assigned a drink to ${recipient.name}.`,
@@ -949,7 +970,7 @@ function creditDrink(s, player, amount, event) {
   );
   player.bank += amount;
   player.buyIn += amount;
-  recordDrinkChange(s, player, event);
+  recordChipChange(s, player, event);
 }
 
 export function simulateBotDrink(s, id, unit, quantity) {
@@ -1007,7 +1028,7 @@ export function respondToDrink(s, id, requestId, response) {
   s.drinkRequests.splice(index, 1);
 }
 
-function recordDrinkChange(s, player, event) {
+function recordChipChange(s, player, event) {
   player.history.push({
     roll: s.rolls.length,
     equity: equity(player),

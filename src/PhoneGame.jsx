@@ -1725,7 +1725,7 @@ export default function PhoneGame({
   connected,
   rollArea,
   settingsArea,
-  onMusic,
+  musicArea,
   serverError,
 }) {
   const images = useChipThumbnails();
@@ -1751,6 +1751,15 @@ export default function PhoneGame({
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
   const stake = sum(player.bets.map((b) => b.amount));
   const drinkingMode = !!state.config.drinkingMode;
+  const learnEnabled = !!state.config.teach;
+  useEffect(() => {
+    setTab((current) =>
+      (current === "learn" && !learnEnabled) ||
+      (current === "music" && !musicArea)
+        ? "play"
+        : current,
+    );
+  }, [learnEnabled, !!musicArea]);
   const drinkAlerts = drinkingMode
     ? (state.drinkRequests ?? []).filter(
         (request) =>
@@ -1798,17 +1807,21 @@ export default function PhoneGame({
     ) {
       setPresentation(null);
       if (rollArea)
-        setTab((current) => (current === "drinks" ? current : "dice"));
+        setTab((current) =>
+          current === "drinks" || current === "music" ? current : "dice",
+        );
     }
     const fresh = freshMobileSettlement(previous, state, player.id);
-    if (tab === "drinks") setPresentation(null);
+    if (tab === "drinks" || tab === "music") setPresentation(null);
     else if (fresh) setPresentation({ ...fresh, active: false, landed: [] });
   }, [state, connected, player.id, !!rollArea, tab]);
   useEffect(() => {
     if (!presentation || presentation.active) return;
     const id = presentation.id;
     const timer = setTimeout(() => {
-      setTab((current) => (current === "drinks" ? current : "play"));
+      setTab((current) =>
+        current === "drinks" || current === "music" ? current : "play",
+      );
       setDetailOpen(false);
       setPresentation((current) =>
         current?.id === id && current.entries.length
@@ -2018,7 +2031,8 @@ export default function PhoneGame({
           },
         ]
       : []),
-    { id: "learn", label: "Learn", icon: BookOpen },
+    ...(learnEnabled ? [{ id: "learn", label: "Learn", icon: BookOpen }] : []),
+    ...(musicArea ? [{ id: "music", label: "Music", icon: Music2 }] : []),
     ...(drinkingMode
       ? [{ id: "drinks", label: "Drinks", badge: drinkAlerts || null }]
       : []),
@@ -2077,17 +2091,6 @@ export default function PhoneGame({
               onClick={() => setSettingsOpen(true)}
             >
               <Settings size={20} />
-            </button>
-          )}
-          {onMusic && (
-            <button
-              type="button"
-              className="pg-icon"
-              aria-label="Music requests"
-              aria-haspopup="dialog"
-              onClick={onMusic}
-            >
-              <Music2 size={20} />
             </button>
           )}
         </header>
@@ -2170,6 +2173,7 @@ export default function PhoneGame({
             />
           )}
           {tab === "dice" && <div className="pg-dice">{rollArea}</div>}
+          {tab === "music" && musicArea}
           {tab === "drinks" && (
             <DrinksPanel
               state={state}
@@ -2180,7 +2184,7 @@ export default function PhoneGame({
               setDrafts={setDrinkDrafts}
             />
           )}
-          {tab === "learn" && (
+          {tab === "learn" && learnEnabled && (
             <Suspense
               fallback={
                 <div className="pg-empty" role="status">

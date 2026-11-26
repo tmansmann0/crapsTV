@@ -1,13 +1,16 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import {
+  MAX_JUKEBOX_QUEUE,
+  restoreJukeboxSettings,
+  updateJukeboxSettings,
+} from "../src/jukebox-settings.js";
 
 const run = promisify(execFile);
 const videoId = /^[A-Za-z0-9_-]{11}$/;
 const titleLimit = 160;
 const searchLimit = 8;
 const maxDuration = 15 * 60;
-const maxQueue = 20;
-const maxPerPlayer = 3;
 const resultLifetime = 5 * 60_000;
 
 export function youtubeTracks(data) {
@@ -137,23 +140,26 @@ export function nativeMusic({
 }
 
 export class DesktopJukebox {
-  constructor(backend) {
+  constructor(backend, { enabled = false } = {}) {
     this.backend = backend;
     this.onChange = () => {};
+    this.onBalance = () => {};
+    this.balanceChanged = false;
     this.searches = new Map();
     this.pendingSearches = new Map();
     this.queue = [];
     this.current = null;
     this.active = null;
     this.notice = null;
-    this.mode = "open";
+    this.defaultSettings = restoreJukeboxSettings({ enabled });
+    this.settings = { ...this.defaultSettings };
   }
 
   snapshot(joined) {
     const state = { playing: !!this.current };
     if (joined)
       Object.assign(state, {
-        mode: this.mode,
+        ...this.settings,
         current: this.current,
         queue: this.queue.slice(),
         notice: this.notice,
@@ -165,7 +171,7 @@ export class DesktopJukebox {
     const term = typeof query === "string" ? query.trim() : "";
     if (term.length < 2 || term.length > 100)
       throw Error("Enter 2–100 characters to search.");
-    if (this.mode === "off") throw Error("The host paused music requests.");
+    this.requireRequests();
     const now = Date.now();
     for (const [id, result] of this.searches)
       if (Math.max(result.after, result.expires) < now)
@@ -199,8 +205,8 @@ export class DesktopJukebox {
     }
   }
 
-  request(player, id, isHost) {
-    if (this.mode === "off") throw Error("The host paused music requests.");
+  request(player, id, isHost, quotedCost) {
+    this.requireRequests();
     const result = this.searches.get(player.id);
     const track =
       result?.expires > Date.now()
@@ -210,44 +216,93 @@ export class DesktopJukebox {
     if (this.current?.id === id || this.queue.some((entry) => entry.id === id))
       throw Error("That track is already queued.");
     if (
-      this.queue.length >= maxQueue ||
+      this.queue.length >= MAX_JUKEBOX_QUEUE ||
       this.queue.filter((entry) => entry.requesterId === player.id).length >=
-        maxPerPlayer
+        this.settings.limit
     )
       throw Error(
         "Your request limit has been reached. Try again after a song plays.",
       );
+    const cost = this.settings.cost;
+    if (quotedCost !== cost)
+      throw Error(
+        "The song price changed. Review the new price and try again.",
+      );
+    this.changeBalance(player.id, -cost);
     this.queue.push({
       ...track,
       requesterId: player.id,
       requester: player.name,
-      pending: this.mode === "approval" && !isHost,
+      cost,
+      pending: this.settings.mode === "approval" && !isHost,
     });
     this.advance();
-    this.onChange();
+    this.publish();
+  }
+
+  requireRequests() {
+    if (!this.settings.enabled) throw Error("Music mode is off.");
+    if (this.settings.mode === "off")
+      throw Error("The host paused music requests.");
+  }
+
+  changeBalance(playerId, amount) {
+    if (amount) {
+      this.onBalance(playerId, amount);
+      this.balanceChanged = true;
+    }
+  }
+
+  refund(track) {
+    this.changeBalance(track.requesterId, track.cost);
+  }
+
+  publish() {
+    const changed = this.balanceChanged;
+    this.balanceChanged = false;
+    this.onChange(changed);
   }
 
   control(message) {
     if (message.action === "mode") {
-      if (!["open", "approval", "off"].includes(message.mode))
-        throw Error("Choose a request mode.");
-      this.mode = message.mode;
+      this.settings = updateJukeboxSettings(this.settings, {
+        mode: message.mode,
+      });
+    } else if (message.action === "settings") {
+      this.settings = updateJukeboxSettings(this.settings, message.settings);
+      if (!this.settings.enabled) {
+        this.cancelSearches();
+        this.clear();
+        return;
+      }
     } else if (message.action === "skip") {
       this.stopCurrent();
       return;
     } else if (message.action === "clear") {
       this.clear();
       return;
-    } else if (["approve", "remove"].includes(message.action)) {
+    } else if (
+      ["approve", "remove", "move-up", "move-down"].includes(message.action)
+    ) {
       const index = this.queue.findIndex(
         (track) => track.id === message.trackId,
       );
       if (index === -1) throw Error("That request is no longer in the queue.");
       if (message.action === "approve") this.queue[index].pending = false;
-      else this.queue.splice(index, 1);
+      else if (message.action === "remove") {
+        const [track] = this.queue.splice(index, 1);
+        this.refund(track);
+      } else {
+        const target = index + (message.action === "move-up" ? -1 : 1);
+        if (target < 0 || target >= this.queue.length) return;
+        [this.queue[index], this.queue[target]] = [
+          this.queue[target],
+          this.queue[index],
+        ];
+      }
     } else throw Error("Unknown jukebox control.");
     this.advance();
-    this.onChange();
+    this.publish();
   }
 
   advance() {
@@ -259,6 +314,7 @@ export class DesktopJukebox {
     try {
       playback = this.backend.play(track);
     } catch {
+      this.refund(track);
       this.notice = `${track.title} was skipped. mpv could not start playback.`;
       this.advance();
       return;
@@ -268,11 +324,13 @@ export class DesktopJukebox {
     this.current = track;
     active.done.then((error) => {
       if (this.active !== active) return;
-      if (!active.stopped)
+      if (!active.stopped) {
+        if (error) this.refund(track);
         this.notice = error ? `${track.title} was skipped. ${error}` : null;
+      }
       this.active = this.current = null;
       this.advance();
-      this.onChange();
+      this.publish();
     });
   }
 
@@ -283,19 +341,36 @@ export class DesktopJukebox {
     }
   }
 
-  clear() {
+  clear({ refund = true } = {}) {
+    if (refund) for (const track of this.queue) this.refund(track);
     this.queue = [];
     this.notice = null;
     this.stopCurrent();
-    this.onChange();
+    this.publish();
   }
 
-  reset() {
+  cancelSearches() {
     for (const search of this.pendingSearches.values()) search.abort();
     this.pendingSearches.clear();
     this.searches.clear();
-    this.mode = "open";
-    this.clear();
+  }
+
+  removePlayer(id) {
+    this.pendingSearches.get(id)?.abort();
+    this.searches.delete(id);
+    const retained = [];
+    for (const track of this.queue) {
+      if (track.requesterId === id) this.refund(track);
+      else retained.push(track);
+    }
+    this.queue = retained;
+    this.publish();
+  }
+
+  reset({ refund = true, restoreDefaults = true } = {}) {
+    this.cancelSearches();
+    if (restoreDefaults) this.settings = { ...this.defaultSettings };
+    this.clear({ refund });
   }
 
   close() {

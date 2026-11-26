@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Music2, Search, SkipForward, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Music2,
+  Search,
+  SkipForward,
+  X,
+} from "lucide-react";
+import { money } from "./game.js";
 import "./jukebox.css";
 
 function Track({ track, requester = false }) {
@@ -26,14 +34,17 @@ export default function Jukebox({
   search,
   isHost,
   connected,
+  bank,
+  playing,
+  inline = false,
   send,
   onClose,
 }) {
   const dialog = useRef(null);
   const [query, setQuery] = useState("");
   useEffect(() => {
-    dialog.current.showModal();
-  }, []);
+    if (!inline) dialog.current.showModal();
+  }, [inline]);
   const queued = new Set([
     state.current?.id,
     ...state.queue.map((track) => track.id),
@@ -41,28 +52,30 @@ export default function Jukebox({
   const control = (action, payload) =>
     send({ type: "jukebox-control", action, ...payload });
   const canRequest = connected && state.mode !== "off";
-  return (
-    <dialog
-      ref={dialog}
-      className="modal jukebox-dialog"
-      aria-labelledby="jukebox-title"
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-    >
+  const canQueue =
+    canRequest && (state.cost === 0 || (playing && bank >= state.cost));
+  const content = (
+    <>
       <header className="jukebox-heading">
         <Music2 size={23} aria-hidden="true" />
         <h2 id="jukebox-title">Music requests</h2>
-        <button
-          type="button"
-          className="icon-button"
-          aria-label="Close music requests"
-          onClick={onClose}
-        >
-          <X size={22} />
-        </button>
+        {!inline && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close music requests"
+            onClick={onClose}
+          >
+            <X size={22} />
+          </button>
+        )}
       </header>
+      <p className="jukebox-price">
+        {state.cost
+          ? `${money(state.cost)} in chips per song`
+          : "Free requests"}{" "}
+        · Up to {state.limit} queued per player
+      </p>
       {isHost && (
         <label className="jukebox-mode">
           Requests
@@ -118,6 +131,13 @@ export default function Jukebox({
               : "Reconnecting to the table…"}
           </p>
         )}
+        {canRequest && !canQueue && (
+          <p>
+            {playing
+              ? "You need more available chips to queue a song."
+              : "Songs can be purchased once the table opens."}
+          </p>
+        )}
       </div>
       {!!search.tracks?.length && (
         <ul className="jukebox-list" aria-label="Search results">
@@ -127,10 +147,14 @@ export default function Jukebox({
               <button
                 className="button outline small"
                 type="button"
-                disabled={!canRequest || queued.has(track.id)}
+                disabled={!canQueue || queued.has(track.id)}
                 aria-label={`Queue ${track.title}`}
                 onClick={() =>
-                  send({ type: "jukebox-request", trackId: track.id })
+                  send({
+                    type: "jukebox-request",
+                    trackId: track.id,
+                    cost: state.cost,
+                  })
                 }
               >
                 {queued.has(track.id) ? "Queued" : "Queue"}
@@ -159,7 +183,7 @@ export default function Jukebox({
         )}
         {state.queue.length ? (
           <ol className="jukebox-list" aria-label="Up next">
-            {state.queue.map((track) => (
+            {state.queue.map((track, index) => (
               <li key={track.id}>
                 <Track track={track} requester />
                 {track.pending &&
@@ -176,15 +200,37 @@ export default function Jukebox({
                     <small>Pending</small>
                   ))}
                 {isHost && (
-                  <button
-                    type="button"
-                    className="icon-button"
-                    disabled={!connected}
-                    aria-label={`Remove ${track.title}`}
-                    onClick={() => control("remove", { trackId: track.id })}
-                  >
-                    <X size={18} />
-                  </button>
+                  <span className="jukebox-order">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={!connected || index === 0}
+                      aria-label={`Move ${track.title} up`}
+                      onClick={() => control("move-up", { trackId: track.id })}
+                    >
+                      <ArrowUp size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={!connected || index === state.queue.length - 1}
+                      aria-label={`Move ${track.title} down`}
+                      onClick={() =>
+                        control("move-down", { trackId: track.id })
+                      }
+                    >
+                      <ArrowDown size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={!connected}
+                      aria-label={`Remove ${track.title}`}
+                      onClick={() => control("remove", { trackId: track.id })}
+                    >
+                      <X size={18} />
+                    </button>
+                  </span>
                 )}
               </li>
             ))}
@@ -203,6 +249,25 @@ export default function Jukebox({
           </button>
         )}
       </section>
+    </>
+  );
+  if (inline)
+    return (
+      <section className="jukebox-panel" aria-labelledby="jukebox-title">
+        {content}
+      </section>
+    );
+  return (
+    <dialog
+      ref={dialog}
+      className="modal jukebox-dialog"
+      aria-labelledby="jukebox-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+    >
+      {content}
     </dialog>
   );
 }

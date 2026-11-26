@@ -2,6 +2,7 @@ import * as game from "./game.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
+import { restoreJukeboxSettings } from "./jukebox-settings.js";
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
@@ -17,12 +18,17 @@ export class RoomHub {
   ) {
     this.saveStore = saveStore;
     this.jukebox = jukebox;
+    this.state = restored?.state ?? this.newState(code);
     if (jukebox) {
-      jukebox.onChange = () => {
+      if (this.state.jukeboxSettings)
+        jukebox.settings = restoreJukeboxSettings(this.state.jukeboxSettings);
+      jukebox.onBalance = (playerId, amount) =>
+        game.adjustSongChips(this.state, playerId, amount);
+      jukebox.onChange = (balanceChanged) => {
+        if (balanceChanged && !this.closed) this.broadcast();
         for (const id of this.clients.keys()) this.sendJukebox(id);
       };
     }
-    this.state = restored?.state ?? this.newState(code);
     if (saveStore) this.state.saveSessionAvailable = true;
     this.bettingRemainingMs = restored?.bettingRemainingMs ?? 0;
     this.clients = new Map();
@@ -97,6 +103,7 @@ export class RoomHub {
           player,
           message.trackId,
           playerId === room.adminId,
+          message.cost,
         );
       } else {
         if (playerId !== room.adminId)
@@ -218,10 +225,8 @@ export class RoomHub {
       } else {
         const pid = c.playerId;
         if (!pid) throw Error("Join the table first.");
-        if (type === "save-session") {
-          this.saveSession(pid);
-          this.jukebox?.reset();
-        } else if (type === "resume-session") this.resumeSession(pid);
+        if (type === "save-session") this.saveSession(pid);
+        else if (type === "resume-session") this.resumeSession(pid);
         else if (s.pausedAt)
           throw Error("The table is saved. The host can resume play.");
         else if (type === "configure")
@@ -263,8 +268,10 @@ export class RoomHub {
           });
         else if (type === "drink-response")
           game.respondToDrink(s, pid, message.requestId, message.response);
-        else if (type === "leave") game.leave(s, pid);
-        else if (type === "end") {
+        else if (type === "leave") {
+          game.leave(s, pid);
+          this.jukebox?.removePlayer(pid);
+        } else if (type === "end") {
           game.end(s, pid);
           this.jukebox?.reset();
         } else if (type === "transfer") game.transfer(s, pid, message.playerId);
@@ -324,6 +331,11 @@ export class RoomHub {
     if (s.status === "ended") throw Error("This table has already closed.");
     if (s.rolling) throw Error("Wait for the dice to land before saving.");
     const save = captureRoomSave(s, this.tokens, this.completedBotDecisions());
+    if (this.jukebox) {
+      save.state.jukeboxSettings = { ...this.jukebox.settings };
+      for (const track of this.jukebox.queue)
+        game.adjustSongChips(save.state, track.requesterId, track.cost);
+    }
     try {
       this.saveStore.write(save);
     } catch {
@@ -333,6 +345,7 @@ export class RoomHub {
     }
     this.state = save.state;
     this.bettingRemainingMs = save.bettingRemainingMs;
+    this.jukebox?.reset({ refund: false, restoreDefaults: false });
   }
   resumeSession(id) {
     this.requireSaveHost(id);

@@ -375,6 +375,14 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
       fullPage: true,
     });
     const bankBefore = await phone.locator(".pg-wallet dd").allTextContents();
+    await expect(
+      phone.getByRole("tab", { name: "Learn", exact: true }),
+    ).toHaveCount(0);
+    await openAdminSection(phone, "Table");
+    const teachMode = phone.getByRole("checkbox", { name: "Teach mode" });
+    await teachMode.click();
+    await expect(teachMode).toBeChecked();
+    await phone.getByRole("button", { name: "Close settings" }).click();
     await phone.getByRole("tab", { name: "Learn", exact: true }).click();
     await phone
       .getByRole("combobox", { name: "Choose a lesson" })

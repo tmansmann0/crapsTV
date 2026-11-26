@@ -9,6 +9,17 @@
 .jukebox-dialog::backdrop {
   background: #221518b8;
 }
+.jukebox-panel {
+  height: 100%;
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.jukebox-price {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
 .jukebox-heading,
 .jukebox-search,
 .jukebox-mode,
@@ -93,4 +104,9 @@
 }
 .jukebox-clear {
   margin-top: 10px;
+}
+.jukebox-order {
+  display: flex;
+  flex: none;
+  gap: 0;
 }

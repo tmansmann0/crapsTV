@@ -537,6 +537,7 @@ function App() {
       : "";
   const visibleError = error || hostWarning;
   const musicAvailable = DESKTOP_DISPLAY && Array.isArray(jukebox?.queue);
+  const musicEnabled = musicAvailable && jukebox.enabled;
   const sendMusic = (message) => {
     if (status !== "connected") return;
     setMusicSearch((current) =>
@@ -546,6 +547,23 @@ function App() {
     );
     send(message);
   };
+  const renderMusic = (inline) =>
+    Jukebox &&
+    musicEnabled && (
+      <Suspense fallback={<p className="pg-empty">Loading music requests…</p>}>
+        <Jukebox
+          state={jukebox}
+          search={musicSearch}
+          isHost={isAdmin}
+          connected={status === "connected"}
+          bank={player?.bank ?? 0}
+          playing={state?.status === "playing"}
+          inline={inline}
+          send={sendMusic}
+          onClose={() => setJukeboxOpen(false)}
+        />
+      </Suspense>
+    );
   const joinLink =
     androidHost && !session.joinOrigin
       ? ""
@@ -778,27 +796,21 @@ function App() {
           }
           serverError={error}
           fallbackJoinURL={fallbackJoinLink}
-          onMusic={musicAvailable ? () => setJukeboxOpen(true) : undefined}
+          onMusic={musicEnabled ? () => setJukeboxOpen(true) : undefined}
+          musicArea={renderMusic(true)}
+          musicSettings={musicAvailable ? jukebox : null}
+          onMusicSettings={(settings) =>
+            sendMusic({ type: "jukebox-control", action: "settings", settings })
+          }
         />
       )}
-      {Jukebox &&
-        jukeboxOpen &&
-        musicAvailable &&
+      {jukeboxOpen &&
+        musicEnabled &&
         player &&
         !player.left &&
         !state?.pausedAt &&
-        state?.status !== "ended" && (
-          <Suspense fallback={null}>
-            <Jukebox
-              state={jukebox}
-              search={musicSearch}
-              isHost={isAdmin}
-              connected={status === "connected"}
-              send={sendMusic}
-              onClose={() => setJukeboxOpen(false)}
-            />
-          </Suspense>
-        )}
+        state?.status === "lobby" &&
+        renderMusic(false)}
       {adminAudio &&
         isAdmin &&
         player &&
@@ -926,6 +938,9 @@ function Phone({
   onDisplayAction,
   onTableAudio,
   onMusic,
+  musicArea,
+  musicSettings,
+  onMusicSettings,
   serverError,
   fallbackJoinURL,
 }) {
@@ -938,6 +953,8 @@ function Phone({
     confirm,
     onDisplayAction,
     onTableAudio,
+    musicSettings,
+    onMusicSettings,
     fallbackJoinURL,
     serverError,
   };
@@ -972,7 +989,7 @@ function Phone({
         connected={connected}
         settingsArea={settingsArea}
         serverError={serverError}
-        onMusic={onMusic}
+        musicArea={musicArea}
         rollArea={
           <DiceThrow
             state={state}

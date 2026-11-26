@@ -2,6 +2,7 @@ import express from "express";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
 import { randomBytes } from "node:crypto";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { WebSocketServer } from "ws";
@@ -24,13 +25,15 @@ const code =
   Array.from(randomBytes(6), (b) => alphabet[b % alphabet.length]).join("");
 const musicEnabled =
   process.argv.includes("--jukebox") || process.env.CRAPSTV_JUKEBOX === "1";
-const jukebox = musicEnabled
+const desktopBuild = existsSync(path.join(root, "dist", ".crapstv-desktop"));
+const jukebox = desktopBuild
   ? new DesktopJukebox(
       nativeMusic({
         mpv: process.env.CRAPSTV_MPV,
         ytdlp: process.env.CRAPSTV_YTDLP,
         volume: Number(process.env.CRAPSTV_JUKEBOX_VOLUME ?? 35),
       }),
+      { enabled: musicEnabled },
     )
   : null;
 const hub = new RoomHub(code, { saveStore, restored, jukebox });

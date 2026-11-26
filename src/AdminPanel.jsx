@@ -26,6 +26,7 @@ import {
   validDrinkingRules,
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
+import { MAX_JUKEBOX_QUEUE, MAX_SONG_COST } from "./jukebox-settings.js";
 import {
   DESKTOP_DISPLAY,
   DISPLAY_GRAPHICS_OPTIONS,
@@ -638,12 +639,93 @@ function PlayerSeats({
   );
 }
 
+function MusicSettings({ settings, connected, onChange }) {
+  const [cost, setCost] = useState(String(settings.cost / 100));
+  const [limit, setLimit] = useState(String(settings.limit));
+  useEffect(() => {
+    setCost(String(settings.cost / 100));
+    setLimit(String(settings.limit));
+  }, [settings.cost, settings.limit]);
+  const cents = Math.round(Number(cost) * 100);
+  const max = Number(limit);
+  const valid =
+    cost.trim() !== "" &&
+    Number.isSafeInteger(cents) &&
+    cents >= 0 &&
+    cents <= MAX_SONG_COST &&
+    Number.isInteger(max) &&
+    max >= 1 &&
+    max <= MAX_JUKEBOX_QUEUE;
+  return (
+    <>
+      <label className="toggle-label">
+        <span>
+          Music mode<small>Let players request songs.</small>
+        </span>
+        <input
+          type="checkbox"
+          aria-label="Music mode"
+          checked={settings.enabled}
+          disabled={!connected}
+          onChange={(event) => onChange({ enabled: event.target.checked })}
+        />
+      </label>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (connected && valid) onChange({ cost: cents, limit: max });
+        }}
+      >
+        <div className="ha-graphics-grid">
+          <label>
+            Chip cost per song ($)
+            <input
+              type="number"
+              min="0"
+              max={MAX_SONG_COST / 100}
+              step="0.01"
+              value={cost}
+              onChange={(event) => setCost(event.target.value)}
+              disabled={!connected}
+            />
+          </label>
+          <label>
+            Max queued songs per player
+            <input
+              type="number"
+              min="1"
+              max={MAX_JUKEBOX_QUEUE}
+              step="1"
+              value={limit}
+              onChange={(event) => setLimit(event.target.value)}
+              disabled={!connected}
+            />
+          </label>
+        </div>
+        <button
+          type="submit"
+          className="button outline small"
+          disabled={
+            !connected ||
+            !valid ||
+            (cents === settings.cost && max === settings.limit)
+          }
+        >
+          Save music settings
+        </button>
+      </form>
+    </>
+  );
+}
+
 function TVSettings({
   state,
   send,
   connected,
   onDisplayAction,
   onTableAudio,
+  musicSettings,
+  onMusicSettings,
   fallbackJoinURL,
 }) {
   const graphics = graphicsForDisplay(state.display?.graphics ?? {});
@@ -692,6 +774,13 @@ function TVSettings({
         </span>
         <ChevronRight size={18} />
       </button>
+      {musicSettings && (
+        <MusicSettings
+          settings={musicSettings}
+          connected={connected}
+          onChange={onMusicSettings}
+        />
+      )}
       <label>
         TV camera
         <select
@@ -804,6 +893,8 @@ export default function AdminPanel({
   confirm,
   onDisplayAction,
   onTableAudio,
+  musicSettings,
+  onMusicSettings,
   fallbackJoinURL,
   serverError,
 }) {
@@ -1196,6 +1287,8 @@ export default function AdminPanel({
             connected={connected}
             onDisplayAction={onDisplayAction}
             onTableAudio={onTableAudio}
+            musicSettings={musicSettings}
+            onMusicSettings={onMusicSettings}
             fallbackJoinURL={fallbackJoinURL}
           />
         )}
