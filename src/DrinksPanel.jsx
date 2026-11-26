@@ -5,6 +5,7 @@ import {
   drinkDescription,
   drinkPrice,
   drinkUnits,
+  drinkVerificationBot,
 } from "./drinking-mode.js";
 import "./drinks-panel.css";
 
@@ -13,6 +14,7 @@ function DrinkForm({
   rules,
   player,
   peers,
+  automaticTopUps,
   pending,
   locked,
   send,
@@ -47,7 +49,9 @@ function DrinkForm({
           <p>
             {isOffer
               ? "Use available chips to send a drink."
-              : "Log a drink after taking it. Another player verifies the top-up."}
+              : automaticTopUps
+                ? "Log a drink after taking it to add chips automatically."
+                : "Log a drink after taking it. Another player verifies the top-up."}
           </p>
         </div>
       </div>
@@ -159,7 +163,11 @@ function DrinkForm({
             </p>
           )}
           <button className="pg-drink-primary" disabled={disabled || !valid}>
-            {isOffer ? "Send a drink" : "Request verification"}
+            {isOffer
+              ? "Send a drink"
+              : automaticTopUps
+                ? "Add chips"
+                : "Request verification"}
             {valid && (
               <span>
                 {isOffer ? "−" : "+"}
@@ -185,7 +193,7 @@ export default function DrinksPanel({
   const peers = state.players.filter(
     (p) => p.id !== player.id && !p.left && p.connected,
   );
-  const humanPeers = peers.filter((p) => !p.bot);
+  const automaticTopUps = !!drinkVerificationBot(peers);
   const requests = state.drinkRequests ?? [];
   const locked = !connected || state.rolling;
   const incoming = requests.filter(
@@ -220,9 +228,9 @@ export default function DrinksPanel({
           dice land.
         </p>
       )}
-      {!humanPeers.length && (
+      {!peers.length && (
         <p className="pg-drink-notice">
-          A second connected human player can verify top-ups.
+          Top-ups need another connected player or a bot.
         </p>
       )}
       {incoming.length > 0 && (
@@ -282,7 +290,8 @@ export default function DrinksPanel({
           kind={kind}
           rules={rules}
           player={player}
-          peers={kind === "credit" ? humanPeers : peers}
+          peers={peers}
+          automaticTopUps={automaticTopUps}
           locked={locked}
           send={send}
           draft={drafts[kind]}

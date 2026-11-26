@@ -12,6 +12,12 @@ export const DRINK_UNITS = [
   { id: "finish", label: "Finish drink", valueKey: "finishValue" },
 ];
 
+export function drinkVerificationBot(players) {
+  return players.find(
+    (player) => player.bot && player.connected && !player.left,
+  );
+}
+
 export function drinkUnits(rules) {
   return rules.finishEnabled ? DRINK_UNITS : DRINK_UNITS.slice(0, 2);
 }

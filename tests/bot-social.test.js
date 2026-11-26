@@ -33,7 +33,6 @@ function sendDrink(state, from, to) {
     quantity: 1,
     to: to.id,
   });
-  game.respondToDrink(state, to.id, state.drinkRequests.at(-1).id, "complete");
 }
 
 function targetCount(state, bot, player) {

@@ -128,6 +128,7 @@ export class RoomHub {
     }
   }
   broadcast() {
+    game.resolvePendingBotDrinks(this.state);
     this.scheduleBots();
     const message = {
       type: "state",
@@ -510,8 +511,6 @@ export class RoomHub {
             game.simulateBotDrink(s, bot.id, action.unit, action.quantity);
           else if (action.type === "drink-offer")
             game.requestDrink(s, bot.id, { ...action, kind: "offer" });
-          else if (action.type === "complete-drink")
-            game.respondToDrink(s, bot.id, action.requestId, "complete");
         } catch {
           /* A current rule/bank change can invalidate a prepared choice. */
         }

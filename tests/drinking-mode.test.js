@@ -23,17 +23,11 @@ test("Drinking Mode starts humans at zero and top-ups require peer verification"
   const { state, host, guest } = table();
   assert.equal(host.bank, 0);
   assert.equal(game.join(state, "Late guest").bank, 0);
-  const bot = game.addBot(state, host.id, { name: "Dealer bot" });
-  assert.equal(bot.bank, 0);
   assert.throws(() => game.reup(state, host.id), /verified chips/);
   assert.throws(() => game.place(state, host.id, "pass", 500), /Not enough/);
   assert.throws(() => requestCredit(state, host, "finish", 1), /off/);
   assert.throws(() => requestCredit(state, host, "sip", 0.5), /whole number/);
   const id = requestCredit(state, host, "sip", 2);
-  assert.throws(
-    () => game.respondToDrink(state, bot.id, id, "accept"),
-    /Only another human/,
-  );
   assert.equal(host.bank, 0);
   assert.throws(() => requestCredit(state, host, "sip", 1), /pending/);
   assert.throws(
@@ -143,7 +137,7 @@ test("switching a lobby to Drinking Mode keeps bot seats with zero starting chip
   assert(state.players.every((player) => player.bank === 0));
 });
 
-test("bots drink for chips and can send drinks without verifying human top-ups", () => {
+test("bots drink for chips, approve top-ups, and complete assignments immediately", () => {
   const { state, host, guest } = table();
   const bot = game.addBot(state, host.id, {
     name: "Ruby",
@@ -164,17 +158,23 @@ test("bots drink for chips and can send drinks without verifying human top-ups",
       quantity: 1,
       to: to.id,
     });
-    return state.drinkRequests.at(-1).id;
   };
-  const fromBot = send(bot, guest);
+  send(bot, guest);
+  const fromBot = state.drinkRequests.at(-1).id;
   assert.equal(bot.bank, 375);
   assert.equal(guest.bank, 0);
   game.respondToDrink(state, guest.id, fromBot, "complete");
-  const topUp = requestCredit(state, host, "sip", 2);
-  game.respondToDrink(state, guest.id, topUp, "accept");
-  const toBot = send(host, bot);
-  game.respondToDrink(state, bot.id, toBot, "complete");
+  game.requestDrink(state, host.id, {
+    kind: "credit",
+    unit: "sip",
+    quantity: 2,
+  });
+  assert.deepEqual([host.bank, host.buyIn, game.net(host)], [1000, 1000, 0]);
+  assert.match(state.log[0].text, /Ruby automatically approved/);
+  send(host, bot);
+  assert.equal(host.bank, 375);
   assert.equal(bot.botDrinkLoad, 3);
+  assert.equal(bot.buyIn, 1000);
   assert.equal(bot.bank, 375);
   assert.equal(state.drinkRequests.length, 0);
 });
@@ -240,4 +240,60 @@ test("the shared room takes the requester and prices from authoritative state", 
   assert.match(inbox.host.at(-1).message, /session has ended/);
   assert.deepEqual(hub.state.config.drinkingRules, nextRules);
   hub.close();
+});
+
+test("one human can log top-ups and send a drink without waiting for the bot's turn", (t) => {
+  const hub = new RoomHub("BOTAUT");
+  t.after(() => hub.close());
+  const messages = [];
+  hub.connect("host", (message) => messages.push(message));
+  const send = (type, fields = {}) => hub.receive("host", { type, ...fields });
+  send("join", { code: "BOTAUT", name: "Alice" });
+  send("start", { config: { drinkingMode: true } });
+  const [host] = hub.state.players;
+  const topUp = { kind: "credit", unit: "sip", quantity: 2 };
+  send("drink-request", topUp);
+  assert.match(messages.at(-1).message, /Another connected player/);
+  send("add-bot", { name: "Ruby" });
+  const [, bot] = hub.state.players;
+
+  send("drink-request", { ...topUp, amount: 100000, from: bot.id });
+  assert.equal(host.bank, 1000);
+  assert.equal(messages.at(-1).state.players[0].bank, 1000);
+  assert.equal(hub.state.drinkRequests.length, 0);
+  send("drink-request", {
+    kind: "offer",
+    unit: "sip",
+    quantity: 1,
+    to: bot.id,
+  });
+  assert.equal(bot.botDrinkLoad, 1);
+  assert.equal(host.bank, 375);
+  assert.equal(hub.state.drinkRequests.length, 0);
+  send("remove-bot", { playerId: bot.id });
+  send("drink-request", topUp);
+  assert.match(messages.at(-1).message, /Another connected player/);
+  assert.equal(host.bank, 375);
+});
+
+test("a pending top-up auto-approves once when a bot joins and the dice are down", (t) => {
+  const hub = new RoomHub("BOTAUT");
+  t.after(() => hub.close());
+  for (const id of ["host", "guest"]) {
+    hub.connect(id, () => {});
+    hub.receive(id, { type: "join", code: "BOTAUT", name: id });
+  }
+  const send = (type, fields = {}) => hub.receive("host", { type, ...fields });
+  send("start", { config: { drinkingMode: true } });
+  send("drink-request", { kind: "credit", unit: "shot", quantity: 1 });
+  assert.equal(hub.state.drinkRequests.length, 1);
+  hub.state.rolling = true;
+  send("add-bot", { name: "Ruby" });
+  assert.equal(hub.state.drinkRequests.length, 1);
+  assert.equal(hub.state.players[0].bank, 0);
+  game.finishRoll(hub.state, [3, 3]);
+  hub.broadcast();
+  hub.broadcast();
+  assert.equal(hub.state.drinkRequests.length, 0);
+  assert.equal(hub.state.players[0].bank, DEFAULT_DRINKING_RULES.shotValue);
 });
