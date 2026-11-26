@@ -1,4 +1,4 @@
-import { useId, useRef } from "react";
+import { useRef } from "react";
 import "./house-rule-chance-art.css";
 
 // Full-screen CHANCE ROLL scene. Everything before `revealed` is identical
@@ -71,76 +71,9 @@ function Die({ kind, value }) {
   );
 }
 
-// Midpoint subdivision and offset branches adapted from Sahil K's
-// Lightning-VFX (MIT), https://github.com/SahilK-027/Lightning-VFX.
-// See public/licenses/Lightning-VFX-MIT.txt.
-function lightningPath(start, end, depth, roughness, random) {
-  if (!depth) return [start, end];
-  const [x, y] = start;
-  const dx = end[0] - x;
-  const dy = end[1] - y;
-  const along = 0.45 + random() * 0.1;
-  const offset = (random() - 0.5) * roughness;
-  const middle = [x + dx * along + dy * offset, y + dy * along - dx * offset];
-  const left = lightningPath(
-    start,
-    middle,
-    depth - 1,
-    roughness * 0.88,
-    random,
-  );
-  const right = lightningPath(middle, end, depth - 1, roughness * 0.88, random);
-  return [...left.slice(0, -1), ...right];
-}
-
-function createStrike() {
-  let seed = 1627;
-  const random = () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 0x100000000;
-  };
-  const impact = [800, 550];
-  const main = lightningPath([1335, -28], impact, 6, 0.96, random);
-  const arcs = [
-    main,
-    lightningPath([1386, -26], impact, 5, 0.86, random),
-    ...[
-      [12, [1538, 120]],
-      [19, [1117, 148]],
-      [30, [1300, 264]],
-      [38, [952, 284]],
-      [44, [1163, 478]],
-      [53, [628, 486]],
-    ].map(([point, end]) => lightningPath(main[point], end, 4, 1.1, random)),
-  ];
-  return arcs.map((arc) =>
-    arc
-      .map(([x, y], i) => `${i ? "L" : "M"}${Math.round(x)} ${Math.round(y)}`)
-      .join(" "),
-  );
-}
-
-const STRIKE_PATHS = createStrike();
-const SPARKS = [
-  [-127, 20],
-  [-99, -24],
-  [-77, -52],
-  [-51, -23],
-  [-31, -72],
-  [-9, -57],
-  [14, -33],
-  [41, -63],
-  [70, -37],
-  [105, -11],
-  [134, 12],
-  [92, 31],
-  [43, 35],
-  [-56, 43],
-  [-105, 35],
-];
-
 function Bolt() {
-  const id = useId();
+  const d =
+    "M1700 -60 L1236 248 L1330 282 L888 548 L1000 584 L520 860 L606 884 L-80 1080";
   return (
     <svg
       className="hrc-bolt"
@@ -148,42 +81,22 @@ function Bolt() {
       preserveAspectRatio="none"
       focusable="false"
     >
-      <defs>
-        <radialGradient id={id}>
-          <stop stopColor="#fffdf2" stopOpacity="0.95" />
-          <stop offset="0.23" className="hrc-strike-color" stopOpacity="0.7" />
-          <stop offset="1" className="hrc-strike-color" stopOpacity="0" />
-        </radialGradient>
-      </defs>
       <g className="hrc-bolt-strike">
-        <path className="hrc-bolt-glow" d={STRIKE_PATHS[0]} pathLength="1" />
-        {STRIKE_PATHS.map((d, index) => (
-          <path
-            key={d}
-            className={index === 0 ? "hrc-bolt-core" : "hrc-bolt-fork"}
-            d={d}
-            pathLength="1"
-            style={{ "--fork-delay": `${10 + index * 13}ms` }}
-          />
-        ))}
-      </g>
-      <g transform="translate(800 550)">
-        <ellipse
-          className="hrc-strike-light"
-          rx="265"
-          ry="104"
-          fill={`url(#${id})`}
+        <path
+          className="hrc-bolt-glow"
+          d={d}
+          vectorEffect="non-scaling-stroke"
         />
-        <ellipse className="hrc-strike-ring" rx="178" ry="48" />
-        <g className="hrc-strike-sparks">
-          {SPARKS.map(([x, y]) => (
-            <path
-              key={x}
-              d={`M${x * 0.38} ${y * 0.38} L${x * 0.61} ${y * 0.61}`}
-              style={{ "--spark-x": `${x}px`, "--spark-y": `${y}px` }}
-            />
-          ))}
-        </g>
+        <path
+          className="hrc-bolt-core"
+          d={d}
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          className="hrc-bolt-fork"
+          d="M888 548 L760 520 L700 590 M1236 248 L1150 200 L1090 236"
+          vectorEffect="non-scaling-stroke"
+        />
       </g>
     </svg>
   );

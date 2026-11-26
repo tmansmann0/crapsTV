@@ -9,6 +9,7 @@ const STORAGE_KEY = "crapstv.table-audio";
 const clips = {
   felt: ["felt-1", "felt-2"],
   rail: ["rail-1", "rail-2"],
+  thunder: ["house-thunder"],
   dice: ["dice-1", "dice-2"],
   puck: ["puck-1"],
   chips: ["chips-1", "chips-2"],
@@ -248,7 +249,7 @@ export function createTableAudio() {
       return;
     if (phase === "rolling") {
       const now = context.currentTime;
-      play("rail", 0.48, 0, now);
+      if (!play("thunder", 0.72, 0, now)) play("rail", 0.48, 0, now);
       play("dice", 0.54, -1.2, now + 0.29);
       play("dice", 0.48, 1.2, now + 0.57);
     } else if (phase === "revealed") play(hit ? "chips" : "felt", 0.6, 0);
