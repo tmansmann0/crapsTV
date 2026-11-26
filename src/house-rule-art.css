@@ -1,340 +1,950 @@
+/* House-rule reveal artwork. Unanimated styles are the finished frame;
+   keyframes only describe how each element gets there. */
 .house-rule-art {
-  --die-size: 28%;
+  --rule-accent: #edc677;
   position: relative;
-  display: grid;
-  place-items: center;
-  width: min(64vw, 49vmin, 560px);
-  aspect-ratio: 1.36;
-  margin-bottom: clamp(12px, 2.4vmin, 36px);
-  color: var(--rule-accent);
+  width: min(90vw, 80vmin);
+  aspect-ratio: 1.6;
+  margin-bottom: clamp(8px, 1.6vmin, 30px);
+  pointer-events: none;
 }
-.house-art-rim {
-  position: absolute;
-  inset: 0 13%;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.48;
-  background: radial-gradient(ellipse at center, #2d533f, #153328 68%);
-  box-shadow:
-    inset 0 0 0 0.55vmin #071914,
-    inset 0 0 0 0.71vmin color-mix(in srgb, currentColor 40%, transparent);
-  animation: house-rim-enter 650ms ease-out both;
-}
-.house-rule-art > .house-die,
-.house-rule-art > .house-chips {
-  position: absolute;
-}
-.house-die {
-  display: grid;
-  width: var(--die-size);
-  aspect-ratio: 1;
-  box-sizing: border-box;
-  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
-  gap: 10%;
-  padding: 5%;
-  border: 2px solid #f9e4af;
-  border-radius: 20%;
-  background: #f7e7c0;
-  box-shadow:
-    0 0.7vmin 0 #947749,
-    0 1.1vmin 2vmin #0818108f;
-}
-.house-die i {
+.house-rule-art svg {
   display: block;
-  border-radius: 50%;
-  background: #14392a;
-}
-.house-art-sweep {
-  position: absolute;
-  width: 57%;
-  height: 57%;
-  opacity: 0.65;
-  animation: house-art-sweep 950ms ease-out both;
-}
-.house-wind-left {
-  left: 16%;
-  top: 38%;
-  transform: rotate(-14deg);
-  animation: house-reroll-left 1350ms ease-in-out both;
-}
-.house-wind-right {
-  right: 16%;
-  top: 38%;
-  transform: rotate(15deg);
-  animation: house-reroll-right 1350ms ease-in-out both;
-}
-.house-wind-left,
-.house-wind-right {
-  opacity: 0;
-}
-.house-wind-back {
-  top: 38%;
-  place-items: center;
-  background: #c4e5cc;
-  border-color: #e5f6e8;
-  transform: rotate(var(--tilt));
-  animation: house-wind-flip 610ms 690ms ease-out both;
-}
-.house-wind-back::after {
-  grid-area: 1 / 1 / -1 / -1;
-  width: 60%;
-  aspect-ratio: 1;
-  border: 0.38vmin solid #35644a;
-  border-radius: 20%;
-  transform: rotate(45deg);
-  content: "";
-}
-.house-wind-back-left {
-  --tilt: -14deg;
-  left: 16%;
-}
-.house-wind-back-right {
-  --tilt: 15deg;
-  right: 16%;
-}
-.house-rule-art.is-secondWind .house-art-sweep {
-  top: 1%;
-  animation: house-reroll-arrow 1350ms ease-in-out both;
-}
-.house-hard-left,
-.house-hard-right {
-  top: 27%;
-  transform: rotate(var(--tilt));
-  animation: house-pair-land 690ms ease-out both;
-}
-.house-hard-left {
-  --tilt: -10deg;
-  --inbound: -70%;
-  left: 18%;
-}
-.house-hard-right {
-  --tilt: 10deg;
-  --inbound: 70%;
-  right: 18%;
-}
-.house-rule-art.is-hardPoint .house-art-rim {
-  opacity: 1;
-  animation: house-hard-ring 850ms 220ms ease-out both;
-}
-.house-art-emblem {
-  position: absolute;
-  top: 4%;
-  width: 52%;
-  height: 59%;
-  animation: house-emblem-rise 760ms 100ms ease-out both;
-}
-.house-rule-art.is-luckySeven .house-art-emblem {
-  top: -7%;
-  width: 83%;
-  height: 67%;
-}
-.house-lucky-left,
-.house-lucky-right {
-  top: 40%;
-  transform: rotate(var(--tilt));
-  animation: house-pair-land 650ms 160ms ease-out both;
-}
-.house-lucky-left {
-  --tilt: -16deg;
-  --inbound: -45%;
-  left: 18%;
-}
-.house-lucky-right {
-  --tilt: 16deg;
-  --inbound: 45%;
-  right: 18%;
-}
-.house-art-markers {
-  position: absolute;
-  inset: 52% 21% 16%;
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 7%;
-}
-.house-art-markers > * {
-  animation: house-marker-rise 560ms var(--marker-delay) ease-out both;
-}
-.house-art-markers .is-tier-0 {
-  --marker-delay: 120ms;
-}
-.house-art-markers .is-tier-1 {
-  --marker-delay: 360ms;
-}
-.house-art-markers .is-tier-2 {
-  --marker-delay: 600ms;
-}
-.house-chips {
-  position: relative;
-  display: block;
-  width: 32%;
-  height: 35%;
-}
-.house-chips i {
-  position: absolute;
-  inset: auto 0 0;
   width: 100%;
-  aspect-ratio: 2.45;
-  box-sizing: border-box;
-  border: 0.34vmin solid #f5d491;
-  border-radius: 50%;
-  background: #946136;
-  background-image: radial-gradient(ellipse, #dbab64 42%, transparent 44%);
-  box-shadow: 0 0.36vmin 0 #593c27;
-  transform: translateY(calc(var(--chip) * -32%));
+  height: 100%;
+  overflow: visible;
 }
-.house-rule-art.is-crapsCashback .house-art-sweep {
-  top: -3%;
+.house-rule-art .hr-c {
+  transform-box: fill-box;
+  transform-origin: center;
 }
-.house-cash-out {
-  left: 17%;
-  top: 40%;
-  opacity: 0.38;
-  animation: house-cash-leave 960ms ease-out both;
+.house-rule-art .hp-shock,
+.house-rule-art .hp-sparks,
+.house-rule-art .tj-coin {
+  transform-box: fill-box;
+  transform-origin: center;
 }
-.house-cash-back {
-  right: 17%;
-  top: 40%;
-  animation: house-cash-return 1000ms 200ms ease-out both;
+.house-rule-art .hr-stop-accent {
+  stop-color: var(--rule-accent);
 }
-.house-seat {
-  position: absolute;
-  bottom: 17%;
-  width: 21%;
-  height: 33%;
+.house-rule-art .hr-num {
+  font-family: Manrope, "DM Sans", Arial, sans-serif;
+  font-weight: 800;
 }
-.house-seat-left {
-  left: 13%;
+.house-rule-art .hr-label {
+  font-family: Manrope, "DM Sans", Arial, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  fill: var(--rule-accent);
 }
-.house-seat-right {
-  right: 13%;
+.house-rule-art .hr-pill {
+  fill: #0b241b;
+  stroke: var(--rule-accent);
+  stroke-width: 2.5;
 }
-.house-rule-art.is-passTheDice .house-art-sweep {
-  top: 29%;
-  width: 45%;
+.house-rule-art .hr-die-mark {
+  stroke: #2b7a68;
+  stroke-width: 7;
 }
-.house-rule-art.is-passTheDice {
-  --die-size: 19%;
+.house-rule-art .hr-fade {
+  animation: hr-fade 700ms ease-out both;
 }
-.house-pass-die {
-  top: 16%;
-  left: 65%;
-  padding: 3.4%;
-  transform: rotate(14deg);
-  animation: house-pass-slide 1150ms ease-in-out both;
-}
-.house-rule-art.is-tableJackpot .house-art-emblem {
-  top: 3%;
-  width: 58%;
-  height: 60%;
-}
-.house-rule-art.is-tableJackpot .house-die {
-  padding: 6%;
-}
-@keyframes house-rim-enter {
+@keyframes hr-fade {
   from {
     opacity: 0;
-    transform: scale(0.78);
   }
 }
-@keyframes house-art-sweep {
+@keyframes hr-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ---------------- Second Wind: the seven gets blown off the felt ---------------- */
+.is-secondWind .sw-old {
+  opacity: 0;
+  animation: sw-blow-away 560ms 640ms cubic-bezier(0.55, 0, 0.85, 0.35) both;
+}
+@keyframes sw-blow-away {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(560px, -50px);
+  }
+}
+.is-secondWind .sw-old-left,
+.is-secondWind .sw-old-right {
+  animation:
+    sw-land 380ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both,
+    sw-tumble 560ms 640ms ease-in forwards;
+}
+.is-secondWind .sw-old-right {
+  animation-delay: 60ms, 680ms;
+}
+@keyframes sw-land {
+  0% {
+    opacity: 0;
+    transform: translateY(-240px) rotate(-160deg) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes sw-tumble {
+  to {
+    transform: rotate(280deg) scale(0.7);
+  }
+}
+.is-secondWind .sw-seven {
+  animation: hr-pop 300ms 300ms ease-out both;
+}
+.is-secondWind .sw-gust {
+  stroke: var(--rule-accent);
+  opacity: 0;
+  animation: sw-gust 700ms 520ms cubic-bezier(0.3, 0, 0.6, 1) both;
+}
+@keyframes sw-gust {
+  0% {
+    opacity: 0;
+    transform: translateX(-640px);
+  }
+  30% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(520px);
+  }
+}
+.is-secondWind .sw-new-left {
+  animation: sw-roll-in 560ms 880ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.is-secondWind .sw-new-right {
+  animation: sw-roll-in 560ms 960ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes sw-roll-in {
+  0% {
+    opacity: 0;
+    transform: translate(-460px, -50px) rotate(-540deg) scale(0.8);
+  }
+  20% {
+    opacity: 1;
+  }
+  72% {
+    transform: translate(14px, 0) rotate(10deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-secondWind .sw-flip {
+  animation: sw-turn-over 380ms 1300ms ease-in-out both;
+}
+.is-secondWind .sw-new-right .sw-flip {
+  animation-delay: 1380ms;
+}
+@keyframes sw-turn-over {
+  0%,
+  100% {
+    transform: none;
+  }
+  30% {
+    transform: scaleX(0.06);
+  }
+  65% {
+    transform: scale(1.08, 0.94);
+  }
+}
+.is-secondWind .sw-loop {
+  opacity: 0.85;
+  animation: sw-loop 1300ms 420ms cubic-bezier(0.2, 0.6, 0.3, 1) both;
+}
+@keyframes sw-loop {
   from {
+    opacity: 0;
+    transform: rotate(-400deg) scale(0.75);
+  }
+}
+.is-secondWind .sw-arc {
+  fill: none;
+  stroke: var(--rule-accent);
+  stroke-width: 9;
+  stroke-linecap: round;
+}
+.is-secondWind .sw-arrowhead {
+  fill: var(--rule-accent);
+}
+.is-secondWind .sw-tag {
+  animation: hr-pop 320ms 1500ms ease-out both;
+}
+
+/* ---------------- Hard Point: twin dice slam, the gold ring stamps ---------------- */
+.is-hardPoint .hp-die {
+  animation: hp-drop 620ms cubic-bezier(0.5, 0, 0.6, 1) both;
+}
+.is-hardPoint .hp-die-right {
+  animation-delay: 60ms;
+}
+@keyframes hp-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-460px) scale(0.9, 1.35);
+  }
+  12% {
+    opacity: 1;
+  }
+  62% {
+    transform: translateY(0) scale(0.95, 1.2);
+  }
+  74% {
+    transform: scale(1.16, 0.8);
+  }
+  88% {
+    transform: scale(0.97, 1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-hardPoint .hp-ring {
+  animation: hp-stamp 340ms 520ms cubic-bezier(0.6, 0, 0.8, 0.4) both;
+}
+@keyframes hp-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(2.5) rotate(-40deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  75% {
+    transform: scale(0.93) rotate(2deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-hardPoint .hp-shake {
+  animation: hp-shake 300ms 780ms linear both;
+}
+@keyframes hp-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(7px, 9px);
+  }
+  40% {
+    transform: translate(-6px, -5px);
+  }
+  60% {
+    transform: translate(4px, 3px);
+  }
+  80% {
+    transform: translate(-2px, -1px);
+  }
+}
+.is-hardPoint .hp-shock {
+  fill: none;
+  stroke: var(--rule-accent);
+  stroke-width: 12;
+  opacity: 0;
+  animation: hp-shock 640ms 800ms cubic-bezier(0.1, 0.6, 0.3, 1) both;
+}
+.is-hardPoint .hp-shock-2 {
+  stroke: #ffd970;
+  stroke-width: 6;
+  animation-delay: 920ms;
+}
+@keyframes hp-shock {
+  0% {
+    opacity: 0.95;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.85);
+  }
+}
+.is-hardPoint .hp-sparks {
+  fill: #ffe7a1;
+  opacity: 0;
+  animation: hp-sparks 520ms 790ms ease-out both;
+}
+@keyframes hp-sparks {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+.is-hardPoint .hp-glow {
+  opacity: 0.75;
+  animation: hp-glow 900ms 780ms ease-out both;
+}
+@keyframes hp-glow {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+}
+
+/* ---------------- Hot Hand: three points catch fire, then a streak ---------------- */
+.is-hotHand .hh-dim {
+  animation: hh-enter 300ms ease-out both;
+}
+.hh-puck-1 .hh-dim {
+  animation-delay: 80ms;
+}
+.hh-puck-2 .hh-dim {
+  animation-delay: 160ms;
+}
+@keyframes hh-enter {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+.is-hotHand .hh-lit {
+  animation: hh-ignite 220ms 320ms ease-out both;
+}
+.is-hotHand .hh-puck {
+  animation: hh-punch 360ms 320ms ease-out both;
+}
+.is-hotHand .hh-flame {
+  transform-origin: 50% 100%;
+  animation:
+    hh-flame-up 460ms 320ms cubic-bezier(0.2, 0.8, 0.3, 1.2) both,
+    hh-flicker 300ms 1300ms ease-in-out 2 alternate forwards;
+}
+.is-hotHand .hh-lit-1,
+.is-hotHand .hh-puck-1 {
+  animation-delay: 580ms;
+}
+.is-hotHand .hh-lit-2,
+.is-hotHand .hh-puck-2 {
+  animation-delay: 840ms;
+}
+.is-hotHand .hh-flame-1 {
+  animation-delay: 580ms, 1380ms;
+}
+.is-hotHand .hh-flame-2 {
+  animation-delay: 840ms, 1460ms;
+}
+@keyframes hh-ignite {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes hh-punch {
+  0%,
+  100% {
+    transform: none;
+  }
+  40% {
+    transform: scale(1.2);
+  }
+}
+@keyframes hh-flame-up {
+  0% {
+    opacity: 0;
+    transform: scale(0.3, 0);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.15, 1.3);
+  }
+  100% {
+    transform: none;
+  }
+}
+@keyframes hh-flicker {
+  to {
+    transform: scale(1.06, 0.9);
+  }
+}
+.is-hotHand .hh-heat {
+  animation: hr-fade 1100ms 300ms ease-in both;
+}
+.is-hotHand .hh-streak {
+  opacity: 0;
+  animation: hh-streak 560ms 1080ms cubic-bezier(0.4, 0, 0.6, 1) both;
+}
+@keyframes hh-streak {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px) scaleY(0.6);
+  }
+  15%,
+  80% {
+    opacity: 1;
+    transform: translateX(380px) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(1000px) scaleY(0.4);
+  }
+}
+.is-hotHand .hh-ember {
+  opacity: 0;
+  animation: hh-ember 760ms calc(1150ms + var(--i) * 45ms) ease-out both;
+}
+@keyframes hh-ember {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-70px);
+  }
+}
+
+/* ---------------- Craps Cashback: half the stake rides home ---------------- */
+.is-crapsCashback .cb-craps {
+  animation: hp-stamp 320ms 120ms ease-out both;
+}
+.is-crapsCashback .cb-lost {
+  opacity: 0.32;
+  animation:
+    cb-drop 300ms ease-out both,
+    cb-dim 400ms 1300ms ease-out forwards;
+}
+@keyframes cb-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes cb-dim {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.32;
+    transform: translateY(6px);
+  }
+}
+.is-crapsCashback .cb-back {
+  animation: cb-return 1300ms 120ms both;
+}
+@keyframes cb-return {
+  0% {
+    opacity: 0;
+    transform: translate(-300px, -78px);
+    animation-timing-function: ease-out;
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-300px, -48px);
+    animation-timing-function: ease-in;
+  }
+  40% {
+    transform: translate(-296px, -78px);
+    animation-timing-function: linear;
+  }
+  55% {
+    transform: translate(-236px, -190px);
+    animation-timing-function: linear;
+  }
+  68% {
+    transform: translate(-130px, -232px);
+    animation-timing-function: linear;
+  }
+  80% {
+    transform: translate(-36px, -150px);
+    animation-timing-function: ease-in;
+  }
+  90% {
+    transform: translate(0, 8px) scale(1.06, 0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-crapsCashback .cb-path {
+  fill: none;
+  stroke: var(--rule-accent);
+  stroke-width: 3;
+  stroke-dasharray: 2 12;
+  stroke-linecap: round;
+  opacity: 0.4;
+  animation: hr-fade 300ms 640ms both;
+}
+.is-crapsCashback .cb-dot {
+  fill: var(--rule-accent);
+  opacity: 0.85;
+  animation: cb-dot 360ms calc(680ms + var(--i) * 70ms) ease-out both;
+}
+@keyframes cb-dot {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.6);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-crapsCashback .cb-dot,
+.is-crapsCashback .cb-head {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.is-crapsCashback .cb-head {
+  fill: var(--rule-accent);
+  animation: hr-pop 260ms 1240ms ease-out both;
+}
+.is-crapsCashback .cb-ghost {
+  fill: none;
+  stroke: #9fb8a9;
+  stroke-width: 2.5;
+  stroke-dasharray: 7 7;
+  opacity: 0.6;
+  animation: hr-fade 400ms 1300ms both;
+}
+.is-crapsCashback .cb-badge {
+  animation: cb-badge 420ms 1440ms ease-out both;
+}
+@keyframes cb-badge {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-200deg);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-crapsCashback .cb-tag {
+  animation: hr-fade 300ms 200ms both;
+}
+.is-crapsCashback .cb-tag-back {
+  animation-delay: 1400ms;
+}
+
+/* ---------------- Lucky Seven: a foil seven detonates ---------------- */
+.is-luckySeven .ls-seven {
+  animation: ls-slam 540ms cubic-bezier(0.5, 0, 0.3, 1) both;
+}
+@keyframes ls-slam {
+  0% {
+    opacity: 0;
+    transform: scale(3.2) rotate(-16deg);
+  }
+  25% {
+    opacity: 1;
+  }
+  58% {
+    transform: scale(0.9) rotate(2deg);
+  }
+  78% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-luckySeven .ls-seven-wrap {
+  animation: hp-shake 280ms 300ms linear both;
+}
+.is-luckySeven .ls-shine {
+  opacity: 0;
+  animation: ls-shine 720ms 620ms ease-in-out both;
+}
+@keyframes ls-shine {
+  0% {
+    opacity: 1;
+    transform: translateX(-180px);
+  }
+  98% {
+    opacity: 1;
+    transform: translateX(420px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(420px);
+  }
+}
+.is-luckySeven .ls-rays {
+  fill: url(#hr-ray);
+  opacity: 0.6;
+  animation: ls-rays 1000ms 340ms cubic-bezier(0.1, 0.7, 0.3, 1) both;
+}
+.is-luckySeven .ls-rays-2 {
+  fill: url(#hr-ray-accent);
+  opacity: 0.55;
+  animation: ls-rays-2 1100ms 420ms cubic-bezier(0.1, 0.7, 0.3, 1) both;
+}
+@keyframes ls-rays {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(-70deg);
+  }
+  30% {
+    opacity: 1;
+  }
+}
+@keyframes ls-rays-2 {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(60deg);
+  }
+  30% {
+    opacity: 0.9;
+  }
+}
+.is-luckySeven .ls-glow {
+  animation: hp-glow 1000ms 320ms ease-out both;
+}
+.is-luckySeven .ls-star {
+  animation: ls-star 520ms calc(520ms + var(--i) * 90ms) ease-out both;
+}
+@keyframes ls-star {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-120deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.5) rotate(10deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-luckySeven .ls-tag {
+  animation: hr-pop 320ms 1120ms ease-out both;
+}
+
+/* ---------------- Pass the Dice: a toss from seat to seat ---------------- */
+.is-passTheDice .pd-seat-base {
+  fill: #133528;
+  stroke: #5f7d6b;
+  stroke-width: 3;
+}
+.is-passTheDice .pd-seat-figure {
+  fill: #8eaa99;
+}
+.is-passTheDice .pd-plate {
+  fill: #0b241b;
+  stroke: #5f7d6b;
+  stroke-width: 2;
+}
+.is-passTheDice .pd-from .hr-label {
+  fill: #9fb8a9;
+}
+.is-passTheDice .pd-to .pd-seat-base {
+  stroke: var(--rule-accent);
+  stroke-width: 5;
+}
+.is-passTheDice .pd-to .pd-seat-figure {
+  fill: #fff2d0;
+}
+.is-passTheDice .pd-to .pd-plate {
+  stroke: var(--rule-accent);
+}
+.is-passTheDice .pd-from {
+  opacity: 0.45;
+  animation:
+    pd-seat-in 360ms ease-out both,
+    pd-hand-off 400ms 1260ms ease-out forwards;
+}
+.is-passTheDice .pd-to {
+  animation: pd-seat-in 360ms 100ms ease-out both;
+}
+@keyframes pd-seat-in {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pd-hand-off {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+.is-passTheDice .pd-halo {
+  fill: color-mix(in srgb, var(--rule-accent) 16%, transparent);
+  stroke: var(--rule-accent);
+  stroke-width: 4;
+  animation: pd-halo 520ms 1220ms ease-out both;
+}
+@keyframes pd-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-passTheDice .pd-toss {
+  transform: translate(520px, 105px);
+  animation: pd-toss 1000ms 260ms linear both;
+}
+@keyframes pd-toss {
+  0% {
+    opacity: 0;
+    transform: translate(150px, 170px);
+  }
+  6% {
+    opacity: 1;
+  }
+  11.1% {
+    transform: translate(196.25px, 120.3px);
+  }
+  22.2% {
+    transform: translate(242.5px, 82.5px);
+  }
+  33.3% {
+    transform: translate(288.75px, 56.6px);
+  }
+  44.4% {
+    transform: translate(335px, 42.5px);
+  }
+  55.5% {
+    transform: translate(381.25px, 40.3px);
+  }
+  66.6% {
+    transform: translate(427.5px, 50px);
+  }
+  77.7% {
+    transform: translate(473.75px, 71.6px);
+  }
+  88.8% {
+    transform: translate(520px, 105px);
+    animation-timing-function: ease-out;
+  }
+  94% {
+    transform: translate(520px, 93px);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: translate(520px, 105px);
+  }
+}
+.is-passTheDice .pd-spin {
+  animation: pd-spin 1000ms 260ms cubic-bezier(0.3, 0.4, 0.4, 1) both;
+}
+@keyframes pd-spin {
+  from {
+    transform: rotate(-760deg) scale(0.85);
+  }
+}
+.is-passTheDice .pd-trail {
+  fill: var(--rule-accent);
+  opacity: 0.5;
+  animation: pd-trail 560ms calc(330ms + var(--i) * 95ms) ease-out both;
+}
+@keyframes pd-trail {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+}
+.is-passTheDice .pd-arrow {
+  fill: none;
+  stroke: var(--rule-accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+  animation: pd-arrow 420ms 1260ms ease-out both;
+}
+@keyframes pd-arrow {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+}
+
+/* ---------------- Table Jackpot: three points unlock the vault ---------------- */
+.is-tableJackpot .tj-puck {
+  animation: tj-puck 320ms 100ms cubic-bezier(0.5, 0, 0.4, 1.3) both;
+}
+.is-tableJackpot .tj-puck-1 {
+  animation-delay: 300ms;
+}
+.is-tableJackpot .tj-puck-2 {
+  animation-delay: 500ms;
+}
+@keyframes tj-puck {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) translateY(-30px);
+  }
+  30% {
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-tableJackpot .tj-beam {
+  stroke: #ffd970;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 1 13;
+  opacity: 0.4;
+  animation: tj-beam 420ms 260ms ease-out both;
+}
+.is-tableJackpot .tj-beam-1 {
+  animation-delay: 460ms;
+}
+.is-tableJackpot .tj-beam-2 {
+  animation-delay: 660ms;
+}
+@keyframes tj-beam {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+}
+.is-tableJackpot .tj-notch {
+  fill: #ffd970;
+  animation: hr-fade 160ms 380ms both;
+}
+.is-tableJackpot .tj-notch-1 {
+  animation-delay: 580ms;
+}
+.is-tableJackpot .tj-notch-2 {
+  animation-delay: 780ms;
+}
+.is-tableJackpot .tj-lock {
+  opacity: 0;
+  animation: tj-lock 1000ms ease-in both;
+}
+@keyframes tj-lock {
+  0% {
     opacity: 0;
     transform: scale(0.7);
   }
+  15%,
+  80% {
+    opacity: 1;
+    transform: none;
+  }
+  86% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(0, 1.06);
+  }
 }
-@keyframes house-reroll-arrow {
-  0%,
-  35% {
+.is-tableJackpot .tj-chip {
+  animation: tj-chip 520ms 1000ms cubic-bezier(0.2, 0.8, 0.3, 1.1) both;
+}
+@keyframes tj-chip {
+  0% {
     opacity: 0;
-    transform: rotate(-80deg) scale(0.7);
+    transform: scale(0, 1.06);
+  }
+  10% {
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  75% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: none;
+  }
+}
+.is-tableJackpot .tj-rays {
+  fill: url(#hr-ray);
+  opacity: 0.6;
+  animation: ls-rays 900ms 1040ms cubic-bezier(0.1, 0.7, 0.3, 1) both;
+}
+.is-tableJackpot .tj-glow {
+  animation: hp-glow 900ms 1000ms ease-out both;
+}
+.is-tableJackpot .tj-coin {
+  opacity: 0;
+  animation: tj-coin 720ms calc(1040ms + var(--i) * 25ms) linear both;
+}
+@keyframes tj-coin {
+  0% {
+    opacity: 1;
+    transform: scale(0.4);
+    animation-timing-function: cubic-bezier(0.1, 0.6, 0.4, 1);
+  }
+  42% {
+    transform: translate(var(--x), var(--y)) scale(1, 0.4);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.6);
   }
   70% {
-    opacity: 0.95;
-  }
-}
-@keyframes house-reroll-left {
-  0%,
-  28% {
     opacity: 1;
-    transform: rotate(-11deg);
+    transform: translate(calc(var(--x) * 1.15), calc(var(--y) + 120px)) scale(1);
   }
-  65% {
+  100% {
     opacity: 0;
-    transform: translate(8%, -62%) rotate(-110deg);
+    transform: translate(calc(var(--x) * 1.3), calc(var(--y) + 320px))
+      scale(0.6, 1);
   }
 }
-@keyframes house-reroll-right {
-  0%,
-  32% {
-    opacity: 1;
-    transform: rotate(11deg);
-  }
-  69% {
-    opacity: 0;
-    transform: translate(-8%, -67%) rotate(120deg);
-  }
-}
-@keyframes house-wind-flip {
-  from {
-    opacity: 0;
-    transform: translateY(-66%) rotate(calc(var(--tilt) * -6)) scale(0.8);
-  }
-}
-@keyframes house-pair-land {
-  from {
-    opacity: 0;
-    transform: translate(var(--inbound), -38%) rotate(0) scale(0.84);
-  }
-}
-@keyframes house-hard-ring {
-  from {
-    opacity: 0;
-    transform: scale(0.86);
-  }
-  65% {
-    opacity: 1;
-  }
-}
-@keyframes house-emblem-rise {
-  from {
-    opacity: 0;
-    transform: translateY(24%) scale(0.68);
-  }
-}
-@keyframes house-marker-rise {
-  from {
-    opacity: 0.12;
-    transform: translateY(35%);
-  }
-}
-@keyframes house-cash-leave {
-  from {
-    opacity: 1;
-    transform: translateX(23%);
-  }
-}
-@keyframes house-cash-return {
-  from {
-    opacity: 0;
-    transform: translate(-95%, -85%) rotate(-12deg);
-  }
-}
-@keyframes house-pass-slide {
-  from {
-    transform: translateX(-246%) rotate(-14deg);
-  }
-  45% {
-    transform: translate(-115%, -48%) rotate(0);
-  }
-}
+
 @media (prefers-reduced-motion: reduce) {
-  .house-rule-art *,
-  .house-rule-art .house-art-markers > * {
+  .house-rule-art * {
     animation: none !important;
   }
-  .house-wind-left,
-  .house-wind-right {
-    opacity: 0;
+  .house-rule-art svg {
+    animation: hr-fade 400ms ease-out both !important;
   }
 }

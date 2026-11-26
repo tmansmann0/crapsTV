@@ -58,9 +58,29 @@ function Defs() {
         <stop offset="1" stopColor="#4a2f07" />
       </linearGradient>
       <radialGradient id="hr-glow">
-        <stop offset="0" stopColor="var(--rule-accent)" stopOpacity="0.55" />
-        <stop offset="0.45" stopColor="var(--rule-accent)" stopOpacity="0.16" />
-        <stop offset="1" stopColor="var(--rule-accent)" stopOpacity="0" />
+        <stop offset="0" className="hr-stop-accent" stopOpacity="0.55" />
+        <stop offset="0.45" className="hr-stop-accent" stopOpacity="0.16" />
+        <stop offset="1" className="hr-stop-accent" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient
+        id="hr-ray"
+        gradientUnits="userSpaceOnUse"
+        cx="0"
+        cy="0"
+        r="290"
+      >
+        <stop offset="0.15" stopColor="#ffe38a" stopOpacity="0.9" />
+        <stop offset="1" stopColor="#ffe38a" stopOpacity="0" />
+      </radialGradient>
+      <radialGradient
+        id="hr-ray-accent"
+        gradientUnits="userSpaceOnUse"
+        cx="0"
+        cy="0"
+        r="230"
+      >
+        <stop offset="0.3" className="hr-stop-accent" stopOpacity="0.9" />
+        <stop offset="1" className="hr-stop-accent" stopOpacity="0" />
       </radialGradient>
       <radialGradient id="hr-gold-glow">
         <stop offset="0" stopColor="#ffe38a" stopOpacity="0.8" />
@@ -123,7 +143,15 @@ function Chip({ fill = "#c8323a", edge = "#7a1820", top = 0 }) {
         opacity="0.85"
       />
       <ellipse rx="60" ry="22" fill={fill} stroke="#ffffff30" />
-      <ellipse rx="40" ry="14" fill="none" stroke="#fff2d0" strokeWidth="3" strokeDasharray="10 9" opacity="0.8" />
+      <ellipse
+        rx="40"
+        ry="14"
+        fill="none"
+        stroke="#fff2d0"
+        strokeWidth="3"
+        strokeDasharray="10 9"
+        opacity="0.8"
+      />
     </g>
   );
 }
@@ -131,8 +159,18 @@ function Chip({ fill = "#c8323a", edge = "#7a1820", top = 0 }) {
 function Puck({ label, sub, lit }) {
   return (
     <g>
-      <circle r="52" fill={lit ? "#fff7e2" : "#1b3a2d"} stroke={lit ? "#f5c757" : "#5f7d6b"} strokeWidth="6" />
-      <circle r="41" fill="none" stroke={lit ? "#d39a2a" : "#3e5c4b"} strokeWidth="2" />
+      <circle
+        r="52"
+        fill={lit ? "#fff7e2" : "#1b3a2d"}
+        stroke={lit ? "#f5c757" : "#5f7d6b"}
+        strokeWidth="6"
+      />
+      <circle
+        r="41"
+        fill="none"
+        stroke={lit ? "#d39a2a" : "#3e5c4b"}
+        strokeWidth="2"
+      />
       <text
         y={sub ? 9 : 16}
         textAnchor="middle"
@@ -143,7 +181,13 @@ function Puck({ label, sub, lit }) {
         {label}
       </text>
       {sub && (
-        <text y="31" textAnchor="middle" className="hr-label" fontSize="12" fill={lit ? "#8d5f12" : "#6c8a78"}>
+        <text
+          y="31"
+          textAnchor="middle"
+          className="hr-label"
+          fontSize="12"
+          fill={lit ? "#8d5f12" : "#6c8a78"}
+        >
           {sub}
         </text>
       )}
@@ -153,7 +197,11 @@ function Puck({ label, sub, lit }) {
 
 function Star({ r = 14 }) {
   const k = r * 0.22;
-  return <path d={`M0 ${-r} L${k} ${-k} L${r} 0 L${k} ${k} L0 ${r} L${-k} ${k} L${-r} 0 L${-k} ${-k} Z`} />;
+  return (
+    <path
+      d={`M0 ${-r} L${k} ${-k} L${r} 0 L${k} ${k} L0 ${r} L${-k} ${k} L${-r} 0 L${-k} ${-k} Z`}
+    />
+  );
 }
 
 function Rays({ count = 18, inner = 70, outer = 250, className = "" }) {
@@ -161,7 +209,8 @@ function Rays({ count = 18, inner = 70, outer = 250, className = "" }) {
   const half = step * 0.22 * (Math.PI / 180);
   const d = Array.from({ length: count }, (_, i) => {
     const a = i * step * (Math.PI / 180);
-    const p = (r, o) => `${(Math.cos(a + o) * r).toFixed(1)} ${(Math.sin(a + o) * r).toFixed(1)}`;
+    const p = (r, o) =>
+      `${(Math.cos(a + o) * r).toFixed(1)} ${(Math.sin(a + o) * r).toFixed(1)}`;
     return `M${p(inner, 0)} L${p(outer, -half)} L${p(outer, half)} Z`;
   }).join(" ");
   return <path className={className} d={d} />;
@@ -171,13 +220,21 @@ function Rays({ count = 18, inner = 70, outer = 250, className = "" }) {
 function SecondWind() {
   return (
     <>
-      <circle cx="320" cy="210" r="190" fill="url(#hr-glow)" className="hr-fade" />
+      <circle
+        cx="320"
+        cy="210"
+        r="190"
+        fill="url(#hr-glow)"
+        className="hr-fade"
+      />
       <g transform="translate(320 210)">
-        <g className="sw-loop hr-c">
-          <path d="M-150 0 A150 150 0 0 1 106 -106" className="sw-arc" />
-          <path d="M150 0 A150 150 0 0 1 -106 106" className="sw-arc" />
-          <path d="M92 -128 L124 -100 L84 -88 Z" className="sw-arrowhead" />
-          <path d="M-92 128 L-124 100 L-84 88 Z" className="sw-arrowhead" />
+        <g transform="scale(0.88)">
+          <g className="sw-loop hr-c">
+            <path d="M-150 0 A150 150 0 0 1 106 -106" className="sw-arc" />
+            <path d="M150 0 A150 150 0 0 1 -106 106" className="sw-arc" />
+            <path d="M92 -128 L124 -100 L84 -88 Z" className="sw-arrowhead" />
+            <path d="M-92 128 L-124 100 L-84 88 Z" className="sw-arrowhead" />
+          </g>
         </g>
       </g>
       {/* the seven that gets swept away */}
@@ -198,16 +255,31 @@ function SecondWind() {
         </g>
         <g transform="translate(321 92)" className="sw-seven">
           <rect x="-40" y="-24" width="80" height="44" rx="22" fill="#c8323a" />
-          <text y="12" textAnchor="middle" className="hr-num" fontSize="34" fill="#fff2d0">
+          <text
+            y="12"
+            textAnchor="middle"
+            className="hr-num"
+            fontSize="34"
+            fill="#fff2d0"
+          >
             7
           </text>
         </g>
       </g>
       {/* the gust */}
       <g className="sw-gust" fill="none" strokeLinecap="round">
-        <path d="M-40 150 C 120 120, 260 190, 420 150 S 640 130, 700 160" strokeWidth="7" />
-        <path d="M-80 215 C 100 185, 300 250, 470 205 S 640 190, 720 215" strokeWidth="11" />
-        <path d="M-20 280 C 150 255, 300 310, 440 270 S 620 260, 700 285" strokeWidth="5" />
+        <path
+          d="M-40 150 C 120 120, 260 190, 420 150 S 640 130, 700 160"
+          strokeWidth="7"
+        />
+        <path
+          d="M-80 215 C 100 185, 300 250, 470 205 S 640 190, 720 215"
+          strokeWidth="11"
+        />
+        <path
+          d="M-20 280 C 150 255, 300 310, 440 270 S 620 260, 700 285"
+          strokeWidth="5"
+        />
       </g>
       {/* fresh dice, faces still turning */}
       <g transform="translate(252 212)">
@@ -224,11 +296,20 @@ function SecondWind() {
           </g>
         </g>
       </g>
-      <g className="sw-tag hr-c" transform="translate(320 352)">
-        <rect x="-86" y="-20" width="172" height="40" rx="20" className="hr-pill" />
-        <text y="8" textAnchor="middle" className="hr-label" fontSize="20">
-          REROLL
-        </text>
+      <g transform="translate(320 366)">
+        <g className="sw-tag hr-c">
+          <rect
+            x="-86"
+            y="-20"
+            width="172"
+            height="40"
+            rx="20"
+            className="hr-pill"
+          />
+          <text y="8" textAnchor="middle" className="hr-label" fontSize="20">
+            REROLL
+          </text>
+        </g>
       </g>
     </>
   );
@@ -238,7 +319,13 @@ function SecondWind() {
 function HardPoint() {
   return (
     <>
-      <circle cx="320" cy="200" r="200" fill="url(#hr-gold-glow)" className="hp-glow" />
+      <circle
+        cx="320"
+        cy="200"
+        r="200"
+        fill="url(#hr-gold-glow)"
+        className="hp-glow"
+      />
       <g transform="translate(320 200)">
         <circle r="150" className="hp-shock hp-shock-1" />
         <circle r="150" className="hp-shock hp-shock-2" />
@@ -249,15 +336,44 @@ function HardPoint() {
       <g className="hp-shake">
         <g transform="translate(320 200)">
           <g className="hp-ring hr-c">
-            <circle r="150" fill="none" stroke="url(#hr-gold)" strokeWidth="22" />
+            <circle
+              r="150"
+              fill="none"
+              stroke="url(#hr-gold)"
+              strokeWidth="22"
+            />
             <circle r="164" fill="none" stroke="#f8d77b" strokeWidth="2" />
             <circle r="136" fill="none" stroke="#7a4f0e" strokeWidth="2" />
             {Array.from({ length: 24 }, (_, i) => (
-              <rect key={i} x="-2" y="-160" width="4" height="20" fill="#6b440b" transform={`rotate(${i * 15})`} opacity="0.55" />
+              <rect
+                key={i}
+                x="-2"
+                y="-160"
+                width="4"
+                height="20"
+                fill="#6b440b"
+                transform={`rotate(${i * 15})`}
+                opacity="0.55"
+              />
             ))}
             <g transform="translate(0 -150)">
-              <rect x="-62" y="-20" width="124" height="40" rx="8" fill="#12382a" stroke="#f5c757" strokeWidth="3" />
-              <text y="9" textAnchor="middle" className="hr-label" fontSize="24" fill="#ffe7a1">
+              <rect
+                x="-62"
+                y="-20"
+                width="124"
+                height="40"
+                rx="8"
+                fill="#12382a"
+                stroke="#f5c757"
+                strokeWidth="3"
+              />
+              <text
+                y="9"
+                textAnchor="middle"
+                className="hr-label"
+                fontSize="24"
+                fill="#ffe7a1"
+              >
                 HARD
               </text>
             </g>
@@ -302,7 +418,14 @@ function HotHand() {
   const xs = [140, 320, 500];
   return (
     <>
-      <ellipse cx="320" cy="230" rx="320" ry="170" fill="url(#hr-glow)" className="hh-heat" />
+      <ellipse
+        cx="320"
+        cy="230"
+        rx="320"
+        ry="170"
+        fill="url(#hr-glow)"
+        className="hh-heat"
+      />
       {xs.map((x, i) => (
         <g key={x} transform={`translate(${x} 250)`}>
           <g className={`hh-fire hh-fire-${i}`}>
@@ -319,8 +442,15 @@ function HotHand() {
         </g>
       ))}
       <g className="hh-streak">
-        <path d="M-260 236 C -140 200, -40 212, 40 236 C -40 260, -140 272, -260 236 Z" fill="#ffd36b" opacity="0.95" />
-        <path d="M-300 236 C -180 214, -80 222, 0 236 C -80 250, -180 258, -300 236 Z" fill="#fff4cf" />
+        <path
+          d="M-260 236 C -140 200, -40 212, 40 236 C -40 260, -140 272, -260 236 Z"
+          fill="#ffd36b"
+          opacity="0.95"
+        />
+        <path
+          d="M-300 236 C -180 214, -80 222, 0 236 C -80 250, -180 258, -300 236 Z"
+          fill="#fff4cf"
+        />
       </g>
       <g className="hh-embers" fill="#ffcf6a">
         {[
@@ -333,7 +463,14 @@ function HotHand() {
           [260, 330],
           [420, 335],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={i % 3 ? 4 : 6} className="hh-ember" style={{ "--i": i }} />
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r={i % 3 ? 4 : 6}
+            className="hh-ember"
+            style={{ "--i": i }}
+          />
         ))}
       </g>
     </>
@@ -342,58 +479,98 @@ function HotHand() {
 
 /* ---------------- Craps Cashback ---------------- */
 function CrapsCashback() {
-  const chip = (i) => <Chip key={i} top={-i * 16} fill="#2f6fc4" edge="#173a6e" />;
+  const chip = (i) => (
+    <Chip key={i} top={-i * 16} fill="#2f6fc4" edge="#173a6e" />
+  );
   return (
     <>
-      <circle cx="320" cy="220" r="200" fill="url(#hr-glow)" className="hr-fade" />
+      <circle
+        cx="320"
+        cy="220"
+        r="200"
+        fill="url(#hr-glow)"
+        className="hr-fade"
+      />
       {/* the full stake's footprint */}
-      <g transform="translate(170 300)" className="cb-ghost">
-        <path d="M-64 -100 V14 A64 24 0 0 0 64 14 V-100" fill="none" />
-        <ellipse cy="-100" rx="64" ry="24" fill="none" />
+      <g transform="translate(170 300) scale(1.2)" className="cb-ghost">
+        <path d="M-64 -84 V14 A64 24 0 0 0 64 14 V-84" fill="none" />
+        <ellipse cy="-84" rx="64" ry="24" fill="none" />
       </g>
       {/* lower half: lost to the house */}
-      <g transform="translate(170 300)">
-        <g className="cb-lost">
-          {[0, 1, 2].map(chip)}
-        </g>
+      <g transform="translate(170 300) scale(1.2)">
+        <g className="cb-lost">{[0, 1, 2].map(chip)}</g>
       </g>
       {/* return path */}
       <path className="cb-path" d="M190 160 C 230 40, 420 40, 470 196" />
       {[0, 1, 2, 3, 4, 5, 6].map((i) => {
         const t = (i + 1) / 8;
         const u = 1 - t;
-        const x = u ** 3 * 190 + 3 * u * u * t * 230 + 3 * u * t * t * 420 + t ** 3 * 470;
-        const y = u ** 3 * 160 + 3 * u * u * t * 40 + 3 * u * t * t * 40 + t ** 3 * 196;
-        return <circle key={i} cx={x} cy={y} r="6" className="cb-dot" style={{ "--i": i }} />;
+        const x =
+          u ** 3 * 190 +
+          3 * u * u * t * 230 +
+          3 * u * t * t * 420 +
+          t ** 3 * 470;
+        const y =
+          u ** 3 * 160 + 3 * u * u * t * 40 + 3 * u * t * t * 40 + t ** 3 * 196;
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r="6"
+            className="cb-dot"
+            style={{ "--i": i }}
+          />
+        );
       })}
       <path d="M452 186 L470 214 L488 184 Z" className="cb-head" />
       {/* the returned half travels the arc */}
-      <g transform="translate(470 300)">
-        <g className="cb-back">
-          {[0, 1, 2].map(chip)}
-        </g>
+      <g transform="translate(470 300) scale(1.2)">
+        <g className="cb-back">{[0, 1, 2].map(chip)}</g>
       </g>
-      <g transform="translate(470 300)" className="cb-badge hr-c">
-        <g transform="translate(82 -60)">
-          <circle r="40" fill="url(#hr-gold)" stroke="#fff1b8" strokeWidth="3" />
-          <text y="14" textAnchor="middle" className="hr-num" fontSize="40" fill="#3a2506">
+      <g transform="translate(560 216)">
+        <g className="cb-badge hr-c">
+          <circle
+            r="40"
+            fill="url(#hr-gold)"
+            stroke="#fff1b8"
+            strokeWidth="3"
+          />
+          <text
+            y="14"
+            textAnchor="middle"
+            className="hr-num"
+            fontSize="40"
+            fill="#3a2506"
+          >
             ½
           </text>
         </g>
       </g>
-      <g transform="translate(170 352)" className="cb-tag">
-        <text textAnchor="middle" className="hr-label" fontSize="18" fill="#9fb8a9">
+      <g transform="translate(170 378)" className="cb-tag">
+        <text
+          textAnchor="middle"
+          className="hr-label"
+          fontSize="18"
+          fill="#9fb8a9"
+        >
           STAKE
         </text>
       </g>
-      <g transform="translate(470 352)" className="cb-tag cb-tag-back">
+      <g transform="translate(470 378)" className="cb-tag cb-tag-back">
         <text textAnchor="middle" className="hr-label" fontSize="18">
           BACK TO YOU
         </text>
       </g>
       <g transform="translate(170 110)" className="cb-craps hr-c">
         <rect x="-66" y="-22" width="132" height="44" rx="10" fill="#c8323a" />
-        <text y="10" textAnchor="middle" className="hr-label" fontSize="26" fill="#fff2d0">
+        <text
+          y="10"
+          textAnchor="middle"
+          className="hr-label"
+          fontSize="26"
+          fill="#fff2d0"
+        >
           CRAPS
         </text>
       </g>
@@ -410,7 +587,13 @@ function LuckySeven() {
       <clipPath id="ls-clip">
         <path d={SEVEN} transform="translate(320 200)" />
       </clipPath>
-      <circle cx="320" cy="200" r="210" fill="url(#hr-gold-glow)" className="ls-glow" />
+      <circle
+        cx="320"
+        cy="200"
+        r="210"
+        fill="url(#hr-gold-glow)"
+        className="ls-glow"
+      />
       <g transform="translate(320 200)">
         <g className="ls-rays hr-c">
           <Rays count={20} inner={60} outer={260} />
@@ -422,14 +605,40 @@ function LuckySeven() {
       <g className="ls-seven-wrap">
         <g transform="translate(320 200)">
           <g className="ls-seven hr-c">
-            <path d={SEVEN} transform="translate(10 12)" fill="url(#hr-gold-edge)" />
+            <path
+              d={SEVEN}
+              transform="translate(10 12)"
+              fill="url(#hr-gold-edge)"
+            />
             <path d={SEVEN} transform="translate(5 6)" fill="#7a4d0f" />
-            <path d={SEVEN} fill="url(#hr-gold)" stroke="#fff1b8" strokeWidth="4" strokeLinejoin="round" />
-            <path d={SEVEN} fill="none" stroke="#8a5a12" strokeWidth="2" transform="scale(0.88) translate(2 4)" opacity="0.6" />
+            <path
+              d={SEVEN}
+              fill="url(#hr-gold)"
+              stroke="#fff1b8"
+              strokeWidth="4"
+              strokeLinejoin="round"
+            />
+            <path
+              d={SEVEN}
+              fill="none"
+              stroke="#8a5a12"
+              strokeWidth="2"
+              transform="scale(0.88) translate(2 4)"
+              opacity="0.6"
+            />
           </g>
         </g>
         <g clipPath="url(#ls-clip)">
-          <rect x="120" y="40" width="90" height="340" fill="url(#hr-shine)" className="ls-shine" transform="skewX(-18)" />
+          <g transform="skewX(-18)">
+            <rect
+              x="120"
+              y="40"
+              width="90"
+              height="340"
+              fill="url(#hr-shine)"
+              className="ls-shine"
+            />
+          </g>
         </g>
       </g>
       <g className="ls-stars" fill="#fff4c6">
@@ -448,11 +657,20 @@ function LuckySeven() {
           </g>
         ))}
       </g>
-      <g className="ls-tag hr-c" transform="translate(320 368)">
-        <rect x="-70" y="-22" width="140" height="44" rx="22" className="hr-pill" />
-        <text y="9" textAnchor="middle" className="hr-label" fontSize="24">
-          2 : 1
-        </text>
+      <g transform="translate(320 368)">
+        <g className="ls-tag hr-c">
+          <rect
+            x="-70"
+            y="-22"
+            width="140"
+            height="44"
+            rx="22"
+            className="hr-pill"
+          />
+          <text y="9" textAnchor="middle" className="hr-label" fontSize="24">
+            2 : 1
+          </text>
+        </g>
       </g>
     </>
   );
@@ -466,7 +684,14 @@ function Seat({ label }) {
       <circle cy="-16" r="22" className="pd-seat-figure" />
       <path d="M-38 34 C -34 6, 34 6, 38 34 Z" className="pd-seat-figure" />
       <g transform="translate(0 96)">
-        <rect x="-74" y="-18" width="148" height="36" rx="18" className="pd-plate" />
+        <rect
+          x="-74"
+          y="-18"
+          width="148"
+          height="36"
+          rx="18"
+          className="pd-plate"
+        />
         <text y="7" textAnchor="middle" className="hr-label" fontSize="17">
           {label}
         </text>
@@ -477,13 +702,20 @@ function Seat({ label }) {
 
 function PassTheDice() {
   const arc = (t) => {
-    const x = 120 + (520 - 120) * t;
-    const y = 150 - 4 * 120 * t * (1 - t);
+    const x = 150 + 370 * t;
+    const y = 170 - 65 * t - 380 * t * (1 - t);
     return [x, y];
   };
   return (
     <>
-      <ellipse cx="320" cy="230" rx="300" ry="160" fill="url(#hr-glow)" className="hr-fade" />
+      <ellipse
+        cx="320"
+        cy="230"
+        rx="300"
+        ry="160"
+        fill="url(#hr-glow)"
+        className="hr-fade"
+      />
       <g transform="translate(110 220)">
         <g className="pd-from">
           <Seat label="SHOOTER" />
@@ -497,7 +729,16 @@ function PassTheDice() {
       </g>
       {Array.from({ length: 9 }, (_, i) => {
         const [x, y] = arc((i + 1) / 10);
-        return <circle key={i} cx={x} cy={y} r={4 + i * 0.6} className="pd-trail" style={{ "--i": i }} />;
+        return (
+          <circle
+            key={i}
+            cx={x}
+            cy={y}
+            r={4 + i * 0.6}
+            className="pd-trail"
+            style={{ "--i": i }}
+          />
+        );
       })}
       <g className="pd-toss">
         <g className="pd-spin hr-c">
@@ -534,49 +775,125 @@ function TableJackpot() {
   ];
   return (
     <>
-      <circle cx="320" cy="165" r="220" fill="url(#hr-gold-glow)" className="tj-glow" />
+      <circle
+        cx="320"
+        cy="165"
+        r="220"
+        fill="url(#hr-gold-glow)"
+        className="tj-glow"
+      />
       <g transform="translate(320 165)">
         <g className="tj-rays hr-c">
           <Rays count={16} inner={90} outer={300} />
         </g>
       </g>
       {pucks.map(([x, y], i) => (
-        <line key={i} x1={x} y1={y} x2="320" y2="165" className={`tj-beam tj-beam-${i}`} />
+        <line
+          key={i}
+          x1={x}
+          y1={y}
+          x2="320"
+          y2="165"
+          className={`tj-beam tj-beam-${i}`}
+        />
       ))}
       <g transform="translate(320 165)">
         {/* locked vault disc */}
         <g className="tj-lock hr-c">
           <circle r="104" fill="#173c2e" stroke="#5f7d6b" strokeWidth="6" />
-          <circle r="80" fill="none" stroke="#3e5c4b" strokeWidth="3" strokeDasharray="6 8" />
-          <path d="M-20 -10 V-30 A20 20 0 0 1 20 -30 V-10" fill="none" stroke="#88a593" strokeWidth="9" />
+          <circle
+            r="80"
+            fill="none"
+            stroke="#3e5c4b"
+            strokeWidth="3"
+            strokeDasharray="6 8"
+          />
+          <path
+            d="M-20 -10 V-30 A20 20 0 0 1 20 -30 V-10"
+            fill="none"
+            stroke="#88a593"
+            strokeWidth="9"
+          />
           <rect x="-32" y="-12" width="64" height="48" rx="8" fill="#88a593" />
-          {[-120, 0, 120].map((a, i) => (
-            <circle key={a} r="10" cy="-92" transform={`rotate(${a + 180})`} className={`tj-notch tj-notch-${i}`} />
+          {[-120, 180, 120].map((a, i) => (
+            <circle
+              key={a}
+              r="10"
+              cy="-92"
+              transform={`rotate(${a})`}
+              className={`tj-notch tj-notch-${i}`}
+            />
           ))}
         </g>
         {/* the oversized jackpot chip */}
         <g className="tj-chip hr-c">
-          <circle r="118" fill="url(#hr-gold)" stroke="#fff1b8" strokeWidth="4" />
+          <circle
+            r="118"
+            fill="url(#hr-gold)"
+            stroke="#fff1b8"
+            strokeWidth="4"
+          />
           {Array.from({ length: 8 }, (_, i) => (
-            <rect key={i} x="-13" y="-118" width="26" height="30" fill="#12382a" transform={`rotate(${i * 45})`} />
+            <rect
+              key={i}
+              x="-13"
+              y="-118"
+              width="26"
+              height="30"
+              fill="#12382a"
+              transform={`rotate(${i * 45})`}
+            />
           ))}
           <circle r="86" fill="#12382a" stroke="#f5c757" strokeWidth="4" />
-          <circle r="74" fill="none" stroke="#f5c757" strokeWidth="2" strokeDasharray="4 7" />
+          <circle
+            r="74"
+            fill="none"
+            stroke="#f5c757"
+            strokeWidth="2"
+            strokeDasharray="4 7"
+          />
           <g transform="translate(0 -26)" fill="#ffd970">
             <path d="M-26 -18 H26 V0 C26 18, 14 30, 0 30 C -14 30, -26 18, -26 0 Z" />
-            <path d="M-26 -10 C-46 -10, -46 14, -20 16 M26 -10 C46 -10, 46 14, 20 16" fill="none" stroke="#ffd970" strokeWidth="6" />
+            <path
+              d="M-26 -10 C-46 -10, -46 14, -20 16 M26 -10 C46 -10, 46 14, 20 16"
+              fill="none"
+              stroke="#ffd970"
+              strokeWidth="6"
+            />
             <rect x="-6" y="28" width="12" height="12" />
             <rect x="-20" y="38" width="40" height="8" rx="2" />
           </g>
-          <text y="48" textAnchor="middle" className="hr-label" fontSize="22" fill="#ffe7a1">
+          <text
+            y="48"
+            textAnchor="middle"
+            className="hr-label"
+            fontSize="22"
+            fill="#ffe7a1"
+          >
             JACKPOT
           </text>
         </g>
         <g className="tj-coins">
           {coins.map(([x, y, i]) => (
-            <g key={i} className="tj-coin" style={{ "--x": `${x}px`, "--y": `${y}px`, "--i": i }}>
-              <ellipse rx="15" ry="15" fill="url(#hr-gold)" stroke="#fff1b8" strokeWidth="2" />
-              <ellipse rx="8" ry="8" fill="none" stroke="#8a5a12" strokeWidth="2" />
+            <g
+              key={i}
+              className="tj-coin"
+              style={{ "--x": `${x}px`, "--y": `${y}px`, "--i": i }}
+            >
+              <ellipse
+                rx="15"
+                ry="15"
+                fill="url(#hr-gold)"
+                stroke="#fff1b8"
+                strokeWidth="2"
+              />
+              <ellipse
+                rx="8"
+                ry="8"
+                fill="none"
+                stroke="#8a5a12"
+                strokeWidth="2"
+              />
             </g>
           ))}
         </g>
