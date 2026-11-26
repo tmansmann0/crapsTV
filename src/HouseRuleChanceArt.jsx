@@ -72,8 +72,25 @@ function Die({ kind, value }) {
 }
 
 function Bolt() {
-  const d =
-    "M1700 -60 L1236 248 L1330 282 L888 548 L1000 584 L520 860 L606 884 L-80 1080";
+  const channel = [
+    "M1535 43 L1491 76 L1458 73 L1437 105 L1392 117 L1383 144 L1332 158",
+    "L1310 187 L1261 185 L1254 219 L1201 243 L1186 233 L1158 282 L1106 295",
+    "L1085 329 L1049 336 L1020 373 L969 383 L945 428 L897 427 L876 467",
+    "L841 480 L828 508 L781 519 L758 562 L719 574 L730 593 L673 618",
+    "L659 642 L613 658 L596 686 L564 688 L546 729 L496 755 L479 746",
+    "L443 789 L392 805 L365 835 L318 839 L277 859",
+  ].join(" ");
+  const forks = [
+    "M1383 144 L1360 168 L1314 164 L1295 182 L1251 177 L1226 193 L1177 196",
+    "M1158 282 L1171 319 L1134 352 L1142 378 L1100 410 L1087 442",
+    "M945 428 L914 405 L870 414 L848 390 L809 394 L774 368 L718 373",
+    "M828 508 L846 538 L827 557 L834 588 L809 623",
+    "M673 618 L622 609 L597 629 L561 624 L538 645 L488 640 L452 665",
+  ];
+  const filaments =
+    "M1251 177 L1238 152 L1209 154 M1134 352 L1165 362 L1158 402 " +
+    "M848 390 L828 360 L795 342 M799 372 L781 331 L752 325 " +
+    "M561 624 L548 597 L516 586 M392 805 L345 802 L327 817 L294 814";
   return (
     <svg
       className="hrc-bolt"
@@ -84,17 +101,29 @@ function Bolt() {
       <g className="hrc-bolt-strike">
         <path
           className="hrc-bolt-glow"
-          d={d}
+          d={channel}
+          pathLength="1"
           vectorEffect="non-scaling-stroke"
         />
         <path
           className="hrc-bolt-core"
-          d={d}
+          d={channel}
+          pathLength="1"
           vectorEffect="non-scaling-stroke"
         />
+        {forks.map((d, index) => (
+          <path
+            key={d}
+            className="hrc-bolt-fork"
+            d={d}
+            pathLength="1"
+            vectorEffect="non-scaling-stroke"
+            style={{ "--fork-delay": `${35 + index * 17}ms` }}
+          />
+        ))}
         <path
-          className="hrc-bolt-fork"
-          d="M888 548 L760 520 L700 590 M1236 248 L1150 200 L1090 236"
+          className="hrc-bolt-filaments"
+          d={filaments}
           vectorEffect="non-scaling-stroke"
         />
       </g>
