@@ -73,29 +73,15 @@ def house_rule_stinger(key, rate=24000):
     return mix * (0.28 / np.max(np.abs(mix)))
 
 
-def chance_roll_cues(rate=44100):
-    """Return a short electric impact and a rising first-die cue."""
-    rng = np.random.default_rng(2716)
-    t = np.arange(int(rate * 0.49)) / rate
-    bass = np.sin(2 * np.pi * (52 * t + 0.97 * (1 - np.exp(-t / 0.017))))
-    sparks = np.zeros_like(t)
-    for delay, gain in [(0.0, 0.43), (0.033, 0.31), (0.072, 0.17)]:
-        onset = int(delay * rate)
-        tail = t[:len(t) - onset]
-        grit = np.diff(rng.uniform(-1, 1, len(tail) + 1))
-        sparks[onset:] += gain * grit * np.exp(-tail / 0.010)
-    arc = np.sin(2 * np.pi * (470 * t + 13 * (1 - np.exp(-t / 0.028))))
-    strike = 0.45 * bass * np.exp(-t / 0.087) + sparks + 0.19 * arc * np.exp(-t / 0.12)
-    strike *= np.minimum(t / 0.002, 1) * np.minimum((0.49 - t) / 0.055, 1)
-
+def chance_roll_tension(rate=44100):
+    """Return a rising cue between the first and second die reveals."""
     duration = 0.69
     t = np.arange(int(rate * duration)) / rate
     phase = 2 * np.pi * (102 * t + 28 * t**2)
     rise = np.sin(phase) + 0.3 * np.sin(phase * 2.01) + 0.15 * np.sin(phase * 3)
     swell = np.minimum(t / 0.14, 1) * np.minimum((duration - t) / 0.075, 1)
     tick = np.sin(2 * np.pi * 970 * t) * np.exp(-t / 0.025)
-    anticipation = 0.53 * rise * swell * (0.65 + 0.35 * t / duration) + 0.38 * tick
-    return {"house-electric": strike, "house-tension": anticipation}
+    return 0.53 * rise * swell * (0.65 + 0.35 * t / duration) + 0.38 * tick
 
 
 if __name__ == "__main__":
@@ -103,10 +89,10 @@ if __name__ == "__main__":
     import subprocess
 
     output = Path(__file__).resolve().parents[1] / "public" / "audio" / "table"
-    for name, cue in chance_roll_cues().items():
-        normalized = cue * (0.64 / np.max(np.abs(cue)))
-        subprocess.run([
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "pipe:0",
-            "-c:a", "libmp3lame", "-b:a", "128k", str(output / f"{name}.mp3"),
-        ], input=normalized.astype("<f4").tobytes(), check=True)
+    cue = chance_roll_tension()
+    normalized = cue * (0.64 / np.max(np.abs(cue)))
+    subprocess.run([
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-f", "f32le", "-ar", "44100", "-ac", "1", "-i", "pipe:0",
+        "-c:a", "libmp3lame", "-b:a", "128k", str(output / "house-tension.mp3"),
+    ], input=normalized.astype("<f4").tobytes(), check=True)
