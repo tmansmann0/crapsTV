@@ -68,6 +68,7 @@ export const BONUS_NUMBERS = {
   "bonus-all": ALL_POINTS,
 };
 export const MAX_BANKROLL_ADJUSTMENT = 100000000;
+const DEFAULT_HOUSE_RULES = Object.freeze({ secondWind: false });
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 const oddsRatio = (numerator, denominator) => {
   const divisor = gcd(numerator, denominator);
@@ -143,6 +144,7 @@ export function createState(code = "LOCAL") {
       startingBank: 100000,
       minBet: 500,
       teach: false,
+      houseRules: { ...DEFAULT_HOUSE_RULES },
       rollCooldownSeconds: DEFAULT_ROLL_COOLDOWN_SECONDS,
       botRollDelaySeconds: DEFAULT_BOT_ROLL_DELAY_SECONDS,
     },
@@ -641,6 +643,7 @@ export function configure(s, id, changes) {
     drinkingMode,
     ...(drinkingMode && { drinkingRules: normalizedDrinkRules }),
     teach,
+    houseRules: s.config.houseRules ?? { ...DEFAULT_HOUSE_RULES },
     rollCooldownSeconds,
     pointRollCooldownSeconds,
     botRollDelaySeconds,
@@ -716,6 +719,23 @@ export function setTeach(s, id, value) {
   assert(typeof value === "boolean", "Invalid teach setting.");
   s.config.teach = value;
   if (value) log(s, "Teach mode is on.", "teach-mode");
+}
+export function setHouseRule(s, id, rule, enabled) {
+  admin(s, id);
+  assert(!active(s, id).bot, "Only a human host can change game rules.");
+  assert(s.status !== "ended", "The session has ended.");
+  assert(!s.rolling, "Wait for the dice to land before changing game rules.");
+  assert(
+    typeof rule === "string" &&
+      Object.hasOwn(DEFAULT_HOUSE_RULES, rule) &&
+      typeof enabled === "boolean",
+    "Choose a game rule and turn it on or off.",
+  );
+  s.config.houseRules = {
+    ...DEFAULT_HOUSE_RULES,
+    ...s.config.houseRules,
+    [rule]: enabled,
+  };
 }
 export function previewBet(s, id, amount, betId = null, now = Date.now()) {
   const p = s.players.find((player) => player.id === id);
@@ -892,7 +912,11 @@ export function adjustSongChips(s, id, amount) {
   assert(Number.isSafeInteger(nextEquity), "That chip change is too large.");
   player.bank += amount;
   player.betPreview = null;
-  recordChipChange(s, player, amount < 0 ? "Queued a song" : "Song request refunded");
+  recordChipChange(
+    s,
+    player,
+    amount < 0 ? "Queued a song" : "Song request refunded",
+  );
 }
 
 function drinkPlayer(s, id) {
@@ -1140,6 +1164,22 @@ export function setAim(s, id, input, now = Date.now()) {
   s.aim = { ...gesture, playerId: id, active: true, at: now };
   return true;
 }
+function throwSeed() {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
+function settledThrow(options) {
+  for (let attempt = 0; attempt < 16; attempt++) {
+    try {
+      return createThrowTimeline({ ...options, seed: throwSeed() });
+    } catch (error) {
+      // Resample unsettled physical throws without choosing a target face.
+      if (error.code !== "DICE_UNSETTLED") throw error;
+    }
+  }
+  return null;
+}
+
 export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   throwController(s, id);
   const puck =
@@ -1149,29 +1189,26 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
     gesture,
     s.aim?.playerId === id ? s.aim : undefined,
   );
-  let timeline;
-  for (let attempt = 0; attempt < 16; attempt++) {
-    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
-    try {
-      timeline = createThrowTimeline({
-        id: uid(),
-        playerId: id,
-        shooterId: s.shooterId,
-        seed,
-        gesture: controls,
-        startAt: 0,
-        duration,
-        puck,
-        stacks,
-      });
-      break;
-    } catch (error) {
-      // Only retry a physically cocked/off-table throw. No face value is ever
-      // selected or used to accept/reject a valid landed throw.
-      if (error.code !== "DICE_UNSETTLED") throw error;
-    }
-  }
+  const options = {
+    id: uid(),
+    playerId: id,
+    shooterId: s.shooterId,
+    gesture: controls,
+    startAt: 0,
+    duration,
+    puck,
+    stacks,
+  };
+  let timeline = settledThrow(options);
   assert(timeline, "The dice did not settle. Please throw again.");
+  if (
+    s.config.houseRules?.secondWind === true &&
+    timeline.dice[0] + timeline.dice[1] === 7 &&
+    throwSeed() < 0x80000000
+  ) {
+    // Only the replacement is shown and settled. A second seven stands.
+    timeline = settledThrow(options) ?? timeline;
+  }
   timeline.startAt = Date.now();
   timeline.settledAt += timeline.startAt;
   s.throw = timeline;

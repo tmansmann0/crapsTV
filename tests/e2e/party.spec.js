@@ -261,6 +261,11 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await bob.getByRole("button", { name: "Join", exact: true }).click();
     await bob.getByText("Your chips are waiting.").waitFor();
     await phone.bringToFront();
+    await openAdminSection(phone, "Game Rules");
+    await expect(
+      phone.getByRole("checkbox", { name: "Second Wind" }),
+    ).not.toBeChecked();
+    await openAdminSection(phone, "Table");
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();
     // The default betting window is enforced and the local countdown

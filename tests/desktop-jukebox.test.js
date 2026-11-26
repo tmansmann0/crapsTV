@@ -67,7 +67,7 @@ test("desktop jukebox protects transport controls, shares the queue and advances
   send("guest", "join", { name: "Guest", code: "MUSIC1" });
   const guest = hub.state.players.find((player) => player.name === "Guest");
   const initial = guest.bank;
-  const details = last("host", "jukebox-state").state;
+  const details = last("host", "jukebox-state").jukebox;
   assert.equal(details.enabled, false);
   assert.equal(details.cost, 500);
   assert.equal(details.limit, 3);
@@ -91,34 +91,40 @@ test("desktop jukebox protects transport controls, shares the queue and advances
   send("guest", "jukebox-request", { trackId: second.id, cost: 500 });
   assert.equal(played.length, 0);
   assert.equal(guest.bank, initial - 1000);
-  assert.equal(last("host", "jukebox-state").state.queue[0].pending, true);
+  assert.equal(last("host", "jukebox-state").jukebox.queue[0].pending, true);
 
   send("host", "jukebox-control", { action: "move-up", trackId: second.id });
   assert.deepEqual(
-    last("host", "jukebox-state").state.queue.map((track) => track.id),
+    last("host", "jukebox-state").jukebox.queue.map((track) => track.id),
     [second.id, first.id],
   );
   send("host", "jukebox-control", { action: "approve", trackId: second.id });
   send("host", "jukebox-control", { action: "approve", trackId: first.id });
   assert.equal(played.length, 1);
-  assert.equal(last("host", "jukebox-state").state.current.title, second.title);
-  assert.deepEqual(last("tv", "jukebox-state").state, { playing: true });
+  assert.equal(
+    last("host", "jukebox-state").jukebox.current.title,
+    second.title,
+  );
+  assert.deepEqual(last("tv", "jukebox-state").jukebox, { playing: true });
   send("host", "jukebox-control", { action: "skip" });
   assert.equal(played[0].stopped, true);
   assert.equal(played.length, 1);
   played[0].finish("mpv exited");
   await next();
   assert.equal(played.length, 2);
-  assert.equal(last("guest", "jukebox-state").state.current.title, first.title);
+  assert.equal(
+    last("guest", "jukebox-state").jukebox.current.title,
+    first.title,
+  );
 
   played[1].finish("The video is unavailable.");
   await next();
   assert.match(
-    last("guest", "jukebox-state").state.notice,
+    last("guest", "jukebox-state").jukebox.notice,
     /First track was skipped/,
   );
   assert.equal(guest.bank, initial - 500);
-  assert.deepEqual(last("tv", "jukebox-state").state, { playing: false });
+  assert.deepEqual(last("tv", "jukebox-state").jukebox, { playing: false });
 });
 
 test("clearing a room aborts an unfinished lookup and reports no stale results", async () => {

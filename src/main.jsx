@@ -373,7 +373,7 @@ function App() {
         const old = getSaved(key) || {};
         save(key, { ...old, token: m.token, playerId: m.playerId });
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-state") {
-        setJukebox(m.state);
+        setJukebox(m.jukebox);
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-results") {
         setMusicSearch({ pending: false, tracks: m.tracks, error: "" });
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-error") {

@@ -70,7 +70,7 @@ export class RoomHub {
     );
     this.send(id, {
       type: "jukebox-state",
-      state: this.jukebox.snapshot(joined),
+      jukebox: this.jukebox.snapshot(joined),
     });
   }
   async receiveJukebox(id, message) {
@@ -235,6 +235,8 @@ export class RoomHub {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
+        else if (type === "house-rule")
+          game.setHouseRule(s, pid, message.rule, message.enabled);
         else if (type === "cooldown")
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")

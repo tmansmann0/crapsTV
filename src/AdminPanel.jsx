@@ -10,6 +10,7 @@ import {
   Coins,
   Crown,
   Dices,
+  ListChecks,
   LogOut,
   Monitor,
   Plus,
@@ -1011,6 +1012,7 @@ export default function AdminPanel({
       <div role="tablist" aria-label="Host sections" className="ha-tabs">
         {[
           { id: "table", name: "Table", icon: Dices },
+          { id: "rules", name: "Game Rules", icon: ListChecks },
           { id: "players", name: "Players", icon: Users },
           { id: "tv", name: "TV", icon: Monitor },
         ].map(({ id: key, name, icon: Icon }) => (
@@ -1279,6 +1281,31 @@ export default function AdminPanel({
               </details>
             )}
           </>
+        )}
+        {tab === "rules" && (
+          <div>
+            <label className="toggle-label">
+              <span>
+                Second Wind
+                <small>
+                  An initial 7 has a 50% chance of being rerolled once.
+                </small>
+              </span>
+              <input
+                aria-label="Second Wind"
+                type="checkbox"
+                checked={state.config.houseRules?.secondWind === true}
+                disabled={disabled}
+                onChange={(event) =>
+                  send({
+                    type: "house-rule",
+                    rule: "secondWind",
+                    enabled: event.target.checked,
+                  })
+                }
+              />
+            </label>
+          </div>
         )}
         {tab === "tv" && (
           <TVSettings
