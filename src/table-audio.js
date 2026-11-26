@@ -251,14 +251,14 @@ export function createTableAudio() {
     if (phase === "entering") {
       const now = context.currentTime;
       if (!play("thunder", 0.75, 0, now)) play("rail", 0.48, 0, now);
-      play("dice", 0.54, -1.2, now + 0.29);
-      play("dice", 0.48, 1.2, now + 0.57);
+      play("dice", 0.54, -1.2, now + 0.43);
     } else if (phase === "between") {
-      play("dice", 0.54, -1.2);
-      play("tension", 0.48, 0.8);
+      const landing = context.currentTime + 0.23;
+      play("dice", 0.54, -1.2, landing);
+      play("tension", 0.48, 0.8, landing);
     } else if (phase === "revealed") {
-      play("dice", 0.48, 1.2);
-      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.3);
+      play("dice", 0.48, 1.2, context.currentTime + 0.23);
+      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.4);
     }
   }
 

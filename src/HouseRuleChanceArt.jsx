@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef } from "react";
+import { useRef } from "react";
+import HouseRuleDice from "./HouseRuleDice.jsx";
 import { describeHouseRuleTarget } from "./house-rules.js";
 import "./house-rule-chance-art.css";
 
@@ -12,104 +13,8 @@ const VARIANTS = new Set([
   "tableJackpot",
 ]);
 
-// These are fixed die faces. The stopped die turns to its rolled face.
-const FACES = Object.entries({
-  front: 1,
-  back: 6,
-  right: 3,
-  left: 4,
-  top: 2,
-  bottom: 5,
-});
-const POSES = [
-  "",
-  "rotateY(0deg)",
-  "rotateX(-90deg)",
-  "rotateY(-90deg)",
-  "rotateY(90deg)",
-  "rotateX(90deg)",
-  "rotateY(180deg)",
-];
-const PIPS = [
-  [],
-  [4],
-  [0, 8],
-  [0, 4, 8],
-  [0, 2, 6, 8],
-  [0, 2, 4, 6, 8],
-  [0, 2, 3, 5, 6, 8],
-];
-
 function cleanName(value) {
   return typeof value === "string" ? value.trim().slice(0, 40) : "";
-}
-
-function Die({ kind, value, tumbling, entryDelay = 0 }) {
-  const cube = useRef(null);
-  const motion = useRef(null);
-  useLayoutEffect(() => {
-    const node = cube.current;
-    const moving = motion.current;
-    const from = moving ? getComputedStyle(node).transform : null;
-    moving?.cancel();
-    motion.current = null;
-
-    const pose = POSES[value ?? 1];
-    node.style.transform = pose;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches || !node.animate)
-      return;
-    if (tumbling) {
-      const direction = kind === "first" ? 1 : -1;
-      motion.current = node.animate(
-        [
-          { transform: "rotateX(0deg) rotateY(0deg) rotateZ(0deg)" },
-          {
-            transform: `rotateX(${360 * direction}deg) rotateY(360deg) rotateZ(${360 * direction}deg)`,
-          },
-        ],
-        { delay: entryDelay, duration: 1540, iterations: Infinity },
-      );
-    } else if (from && value != null) {
-      motion.current = node.animate(
-        [{ transform: from }, { transform: pose }],
-        { duration: 350, easing: "cubic-bezier(0.16, 0.75, 0.3, 1)" },
-      );
-    }
-  }, [kind, value, tumbling, entryDelay]);
-  useLayoutEffect(() => () => motion.current?.cancel(), []);
-
-  return (
-    <div
-      className={`hrc-die hrc-die-${kind}${tumbling ? " is-tumbling" : ""}${value != null ? " has-value" : ""}`}
-    >
-      <div className="hrc-shadow" />
-      <div className="hrc-travel">
-        <div className="hrc-impact">
-          <div className="hrc-spin">
-            <div ref={cube} className="hrc-cube">
-              <i className="hrc-core hrc-core-x" />
-              <i className="hrc-core hrc-core-y" />
-              <i className="hrc-core hrc-core-z" />
-              {FACES.map(([face, pips]) => (
-                <span key={face} className={`hrc-face hrc-face-${face}`}>
-                  <span className="hrc-pips">
-                    {PIPS[pips].map((cell) => (
-                      <i
-                        key={cell}
-                        style={{
-                          gridArea: `${Math.floor(cell / 3) + 1} / ${(cell % 3) + 1}`,
-                        }}
-                      />
-                    ))}
-                  </span>
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function Bolt() {
@@ -345,7 +250,6 @@ export default function HouseRuleChanceArt({
   const title = (typeof label === "string" && label.trim()) || "House Rule";
   const shown = phase === "revealed";
   const secondRolling = phase === "second-rolling";
-  const firstRolling = phase === "entering" || phase === "first-rolling";
   const won = shown && hit === true;
   const targetText = describeHouseRuleTarget(target);
   const stopText = secondRolling ? "Stop the second die" : "Stop the first die";
@@ -403,15 +307,12 @@ export default function HouseRuleChanceArt({
             </div>
           )}
           {won && <div className="hrc-halo" />}
-          <div className="hrc-dice">
-            <Die
-              kind="first"
-              value={firstDie}
-              tumbling={firstRolling}
-              entryDelay={lateReveal ? 0 : 960}
-            />
-            <Die kind="second" value={dice?.[1]} tumbling={secondRolling} />
-          </div>
+          <HouseRuleDice
+            phase={phase}
+            firstDie={firstDie}
+            secondDie={dice?.[1]}
+            lateReveal={lateReveal}
+          />
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">
               <span>{shown ? "Rolled by" : "Roller"}</span> {rollerTag}
