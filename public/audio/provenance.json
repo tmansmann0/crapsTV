@@ -9,6 +9,7 @@
   "sampleRate": 44100,
   "codec": "MP3 / libmp3lame",
   "bitrate": "128kbps mono",
+  "houseRuleStingers": "Original deterministic synthesis in scripts/house_rule_stingers.py",
   "files": {
     "welcome": {
       "sha256": "3a3ce61412b66844e26c8622b021d3affe24249719a54ece2f0e9576f6aaa1c9",
@@ -113,6 +114,34 @@
     "hardway": {
       "sha256": "70d9aec9a1e5d0caec4c5dabfc19c8fca5db645556723a7294e21c72f9a09ba2",
       "text": "The hard way! Nice roll!"
+    },
+    "house-second-wind": {
+      "sha256": "305616752c16918517c5e8e82441a9a6ac5e2f9a2be6638dc18ad2227f8fbafc",
+      "text": "Second wind! The seven was rerolled."
+    },
+    "house-hard-point": {
+      "sha256": "574feb40d32ba7a35e4eaf2358bbf8e77b34612240ef70e73ae41f1854caf97f",
+      "text": "Hard point! The pass line pays five to four."
+    },
+    "house-hot-hand": {
+      "sha256": "90001e6989f28905ad1d65391048780845196f697f7074ecfb0f1a09d2a11896",
+      "text": "Hot hand! Three points in one turn. Bonus for the winners!"
+    },
+    "house-craps-cashback": {
+      "sha256": "045a364cb3586b7f31e73630217e7a9064c69dc3b5033c271d76846be4a9b0a6",
+      "text": "Craps cashback! Half your pass line stake comes back."
+    },
+    "house-lucky-seven": {
+      "sha256": "525afed1641057c1ebc342639413ac05d79aa9ab584966e122a435814f0bea55",
+      "text": "Lucky seven! Double profit on the pass line."
+    },
+    "house-pass-the-dice": {
+      "sha256": "be011dfe3dced34fc2abb84e95f49743bf949bd98df62bdb296628ad421f709d",
+      "text": "Pass the dice. A new shooter steps up."
+    },
+    "house-table-jackpot": {
+      "sha256": "14d7a1a8b922dd128d8d2922ae830fdd1e79d8be7d1408dc1e2aac2f68b7a5c6",
+      "text": "Table jackpot! Three different points made. Pay the jackpot!"
     },
     "roll-2": {
       "sha256": "480a3e642f2503756db80f02c71bd6048cd1c37fb91838273a6e5e95a0313284",

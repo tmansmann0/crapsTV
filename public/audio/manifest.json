@@ -103,6 +103,34 @@
     "file": "hardway.mp3",
     "text": "The hard way! Nice roll!"
   },
+  "house-second-wind": {
+    "file": "house-second-wind.mp3",
+    "text": "Second wind! The seven was rerolled."
+  },
+  "house-hard-point": {
+    "file": "house-hard-point.mp3",
+    "text": "Hard point! The pass line pays five to four."
+  },
+  "house-hot-hand": {
+    "file": "house-hot-hand.mp3",
+    "text": "Hot hand! Three points in one turn. Bonus for the winners!"
+  },
+  "house-craps-cashback": {
+    "file": "house-craps-cashback.mp3",
+    "text": "Craps cashback! Half your pass line stake comes back."
+  },
+  "house-lucky-seven": {
+    "file": "house-lucky-seven.mp3",
+    "text": "Lucky seven! Double profit on the pass line."
+  },
+  "house-pass-the-dice": {
+    "file": "house-pass-the-dice.mp3",
+    "text": "Pass the dice. A new shooter steps up."
+  },
+  "house-table-jackpot": {
+    "file": "house-table-jackpot.mp3",
+    "text": "Table jackpot! Three different points made. Pay the jackpot!"
+  },
   "roll-2": {
     "file": "roll-2.mp3",
     "text": "Two. Snake eyes!"

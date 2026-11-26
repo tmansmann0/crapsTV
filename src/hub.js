@@ -253,7 +253,13 @@ export class RoomHub {
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
         else if (type === "house-rule")
-          game.setHouseRule(s, pid, message.rule, message.enabled);
+          game.setHouseRule(
+            s,
+            pid,
+            message.rule,
+            message.value ?? message.enabled,
+          );
+        else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")

@@ -27,6 +27,12 @@ import {
   validDrinkingRules,
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
+import {
+  DEFAULT_JACKPOT_BONUS,
+  HOUSE_RULES,
+  MAX_JACKPOT_BONUS,
+  validJackpotBonus,
+} from "./house-rules.js";
 import { MAX_JUKEBOX_QUEUE, MAX_SONG_COST } from "./jukebox-settings.js";
 import {
   DESKTOP_DISPLAY,
@@ -886,6 +892,76 @@ function TVSettings({
   );
 }
 
+function GameRulesPanel({ rules, disabled, send }) {
+  const [jackpotDraft, setJackpotDraft] = useState(null);
+  const jackpotBonus = rules.jackpotBonus ?? DEFAULT_JACKPOT_BONUS;
+  const jackpotAmount = jackpotDraft ?? String(jackpotBonus / 100);
+  const cents = Math.round(Number(jackpotAmount) * 100);
+  const setRule = (rule, value) => send({ type: "house-rule", rule, value });
+  const toggle = (rule, label, detail) => (
+    <label className="toggle-label" key={rule}>
+      <span>
+        {label}
+        <small>{detail}</small>
+      </span>
+      <input
+        aria-label={label}
+        type="checkbox"
+        checked={rules[rule] === true}
+        disabled={disabled}
+        onChange={(event) => setRule(rule, event.target.checked)}
+      />
+    </label>
+  );
+  return (
+    <div className="ha-game-rules">
+      {toggle(
+        "announce",
+        "Announce house rules",
+        "Show a full-screen animation and play a voice call when a house rule triggers.",
+      )}
+      {Object.entries(HOUSE_RULES).map(([rule, { label, detail }]) =>
+        toggle(rule, label, detail),
+      )}
+      {rules.tableJackpot && (
+        <form
+          className="ha-jackpot"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (disabled || !validJackpotBonus(cents) || cents === jackpotBonus)
+              return;
+            setRule("jackpotBonus", cents);
+            setJackpotDraft(null);
+          }}
+        >
+          <label>
+            Jackpot bonus ($)
+            <input
+              type="number"
+              min="1"
+              max={MAX_JACKPOT_BONUS / 100}
+              step="0.01"
+              required
+              disabled={disabled}
+              value={jackpotAmount}
+              onChange={(event) => setJackpotDraft(event.target.value)}
+            />
+          </label>
+          <button
+            type="submit"
+            className="button outline"
+            disabled={
+              disabled || !validJackpotBonus(cents) || cents === jackpotBonus
+            }
+          >
+            Save bonus
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPanel({
   state,
   player,
@@ -1283,29 +1359,11 @@ export default function AdminPanel({
           </>
         )}
         {tab === "rules" && (
-          <div>
-            <label className="toggle-label">
-              <span>
-                Second Wind
-                <small>
-                  An initial 7 has a 50% chance of being rerolled once.
-                </small>
-              </span>
-              <input
-                aria-label="Second Wind"
-                type="checkbox"
-                checked={state.config.houseRules?.secondWind === true}
-                disabled={disabled}
-                onChange={(event) =>
-                  send({
-                    type: "house-rule",
-                    rule: "secondWind",
-                    enabled: event.target.checked,
-                  })
-                }
-              />
-            </label>
-          </div>
+          <GameRulesPanel
+            rules={state.config.houseRules ?? {}}
+            disabled={disabled}
+            send={send}
+          />
         )}
         {tab === "tv" && (
           <TVSettings

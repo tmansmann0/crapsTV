@@ -30,6 +30,13 @@ import {
 } from "./graphics-settings.js";
 import { validBetChoices } from "./bet-options.js";
 import {
+  DEFAULT_HOUSE_RULES,
+  HOUSE_RULES,
+  canPassDice,
+  newHouseHand,
+  validJackpotBonus,
+} from "./house-rules.js";
+import {
   createThrowTimeline,
   sanitizeGesture,
   THROW_DURATION,
@@ -69,7 +76,6 @@ export const BONUS_NUMBERS = {
   "bonus-all": ALL_POINTS,
 };
 export const MAX_BANKROLL_ADJUSTMENT = 100000000;
-const DEFAULT_HOUSE_RULES = Object.freeze({ secondWind: false });
 const gcd = (a, b) => (b ? gcd(b, a % b) : a);
 const oddsRatio = (numerator, denominator) => {
   const divisor = gcd(numerator, denominator);
@@ -171,6 +177,7 @@ export function createState(code = "LOCAL") {
     rolls: [],
     lastRoll: null,
     bonus: { hits: [] },
+    houseHand: newHouseHand(),
     log: [],
     createdAt: Date.now(),
     endedAt: null,
@@ -721,21 +728,29 @@ export function setTeach(s, id, value) {
   s.config.teach = value;
   if (value) log(s, "Teach mode is on.", "teach-mode");
 }
-export function setHouseRule(s, id, rule, enabled) {
+export function setHouseRule(s, id, rule, value) {
   admin(s, id);
   assert(!active(s, id).bot, "Only a human host can change game rules.");
   assert(s.status !== "ended", "The session has ended.");
   assert(!s.rolling, "Wait for the dice to land before changing game rules.");
   assert(
-    typeof rule === "string" &&
-      Object.hasOwn(DEFAULT_HOUSE_RULES, rule) &&
-      typeof enabled === "boolean",
+    typeof rule === "string" && Object.hasOwn(DEFAULT_HOUSE_RULES, rule),
     "Choose a game rule and turn it on or off.",
   );
+  if (rule === "jackpotBonus")
+    assert(
+      validJackpotBonus(value),
+      "Enter a jackpot bonus from $1 to $1,000,000.",
+    );
+  else
+    assert(
+      typeof value === "boolean",
+      "Choose a game rule and turn it on or off.",
+    );
   s.config.houseRules = {
     ...DEFAULT_HOUSE_RULES,
     ...s.config.houseRules,
-    [rule]: enabled,
+    [rule]: value,
   };
 }
 export function previewBet(s, id, amount, betId = null, now = Date.now()) {
@@ -1270,7 +1285,11 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
     throwSeed() < 0x80000000
   ) {
     // Only the replacement is shown and settled. A second seven stands.
-    timeline = settledThrow(options) ?? timeline;
+    const replacement = settledThrow(options);
+    if (replacement) {
+      timeline = replacement;
+      if (s.config.houseRules?.announce === true) timeline.secondWind = true;
+    }
   }
   timeline.startAt = Date.now();
   timeline.settledAt += timeline.startAt;
@@ -1332,7 +1351,27 @@ export function finishRoll(s, dice = s.throw?.dice) {
       : [...new Set([...s.bonus.hits, total])].sort((a, b) => a - b);
   const events = [];
   const presentationSources = {};
-  for (const p of s.players.filter((p) => !p.left)) {
+  const rules = s.config.houseRules ?? DEFAULT_HOUSE_RULES;
+  const triggered = new Set(s.throw?.secondWind ? ["secondWind"] : []);
+  const players = s.players.filter((p) => !p.left);
+  const pointHit = Boolean(oldPoint && total === oldPoint);
+  const hand = (s.houseHand ??= newHouseHand());
+  const collectingJackpot = hand.points.length < 3;
+  const newJackpotPoint = pointHit && !hand.points.includes(total);
+  if (pointHit) hand.made++;
+  if (newJackpotPoint) hand.points.push(total);
+  if (pointHit && collectingJackpot) {
+    for (const p of players)
+      if (
+        !hand.jackpotPlayers.includes(p.id) &&
+        p.bets.some((b) => b.type === "pass" && b.point === total)
+      )
+        hand.jackpotPlayers.push(p.id);
+  }
+  const hotHand = rules.hotHand && pointHit && hand.made === 3;
+  const tableJackpot =
+    rules.tableJackpot && newJackpotPoint && hand.points.length === 3;
+  for (const p of players) {
     if (p.botDrinkLoad) p.botDrinkLoad *= 0.84;
     const before = equity(p),
       pending = [...p.bets];
@@ -1342,7 +1381,13 @@ export function finishRoll(s, dice = s.throw?.dice) {
       pending.map((bet) => [bet.id, describeBet(s, p, bet)?.name || bet.type]),
     );
     const settlements = [];
-    const settleBet = (bet, result, multiplier = 1, stay = false) => {
+    const settleBet = (
+      bet,
+      result,
+      multiplier = 1,
+      stay = false,
+      cashback = 0,
+    ) => {
       const beforeBet = equity(p);
       const amount = bet.amount;
       const parent = pending.find((candidate) => candidate.id === bet.parent);
@@ -1352,12 +1397,14 @@ export function finishRoll(s, dice = s.throw?.dice) {
         standing: result === "win" && stay,
       };
       settle(p, bet, result, multiplier, stay);
+      if (cashback) p.bank += cashback;
       settlements.push({
         betId: bet.id,
         label: labels.get(bet.id),
         result,
         delta: equity(p) - beforeBet,
         amount,
+        ...(cashback && { returnedStake: cashback }),
       });
     };
     // Parent line outcomes determine odds outcomes, regardless of iteration order.
@@ -1380,7 +1427,37 @@ export function finishRoll(s, dice = s.throw?.dice) {
       else b.point = total;
       if (result) {
         outcomes.set(b.id, result);
-        settleBet(b, result);
+        let multiplier = 1;
+        let cashback = 0;
+        if (b.type === "pass") {
+          if (
+            result === "win" &&
+            rules.hardPoint &&
+            pointHit &&
+            dice[0] === dice[1]
+          ) {
+            multiplier = 1.25;
+            triggered.add("hardPoint");
+          } else if (
+            result === "win" &&
+            rules.luckySeven &&
+            !oldPoint &&
+            total === 7
+          ) {
+            multiplier = 2;
+            triggered.add("luckySeven");
+          } else if (
+            result === "lose" &&
+            rules.crapsCashback &&
+            !oldPoint &&
+            !crapless &&
+            !b.point
+          ) {
+            cashback = Math.floor(b.amount / 2);
+            triggered.add("crapsCashback");
+          }
+        }
+        settleBet(b, result, multiplier, false, cashback);
       }
     }
     for (const b of pending.filter((b) => b.type === "odds")) {
@@ -1456,6 +1533,25 @@ export function finishRoll(s, dice = s.throw?.dice) {
           total === 2 || total === 12 ? 2 : 1,
         );
     }
+    const award = (rule, amount) => {
+      if (amount <= 0) return;
+      p.bank += amount;
+      settlements.push({
+        betId: rule,
+        label: HOUSE_RULES[rule].label,
+        result: "win",
+        delta: amount,
+        amount: 0,
+        award: true,
+      });
+      triggered.add(rule);
+    };
+    if (hotHand) award("hotHand", Math.floor((equity(p) - before) / 4));
+    if (tableJackpot && hand.jackpotPlayers.includes(p.id))
+      award(
+        "tableJackpot",
+        rules.jackpotBonus ?? DEFAULT_HOUSE_RULES.jackpotBonus,
+      );
     p.stats.rolls++;
     const delta = equity(p) - before;
     if (s.config.drinkingMode && p.bot)
@@ -1516,6 +1612,7 @@ export function finishRoll(s, dice = s.throw?.dice) {
     shooterId,
     message,
     events,
+    ...(triggered.size && { houseRulesTriggered: [...triggered] }),
     pointBefore: oldPoint,
     throwId: s.throw?.id || null,
     at: Date.now(),
@@ -1528,7 +1625,16 @@ export function finishRoll(s, dice = s.throw?.dice) {
   log(s, message, kind);
   return s.lastRoll;
 }
+export function passDice(s, id) {
+  assert(canPassDice(s, id), "You can pass the dice after making a point.");
+  rotateShooter(s);
+  s.aim = null;
+  openBettingWindow(s);
+  const next = s.players.find((player) => player.id === s.shooterId);
+  log(s, `The dice pass to ${next.name}.`, "house-pass-the-dice");
+}
 export function rotateShooter(s) {
+  s.houseHand = newHouseHand();
   const eligible = s.players.filter((p) => !p.left && p.connected);
   if (!eligible.length) {
     s.shooterId = null;
@@ -1546,6 +1652,10 @@ export function leave(s, id) {
   p.left = true;
   p.connected = false;
   forgetDrinkPlayer(s, id);
+  if (s.houseHand)
+    s.houseHand.jackpotPlayers = s.houseHand.jackpotPlayers.filter(
+      (playerId) => playerId !== id,
+    );
   if (s.drinkRequests?.length)
     s.drinkRequests = s.drinkRequests.filter((request) =>
       request.kind === "credit" ? request.from !== id : request.to !== id,

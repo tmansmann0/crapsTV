@@ -198,6 +198,35 @@ body:has(.pg-shell) {
   z-index: 30;
   padding: 0 10px 6px;
 }
+.pg-house-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.pg-house-results span {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--pg-ivory-deep);
+  color: var(--pg-felt-deep);
+  font-size: 12px;
+  font-weight: 750;
+}
+.pg-shell .pg-house-pass {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--pg-rule);
+  border-radius: 10px;
+  background: var(--pg-paper);
+  color: var(--pg-felt-deep);
+  font-size: 13px;
+  font-weight: 750;
+}
 .pg-strip {
   display: flex;
   gap: 10px;

@@ -53,6 +53,7 @@ GitHub Pages serves the static app. PeerJS’s free public signaling service int
 ## House rules, your way
 
 - **Classic craps or crapless craps.** Rules lock at the start; teach mode can change during play.
+- **Optional Game Rules.** In **Host controls → Game Rules**, turn on Second Wind, Hard Point, Hot Hand, Craps Cashback, Lucky Seven, Pass the Dice, or Table Jackpot. The jackpot defaults to $25 per qualifying player and is editable. **Announce house rules** plays a full-screen TV animation and voice call when a rule triggers. Second Wind reveals the reroll only in this mode. All switches start off.
 - **Starting stack and table minimum.** The first player chooses both.
 - **Drinking Mode.** Enable it in host setup with Classic or Crapless rules. Players start at zero and can use verified top-ups, host adjustments, or payouts to build their chip balance. Available chips can be spent right away to place bets or send a required drink. The sender pays when they send it, and the recipient marks it complete in Drinks. The host can set drink values and markup at setup or between rolls. Defaults are $5 per sip, $100 per shot, and 25% markup on drink assignments. Finish drink is off by default and has a $75 base price when enabled. Bots can earn chips with simulated drinks and send drinks to people or other bots based on recent rolls and assignments. With a bot seated, chip top-ups are approved automatically and drinks sent to bots complete immediately.
 - **Time to bet.** The host can set separate 0–60 second windows for come-out rolls and rolls with a point on. Both default to 15 seconds. Bot shooters have an additional five-second delay by default.
@@ -114,7 +115,7 @@ Publishing uses `.github/workflows/pages.yml`. From GitHub Actions, run **Publis
 | `src/throw-motion.js`       | Authority-generated physics timeline and stateless frame sampling      |
 | `public/assets/`            | Original generated branding, vector boards, GLBs, EXR/HDR and previews |
 | `assets/source/`            | Editable Blender sources                                               |
-| `public/audio/`             | 51 MP3 announcements with manifests, hashes, and license notice        |
+| `public/audio/`             | 58 MP3 announcements with manifests, hashes, and license notice        |
 | `scripts/`                  | Optional reproducible board/model/audio generation                     |
 
 No money changes hands. This is a casual game for friends. A human hosting a peer room controls that room’s authority, and saved tables stay on the host. This version does not provide accounts, a lobby directory, public matchmaking, cloud saves, tournaments, fire bets, or real-money gambling.
@@ -123,7 +124,7 @@ No money changes hands. This is a casual game for friends. A human hosting a pee
 
 The table/dice were built and exported with Blender; the boards are original editable SVGs with an open area behind the pass line for odds. The active casino environment is a real Blender-rendered **scene-linear EXR**, used for both the background and PMREM lighting/reflections. The older image-generated LDR panorama is retained as a source asset and is not used for lighting. [Model details](docs/models.md) · [Image prompts and provenance](docs/visual-assets.md).
 
-The male voice is **Kokoro `am_michael`**. NeuTTS-2E was investigated but required gated model access, so it is not used. All 51 playable clips are bundled; see [audio.md](docs/audio.md) for the pinned model, license, and regeneration instructions.
+The male voice is **Kokoro `am_michael`**. NeuTTS-2E was investigated but required gated model access, so it is not used. All 58 playable clips are bundled; see [audio.md](docs/audio.md) for the pinned model, license, and regeneration instructions.
 
 MIT licensed original code and assets; included third-party dependencies and font/model notices retain their respective licenses. This is an independent project, unaffiliated with Jackbox or Spotify.
 

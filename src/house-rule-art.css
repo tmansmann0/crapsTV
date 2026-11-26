@@ -1,0 +1,340 @@
+.house-rule-art {
+  --die-size: 28%;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(64vw, 49vmin, 560px);
+  aspect-ratio: 1.36;
+  margin-bottom: clamp(12px, 2.4vmin, 36px);
+  color: var(--rule-accent);
+}
+.house-art-rim {
+  position: absolute;
+  inset: 0 13%;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0.48;
+  background: radial-gradient(ellipse at center, #2d533f, #153328 68%);
+  box-shadow:
+    inset 0 0 0 0.55vmin #071914,
+    inset 0 0 0 0.71vmin color-mix(in srgb, currentColor 40%, transparent);
+  animation: house-rim-enter 650ms ease-out both;
+}
+.house-rule-art > .house-die,
+.house-rule-art > .house-chips {
+  position: absolute;
+}
+.house-die {
+  display: grid;
+  width: var(--die-size);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 10%;
+  padding: 5%;
+  border: 2px solid #f9e4af;
+  border-radius: 20%;
+  background: #f7e7c0;
+  box-shadow:
+    0 0.7vmin 0 #947749,
+    0 1.1vmin 2vmin #0818108f;
+}
+.house-die i {
+  display: block;
+  border-radius: 50%;
+  background: #14392a;
+}
+.house-art-sweep {
+  position: absolute;
+  width: 57%;
+  height: 57%;
+  opacity: 0.65;
+  animation: house-art-sweep 950ms ease-out both;
+}
+.house-wind-left {
+  left: 16%;
+  top: 38%;
+  transform: rotate(-14deg);
+  animation: house-reroll-left 1350ms ease-in-out both;
+}
+.house-wind-right {
+  right: 16%;
+  top: 38%;
+  transform: rotate(15deg);
+  animation: house-reroll-right 1350ms ease-in-out both;
+}
+.house-wind-left,
+.house-wind-right {
+  opacity: 0;
+}
+.house-wind-back {
+  top: 38%;
+  place-items: center;
+  background: #c4e5cc;
+  border-color: #e5f6e8;
+  transform: rotate(var(--tilt));
+  animation: house-wind-flip 610ms 690ms ease-out both;
+}
+.house-wind-back::after {
+  grid-area: 1 / 1 / -1 / -1;
+  width: 60%;
+  aspect-ratio: 1;
+  border: 0.38vmin solid #35644a;
+  border-radius: 20%;
+  transform: rotate(45deg);
+  content: "";
+}
+.house-wind-back-left {
+  --tilt: -14deg;
+  left: 16%;
+}
+.house-wind-back-right {
+  --tilt: 15deg;
+  right: 16%;
+}
+.house-rule-art.is-secondWind .house-art-sweep {
+  top: 1%;
+  animation: house-reroll-arrow 1350ms ease-in-out both;
+}
+.house-hard-left,
+.house-hard-right {
+  top: 27%;
+  transform: rotate(var(--tilt));
+  animation: house-pair-land 690ms ease-out both;
+}
+.house-hard-left {
+  --tilt: -10deg;
+  --inbound: -70%;
+  left: 18%;
+}
+.house-hard-right {
+  --tilt: 10deg;
+  --inbound: 70%;
+  right: 18%;
+}
+.house-rule-art.is-hardPoint .house-art-rim {
+  opacity: 1;
+  animation: house-hard-ring 850ms 220ms ease-out both;
+}
+.house-art-emblem {
+  position: absolute;
+  top: 4%;
+  width: 52%;
+  height: 59%;
+  animation: house-emblem-rise 760ms 100ms ease-out both;
+}
+.house-rule-art.is-luckySeven .house-art-emblem {
+  top: -7%;
+  width: 83%;
+  height: 67%;
+}
+.house-lucky-left,
+.house-lucky-right {
+  top: 40%;
+  transform: rotate(var(--tilt));
+  animation: house-pair-land 650ms 160ms ease-out both;
+}
+.house-lucky-left {
+  --tilt: -16deg;
+  --inbound: -45%;
+  left: 18%;
+}
+.house-lucky-right {
+  --tilt: 16deg;
+  --inbound: 45%;
+  right: 18%;
+}
+.house-art-markers {
+  position: absolute;
+  inset: 52% 21% 16%;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 7%;
+}
+.house-art-markers > * {
+  animation: house-marker-rise 560ms var(--marker-delay) ease-out both;
+}
+.house-art-markers .is-tier-0 {
+  --marker-delay: 120ms;
+}
+.house-art-markers .is-tier-1 {
+  --marker-delay: 360ms;
+}
+.house-art-markers .is-tier-2 {
+  --marker-delay: 600ms;
+}
+.house-chips {
+  position: relative;
+  display: block;
+  width: 32%;
+  height: 35%;
+}
+.house-chips i {
+  position: absolute;
+  inset: auto 0 0;
+  width: 100%;
+  aspect-ratio: 2.45;
+  box-sizing: border-box;
+  border: 0.34vmin solid #f5d491;
+  border-radius: 50%;
+  background: #946136;
+  background-image: radial-gradient(ellipse, #dbab64 42%, transparent 44%);
+  box-shadow: 0 0.36vmin 0 #593c27;
+  transform: translateY(calc(var(--chip) * -32%));
+}
+.house-rule-art.is-crapsCashback .house-art-sweep {
+  top: -3%;
+}
+.house-cash-out {
+  left: 17%;
+  top: 40%;
+  opacity: 0.38;
+  animation: house-cash-leave 960ms ease-out both;
+}
+.house-cash-back {
+  right: 17%;
+  top: 40%;
+  animation: house-cash-return 1000ms 200ms ease-out both;
+}
+.house-seat {
+  position: absolute;
+  bottom: 17%;
+  width: 21%;
+  height: 33%;
+}
+.house-seat-left {
+  left: 13%;
+}
+.house-seat-right {
+  right: 13%;
+}
+.house-rule-art.is-passTheDice .house-art-sweep {
+  top: 29%;
+  width: 45%;
+}
+.house-rule-art.is-passTheDice {
+  --die-size: 19%;
+}
+.house-pass-die {
+  top: 16%;
+  left: 65%;
+  padding: 3.4%;
+  transform: rotate(14deg);
+  animation: house-pass-slide 1150ms ease-in-out both;
+}
+.house-rule-art.is-tableJackpot .house-art-emblem {
+  top: 3%;
+  width: 58%;
+  height: 60%;
+}
+.house-rule-art.is-tableJackpot .house-die {
+  padding: 6%;
+}
+@keyframes house-rim-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.78);
+  }
+}
+@keyframes house-art-sweep {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+@keyframes house-reroll-arrow {
+  0%,
+  35% {
+    opacity: 0;
+    transform: rotate(-80deg) scale(0.7);
+  }
+  70% {
+    opacity: 0.95;
+  }
+}
+@keyframes house-reroll-left {
+  0%,
+  28% {
+    opacity: 1;
+    transform: rotate(-11deg);
+  }
+  65% {
+    opacity: 0;
+    transform: translate(8%, -62%) rotate(-110deg);
+  }
+}
+@keyframes house-reroll-right {
+  0%,
+  32% {
+    opacity: 1;
+    transform: rotate(11deg);
+  }
+  69% {
+    opacity: 0;
+    transform: translate(-8%, -67%) rotate(120deg);
+  }
+}
+@keyframes house-wind-flip {
+  from {
+    opacity: 0;
+    transform: translateY(-66%) rotate(calc(var(--tilt) * -6)) scale(0.8);
+  }
+}
+@keyframes house-pair-land {
+  from {
+    opacity: 0;
+    transform: translate(var(--inbound), -38%) rotate(0) scale(0.84);
+  }
+}
+@keyframes house-hard-ring {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  65% {
+    opacity: 1;
+  }
+}
+@keyframes house-emblem-rise {
+  from {
+    opacity: 0;
+    transform: translateY(24%) scale(0.68);
+  }
+}
+@keyframes house-marker-rise {
+  from {
+    opacity: 0.12;
+    transform: translateY(35%);
+  }
+}
+@keyframes house-cash-leave {
+  from {
+    opacity: 1;
+    transform: translateX(23%);
+  }
+}
+@keyframes house-cash-return {
+  from {
+    opacity: 0;
+    transform: translate(-95%, -85%) rotate(-12deg);
+  }
+}
+@keyframes house-pass-slide {
+  from {
+    transform: translateX(-246%) rotate(-14deg);
+  }
+  45% {
+    transform: translate(-115%, -48%) rotate(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .house-rule-art *,
+  .house-rule-art .house-art-markers > * {
+    animation: none !important;
+  }
+  .house-wind-left,
+  .house-wind-right {
+    opacity: 0;
+  }
+}

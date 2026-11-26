@@ -23,6 +23,10 @@ import {
 } from "lucide-react";
 import { routeInfo, controllerURL } from "./routes.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
+import { HOUSE_RULES } from "./house-rules.js";
+import HouseRuleShowcase, {
+  useHouseRuleShowcase,
+} from "./HouseRuleShowcase.jsx";
 import { DESKTOP_DISPLAY } from "./display-build.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
 const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
@@ -133,54 +137,83 @@ function Brand() {
     </a>
   );
 }
-function useAnnouncer(state, enabled) {
+function useAnnouncer(state, enabled, houseEnabled, showcase) {
   const manifest = useRef(null),
     last = useRef(null),
     lastLog = useRef(null),
     queue = useRef([]),
     playing = useRef(false),
     audio = useRef(null),
-    latest = useRef(enabled);
-  latest.current = enabled;
+    audioChannel = useRef(null),
+    latest = useRef({ enabled, houseEnabled });
+  latest.current = { enabled, houseEnabled };
   useEffect(() => {
     fetch(`${base}audio/manifest.json`)
       .then((r) => r.json())
-      .then((m) => (manifest.current = m))
+      .then((m) => {
+        manifest.current = m;
+        play();
+      })
       .catch(() => {});
     return () => {
       audio.current?.pause();
     };
   }, []);
   function play() {
-    if (!latest.current || playing.current || !queue.current.length) return;
+    if (!manifest.current || playing.current || !queue.current.length) return;
     const key = queue.current.shift(),
       entry = manifest.current?.[key];
-    if (!entry) {
+    const channel = key.startsWith("house-") ? "houseEnabled" : "enabled";
+    if (!entry || !latest.current[channel]) {
       play();
       return;
     }
     const a = new Audio(`${base}audio/${entry.file}`);
     audio.current = a;
+    audioChannel.current = channel;
     playing.current = true;
     a.onended = a.onerror = () => {
       playing.current = false;
       play();
     };
     a.play().catch(() => {
+      if (audio.current !== a) return;
       playing.current = false;
       queue.current = [];
     });
   }
-  useEffect(() => {
-    if (!enabled) {
-      audio.current?.pause();
-      playing.current = false;
-      queue.current = [];
-      return;
+  function stop() {
+    if (audio.current) {
+      audio.current.onended = null;
+      audio.current.onerror = null;
+      audio.current.pause();
     }
-    queue.current.push("welcome");
-    play();
+    audio.current = null;
+    audioChannel.current = null;
+    playing.current = false;
+  }
+  useEffect(() => {
+    if (enabled) {
+      if (!showcase) {
+        queue.current.push("welcome");
+        play();
+      }
+    } else {
+      if (audioChannel.current === "enabled") stop();
+      queue.current = queue.current.filter((key) => key.startsWith("house-"));
+    }
   }, [enabled]);
+  useEffect(() => {
+    const clip = houseEnabled && showcase && HOUSE_RULES[showcase.rule]?.clip;
+    if (clip) {
+      stop();
+      queue.current = [clip];
+    } else {
+      if (audioChannel.current === "houseEnabled") stop();
+      queue.current = queue.current.filter((key) => !key.startsWith("house-"));
+    }
+    play();
+  }, [showcase, houseEnabled]);
   useEffect(() => {
     if (!state) return;
     const signature = `${state.status}:${state.rolling ? "rolling" : state.lastRoll?.id || ""}`,
@@ -189,7 +222,7 @@ function useAnnouncer(state, enabled) {
     const newest = state.log[0],
       priorLog = lastLog.current;
     lastLog.current = newest?.id;
-    if (!enabled || previous === null) return;
+    if ((!enabled && !houseEnabled) || previous === null) return;
     if (newest?.id !== priorLog) {
       const key = {
         "player-joined": "player-joined",
@@ -197,9 +230,9 @@ function useAnnouncer(state, enabled) {
         reup: "re-up",
         "teach-mode": "teach-mode",
       }[newest?.type];
-      if (key) queue.current.push(key);
+      if (enabled && key) queue.current.push(key);
     }
-    if (signature !== previous) {
+    if (enabled && !showcase && signature !== previous) {
       if (state.rolling) queue.current.push("bets-locked");
       else if (state.status === "ended") queue.current.push("session-ended");
       else if (state.lastRoll) {
@@ -220,7 +253,7 @@ function useAnnouncer(state, enabled) {
       } else if (state.status === "playing") queue.current.push("game-started");
     }
     play();
-  }, [state, enabled]);
+  }, [state, enabled, houseEnabled, showcase]);
 }
 function App() {
   const route = useRef(routeInfo()).current;
@@ -466,7 +499,18 @@ function App() {
   useEffect(() => {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
-  useAnnouncer(state, sound && view === "tv");
+  const announceHouseRules =
+    view === "tv" && state?.config.houseRules?.announce === true;
+  const houseRuleShowcase = useHouseRuleShowcase(
+    status === "connected" ? state : null,
+    announceHouseRules,
+  );
+  useAnnouncer(
+    state,
+    sound && view === "tv",
+    announceHouseRules,
+    houseRuleShowcase,
+  );
   const audioRevision = state?.display?.audioRevision;
   useEffect(() => {
     if (view === "tv" && audioRevision)
@@ -670,6 +714,12 @@ function App() {
               }
             />
           </Suspense>
+        )}
+        {houseRuleShowcase && (
+          <HouseRuleShowcase
+            key={houseRuleShowcase.id}
+            rule={houseRuleShowcase.rule}
+          />
         )}
         <div className="scene-accessibility" aria-label="Table controls">
           {!kiosk && (

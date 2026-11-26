@@ -372,7 +372,9 @@ function wagerSubject(route, state, plan = null) {
   else {
     record.placements ??= wagerPlacementMap(
       state,
-      plan?.transfers.map((flow) => flow.from),
+      plan?.transfers.flatMap((flow) =>
+        flow.from.kind === "bet" ? [flow.from] : [],
+      ),
     );
     bounds = wagerPileLayout(
       route,
@@ -659,7 +661,8 @@ export function sampleOutcomeCamera({
   );
   for (const flow of transfers) {
     const subject =
-      flow.kind === "win" && flow.sourceAmount === 0
+      flow.from.kind === "dealer" ||
+      (flow.kind === "win" && flow.sourceAmount === 0)
         ? dealerSubject
         : wagerSubject(flow.from, state, plan);
     const receiver =

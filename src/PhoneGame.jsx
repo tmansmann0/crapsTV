@@ -16,6 +16,7 @@ import {
 } from "react";
 import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   BookOpen,
   ChevronDown,
@@ -32,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { validBetChoices } from "./bet-options.js";
+import { HOUSE_RULES, canPassDice } from "./house-rules.js";
 import {
   catalogue,
   canRemoveBet,
@@ -2104,6 +2106,28 @@ export default function PhoneGame({
             expanded={detailOpen}
             onToggle={() => setDetailOpen((open) => !open)}
           />
+          {!state.rolling &&
+            state.lastRoll?.houseRulesTriggered?.length > 0 && (
+              <div
+                className="pg-house-results"
+                aria-label="House rules triggered"
+              >
+                {state.lastRoll.houseRulesTriggered.map((rule) =>
+                  HOUSE_RULES[rule] ? (
+                    <span key={rule}>{HOUSE_RULES[rule].label}</span>
+                  ) : null,
+                )}
+              </div>
+            )}
+          {connected && canPassDice(state, player.id) && (
+            <button
+              type="button"
+              className="pg-house-pass"
+              onClick={() => send({ type: "pass-dice" })}
+            >
+              Pass the dice <ArrowRight size={16} aria-hidden="true" />
+            </button>
+          )}
           {detailOpen && state.lastRoll && !state.rolling && (
             <RollDetail
               state={state}

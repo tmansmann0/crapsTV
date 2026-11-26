@@ -46,6 +46,13 @@ PHRASES = {
     "dont-pass-win": "Pay the don't pass line.",
     "field-win": "Winner in the field!",
     "hardway": "The hard way! Nice roll!",
+    "house-second-wind": "Second wind! The seven was rerolled.",
+    "house-hard-point": "Hard point! The pass line pays five to four.",
+    "house-hot-hand": "Hot hand! Three points in one turn. Bonus for the winners!",
+    "house-craps-cashback": "Craps cashback! Half your pass line stake comes back.",
+    "house-lucky-seven": "Lucky seven! Double profit on the pass line.",
+    "house-pass-the-dice": "Pass the dice. A new shooter steps up.",
+    "house-table-jackpot": "Table jackpot! Three different points made. Pay the jackpot!",
 }
 NUMBERS = {2:"Two. Snake eyes!",3:"Three. Ace deuce!",4:"Four. Little Joe!",5:"Five. Five alive!",6:"Six. Easy six!",7:"Seven!",8:"Eight. The eighter from Decatur!",9:"Nine. Center field!",10:"Ten. The big one!",11:"Eleven. Yo eleven!",12:"Twelve. Boxcars!"}
 for number, text in NUMBERS.items():
@@ -71,6 +78,7 @@ def main():
     import torch
     from kokoro import KModel, KPipeline
     from huggingface_hub import hf_hub_download
+    from house_rule_stingers import house_rule_stinger
     torch.manual_seed(20261107)
     def download(filename):
         return hf_hub_download(repo_id=MODEL_ID, filename=filename, revision=MODEL_REVISION)
@@ -94,7 +102,13 @@ def main():
             if not chunks:
                 raise RuntimeError(f"No audio generated for {key}")
             wav_path = Path(tmp) / f"{key}.wav"
-            sf.write(wav_path, np.concatenate(chunks), 24000)
+            voice = np.concatenate(chunks)
+            accent = house_rule_stinger(key)
+            if accent is not None:
+                lead = int(0.25 * 24000)
+                voice = np.pad(voice, (lead, 0))
+                voice[:len(accent)] += accent
+            sf.write(wav_path, voice, 24000)
             subprocess.run([
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav_path),
                 "-af", "silenceremove=start_periods=1:start_duration=0.01:start_threshold=-48dB,loudnorm=I=-18:TP=-1.5:LRA=7",
@@ -109,6 +123,7 @@ def main():
         "modelRevision": MODEL_REVISION,
         "engine": "kokoro", "speed": args.speed, "seed": 20261107,
         "sampleRate": 44100, "codec": "MP3 / libmp3lame", "bitrate": "128kbps mono",
+        "houseRuleStingers": "Original deterministic synthesis in scripts/house_rule_stingers.py",
         "files": {key: {"sha256": hashlib.sha256((args.output / value["file"]).read_bytes()).hexdigest(),
                          "text": value["text"]} for key, value in manifest.items()}
     }
