@@ -1612,6 +1612,9 @@ footer span span {
 .modal .button-row {
   justify-content: flex-end;
 }
+.jukebox-lobby {
+  margin: 16px auto;
+}
 .recap-page {
   max-width: 550px;
   margin: 45px auto;

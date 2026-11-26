@@ -30,6 +30,12 @@ These commands are the same in macOS/Linux terminals, Windows PowerShell, and Wi
 
 `npm run dev` runs the same local server with Vite hot reload. Set the optional `PORT` environment variable to change the default port. The server listens on all interfaces so phones can connect.
 
+### Desktop music requests
+
+Install `mpv` and `yt-dlp` on the host and make both available on its `PATH`. After `npm run build:desktop`, run `npm start -- --jukebox`. Joined players can open **Music requests**, search YouTube by song or artist, and request a result. The host can require approval, skip a song, or pause requests. Audio plays through the host's default output while the table stays fullscreen. YouTube search and playback require internet access.
+
+For desktop launchers, `CRAPSTV_JUKEBOX=1` is equivalent to the flag. Set `CRAPSTV_MPV` or `CRAPSTV_YTDLP` for custom executable paths, and `CRAPSTV_JUKEBOX_VOLUME` to a value from 0 to 100 (default 35). Use media you’re allowed to play through these tools.
+
 ## Host on Android
 
 The [Android offline host preview](android/README.md) runs the table from an Android device. Friends can join through a shared Wi-Fi network or an offline hotspot created in the app.

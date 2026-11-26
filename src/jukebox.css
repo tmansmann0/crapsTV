@@ -1,0 +1,96 @@
+.jukebox-dialog {
+  width: min(460px, calc(100vw - 24px));
+  max-height: min(760px, calc(100dvh - 32px));
+  padding: 20px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.jukebox-dialog::backdrop {
+  background: #221518b8;
+}
+.jukebox-heading,
+.jukebox-search,
+.jukebox-mode,
+.jukebox-list li,
+.jukebox-now {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.jukebox-heading h2 {
+  flex: 1;
+  margin: 0;
+  font-size: clamp(25px, 6vw, 33px);
+}
+.jukebox-heading .icon-button,
+.jukebox-list .icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 36px;
+  min-height: 42px;
+}
+.jukebox-search,
+.jukebox-mode {
+  margin: 14px 0 10px;
+}
+.jukebox-search input {
+  flex: 1;
+  width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+}
+.jukebox-mode {
+  justify-content: space-between;
+  font-size: 13px;
+}
+.jukebox-mode select {
+  min-height: 40px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+}
+.jukebox-queue {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.jukebox-queue h3,
+.jukebox-status p,
+.jukebox-queue p {
+  margin: 0 0 8px;
+}
+.jukebox-list {
+  display: grid;
+  gap: 1px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.jukebox-list li,
+.jukebox-now {
+  min-height: 56px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.jukebox-track {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 3px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.jukebox-track small {
+  color: var(--muted);
+}
+.jukebox-clear {
+  margin-top: 10px;
+}

@@ -62,6 +62,12 @@ The TV URL `?kiosk=1` enables the same presentation mode. This is a display
 option, not an access-control boundary; the existing room/admin rules remain in
 force. Server boot reports its mode in `/api/config`.
 
+To enable desktop music requests on the TV, install `mpv` and `yt-dlp` so
+the user service can find them, then set `"jukebox": true` in its launcher
+configuration. Restart the launcher when Craps Night is off. The existing
+button starts the jukebox with the game, and the phone controller has the
+search and queue controls.
+
 Launcher checks: `python3 scripts/linux/test_craps_night.py` verifies owned
 process cleanup, cancellable start, unchanged-release build reuse, update-failure
 fallback, and Jellyfin focus without stopping its service.

@@ -24,6 +24,7 @@ import {
   Dices,
   Equal,
   Lock,
+  Music2,
   Plus,
   RefreshCw,
   Settings,
@@ -1724,6 +1725,7 @@ export default function PhoneGame({
   connected,
   rollArea,
   settingsArea,
+  onMusic,
   serverError,
 }) {
   const images = useChipThumbnails();
@@ -2075,6 +2077,17 @@ export default function PhoneGame({
               onClick={() => setSettingsOpen(true)}
             >
               <Settings size={20} />
+            </button>
+          )}
+          {onMusic && (
+            <button
+              type="button"
+              className="pg-icon"
+              aria-label="Music requests"
+              aria-haspopup="dialog"
+              onClick={onMusic}
+            >
+              <Music2 size={20} />
             </button>
           )}
         </header>
