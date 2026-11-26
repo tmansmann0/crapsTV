@@ -1,7 +1,7 @@
 import * as game from "./game.js";
 import {
-  HOUSE_RULE_CHANCE_MS,
-  HOUSE_RULE_FIRST_DIE_MS,
+  HOUSE_RULE_BETWEEN_DICE_MS,
+  HOUSE_RULE_FIRST_STOP_MS,
   HOUSE_RULE_REVEAL_MS,
 } from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
@@ -272,7 +272,7 @@ export class RoomHub {
         else if (type === "buy-house-rule")
           game.buyHouseRule(s, pid, message.rule, message.quote);
         else if (type === "roll-house-rule") {
-          this.rollHouseRule(pid, message.promptId);
+          this.stopHouseRuleDie(pid, message.promptId, message.die);
           return;
         } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
@@ -452,26 +452,23 @@ export class RoomHub {
   }
   offerHouseRuleRoll(attempts, done) {
     const state = this.state;
-    const people = state.players.filter(
-      (p) => !p.left && !p.bot && p.connected,
-    );
-    const random = crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000;
-    const roller = people[Math.floor(random * people.length)];
     const id = game.uid();
     let index = 0;
-    const setPrompt = (phase) => {
-      const { roll, hit, ...details } = attempts[index];
+    let roller;
+    const setPrompt = (phase, stopDie) => {
+      const { dice, roll, hit, ...details } = attempts[index];
       state.houseRulePrompt = {
         ...details,
         id: `${id}:${index}`,
         phase,
         rollerId: roller?.id,
         rollerName: roller?.name,
-        ...(phase === "waiting" && {
-          deadline: Date.now() + HOUSE_RULE_ROLL_TIMEOUT_MS,
-        }),
-        ...(phase === "units" && { units: String(roll % 10) }),
-        ...(phase === "revealed" && { roll, hit }),
+        ...(stopDie && { stopDie }),
+        ...(phase !== "entering" &&
+          phase !== "first-rolling" && {
+            firstDie: dice[0],
+          }),
+        ...(phase === "revealed" && { dice, roll, hit }),
       };
       this.broadcast();
     };
@@ -481,38 +478,54 @@ export class RoomHub {
         if (!this.closed && this.state === state && state.rolling) fn();
       }, delay);
     };
-    const start = () => {
-      this.houseRuleRoll = null;
-      setPrompt("rolling");
-      advance(() => {
-        setPrompt("units");
-        advance(() => {
-          setPrompt("revealed");
-          advance(() => {
-            if (++index < attempts.length) start();
-            else {
-              delete state.houseRulePrompt;
-              done();
-            }
-          }, HOUSE_RULE_CHANCE_MS - HOUSE_RULE_REVEAL_MS);
-        }, HOUSE_RULE_REVEAL_MS - HOUSE_RULE_FIRST_DIE_MS);
-      }, HOUSE_RULE_FIRST_DIE_MS);
+    const waitForStop = (phase, die, stop) => {
+      const available = roller?.connected && !roller.left;
+      this.houseRuleRoll = available ? stop : null;
+      advance(stop, available ? HOUSE_RULE_ROLL_TIMEOUT_MS : 950);
+      setPrompt(phase, available ? die : undefined);
     };
-    if (roller) {
-      this.houseRuleRoll = start;
-      setPrompt("waiting");
-      advance(start, HOUSE_RULE_ROLL_TIMEOUT_MS);
-    } else start();
+    const reveal = () => {
+      this.houseRuleRoll = null;
+      setPrompt("revealed");
+      advance(() => {
+        if (++index < attempts.length) start();
+        else {
+          delete state.houseRulePrompt;
+          done();
+        }
+      }, HOUSE_RULE_REVEAL_MS);
+    };
+    const stopFirst = () => {
+      this.houseRuleRoll = null;
+      setPrompt("between");
+      advance(
+        () => waitForStop("second-rolling", 2, reveal),
+        HOUSE_RULE_BETWEEN_DICE_MS,
+      );
+    };
+    const start = () => {
+      const people = state.players.filter(
+        (p) => !p.left && !p.bot && p.connected,
+      );
+      const random = people.length
+        ? crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000
+        : 0;
+      roller = people[Math.floor(random * people.length)];
+      setPrompt("entering");
+      advance(
+        () => waitForStop("first-rolling", 1, stopFirst),
+        HOUSE_RULE_FIRST_STOP_MS,
+      );
+    };
+    start();
   }
-  rollHouseRule(playerId, promptId) {
+  stopHouseRuleDie(playerId, promptId, die) {
     const prompt = this.state.houseRulePrompt;
-    if (
-      !this.houseRuleRoll ||
-      prompt?.phase !== "waiting" ||
-      prompt.id !== promptId ||
-      prompt.rollerId !== playerId
-    )
-      throw Error("Only the selected player can roll this house rule.");
+    if (prompt?.id !== promptId || !prompt) return;
+    if (prompt.rollerId !== playerId)
+      throw Error("Only the selected player can stop these dice.");
+    // A repeated tap for the first die cannot stop the second one.
+    if (!this.houseRuleRoll || prompt.stopDie !== die) return;
     this.clearTimer(this.timer);
     this.houseRuleRoll();
   }

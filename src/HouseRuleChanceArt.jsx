@@ -1,9 +1,6 @@
-import { useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { describeHouseRuleTarget } from "./house-rules.js";
 import "./house-rule-chance-art.css";
-
-// Full-screen CHANCE ROLL scene. Everything before `revealed` is identical
-// for every roll and result: the outcome is not rendered, not in classes,
-// not in style variables and not in accessible text until the reveal.
 
 const VARIANTS = new Set([
   "secondWind",
@@ -15,56 +12,98 @@ const VARIANTS = new Set([
   "tableJackpot",
 ]);
 
-const FACES = ["front", "back", "right", "left", "top", "bottom"];
-
-function clampInt(value, min, max, fallback) {
-  const n = Math.round(Number(value));
-  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
-}
+// These are fixed die faces. The stopped die turns to its rolled face.
+const FACES = Object.entries({
+  front: 1,
+  back: 6,
+  right: 3,
+  left: 4,
+  top: 2,
+  bottom: 5,
+});
+const POSES = [
+  "",
+  "rotateY(0deg)",
+  "rotateX(-90deg)",
+  "rotateY(-90deg)",
+  "rotateY(90deg)",
+  "rotateX(90deg)",
+  "rotateY(180deg)",
+];
+const PIPS = [
+  [],
+  [4],
+  [0, 8],
+  [0, 4, 8],
+  [0, 2, 6, 8],
+  [0, 2, 4, 6, 8],
+  [0, 2, 3, 5, 6, 8],
+];
 
 function cleanName(value) {
   return typeof value === "string" ? value.trim().slice(0, 40) : "";
 }
 
-// Percentile mapping: tens die 00-90, units die 0-9; 00 + 0 reads as 100.
-export function percentileFaces(roll) {
-  if (roll === 100) return { tens: "00", units: "0" };
-  return {
-    tens: String(Math.floor(roll / 10) * 10).padStart(2, "0"),
-    units: String(roll % 10),
-  };
-}
+function Die({ kind, value, tumbling, entryDelay = 0 }) {
+  const cube = useRef(null);
+  const motion = useRef(null);
+  useLayoutEffect(() => {
+    const node = cube.current;
+    const moving = motion.current;
+    const from = moving ? getComputedStyle(node).transform : null;
+    moving?.cancel();
+    motion.current = null;
 
-function Die({ kind, value }) {
+    const pose = POSES[value ?? 1];
+    node.style.transform = pose;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches || !node.animate)
+      return;
+    if (tumbling) {
+      const direction = kind === "first" ? 1 : -1;
+      motion.current = node.animate(
+        [
+          { transform: "rotateX(0deg) rotateY(0deg) rotateZ(0deg)" },
+          {
+            transform: `rotateX(${360 * direction}deg) rotateY(360deg) rotateZ(${360 * direction}deg)`,
+          },
+        ],
+        { delay: entryDelay, duration: 1540, iterations: Infinity },
+      );
+    } else if (from && value != null) {
+      motion.current = node.animate(
+        [{ transform: from }, { transform: pose }],
+        { duration: 350, easing: "cubic-bezier(0.16, 0.75, 0.3, 1)" },
+      );
+    }
+  }, [kind, value, tumbling, entryDelay]);
+  useLayoutEffect(() => () => motion.current?.cancel(), []);
+
   return (
     <div
-      className={`hrc-die hrc-die-${kind}${value == null ? "" : " has-value"}`}
+      className={`hrc-die hrc-die-${kind}${tumbling ? " is-tumbling" : ""}${value != null ? " has-value" : ""}`}
     >
       <div className="hrc-shadow" />
       <div className="hrc-travel">
         <div className="hrc-impact">
           <div className="hrc-spin">
-            <div className="hrc-tip">
-              <div className="hrc-cube">
-                <i className="hrc-core hrc-core-x" />
-                <i className="hrc-core hrc-core-y" />
-                <i className="hrc-core hrc-core-z" />
-                {FACES.map((face) => (
-                  <span key={face} className={`hrc-face hrc-face-${face}`}>
-                    {face === "front" && value != null ? (
-                      <b
-                        className={`hrc-digit${value.length > 1 ? " is-pair" : ""}${
-                          value === "6" || value === "9" ? " is-marked" : ""
-                        }`}
-                      >
-                        {value}
-                      </b>
-                    ) : (
-                      <i className="hrc-mark" />
-                    )}
+            <div ref={cube} className="hrc-cube">
+              <i className="hrc-core hrc-core-x" />
+              <i className="hrc-core hrc-core-y" />
+              <i className="hrc-core hrc-core-z" />
+              {FACES.map(([face, pips]) => (
+                <span key={face} className={`hrc-face hrc-face-${face}`}>
+                  <span className="hrc-pips">
+                    {PIPS[pips].map((cell) => (
+                      <i
+                        key={cell}
+                        style={{
+                          gridArea: `${Math.floor(cell / 3) + 1} / ${(cell % 3) + 1}`,
+                        }}
+                      />
+                    ))}
                   </span>
-                ))}
-              </div>
+                </span>
+              ))}
             </div>
           </div>
         </div>
@@ -292,24 +331,34 @@ export default function HouseRuleChanceArt({
   label,
   playerName,
   rollerName,
-  chance,
-  units,
+  target,
+  firstDie,
+  dice,
   roll,
   hit,
-  revealed,
+  phase,
+  stopDie,
 }) {
-  // A display joining after the server revealed the result skips the intro.
-  const lateReveal = useRef(revealed === true || units != null).current;
+  // Joining mid-roll should show the current dice without replaying the intro.
+  const lateReveal = useRef(phase !== "entering").current;
   const variant = VARIANTS.has(rule) ? rule : "default";
   const title = (typeof label === "string" && label.trim()) || "House Rule";
-  const target = clampInt(chance, 0, 100, 0);
-  const shown = revealed === true;
-  const firstDie = !shown && typeof units === "string";
-  const result = shown ? clampInt(roll, 1, 100, 100) : null;
-  const faces = shown
-    ? percentileFaces(result)
-    : { tens: null, units: units ?? null };
+  const shown = phase === "revealed";
+  const secondRolling = phase === "second-rolling";
+  const firstRolling = phase === "entering" || phase === "first-rolling";
   const won = shown && hit === true;
+  const targetText = describeHouseRuleTarget(target);
+  const stopText = secondRolling ? "Stop the second die" : "Stop the first die";
+  const cue = shown
+    ? ""
+    : phase === "between"
+      ? "One die to go"
+      : phase === "entering"
+        ? "Get ready"
+        : stopDie
+          ? stopText
+          : "Rolling";
+  const trackPosition = (total) => `${((total - 1.5) / 11) * 100}%`;
 
   const holder = cleanName(playerName);
   const roller = cleanName(rollerName);
@@ -322,7 +371,7 @@ export default function HouseRuleChanceArt({
     "hrc",
     `hrc-v-${variant}`,
     shown ? "is-revealed" : "is-rolling",
-    firstDie ? "is-units" : "",
+    phase === "between" ? "is-between" : "",
     shown ? (won ? "is-hit" : "is-miss") : "",
     lateReveal ? "is-late" : "",
   ]
@@ -330,7 +379,10 @@ export default function HouseRuleChanceArt({
     .join(" ");
 
   return (
-    <div className={classes} style={{ "--hrc-chance": `${target}%` }}>
+    <div
+      className={classes}
+      style={{ "--hrc-target": `${((target - 1) / 11) * 100}%` }}
+    >
       <div className="hrc-scene" aria-hidden="true">
         <div className="hrc-wash" />
         <Bolt />
@@ -342,7 +394,7 @@ export default function HouseRuleChanceArt({
 
         <div className="hrc-stage">
           <div className="hrc-burst" />
-          {firstDie && <div className="hrc-hold-light" />}
+          {phase === "between" && <div className="hrc-hold-light" />}
           <StageFx variant={variant} />
           {variant === "passTheDice" && (
             <div className="hrc-seat">
@@ -352,12 +404,17 @@ export default function HouseRuleChanceArt({
           )}
           {won && <div className="hrc-halo" />}
           <div className="hrc-dice">
-            <Die kind="tens" value={faces.tens} />
-            <Die kind="units" value={faces.units} />
+            <Die
+              kind="first"
+              value={firstDie}
+              tumbling={firstRolling}
+              entryDelay={lateReveal ? 0 : 960}
+            />
+            <Die kind="second" value={dice?.[1]} tumbling={secondRolling} />
           </div>
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">
-              <span>Rolled by</span> {rollerTag}
+              <span>{shown ? "Rolled by" : "Roller"}</span> {rollerTag}
             </div>
           )}
           {shown && (
@@ -370,11 +427,8 @@ export default function HouseRuleChanceArt({
         <div className="hrc-panel">
           <div className="hrc-target">
             <span className="hrc-k">Target</span>
-            <span className="hrc-v">
-              {target}
-              <small>%</small>
-            </span>
-            <span className="hrc-k hrc-need">Roll {target} or under</span>
+            <span className="hrc-v">{target === 1 ? "—" : target}</span>
+            <span className="hrc-k hrc-need">{targetText}</span>
           </div>
           <div className="hrc-meter">
             <div className="hrc-track">
@@ -382,42 +436,34 @@ export default function HouseRuleChanceArt({
               {shown && (
                 <div
                   className="hrc-marker-lane"
-                  style={{ "--hrc-pos": `${result}%` }}
+                  style={{ "--hrc-pos": trackPosition(roll) }}
                 >
                   <i className="hrc-marker" />
                 </div>
               )}
             </div>
             <div className="hrc-scale">
-              <span>1</span>
-              <span>100</span>
+              <span>2</span>
+              <span>12</span>
             </div>
           </div>
           <div className="hrc-result">
             <span className="hrc-k">Rolled</span>
             {shown ? (
-              <span className="hrc-v hrc-roll">{result}</span>
+              <span className="hrc-v hrc-roll">{roll}</span>
             ) : (
-              <span className="hrc-v hrc-pending">– –</span>
+              <span className="hrc-v hrc-pending">{firstDie ?? "–"} + –</span>
             )}
             <span className="hrc-k hrc-verdict">
-              {shown
-                ? won
-                  ? "Hit"
-                  : "Miss"
-                : firstDie
-                  ? "One die to go"
-                  : "Rolling"}
+              {shown ? (won ? "Hit" : "Miss") : cue}
             </span>
           </div>
         </div>
       </div>
       <div className="hrc-sr" role="status" aria-live="polite">
         {shown
-          ? `${title}: rolled ${result} against ${target}. ${won ? "Hit" : "Miss"}.`
-          : firstDie
-            ? `Ones die: ${units}. Waiting for the second die.`
-            : `${title} chance roll: ${target} percent.`}
+          ? `${title}: rolled ${dice.join(" and ")}, total ${roll}. ${won ? "Hit" : "Miss"}.`
+          : `${title}. ${targetText}. ${firstDie ? `First die: ${firstDie}. ` : ""}${cue}.`}
       </div>
     </div>
   );

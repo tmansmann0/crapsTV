@@ -476,9 +476,14 @@
   margin: 10px 0;
 }
 .ha-rule-offer label {
+  min-width: 0;
   margin: 0;
 }
-.ha-rule-offer input {
+.ha-rule-offer label:has(select) {
+  grid-column: 1 / -1;
+}
+.ha-rule-offer input,
+.ha-rule-offer select {
   width: 100%;
 }
 .ha-disclosure {

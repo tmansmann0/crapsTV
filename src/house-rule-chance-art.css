@@ -1,7 +1,4 @@
-/* CHANCE ROLL: full-screen percentile-dice reveal.
-   The dice land, the ones face is revealed, and the tens face follows
-   with the result. Each face is visible only when the server reveals it.
-   Unanimated styles are always the settled frame. */
+/* Full-screen chance roll with two independently stopped six-sided dice. */
 
 .hrc {
   --a: #e8b04a;
@@ -272,7 +269,7 @@
   }
 }
 
-/* ---------- 3D percentile dice ---------- */
+/* ---------- 3D dice ---------- */
 .hrc-dice {
   position: absolute;
   left: 50%;
@@ -297,7 +294,7 @@
   height: var(--die);
   transform-style: preserve-3d;
 }
-.hrc-die-units {
+.hrc-die-second {
   --side: 1;
   --lag: 90ms;
   --ry: -24deg;
@@ -308,7 +305,6 @@
 .hrc-travel,
 .hrc-impact,
 .hrc-spin,
-.hrc-tip,
 .hrc-cube {
   position: absolute;
   inset: 0;
@@ -406,12 +402,12 @@
 .hrc-core-y {
   transform: rotateX(90deg);
 }
-.hrc-die-tens {
+.hrc-die-first {
   --face-bg: linear-gradient(150deg, #fffcf3 0%, #f6e8c6 55%, #dcc597 100%);
   --edge: #b89c68;
   --ink: #12382a;
 }
-.hrc-die-units {
+.hrc-die-second {
   --face-bg: linear-gradient(
     150deg,
     color-mix(in srgb, var(--a) 55%, #fff) 0%,
@@ -421,47 +417,26 @@
   --edge: color-mix(in srgb, var(--a) 50%, #000);
   --ink: var(--a-ink);
 }
-.hrc-digit {
-  position: relative;
-  z-index: 1;
-  font-size: calc(var(--die) * 0.58);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.04em;
-  text-shadow: 0 0.03em 0 #ffffff70;
-}
-.hrc-digit.is-pair {
-  font-size: calc(var(--die) * 0.46);
-  letter-spacing: -0.06em;
-}
-.hrc-digit.is-marked {
-  text-decoration: underline;
-  text-decoration-thickness: 0.07em;
-  text-underline-offset: 0.08em;
-}
-.hrc-mark {
+.hrc-pips {
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
   place-items: center;
-  width: 34%;
-  height: 34%;
-  opacity: 0.42;
+  width: 67%;
+  height: 67%;
 }
-.hrc-die-tens .hrc-mark::before {
-  font-size: calc(var(--die) * 0.32);
-  font-weight: 800;
-  font-style: normal;
-  color: #12382a;
-  content: "%";
+.hrc-pips i {
+  width: 61%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow:
+    0 0.045em 0 #ffffff60,
+    inset 0 0.055em 0 #0006;
 }
-.hrc-die-units .hrc-mark::before {
-  width: 62%;
-  height: 62%;
-  border: calc(var(--die) * 0.045) solid var(--ink);
-  border-radius: 22%;
-  transform: rotate(45deg);
-  content: "";
+.hrc-die:not(.is-tumbling, .has-value) .hrc-face {
+  --dim: 0.27;
 }
 
 @keyframes hrc-spin {
@@ -526,14 +501,6 @@
 }
 
 /* ---------- reveal (only after `revealed`) ---------- */
-.hrc-die.has-value .hrc-tip {
-  animation: hrc-tip 340ms ease-out both;
-}
-@keyframes hrc-tip {
-  from {
-    transform: rotateX(54deg);
-  }
-}
 .hrc-hold-light {
   position: absolute;
   left: calc(50% - var(--die) * 0.74);
@@ -719,12 +686,9 @@
   letter-spacing: -0.03em;
   color: var(--ivory);
 }
-.hrc-v small {
-  font-size: 0.5em;
-  color: var(--a);
-}
 .hrc-pending {
-  color: #ffffff33;
+  font-size: 5vmin;
+  color: #cbbd9f;
 }
 .hrc-roll {
   animation: hrc-stamp 380ms var(--reveal-delay) cubic-bezier(0.5, 0, 0.4, 1.4)
@@ -746,7 +710,7 @@
 .is-hit .hrc-verdict {
   color: #ffd970;
 }
-.is-units .hrc-verdict {
+.is-between .hrc-verdict {
   color: var(--gold);
 }
 .hrc-meter {
@@ -763,7 +727,7 @@
 .hrc-zone {
   position: absolute;
   inset: 0 auto 0 0;
-  width: var(--hrc-chance);
+  width: var(--hrc-target);
   border-radius: inherit;
   background: linear-gradient(
     90deg,
@@ -912,7 +876,7 @@
   --sy: 0deg;
   --sz: 0deg;
 }
-.hrc-v-hardPoint .hrc-die-units {
+.hrc-v-hardPoint .hrc-die-second {
   --face-bg: linear-gradient(150deg, #ff8a95 0%, #d6293d 52%, #7c0d1b 100%);
   --edge: #5a0912;
 }
@@ -1027,7 +991,7 @@
 .hrc-cracks {
   animation: hrc-fade 200ms 680ms both;
 }
-.hrc-v-hardPoint.is-revealed .hrc-impact {
+.hrc-v-hardPoint.is-revealed .hrc-die-second .hrc-impact {
   animation: hrc-restamp 360ms var(--reveal-delay) ease-out both;
 }
 @keyframes hrc-restamp {
@@ -1042,7 +1006,7 @@
   --sy: 0deg;
   --sz: 720deg;
 }
-.hrc-v-hotHand .hrc-die-units {
+.hrc-v-hotHand .hrc-die-second {
   --face-bg: radial-gradient(
     circle at 50% 55%,
     #ffe7a1 0%,
@@ -1051,7 +1015,7 @@
   );
   --edge: #6d1f05;
 }
-.hrc-v-hotHand .hrc-die-units .hrc-face {
+.hrc-v-hotHand .hrc-die-second .hrc-face {
   box-shadow:
     inset 0 0 0 0.22vmin #ffe0a080,
     inset 0 0 2.4vmin #fff1b8,
@@ -1178,7 +1142,7 @@
   --sy: -1440deg;
   --sz: 0deg;
 }
-.hrc-v-crapsCashback .hrc-die-units {
+.hrc-v-crapsCashback .hrc-die-second {
   --face-bg: linear-gradient(
     150deg,
     #ffffff 0%,
@@ -1314,7 +1278,7 @@
   --sy: 360deg;
   --sz: 900deg;
 }
-.hrc-v-luckySeven .hrc-die-units {
+.hrc-v-luckySeven .hrc-die-second {
   --face-bg: linear-gradient(
     135deg,
     #f6ffd8 0%,
@@ -1325,7 +1289,7 @@
   );
   --edge: #3f5a12;
 }
-.hrc-v-luckySeven .hrc-die-units .hrc-face-front::before {
+.hrc-v-luckySeven .hrc-die-second .hrc-face-front::before {
   inset: -20% auto -20% -60%;
   width: 40%;
   border-radius: 0;
@@ -1530,7 +1494,7 @@
   --sy: 720deg;
   --sz: 0deg;
 }
-.hrc-v-tableJackpot .hrc-die-units {
+.hrc-v-tableJackpot .hrc-die-second {
   --face-bg: linear-gradient(
     140deg,
     #fff1b8 0%,

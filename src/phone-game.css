@@ -1678,6 +1678,9 @@ body:has(.pg-shell) {
 }
 .pg-rule-prompt .button {
   display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 44px;
   gap: 6px;
   align-items: center;
   background: var(--pg-brass-bright);

@@ -119,23 +119,13 @@ export function useHouseRuleShowcase(state, enabled) {
 }
 
 export function HouseRuleChanceShowcase({ prompt }) {
-  const { label, rule, phase, rollerName, chance } = prompt;
+  const { label, rule } = prompt;
   return (
     <aside
       className={`house-rule-showcase is-house-rule-chance is-${rule}`}
       aria-label={`${label} chance roll`}
     >
-      {phase === "waiting" ? (
-        <div className="house-rule-waiting">
-          <p>{chance}% trigger chance</p>
-          <h2>{label}</h2>
-          <p>
-            <strong>{rollerName}</strong> has the dice
-          </p>
-        </div>
-      ) : (
-        <HouseRuleChanceArt {...prompt} revealed={phase === "revealed"} />
-      )}
+      <HouseRuleChanceArt {...prompt} />
     </aside>
   );
 }

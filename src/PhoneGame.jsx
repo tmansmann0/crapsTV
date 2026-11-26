@@ -39,6 +39,7 @@ import {
   HOUSE_RULES,
   activeHouseRulePass,
   canPassDice,
+  describeHouseRuleTarget,
   isHouseRuleForSale,
 } from "./house-rules.js";
 import {
@@ -2140,28 +2141,39 @@ export default function PhoneGame({
             expanded={detailOpen}
             onToggle={() => setDetailOpen((open) => !open)}
           />
-          {houseRulePrompt?.phase === "waiting" &&
-            houseRulePrompt.rollerId === player.id && (
+          {houseRulePrompt &&
+            houseRulePrompt.rollerId === player.id &&
+            houseRulePrompt.phase !== "revealed" && (
               <aside
                 className="pg-rule-prompt"
                 aria-label="Your house rule roll"
               >
                 <div>
-                  <strong>You have the dice</strong>
-                  <span>{houseRulePrompt.label}</span>
+                  <strong>{houseRulePrompt.label}</strong>
+                  <span>
+                    {houseRulePrompt.firstDie
+                      ? `First die: ${houseRulePrompt.firstDie}`
+                      : describeHouseRuleTarget(houseRulePrompt.target)}
+                  </span>
                 </div>
                 <button
                   type="button"
                   className="button"
-                  disabled={!connected}
+                  disabled={!connected || !houseRulePrompt.stopDie}
                   onClick={() =>
                     send({
                       type: "roll-house-rule",
                       promptId: houseRulePrompt.id,
+                      die: houseRulePrompt.stopDie,
                     })
                   }
                 >
-                  <Dices size={18} aria-hidden="true" /> Roll
+                  <Dices size={18} aria-hidden="true" />
+                  {houseRulePrompt.stopDie === 1
+                    ? "Stop first die"
+                    : houseRulePrompt.stopDie === 2
+                      ? "Stop second die"
+                      : "Get ready"}
                 </button>
               </aside>
             )}

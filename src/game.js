@@ -773,19 +773,19 @@ export function setHouseRuleOffer(s, id, rule, terms) {
     typeof rule === "string" && Object.hasOwn(HOUSE_RULES, rule),
     "Choose a game rule.",
   );
-  const { price, rolls, chance } = terms ?? {};
+  const { price, rolls, target } = terms ?? {};
   assert(
-    Object.entries({ price, rolls, chance }).every(([key, value]) =>
+    Object.entries({ price, rolls, target }).every(([key, value]) =>
       validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS[key], value),
     ),
-    "Enter a valid price, duration, and trigger chance.",
+    "Enter a valid price, duration, and trigger total.",
   );
   const rules = s.config.houseRules;
   s.config.houseRules = {
     ...DEFAULT_HOUSE_RULES,
     ...rules,
-    offers: { ...rules?.offers, [rule]: { price, rolls, chance } },
-    ...(rule === "secondWind" && { secondWindChance: chance }),
+    offers: { ...rules?.offers, [rule]: { price, rolls, target } },
+    ...(rule === "secondWind" && { secondWindTarget: target }),
   };
 }
 export function buyHouseRule(s, id, rule, quote) {
@@ -1330,13 +1330,20 @@ function throwSeed() {
 }
 
 function rollHouseRule(rule, access, player) {
-  const roll = 1 + Math.floor((throwSeed() * 100) / 0x100000000);
+  // Use equally sized buckets for all 36 ordered pairs.
+  const bucketSize = Math.floor(0x100000000 / 36);
+  let draw = throwSeed();
+  while (draw >= bucketSize * 36) draw = throwSeed();
+  const pair = Math.floor(draw / bucketSize);
+  const dice = [1 + Math.floor(pair / 6), 1 + (pair % 6)];
+  const roll = dice[0] + dice[1];
   return {
     rule,
     label: HOUSE_RULES[rule].label,
-    chance: access.chance,
+    target: access.target,
+    dice,
     roll,
-    hit: roll <= access.chance,
+    hit: roll <= access.target,
     value: access.value,
     ...(access.personal && { playerId: player.id, playerName: player.name }),
   };
@@ -1381,7 +1388,7 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
   const access = houseRuleAccess(rules, "secondWind", shooter, s.rolls.length);
   if (
     access &&
-    (access.chance > 0 || announce) &&
+    (access.target > 1 || announce) &&
     timeline.dice[0] + timeline.dice[1] === 7
   ) {
     const attempt = rollHouseRule("secondWind", access, shooter);
@@ -1462,7 +1469,7 @@ export function finishRoll(
   const houseRuleValues = {};
   if (s.throw?.secondWind)
     houseRuleValues.secondWind =
-      s.throw.houseRuleAttempt?.chance ?? rules.secondWindChance;
+      s.throw.houseRuleAttempt?.target ?? rules.secondWindTarget;
   const checkRule = (rule, player) => {
     const access = houseRuleAccess(rules, rule, player, s.rolls.length);
     if (!access) return null;

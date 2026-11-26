@@ -31,6 +31,7 @@ import {
   HOUSE_RULES,
   HOUSE_RULE_OFFER_SETTINGS,
   HOUSE_RULE_SETTINGS,
+  describeHouseRuleTarget,
   houseRuleOffer,
   validHouseRuleValue,
 } from "./house-rules.js";
@@ -938,7 +939,7 @@ function HouseRuleSetting({ setting, saved, disabled, onSave }) {
 function HouseRuleOfferFields({ rule, purchase, offer, disabled, onSave }) {
   const [draft, setDraft] = useState({});
   const settings = Object.entries(HOUSE_RULE_OFFER_SETTINGS).filter(
-    ([key]) => purchase || key === "chance",
+    ([key]) => purchase || key === "target",
   );
   const fields = settings.map(([key, setting]) => {
     const text = draft[key] ?? String(offer[key] / setting.scale);
@@ -966,22 +967,41 @@ function HouseRuleOfferFields({ rule, purchase, offer, disabled, onSave }) {
       {fields.map(({ key, setting, text }) => (
         <label key={key}>
           {setting.label}
-          <input
-            type="number"
-            min={setting.min / setting.scale}
-            max={setting.max / setting.scale}
-            step={1 / setting.scale}
-            required
-            disabled={disabled}
-            value={text}
-            onChange={(event) =>
-              setDraft({ ...draft, [key]: event.target.value })
-            }
-          />
+          {key === "target" ? (
+            <select
+              value={text}
+              disabled={disabled}
+              onChange={(event) =>
+                setDraft({ ...draft, target: event.target.value })
+              }
+            >
+              {Array.from({ length: setting.max }, (_, index) => {
+                const total = index + 1;
+                return (
+                  <option value={total} key={total}>
+                    {describeHouseRuleTarget(total)}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={setting.min / setting.scale}
+              max={setting.max / setting.scale}
+              step={1 / setting.scale}
+              required
+              disabled={disabled}
+              value={text}
+              onChange={(event) =>
+                setDraft({ ...draft, [key]: event.target.value })
+              }
+            />
+          )}
         </label>
       ))}
       <button type="submit" className="button outline" disabled={!canSave}>
-        Save {purchase ? "terms" : "chance"}
+        Save {purchase ? "terms" : "target"}
       </button>
     </form>
   );

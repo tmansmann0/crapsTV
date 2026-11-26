@@ -4,6 +4,7 @@ import {
   DEFAULT_HOUSE_RULES,
   HOUSE_RULES,
   activeHouseRulePass,
+  describeHouseRuleTarget,
   formatHouseRulePayout,
   houseRuleOffer,
 } from "./house-rules.js";
@@ -60,8 +61,8 @@ export default function HouseRulesShop({
               )}
               <dl>
                 <div>
-                  <dt>Trigger chance</dt>
-                  <dd>{terms.chance}%</dd>
+                  <dt>Trigger total</dt>
+                  <dd>{describeHouseRuleTarget(terms.target)}</dd>
                 </div>
                 <div>
                   <dt>{pass ? "Rolls left" : "Duration"}</dt>

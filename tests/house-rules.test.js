@@ -7,6 +7,11 @@ import { mobilePayouts } from "../src/mobile-settlement.js";
 import { sampleTableCamera } from "../src/throw-camera.js";
 import { captureRoomSave, readRoomSave } from "../src/room-save.js";
 
+function chanceDraw(first, second) {
+  const pair = (first - 1) * 6 + (second - 1);
+  return Math.floor(((pair + 0.5) * 0x100000000) / 36);
+}
+
 function table() {
   const state = game.createState("RULES2");
   const host = game.join(state, "Host");
@@ -17,13 +22,13 @@ test("Second Wind starts off and is a host-only rule that survives setup and sav
   const { state, host } = table();
   const guest = game.join(state, "Guest");
   assert.deepEqual(state.config.houseRules, DEFAULT_HOUSE_RULES);
-  assert.equal(state.config.houseRules.secondWindChance, 25);
+  assert.equal(state.config.houseRules.secondWindTarget, 5);
   assert.throws(
     () => game.setHouseRule(state, guest.id, "secondWind", true),
     /Only the table host/,
   );
   assert.throws(
-    () => game.setHouseRule(state, guest.id, "secondWindChance", 75),
+    () => game.setHouseRule(state, guest.id, "secondWindTarget", 75),
     /Only the table host/,
   );
   assert.throws(
@@ -31,22 +36,25 @@ test("Second Wind starts off and is a host-only rule that survives setup and sav
     /Choose a game rule/,
   );
   game.setHouseRule(state, host.id, "secondWind", true);
-  for (const value of [-1, 101, 12.5, "30"])
+  for (const value of [0, 13, 5.5, "5"])
     assert.throws(
-      () => game.setHouseRule(state, host.id, "secondWindChance", value),
-      /reroll chance/,
+      () => game.setHouseRule(state, host.id, "secondWindTarget", value),
+      /trigger total/,
     );
-  game.setHouseRule(state, host.id, "secondWindChance", 37);
+  game.setHouseRule(state, host.id, "secondWindTarget", 7);
   game.configure(state, host.id, { minBet: 1000 });
   assert.equal(state.config.houseRules.secondWind, true);
   const save = captureRoomSave(state, new Map([["host-token", host.id]]), []);
   const restored = () =>
     readRoomSave(JSON.stringify(save)).state.config.houseRules;
   assert.equal(restored().secondWind, true);
-  assert.equal(restored().secondWindChance, 37);
-  delete save.state.config.houseRules.secondWindChance;
+  assert.equal(restored().secondWindTarget, 7);
+  delete save.state.config.houseRules.secondWindTarget;
   assert.equal(restored().secondWind, true);
-  assert.equal(restored().secondWindChance, 25);
+  assert.equal(restored().secondWindTarget, 5);
+  save.state.config.houseRules.secondWindChance = 37;
+  assert.equal(restored().secondWindTarget, 6);
+  assert.equal(restored().secondWindChance, undefined);
   delete save.state.config.houseRules;
   assert.deepEqual(restored(), DEFAULT_HOUSE_RULES);
 });
@@ -54,7 +62,7 @@ test("Second Wind starts off and is a host-only rule that survives setup and sav
 for (const {
   name,
   enabled,
-  chance,
+  target,
   draws,
   finalSeed,
   result,
@@ -75,24 +83,24 @@ for (const {
     result: 5,
   },
   {
-    name: "keeps the first seven at the default 25% cutoff",
+    name: "keeps the first seven above the default total of five",
     enabled: true,
-    draws: [0, 0x40000000],
+    draws: [0, chanceDraw(2, 4)],
     finalSeed: 0,
     result: 7,
   },
   {
-    name: "replaces a seven below the default 25% cutoff",
+    name: "replaces a seven at the default total of five",
     enabled: true,
-    draws: [0, 0x3fffffff, 2],
+    draws: [0, chanceDraw(2, 3), 2],
     finalSeed: 2,
     result: 5,
   },
   {
     name: "rerolls invisibly when house announcements are off",
     enabled: true,
-    chance: 60,
-    draws: [0, 0x7fffffff, 2],
+    target: 7,
+    draws: [0, chanceDraw(4, 3), 2],
     finalSeed: 2,
     result: 5,
     announce: false,
@@ -100,16 +108,16 @@ for (const {
   {
     name: "keeps the replacement when it is another seven",
     enabled: true,
-    chance: 100,
-    draws: [0, 0xffffffff, 1],
+    target: 12,
+    draws: [0, chanceDraw(6, 6), 1],
     finalSeed: 1,
     result: 7,
   },
   {
-    name: "keeps an initial seven when configured to 0%",
+    name: "keeps an initial seven when the trigger is set to Never",
     enabled: true,
-    chance: 0,
-    draws: [0, 0],
+    target: 1,
+    draws: [0, chanceDraw(1, 1)],
     finalSeed: 0,
     result: 7,
   },
@@ -117,8 +125,8 @@ for (const {
   test(`Second Wind ${name}`, (t) => {
     const { state, host } = table();
     game.setHouseRule(state, host.id, "secondWind", enabled);
-    if (chance !== undefined)
-      game.setHouseRule(state, host.id, "secondWindChance", chance);
+    if (target !== undefined)
+      game.setHouseRule(state, host.id, "secondWindTarget", target);
     game.setHouseRule(state, host.id, "announce", announce);
     game.start(state, host.id);
     state.nextRollAt = 0;
@@ -137,7 +145,7 @@ for (const {
     assert.equal(state.throw, flight);
     assert.equal(state.rolls.length, 0);
     assert.throws(
-      () => game.setHouseRule(state, host.id, "secondWindChance", 50),
+      () => game.setHouseRule(state, host.id, "secondWindTarget", 50),
       /Wait for the dice/,
     );
     game.finishRoll(state);
@@ -365,7 +373,7 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
   const { state, host } = table();
   const guest = game.join(state, "Guest");
   const rule = "luckySeven";
-  const terms = { price: 750, rolls: 2, chance: 100 };
+  const terms = { price: 750, rolls: 2, target: 12 };
   assert.throws(
     () => game.setHouseRuleOffer(state, guest.id, rule, terms),
     /table host/,
@@ -388,7 +396,7 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
   game.setHouseRuleOffer(state, host.id, rule, {
     price: 1500,
     rolls: 7,
-    chance: 0,
+    target: 1,
   });
   game.setHouseRule(state, host.id, "luckySevenPayout", 350);
   game.setHouseRule(state, host.id, rule, false);
@@ -399,11 +407,20 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
     result.events.map(({ delta }) => delta),
     [1000, 500],
   );
-  assert.equal(result.houseRuleAttempts[0].chance, 100);
+  assert.equal(result.houseRuleAttempts[0].target, 12);
   assert.equal(result.houseRuleAttempts[0].playerId, host.id);
 
   const saved = captureRoomSave(state, new Map([["host", host.id]]), []);
+  // A paid pass from a previous save keeps its expiry and boost.
+  const legacyPass = saved.state.players[0].houseRulePasses[rule];
+  delete legacyPass.target;
+  legacyPass.chance = 100;
+  const legacyOffer = saved.state.config.houseRules.offers[rule];
+  delete legacyOffer.target;
+  legacyOffer.chance = 0;
   const resumed = readRoomSave(JSON.stringify(saved)).state;
+  assert.equal(resumed.players[0].houseRulePasses[rule].target, 12);
+  assert.equal(resumed.config.houseRules.offers[rule].target, 1);
   assert.equal(resumed.players[0].houseRulePasses[rule].expiresAfterRoll, 2);
   assert.equal(resumed.players[0].houseRulePasses[rule].value, 200);
   assert.equal(resumed.config.houseRules[rule], false);
@@ -448,7 +465,7 @@ function manualRoom(t) {
   return { hub, tick, join, errors };
 }
 
-test("only the drawn player can release a chance roll and settlement waits for the reveal", (t) => {
+test("only the drawn player can stop each die, and settlement waits for the second reveal", (t) => {
   const { hub, join, tick, errors } = manualRoom(t);
   join("Host");
   join("Guest");
@@ -458,7 +475,7 @@ test("only the drawn player can release a chance roll and settlement waits for t
   hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
   hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
   hub.receive("Host", { type: "bet", betId: "pass", amount: 500 });
-  const values = [0, 0x10000000, 0xffffffff];
+  const values = [0, chanceDraw(2, 3), 0xffffffff];
   const native = crypto.getRandomValues.bind(crypto);
   t.mock.method(crypto, "getRandomValues", (buffer) => {
     if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
@@ -472,31 +489,43 @@ test("only the drawn player can release a chance roll and settlement waits for t
   tick();
   const prompt = state.houseRulePrompt;
   assert.equal(prompt.rollerId, guest.id);
-  assert.equal(prompt.phase, "waiting");
+  assert.equal(prompt.phase, "entering");
   assert.equal(prompt.roll, undefined);
   assert.equal(host.bank, 99500);
-  hub.receive("Host", { type: "roll-house-rule", promptId: prompt.id });
-  assert.match(errors.pop(), /selected player/);
-  assert.equal(state.houseRulePrompt.phase, "waiting");
-  hub.receive("Guest", { type: "roll-house-rule", promptId: prompt.id });
-  assert.equal(state.houseRulePrompt.phase, "rolling");
-  assert.equal(state.houseRulePrompt.hit, undefined);
-  assert.equal(state.houseRulePrompt.units, undefined);
+  const stop = (name, die) =>
+    hub.receive(name, { type: "roll-house-rule", promptId: prompt.id, die });
+  stop("Guest", 1);
+  assert.equal(state.houseRulePrompt.phase, "entering");
   tick();
-  assert.equal(state.houseRulePrompt.phase, "units");
-  assert.equal(state.houseRulePrompt.units, "7");
+  assert.equal(state.houseRulePrompt.phase, "first-rolling");
+  stop("Host", 1);
+  assert.match(errors.pop(), /selected player/);
+  stop("Guest", 2);
+  assert.equal(state.houseRulePrompt.phase, "first-rolling");
+  assert.equal(state.houseRulePrompt.hit, undefined);
+  assert.equal(state.houseRulePrompt.firstDie, undefined);
+  assert.equal(state.houseRulePrompt.dice, undefined);
+  stop("Guest", 1);
+  assert.equal(state.houseRulePrompt.phase, "between");
+  assert.equal(state.houseRulePrompt.firstDie, 2);
   assert.equal(state.houseRulePrompt.roll, undefined);
   assert.equal(state.houseRulePrompt.hit, undefined);
-  assert.equal(host.bank, 99500);
+  assert.equal(state.houseRulePrompt.dice, undefined);
   tick();
+  assert.equal(state.houseRulePrompt.phase, "second-rolling");
+  stop("Guest", 1);
+  assert.equal(state.houseRulePrompt.phase, "second-rolling");
+  assert.equal(host.bank, 99500);
+  stop("Guest", 2);
   assert.equal(state.houseRulePrompt.phase, "revealed");
-  assert.equal(state.houseRulePrompt.roll, 7);
+  assert.deepEqual(state.houseRulePrompt.dice, [2, 3]);
+  assert.equal(state.houseRulePrompt.roll, 5);
   assert.equal(state.houseRulePrompt.hit, true);
   assert.equal(host.bank, 99500);
   tick();
   assert.equal(state.houseRulePrompt, undefined);
   assert.equal(host.bank, 101000);
-  assert.equal(state.lastRoll.houseRuleAttempts[0].roll, 7);
+  assert.equal(state.lastRoll.houseRuleAttempts[0].roll, 5);
   assert.equal(state.rolling, false);
   assert.equal(values.length, 0);
 });
@@ -507,7 +536,7 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   hub.receive("Host", { type: "house-rule", rule: "secondWind", value: true });
   hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
   hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
-  const draws = [0, 0x40000000, 0];
+  const draws = [0, chanceDraw(5, 6), 0];
   const native = crypto.getRandomValues.bind(crypto);
   t.mock.method(crypto, "getRandomValues", (buffer) => {
     if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
@@ -518,20 +547,21 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   });
   const { state } = hub;
   hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
-  assert.equal(state.houseRulePrompt.phase, "waiting");
+  assert.equal(state.houseRulePrompt.phase, "entering");
   assert.equal(state.throw, null);
   tick();
-  assert.equal(state.houseRulePrompt.phase, "rolling");
+  assert.equal(state.houseRulePrompt.phase, "first-rolling");
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "between");
+  assert.equal(state.houseRulePrompt.firstDie, 5);
+  assert.equal(state.houseRulePrompt.dice, undefined);
   assert.equal(state.throw, null);
   tick();
-  assert.equal(state.houseRulePrompt.phase, "units");
-  assert.equal(state.houseRulePrompt.units, "6");
-  assert.equal(state.houseRulePrompt.roll, undefined);
-  assert.equal(state.throw, null);
+  assert.equal(state.houseRulePrompt.phase, "second-rolling");
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.equal(state.houseRulePrompt.hit, false);
-  assert.equal(state.houseRulePrompt.roll, 26);
+  assert.equal(state.houseRulePrompt.roll, 11);
   tick();
   assert.equal(state.houseRulePrompt, undefined);
   assert.equal(state.throw.seed, 0);

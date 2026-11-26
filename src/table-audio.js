@@ -248,13 +248,18 @@ export function createTableAudio() {
   function houseRuleRoll(phase, hit) {
     if (context?.state !== "running" || !settings.effects || document.hidden)
       return;
-    if (phase === "rolling") {
+    if (phase === "entering") {
       const now = context.currentTime;
       if (!play("thunder", 0.75, 0, now)) play("rail", 0.48, 0, now);
       play("dice", 0.54, -1.2, now + 0.29);
       play("dice", 0.48, 1.2, now + 0.57);
-    } else if (phase === "units") play("tension", 0.48, 0.8);
-    else if (phase === "revealed") play(hit ? "chips" : "felt", 0.6, 0);
+    } else if (phase === "between") {
+      play("dice", 0.54, -1.2);
+      play("tension", 0.48, 0.8);
+    } else if (phase === "revealed") {
+      play("dice", 0.48, 1.2);
+      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.3);
+    }
   }
 
   async function preview() {

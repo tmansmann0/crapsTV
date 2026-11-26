@@ -3,7 +3,7 @@ export const HOUSE_RULES = {
     label: "Second Wind",
     detail: "An initial 7 can be rerolled once.",
     clip: "house-second-wind",
-    setting: "secondWindChance",
+    setting: "secondWindTarget",
   },
   hardPoint: {
     label: "Hard Point",
@@ -47,11 +47,11 @@ export const HOUSE_RULES = {
 };
 
 export const HOUSE_RULE_SETTINGS = {
-  secondWindChance: {
-    label: "Reroll chance (%)",
-    defaultValue: 25,
-    min: 0,
-    max: 100,
+  secondWindTarget: {
+    label: "Second Wind trigger total",
+    defaultValue: 5,
+    min: 1,
+    max: 12,
     scale: 1,
   },
   hardPointPayout: {
@@ -91,13 +91,13 @@ export const HOUSE_RULE_SETTINGS = {
   },
 };
 
-export const HOUSE_RULE_CHANCE_MS = 3400;
-export const HOUSE_RULE_FIRST_DIE_MS = 1550;
-export const HOUSE_RULE_REVEAL_MS = 2300;
+export const HOUSE_RULE_FIRST_STOP_MS = 1100;
+export const HOUSE_RULE_BETWEEN_DICE_MS = 540;
+export const HOUSE_RULE_REVEAL_MS = 1450;
 export const HOUSE_RULE_OFFER_SETTINGS = {
   price: { label: "Price in chips ($)", min: 100, max: 100000000, scale: 100 },
   rolls: { label: "Duration (table rolls)", min: 1, max: 100, scale: 1 },
-  chance: { label: "Trigger chance (%)", min: 0, max: 100, scale: 1 },
+  target: { label: "Trigger total", min: 1, max: 12, scale: 1 },
 };
 
 export const DEFAULT_HOUSE_RULES = Object.freeze({
@@ -115,6 +115,33 @@ export function validHouseRuleValue(setting, value) {
   return (
     Number.isSafeInteger(value) && value >= setting.min && value <= setting.max
   );
+}
+
+// Convert old percent targets to the nearest cumulative two-dice odds.
+const TWO_DICE_CUMULATIVE_WAYS = [0, 1, 3, 6, 10, 15, 21, 26, 30, 33, 35, 36];
+
+function houseRuleTarget(target, legacyChance, fallback) {
+  if (validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.target, target))
+    return target;
+  if (!Number.isInteger(legacyChance) || legacyChance < 0 || legacyChance > 100)
+    return fallback;
+  const expectedWays = legacyChance * 36;
+  let closest = 1;
+  for (const [index, ways] of TWO_DICE_CUMULATIVE_WAYS.entries()) {
+    if (
+      Math.abs(ways * 100 - expectedWays) <
+      Math.abs(TWO_DICE_CUMULATIVE_WAYS[closest - 1] * 100 - expectedWays)
+    )
+      closest = index + 1;
+  }
+  return closest;
+}
+
+export function describeHouseRuleTarget(target) {
+  if (target === 1) return "Never triggers";
+  if (target === 12) return "Any total";
+  if (target === 2) return "Roll a total of 2";
+  return `Roll a total of ${target} or lower`;
 }
 
 export function normalizeHouseRules(saved) {
@@ -141,13 +168,24 @@ export function normalizeHouseRules(saved) {
           : setting.defaultValue,
       ]),
     ),
+    secondWindTarget: houseRuleTarget(
+      saved?.secondWindTarget,
+      saved?.secondWindChance,
+      DEFAULT_HOUSE_RULES.secondWindTarget,
+    ),
   };
 }
 
 export function houseRuleOffer(rules, rule) {
   const offer = rules?.offers?.[rule];
-  const chance =
-    rule === "secondWind" ? rules?.secondWindChance : offer?.chance;
+  const target =
+    rule === "secondWind"
+      ? houseRuleTarget(
+          rules?.secondWindTarget,
+          rules?.secondWindChance,
+          DEFAULT_HOUSE_RULES.secondWindTarget,
+        )
+      : houseRuleTarget(offer?.target, offer?.chance, 12);
   return {
     price: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.price, offer?.price)
       ? offer.price
@@ -155,11 +193,7 @@ export function houseRuleOffer(rules, rule) {
     rolls: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.rolls, offer?.rolls)
       ? offer.rolls
       : 5,
-    chance: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.chance, chance)
-      ? chance
-      : rule === "secondWind"
-        ? DEFAULT_HOUSE_RULES.secondWindChance
-        : 100,
+    target,
   };
 }
 
@@ -186,28 +220,31 @@ export function normalizeHouseRulePasses(saved, completedRolls) {
       );
       if (
         !pass ||
-        !Object.entries(HOUSE_RULE_OFFER_SETTINGS).every(([key, range]) =>
-          validHouseRuleValue(range, pass[key]),
-        ) ||
+        !validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.price, pass.price) ||
+        !validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.rolls, pass.rolls) ||
         !Number.isSafeInteger(pass.expiresAfterRoll) ||
         pass.expiresAfterRoll > completedRolls + pass.rolls ||
         (setting &&
+          rule !== "secondWind" &&
           !validHouseRuleValue(HOUSE_RULE_SETTINGS[setting], pass.value))
       )
         return [];
-      const { price, rolls, chance, expiresAfterRoll, value } = pass;
-      return [[rule, { price, rolls, chance, expiresAfterRoll, value }]];
+      const target = houseRuleTarget(pass.target, pass.chance, null);
+      if (target === null) return [];
+      const { price, rolls, expiresAfterRoll } = pass;
+      const value = rule === "secondWind" ? target : pass.value;
+      return [[rule, { price, rolls, target, expiresAfterRoll, value }]];
     }),
   );
 }
 
 export function houseRuleAccess(rules, rule, player, completedRolls) {
   const pass = activeHouseRulePass(player, rule, completedRolls);
-  if (pass) return { chance: pass.chance, value: pass.value, personal: true };
+  if (pass) return { target: pass.target, value: pass.value, personal: true };
   if (rules?.[rule] !== true) return null;
   const { setting } = HOUSE_RULES[rule];
   return {
-    chance: houseRuleOffer(rules, rule).chance,
+    target: houseRuleOffer(rules, rule).target,
     value: setting
       ? (rules[setting] ?? DEFAULT_HOUSE_RULES[setting])
       : undefined,
