@@ -37,7 +37,9 @@ export function percentileFaces(roll) {
 
 function Die({ kind, value }) {
   return (
-    <div className={`hrc-die hrc-die-${kind}`}>
+    <div
+      className={`hrc-die hrc-die-${kind}${value == null ? "" : " has-value"}`}
+    >
       <div className="hrc-shadow" />
       <div className="hrc-travel">
         <div className="hrc-impact">
@@ -291,18 +293,22 @@ export default function HouseRuleChanceArt({
   playerName,
   rollerName,
   chance,
+  units,
   roll,
   hit,
   revealed,
 }) {
   // A display joining after the server revealed the result skips the intro.
-  const lateReveal = useRef(revealed === true).current;
+  const lateReveal = useRef(revealed === true || units != null).current;
   const variant = VARIANTS.has(rule) ? rule : "default";
   const title = (typeof label === "string" && label.trim()) || "House Rule";
   const target = clampInt(chance, 0, 100, 0);
   const shown = revealed === true;
+  const firstDie = !shown && typeof units === "string";
   const result = shown ? clampInt(roll, 1, 100, 100) : null;
-  const faces = shown ? percentileFaces(result) : { tens: null, units: null };
+  const faces = shown
+    ? percentileFaces(result)
+    : { tens: null, units: units ?? null };
   const won = shown && hit === true;
 
   const holder = cleanName(playerName);
@@ -316,6 +322,7 @@ export default function HouseRuleChanceArt({
     "hrc",
     `hrc-v-${variant}`,
     shown ? "is-revealed" : "is-rolling",
+    firstDie ? "is-units" : "",
     shown ? (won ? "is-hit" : "is-miss") : "",
     lateReveal ? "is-late" : "",
   ]
@@ -335,6 +342,7 @@ export default function HouseRuleChanceArt({
 
         <div className="hrc-stage">
           <div className="hrc-burst" />
+          {firstDie && <div className="hrc-hold-light" />}
           <StageFx variant={variant} />
           {variant === "passTheDice" && (
             <div className="hrc-seat">
@@ -393,7 +401,13 @@ export default function HouseRuleChanceArt({
               <span className="hrc-v hrc-pending">– –</span>
             )}
             <span className="hrc-k hrc-verdict">
-              {shown ? (won ? "Hit" : "Miss") : "Rolling"}
+              {shown
+                ? won
+                  ? "Hit"
+                  : "Miss"
+                : firstDie
+                  ? "One die to go"
+                  : "Rolling"}
             </span>
           </div>
         </div>
@@ -401,7 +415,9 @@ export default function HouseRuleChanceArt({
       <div className="hrc-sr" role="status" aria-live="polite">
         {shown
           ? `${title}: rolled ${result} against ${target}. ${won ? "Hit" : "Miss"}.`
-          : `${title} chance roll: ${target} percent.`}
+          : firstDie
+            ? `Ones die: ${units}. Waiting for the second die.`
+            : `${title} chance roll: ${target} percent.`}
       </div>
     </div>
   );

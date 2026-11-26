@@ -1,6 +1,6 @@
 /* CHANCE ROLL: full-screen percentile-dice reveal.
-   Timeline: strike + name 0-500ms, dice land by ~1130ms, hold, then the
-   parent flips `revealed` (~1150ms) and the result plays for ~600ms.
+   The dice land, the ones face is revealed, and the tens face follows
+   with the result. Each face is visible only when the server reveals it.
    Unanimated styles are always the settled frame. */
 
 .hrc {
@@ -526,13 +526,33 @@
 }
 
 /* ---------- reveal (only after `revealed`) ---------- */
-.is-revealed .hrc-tip {
-  animation: hrc-tip 460ms var(--reveal-delay) cubic-bezier(0.3, 1.45, 0.5, 1)
-    both;
+.hrc-die.has-value .hrc-tip {
+  animation: hrc-tip 340ms ease-out both;
 }
 @keyframes hrc-tip {
   from {
-    transform: rotateX(90deg);
+    transform: rotateX(54deg);
+  }
+}
+.hrc-hold-light {
+  position: absolute;
+  left: calc(50% - var(--die) * 0.74);
+  bottom: calc(9vmin + var(--die) * 0.36);
+  width: calc(var(--die) * 3);
+  height: calc(var(--die) * 2.2);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--a), transparent 74%);
+  opacity: 0.15;
+  transform: translate(-50%, 50%);
+  animation: hrc-tension 700ms ease-out both;
+}
+@keyframes hrc-tension {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 50%) scale(0.62);
+  }
+  to {
+    opacity: 0.37;
   }
 }
 .is-miss .hrc-face {
@@ -725,6 +745,9 @@
 }
 .is-hit .hrc-verdict {
   color: #ffd970;
+}
+.is-units .hrc-verdict {
+  color: var(--gold);
 }
 .hrc-meter {
   display: grid;

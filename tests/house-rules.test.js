@@ -481,6 +481,13 @@ test("only the drawn player can release a chance roll and settlement waits for t
   hub.receive("Guest", { type: "roll-house-rule", promptId: prompt.id });
   assert.equal(state.houseRulePrompt.phase, "rolling");
   assert.equal(state.houseRulePrompt.hit, undefined);
+  assert.equal(state.houseRulePrompt.units, undefined);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "units");
+  assert.equal(state.houseRulePrompt.units, "7");
+  assert.equal(state.houseRulePrompt.roll, undefined);
+  assert.equal(state.houseRulePrompt.hit, undefined);
+  assert.equal(host.bank, 99500);
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.equal(state.houseRulePrompt.roll, 7);
@@ -515,6 +522,11 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   assert.equal(state.throw, null);
   tick();
   assert.equal(state.houseRulePrompt.phase, "rolling");
+  assert.equal(state.throw, null);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "units");
+  assert.equal(state.houseRulePrompt.units, "6");
+  assert.equal(state.houseRulePrompt.roll, undefined);
   assert.equal(state.throw, null);
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");

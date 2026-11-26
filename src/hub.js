@@ -1,5 +1,9 @@
 import * as game from "./game.js";
-import { HOUSE_RULE_CHANCE_MS, HOUSE_RULE_REVEAL_MS } from "./house-rules.js";
+import {
+  HOUSE_RULE_CHANCE_MS,
+  HOUSE_RULE_FIRST_DIE_MS,
+  HOUSE_RULE_REVEAL_MS,
+} from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
@@ -466,6 +470,7 @@ export class RoomHub {
         ...(phase === "waiting" && {
           deadline: Date.now() + HOUSE_RULE_ROLL_TIMEOUT_MS,
         }),
+        ...(phase === "units" && { units: String(roll % 10) }),
         ...(phase === "revealed" && { roll, hit }),
       };
       this.broadcast();
@@ -480,15 +485,18 @@ export class RoomHub {
       this.houseRuleRoll = null;
       setPrompt("rolling");
       advance(() => {
-        setPrompt("revealed");
+        setPrompt("units");
         advance(() => {
-          if (++index < attempts.length) start();
-          else {
-            delete state.houseRulePrompt;
-            done();
-          }
-        }, HOUSE_RULE_CHANCE_MS - HOUSE_RULE_REVEAL_MS);
-      }, HOUSE_RULE_REVEAL_MS);
+          setPrompt("revealed");
+          advance(() => {
+            if (++index < attempts.length) start();
+            else {
+              delete state.houseRulePrompt;
+              done();
+            }
+          }, HOUSE_RULE_CHANCE_MS - HOUSE_RULE_REVEAL_MS);
+        }, HOUSE_RULE_REVEAL_MS - HOUSE_RULE_FIRST_DIE_MS);
+      }, HOUSE_RULE_FIRST_DIE_MS);
     };
     if (roller) {
       this.houseRuleRoll = start;
