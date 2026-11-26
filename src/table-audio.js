@@ -243,6 +243,17 @@ export function createTableAudio() {
     play(count > 1 ? "shuffle" : "lay", 0.66, x);
   }
 
+  function houseRuleRoll(phase, hit) {
+    if (context?.state !== "running" || !settings.effects || document.hidden)
+      return;
+    if (phase === "rolling") {
+      const now = context.currentTime;
+      play("rail", 0.48, 0, now);
+      play("dice", 0.54, -1.2, now + 0.29);
+      play("dice", 0.48, 1.2, now + 0.57);
+    } else if (phase === "revealed") play(hit ? "chips" : "felt", 0.6, 0);
+  }
+
   async function preview() {
     if (!(await enable())) return;
     const session = context;
@@ -283,6 +294,7 @@ export function createTableAudio() {
     updateIntroThrow,
     scheduleLiveThrow,
     chipLanding,
+    houseRuleRoll,
     preview,
     dispose,
   };

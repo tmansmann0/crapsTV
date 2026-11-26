@@ -6,6 +6,7 @@ import {
   formatHouseRulePayout,
 } from "./house-rules.js";
 import HouseRuleArt from "./HouseRuleArt.jsx";
+import HouseRuleChanceArt from "./HouseRuleChanceArt.jsx";
 import "./house-rule-showcase.css";
 
 // Hold each reveal through the end of its bundled sound accent and voice.
@@ -42,7 +43,8 @@ export function useHouseRuleShowcase(state, enabled) {
   const live = !!state && state.status === "playing" && !state.pausedAt;
   const rolling = state?.rolling === true;
   const throwId = rolling ? state?.throw?.id : null;
-  const secondWind = state?.throw?.secondWind === true;
+  const secondWind =
+    state?.throw?.secondWind === true && !state.throw.houseRuleAttempt;
   const roll = state?.lastRoll;
   const newest = state?.log?.[0];
   const logId = newest?.id;
@@ -73,13 +75,18 @@ export function useHouseRuleShowcase(state, enabled) {
           revealedReroll.current === roll.throwId
         )
           continue;
-        if (HOUSE_RULES[rule])
+        if (Object.hasOwn(showcaseDuration, rule)) {
+          const check = roll.houseRuleAttempts?.find(
+            (attempt) => attempt.rule === rule && attempt.hit,
+          );
           additions.push({
             id: `${roll.id}:${rule}`,
             room,
             rule,
             value: roll.houseRuleValues?.[rule],
+            playerName: check?.playerName,
           });
+        }
       }
     }
     if (pass && logId !== last.logId)
@@ -111,7 +118,29 @@ export function useHouseRuleShowcase(state, enabled) {
   return card;
 }
 
-export default function HouseRuleShowcase({ rule, value }) {
+export function HouseRuleChanceShowcase({ prompt }) {
+  const { label, rule, phase, rollerName, chance } = prompt;
+  return (
+    <aside
+      className={`house-rule-showcase is-house-rule-chance is-${rule}`}
+      aria-label={`${label} chance roll`}
+    >
+      {phase === "waiting" ? (
+        <div className="house-rule-waiting">
+          <p>{chance}% trigger chance</p>
+          <h2>{label}</h2>
+          <p>
+            <strong>{rollerName}</strong> has the dice
+          </p>
+        </div>
+      ) : (
+        <HouseRuleChanceArt {...prompt} revealed={phase === "revealed"} />
+      )}
+    </aside>
+  );
+}
+
+export default function HouseRuleShowcase({ rule, value, playerName }) {
   const { label, setting } = HOUSE_RULES[rule];
   const revealedValue = value ?? DEFAULT_HOUSE_RULES[setting];
   return (
@@ -119,7 +148,10 @@ export default function HouseRuleShowcase({ rule, value }) {
       <div className="house-rule-showcase-content">
         <HouseRuleArt rule={rule} value={revealedValue} />
         <h2>{label}</h2>
-        <p>{speakerCopy[rule](revealedValue)}</p>
+        <p>
+          {playerName && <strong>{playerName} · </strong>}
+          {speakerCopy[rule](revealedValue)}
+        </p>
       </div>
     </aside>
   );

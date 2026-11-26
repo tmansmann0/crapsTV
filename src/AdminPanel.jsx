@@ -29,7 +29,9 @@ import {
 import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
 import {
   HOUSE_RULES,
+  HOUSE_RULE_OFFER_SETTINGS,
   HOUSE_RULE_SETTINGS,
+  houseRuleOffer,
   validHouseRuleValue,
 } from "./house-rules.js";
 import { MAX_JUKEBOX_QUEUE, MAX_SONG_COST } from "./jukebox-settings.js";
@@ -933,6 +935,58 @@ function HouseRuleSetting({ setting, saved, disabled, onSave }) {
   );
 }
 
+function HouseRuleOfferFields({ rule, purchase, offer, disabled, onSave }) {
+  const [draft, setDraft] = useState({});
+  const settings = Object.entries(HOUSE_RULE_OFFER_SETTINGS).filter(
+    ([key]) => purchase || key === "chance",
+  );
+  const fields = settings.map(([key, setting]) => {
+    const text = draft[key] ?? String(offer[key] / setting.scale);
+    const value = text.trim() ? Math.round(Number(text) * setting.scale) : NaN;
+    return { key, setting, text, value };
+  });
+  const canSave =
+    !disabled &&
+    fields.every(({ setting, value }) => validHouseRuleValue(setting, value)) &&
+    fields.some(({ key, value }) => value !== offer[key]);
+  return (
+    <form
+      aria-label={`${HOUSE_RULES[rule].label} terms`}
+      className="ha-rule-offer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSave) return;
+        onSave({
+          ...offer,
+          ...Object.fromEntries(fields.map(({ key, value }) => [key, value])),
+        });
+        setDraft({});
+      }}
+    >
+      {fields.map(({ key, setting, text }) => (
+        <label key={key}>
+          {setting.label}
+          <input
+            type="number"
+            min={setting.min / setting.scale}
+            max={setting.max / setting.scale}
+            step={1 / setting.scale}
+            required
+            disabled={disabled}
+            value={text}
+            onChange={(event) =>
+              setDraft({ ...draft, [key]: event.target.value })
+            }
+          />
+        </label>
+      ))}
+      <button type="submit" className="button outline" disabled={!canSave}>
+        Save {purchase ? "terms" : "chance"}
+      </button>
+    </form>
+  );
+}
+
 function GameRulesPanel({ rules, disabled, send }) {
   const setRule = (rule, value) => send({ type: "house-rule", rule, value });
   const toggle = (rule, label, detail) => (
@@ -955,12 +1009,46 @@ function GameRulesPanel({ rules, disabled, send }) {
       {toggle(
         "announce",
         "Announce house rules",
-        "Show a full-screen animation and play a voice call when a house rule triggers.",
+        "Show the trigger roll on the TV and announce rules that hit.",
       )}
       {Object.entries(HOUSE_RULES).map(([rule, { label, detail, setting }]) => (
         <Fragment key={rule}>
-          {toggle(rule, label, detail)}
-          {setting && rules[rule] && (
+          <label className="ha-rule-mode">
+            <span>
+              <b>{label}</b>
+              <small>{detail}</small>
+            </span>
+            <select
+              aria-label={label}
+              value={rules[rule] === true ? "on" : rules[rule] || "off"}
+              disabled={disabled}
+              onChange={({ target }) =>
+                setRule(
+                  rule,
+                  target.value === "purchase"
+                    ? target.value
+                    : target.value === "on",
+                )
+              }
+            >
+              <option value="off">Off</option>
+              <option value="on">On</option>
+              <option value="purchase">Purchase</option>
+            </select>
+          </label>
+          {rules[rule] && (
+            <HouseRuleOfferFields
+              key={String(rules[rule])}
+              rule={rule}
+              purchase={rules[rule] === "purchase"}
+              offer={houseRuleOffer(rules, rule)}
+              disabled={disabled}
+              onSave={(terms) =>
+                send({ type: "house-rule-offer", rule, terms })
+              }
+            />
+          )}
+          {setting && rule !== "secondWind" && rules[rule] && (
             <HouseRuleSetting
               setting={HOUSE_RULE_SETTINGS[setting]}
               saved={rules[setting]}

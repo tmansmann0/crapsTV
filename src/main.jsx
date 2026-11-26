@@ -25,6 +25,7 @@ import { routeInfo, controllerURL } from "./routes.js";
 import { DEFAULT_GRAPHICS, GRAPHICS_OPTIONS } from "./graphics-settings.js";
 import { HOUSE_RULES } from "./house-rules.js";
 import HouseRuleShowcase, {
+  HouseRuleChanceShowcase,
   useHouseRuleShowcase,
 } from "./HouseRuleShowcase.jsx";
 import { DESKTOP_DISPLAY } from "./display-build.js";
@@ -501,6 +502,8 @@ function App() {
   }, [state?.display?.revision]);
   const announceHouseRules =
     view === "tv" && state?.config.houseRules?.announce === true;
+  const houseRulePrompt =
+    status === "connected" && announceHouseRules ? state.houseRulePrompt : null;
   const houseRuleShowcase = useHouseRuleShowcase(
     status === "connected" ? state : null,
     announceHouseRules,
@@ -509,8 +512,12 @@ function App() {
     state,
     sound && view === "tv",
     announceHouseRules,
-    houseRuleShowcase,
+    houseRulePrompt ? null : houseRuleShowcase,
   );
+  useEffect(() => {
+    if (houseRulePrompt)
+      tableAudio.houseRuleRoll(houseRulePrompt.phase, houseRulePrompt.hit);
+  }, [tableAudio, houseRulePrompt?.id, houseRulePrompt?.phase]);
   const audioRevision = state?.display?.audioRevision;
   useEffect(() => {
     if (view === "tv" && audioRevision)
@@ -715,11 +722,18 @@ function App() {
             />
           </Suspense>
         )}
-        {houseRuleShowcase && (
+        {houseRulePrompt && (
+          <HouseRuleChanceShowcase
+            key={houseRulePrompt.id}
+            prompt={houseRulePrompt}
+          />
+        )}
+        {!houseRulePrompt && houseRuleShowcase && (
           <HouseRuleShowcase
             key={houseRuleShowcase.id}
             rule={houseRuleShowcase.rule}
             value={houseRuleShowcase.value}
+            playerName={houseRuleShowcase.playerName}
           />
         )}
         <div className="scene-accessibility" aria-label="Table controls">

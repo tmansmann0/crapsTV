@@ -2,6 +2,7 @@ import { useBettingWindow } from "./use-betting-window.js";
 import { assetURL } from "./asset-url.js";
 import DrinkIcon from "./DrinkIcon.jsx";
 import DrinksPanel from "./DrinksPanel.jsx";
+import HouseRulesShop from "./HouseRulesShop.jsx";
 import {
   createContext,
   useCallback,
@@ -29,11 +30,17 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Sparkles,
   Undo2,
   X,
 } from "lucide-react";
 import { validBetChoices } from "./bet-options.js";
-import { HOUSE_RULES, canPassDice } from "./house-rules.js";
+import {
+  HOUSE_RULES,
+  activeHouseRulePass,
+  canPassDice,
+  isHouseRuleForSale,
+} from "./house-rules.js";
 import {
   catalogue,
   canRemoveBet,
@@ -51,6 +58,7 @@ import {
 } from "./mobile-settlement.js";
 import "./phone-game.css";
 const LearnCenter = lazy(() => import("./LearnCenter.jsx"));
+const KEEP_TAB_ON_ROLL = ["drinks", "music", "house-rules"];
 
 const TRAY = [100, 500, 2500, 10000];
 const THUMBNAILS = [100, 500, 2500, 10000, 50000];
@@ -1754,14 +1762,37 @@ export default function PhoneGame({
   const stake = sum(player.bets.map((b) => b.amount));
   const drinkingMode = !!state.config.drinkingMode;
   const learnEnabled = !!state.config.teach;
+  const shopRules = Object.keys(HOUSE_RULES).filter(
+    (rule) =>
+      isHouseRuleForSale(state.config, rule) ||
+      activeHouseRulePass(player, rule, state.rolls.length),
+  );
+  const houseRulesOpen = shopRules.length > 0;
+  const houseRulePrompt = state.houseRulePrompt;
+  const triggeredRules = (state.lastRoll?.houseRulesTriggered ?? []).filter(
+    (rule) => {
+      const checks = state.lastRoll.houseRuleAttempts?.filter(
+        (attempt) => attempt.rule === rule,
+      );
+      return (
+        !checks?.length ||
+        checks.some(
+          (attempt) =>
+            attempt.hit &&
+            (!attempt.playerId || attempt.playerId === player.id),
+        )
+      );
+    },
+  );
   useEffect(() => {
     setTab((current) =>
       (current === "learn" && !learnEnabled) ||
-      (current === "music" && !musicArea)
+      (current === "music" && !musicArea) ||
+      (current === "house-rules" && !houseRulesOpen)
         ? "play"
         : current,
     );
-  }, [learnEnabled, !!musicArea]);
+  }, [learnEnabled, !!musicArea, houseRulesOpen]);
   const drinkAlerts = drinkingMode
     ? (state.drinkRequests ?? []).filter(
         (request) =>
@@ -1810,11 +1841,11 @@ export default function PhoneGame({
       setPresentation(null);
       if (rollArea)
         setTab((current) =>
-          current === "drinks" || current === "music" ? current : "dice",
+          KEEP_TAB_ON_ROLL.includes(current) ? current : "dice",
         );
     }
     const fresh = freshMobileSettlement(previous, state, player.id);
-    if (tab === "drinks" || tab === "music") setPresentation(null);
+    if (KEEP_TAB_ON_ROLL.includes(tab)) setPresentation(null);
     else if (fresh) setPresentation({ ...fresh, active: false, landed: [] });
   }, [state, connected, player.id, !!rollArea, tab]);
   useEffect(() => {
@@ -1822,7 +1853,7 @@ export default function PhoneGame({
     const id = presentation.id;
     const timer = setTimeout(() => {
       setTab((current) =>
-        current === "drinks" || current === "music" ? current : "play",
+        KEEP_TAB_ON_ROLL.includes(current) ? current : "play",
       );
       setDetailOpen(false);
       setPresentation((current) =>
@@ -2035,6 +2066,9 @@ export default function PhoneGame({
       : []),
     ...(learnEnabled ? [{ id: "learn", label: "Learn", icon: BookOpen }] : []),
     ...(musicArea ? [{ id: "music", label: "Music", icon: Music2 }] : []),
+    ...(houseRulesOpen
+      ? [{ id: "house-rules", label: "House Rules", icon: Sparkles }]
+      : []),
     ...(drinkingMode
       ? [{ id: "drinks", label: "Drinks", badge: drinkAlerts || null }]
       : []),
@@ -2106,19 +2140,43 @@ export default function PhoneGame({
             expanded={detailOpen}
             onToggle={() => setDetailOpen((open) => !open)}
           />
-          {!state.rolling &&
-            state.lastRoll?.houseRulesTriggered?.length > 0 && (
-              <div
-                className="pg-house-results"
-                aria-label="House rules triggered"
+          {houseRulePrompt?.phase === "waiting" &&
+            houseRulePrompt.rollerId === player.id && (
+              <aside
+                className="pg-rule-prompt"
+                aria-label="Your house rule roll"
               >
-                {state.lastRoll.houseRulesTriggered.map((rule) =>
-                  HOUSE_RULES[rule] ? (
-                    <span key={rule}>{HOUSE_RULES[rule].label}</span>
-                  ) : null,
-                )}
-              </div>
+                <div>
+                  <strong>You have the dice</strong>
+                  <span>{houseRulePrompt.label}</span>
+                </div>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={!connected}
+                  onClick={() =>
+                    send({
+                      type: "roll-house-rule",
+                      promptId: houseRulePrompt.id,
+                    })
+                  }
+                >
+                  <Dices size={18} aria-hidden="true" /> Roll
+                </button>
+              </aside>
             )}
+          {!state.rolling && triggeredRules.length > 0 && (
+            <div
+              className="pg-house-results"
+              aria-label="House rules triggered"
+            >
+              {triggeredRules.map((rule) =>
+                HOUSE_RULES[rule] ? (
+                  <span key={rule}>{HOUSE_RULES[rule].label}</span>
+                ) : null,
+              )}
+            </div>
+          )}
           {connected && canPassDice(state, player.id) && (
             <button
               type="button"
@@ -2198,6 +2256,15 @@ export default function PhoneGame({
           )}
           {tab === "dice" && <div className="pg-dice">{rollArea}</div>}
           {tab === "music" && musicArea}
+          {tab === "house-rules" && (
+            <HouseRulesShop
+              state={state}
+              player={player}
+              connected={connected}
+              rules={shopRules}
+              send={send}
+            />
+          )}
           {tab === "drinks" && (
             <DrinksPanel
               state={state}

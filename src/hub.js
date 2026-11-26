@@ -1,8 +1,11 @@
 import * as game from "./game.js";
+import { HOUSE_RULE_CHANCE_MS, HOUSE_RULE_REVEAL_MS } from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
 import { restoreJukeboxSettings } from "./jukebox-settings.js";
+
+const HOUSE_RULE_ROLL_TIMEOUT_MS = 6500;
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
@@ -35,6 +38,7 @@ export class RoomHub {
     this.tokens = new Map(restored?.tokens);
     this.rollDelay = rollDelay;
     this.timer = null;
+    this.houseRuleRoll = null;
     this.botTimer = null;
     this.botWindows = new Map();
     this.botTurn = null;
@@ -259,7 +263,14 @@ export class RoomHub {
             message.rule,
             message.value ?? message.enabled,
           );
-        else if (type === "pass-dice") game.passDice(s, pid);
+        else if (type === "house-rule-offer")
+          game.setHouseRuleOffer(s, pid, message.rule, message.terms);
+        else if (type === "buy-house-rule")
+          game.buyHouseRule(s, pid, message.rule, message.quote);
+        else if (type === "roll-house-rule") {
+          this.rollHouseRule(pid, message.promptId);
+          return;
+        } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")
@@ -394,20 +405,108 @@ export class RoomHub {
   }
   beginRoll(playerId, gesture) {
     const state = this.state;
-    game.beginRoll(state, playerId, gesture, { duration: this.rollDelay });
-    const throwId = state.throw.id;
-    this.timer = this.setTimer(() => {
-      this.timer = null;
-      if (
-        this.closed ||
-        this.state !== state ||
-        !state.rolling ||
-        state.throw?.id !== throwId
-      )
-        return;
-      game.finishRoll(state);
+    const flight = game.beginRoll(state, playerId, gesture, {
+      duration: this.rollDelay,
+    });
+    const startFlight = () => {
+      const now = Date.now();
+      flight.settledAt += now - flight.startAt;
+      flight.startAt = now;
+      state.throw = flight;
+      this.timer = this.setTimer(() => {
+        this.timer = null;
+        if (
+          this.closed ||
+          this.state !== state ||
+          !state.rolling ||
+          state.throw?.id !== flight.id
+        )
+          return;
+        const chanceRolls = new Map();
+        const settle = () => {
+          game.finishRoll(state, undefined, { chanceRolls });
+          this.broadcast();
+        };
+        if (state.config.houseRules?.announce) {
+          game.finishRoll(game.snapshot(state), undefined, {
+            chanceRolls,
+            preview: true,
+          });
+        }
+        if (chanceRolls.size)
+          this.offerHouseRuleRoll([...chanceRolls.values()], settle);
+        else settle();
+      }, this.rollDelay);
+    };
+    if (flight.houseRuleAttempt) {
+      state.throw = null;
+      this.offerHouseRuleRoll([flight.houseRuleAttempt], () => {
+        startFlight();
+        this.broadcast();
+      });
+    } else startFlight();
+  }
+  offerHouseRuleRoll(attempts, done) {
+    const state = this.state;
+    const people = state.players.filter(
+      (p) => !p.left && !p.bot && p.connected,
+    );
+    const random = crypto.getRandomValues(new Uint32Array(1))[0] / 0x100000000;
+    const roller = people[Math.floor(random * people.length)];
+    const id = game.uid();
+    let index = 0;
+    const setPrompt = (phase) => {
+      const { roll, hit, ...details } = attempts[index];
+      state.houseRulePrompt = {
+        ...details,
+        id: `${id}:${index}`,
+        phase,
+        rollerId: roller?.id,
+        rollerName: roller?.name,
+        ...(phase === "waiting" && {
+          deadline: Date.now() + HOUSE_RULE_ROLL_TIMEOUT_MS,
+        }),
+        ...(phase === "revealed" && { roll, hit }),
+      };
       this.broadcast();
-    }, this.rollDelay);
+    };
+    const advance = (fn, delay) => {
+      this.timer = this.setTimer(() => {
+        this.timer = null;
+        if (!this.closed && this.state === state && state.rolling) fn();
+      }, delay);
+    };
+    const start = () => {
+      this.houseRuleRoll = null;
+      setPrompt("rolling");
+      advance(() => {
+        setPrompt("revealed");
+        advance(() => {
+          if (++index < attempts.length) start();
+          else {
+            delete state.houseRulePrompt;
+            done();
+          }
+        }, HOUSE_RULE_CHANCE_MS - HOUSE_RULE_REVEAL_MS);
+      }, HOUSE_RULE_REVEAL_MS);
+    };
+    if (roller) {
+      this.houseRuleRoll = start;
+      setPrompt("waiting");
+      advance(start, HOUSE_RULE_ROLL_TIMEOUT_MS);
+    } else start();
+  }
+  rollHouseRule(playerId, promptId) {
+    const prompt = this.state.houseRulePrompt;
+    if (
+      !this.houseRuleRoll ||
+      prompt?.phase !== "waiting" ||
+      prompt.id !== promptId ||
+      prompt.rollerId !== playerId
+    )
+      throw Error("Only the selected player can roll this house rule.");
+    this.clearTimer(this.timer);
+    this.houseRuleRoll();
   }
   botsCanAct() {
     return (
@@ -552,6 +651,7 @@ export class RoomHub {
     this.clearTimer(this.timer);
     this.clearTimer(this.botTimer);
     this.timer = this.botTimer = null;
+    this.houseRuleRoll = null;
     this.botWindows.clear();
     this.botTurn = null;
     this.state.botRollAt = null;

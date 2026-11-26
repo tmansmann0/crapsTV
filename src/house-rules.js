@@ -91,6 +91,14 @@ export const HOUSE_RULE_SETTINGS = {
   },
 };
 
+export const HOUSE_RULE_CHANCE_MS = 2100;
+export const HOUSE_RULE_REVEAL_MS = 1150;
+export const HOUSE_RULE_OFFER_SETTINGS = {
+  price: { label: "Price in chips ($)", min: 100, max: 100000000, scale: 100 },
+  rolls: { label: "Duration (table rolls)", min: 1, max: 100, scale: 1 },
+  chance: { label: "Trigger chance (%)", min: 0, max: 100, scale: 1 },
+};
+
 export const DEFAULT_HOUSE_RULES = Object.freeze({
   ...Object.fromEntries(Object.keys(HOUSE_RULES).map((rule) => [rule, false])),
   announce: false,
@@ -111,9 +119,19 @@ export function validHouseRuleValue(setting, value) {
 export function normalizeHouseRules(saved) {
   return {
     ...Object.fromEntries(
-      Object.keys(HOUSE_RULES).map((rule) => [rule, saved?.[rule] === true]),
+      Object.keys(HOUSE_RULES).map((rule) => [
+        rule,
+        saved?.[rule] === "purchase" ? "purchase" : saved?.[rule] === true,
+      ]),
     ),
     announce: saved?.announce === true,
+    ...(saved?.offers && {
+      offers: Object.fromEntries(
+        Object.keys(HOUSE_RULES)
+          .filter((rule) => saved.offers[rule])
+          .map((rule) => [rule, houseRuleOffer(saved, rule)]),
+      ),
+    }),
     ...Object.fromEntries(
       Object.entries(HOUSE_RULE_SETTINGS).map(([key, setting]) => [
         key,
@@ -122,6 +140,77 @@ export function normalizeHouseRules(saved) {
           : setting.defaultValue,
       ]),
     ),
+  };
+}
+
+export function houseRuleOffer(rules, rule) {
+  const offer = rules?.offers?.[rule];
+  const chance =
+    rule === "secondWind" ? rules?.secondWindChance : offer?.chance;
+  return {
+    price: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.price, offer?.price)
+      ? offer.price
+      : 500,
+    rolls: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.rolls, offer?.rolls)
+      ? offer.rolls
+      : 5,
+    chance: validHouseRuleValue(HOUSE_RULE_OFFER_SETTINGS.chance, chance)
+      ? chance
+      : rule === "secondWind"
+        ? DEFAULT_HOUSE_RULES.secondWindChance
+        : 100,
+  };
+}
+
+export function isHouseRuleForSale(config, rule) {
+  return (
+    Object.hasOwn(HOUSE_RULES, rule) &&
+    config.houseRules?.[rule] === "purchase" &&
+    (rule !== "crapsCashback" || config.mode !== "crapless")
+  );
+}
+
+export function activeHouseRulePass(player, rule, completedRolls) {
+  const pass = player?.houseRulePasses?.[rule];
+  return pass?.expiresAfterRoll > completedRolls ? pass : null;
+}
+
+export function normalizeHouseRulePasses(saved, completedRolls) {
+  return Object.fromEntries(
+    Object.entries(HOUSE_RULES).flatMap(([rule, { setting }]) => {
+      const pass = activeHouseRulePass(
+        { houseRulePasses: saved },
+        rule,
+        completedRolls,
+      );
+      if (
+        !pass ||
+        !Object.entries(HOUSE_RULE_OFFER_SETTINGS).every(([key, range]) =>
+          validHouseRuleValue(range, pass[key]),
+        ) ||
+        !Number.isSafeInteger(pass.expiresAfterRoll) ||
+        pass.expiresAfterRoll > completedRolls + pass.rolls ||
+        (setting &&
+          !validHouseRuleValue(HOUSE_RULE_SETTINGS[setting], pass.value))
+      )
+        return [];
+      const { price, rolls, chance, expiresAfterRoll, value } = pass;
+      return [[rule, { price, rolls, chance, expiresAfterRoll, value }]];
+    }),
+  );
+}
+
+export function houseRuleAccess(rules, rule, player, completedRolls) {
+  const pass = activeHouseRulePass(player, rule, completedRolls);
+  if (pass) return { chance: pass.chance, value: pass.value, personal: true };
+  if (rules?.[rule] !== true) return null;
+  const { setting } = HOUSE_RULES[rule];
+  return {
+    chance: houseRuleOffer(rules, rule).chance,
+    value: setting
+      ? (rules[setting] ?? DEFAULT_HOUSE_RULES[setting])
+      : undefined,
+    personal: false,
   };
 }
 
@@ -137,17 +226,8 @@ export function newHouseHand() {
   return { made: 0, points: [], jackpotPlayers: [] };
 }
 
-export function canPassDice(state, playerId) {
+export function canHandOffDice(state, playerId) {
   return (
-    state.config.houseRules?.passTheDice === true &&
-    state.status === "playing" &&
-    !state.pausedAt &&
-    !state.rolling &&
-    !state.point &&
-    state.shooterId === playerId &&
-    state.lastRoll?.kind === "point-hit" &&
-    state.lastRoll.shooterId === playerId &&
-    state.houseHand?.made > 0 &&
     state.players.some(
       (player) =>
         player.id === playerId &&
@@ -158,5 +238,21 @@ export function canPassDice(state, playerId) {
     state.players.some(
       (player) => player.id !== playerId && !player.left && player.connected,
     )
+  );
+}
+
+export function canPassDice(state, playerId) {
+  return (
+    (state.lastRoll?.housePassAvailable ??
+      state.config.houseRules?.passTheDice === true) &&
+    state.status === "playing" &&
+    !state.pausedAt &&
+    !state.rolling &&
+    !state.point &&
+    state.shooterId === playerId &&
+    state.lastRoll?.kind === "point-hit" &&
+    state.lastRoll.shooterId === playerId &&
+    state.houseHand?.made > 0 &&
+    canHandOffDice(state, playerId)
   );
 }

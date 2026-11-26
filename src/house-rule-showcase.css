@@ -67,6 +67,20 @@
 .house-rule-showcase.is-tableJackpot {
   --rule-accent: #ffcf4a;
 }
+.house-rule-showcase.is-house-rule-chance {
+  z-index: 13;
+}
+.house-rule-waiting {
+  display: grid;
+  justify-items: center;
+  gap: 1vmin;
+  text-align: center;
+}
+.house-rule-showcase .house-rule-waiting p:first-child {
+  margin: 0;
+  color: var(--rule-accent);
+  font-size: clamp(14px, 2.4vmin, 36px);
+}
 .house-rule-showcase-content {
   display: grid;
   justify-items: center;

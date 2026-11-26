@@ -1,7 +1,10 @@
 import { createState } from "./game.js";
 import { botPersonalityOptions } from "./bot-options.js";
 import { DEFAULT_DRINKING_RULES } from "./drinking-mode.js";
-import { normalizeHouseRules } from "./house-rules.js";
+import {
+  normalizeHouseRulePasses,
+  normalizeHouseRules,
+} from "./house-rules.js";
 import { normalizeGraphics } from "./graphics-settings.js";
 import { puckHome } from "./puck-layout.js";
 import { normalizeTableAudio } from "./table-audio-settings.js";
@@ -15,6 +18,7 @@ const milliseconds = (value) =>
 function withoutMotion(state) {
   state.aim = null;
   state.throw = null;
+  delete state.houseRulePrompt;
   state.nextRollAt = null;
   state.botRollAt = null;
   for (const player of state.players) player.betPreview = null;
@@ -125,6 +129,12 @@ export function readRoomSave(serialized) {
       ...(player.bot && { bot: botPersonalityOptions(player.bot) }),
       dice: { color: "red", finish: "solid", ...player.dice },
       connected: !!player.bot && !player.left,
+      ...(player.houseRulePasses && {
+        houseRulePasses: normalizeHouseRulePasses(
+          player.houseRulePasses,
+          previous.rolls.length,
+        ),
+      }),
     })),
     pausedAt,
   });

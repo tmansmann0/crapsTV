@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as game from "../src/game.js";
-import { DEFAULT_HOUSE_RULES } from "../src/house-rules.js";
+import { DEFAULT_HOUSE_RULES, houseRuleOffer } from "../src/house-rules.js";
+import { RoomHub } from "../src/hub.js";
 import { mobilePayouts } from "../src/mobile-settlement.js";
 import { sampleTableCamera } from "../src/throw-camera.js";
 import { captureRoomSave, readRoomSave } from "../src/room-save.js";
@@ -108,7 +109,7 @@ for (const {
     name: "keeps an initial seven when configured to 0%",
     enabled: true,
     chance: 0,
-    draws: [0],
+    draws: [0, 0],
     finalSeed: 0,
     result: 7,
   },
@@ -349,4 +350,181 @@ test("only the shooter can voluntarily pass after a point and the next hand star
   assert.equal(host.bets[0].point, 6);
   assert.equal(state.log[0].type, "house-pass-the-dice");
   assert.throws(() => game.passDice(state, guest.id), /after making/);
+});
+
+function quote(state, rule) {
+  const rules = state.config.houseRules;
+  return {
+    ...houseRuleOffer(rules, rule),
+    value: rules.luckySevenPayout,
+    completedRolls: state.rolls.length,
+  };
+}
+
+test("paid rules use chips, affect their buyer only, and keep their terms until expiry", () => {
+  const { state, host } = table();
+  const guest = game.join(state, "Guest");
+  const rule = "luckySeven";
+  const terms = { price: 750, rolls: 2, chance: 100 };
+  assert.throws(
+    () => game.setHouseRuleOffer(state, guest.id, rule, terms),
+    /table host/,
+  );
+  game.setHouseRule(state, host.id, rule, "purchase");
+  game.setHouseRuleOffer(state, host.id, rule, terms);
+  game.start(state, host.id);
+  const offer = quote(state, rule);
+  assert.throws(
+    () => game.buyHouseRule(state, host.id, rule, { ...offer, price: 100 }),
+    /offer changed/,
+  );
+  game.buyHouseRule(state, host.id, rule, offer);
+  assert.equal(host.bank, 100000 - 750);
+  assert.throws(
+    () => game.buyHouseRule(state, host.id, rule, offer),
+    /already have/,
+  );
+  assert.equal(host.bank, 100000 - 750);
+  game.setHouseRuleOffer(state, host.id, rule, {
+    price: 1500,
+    rolls: 7,
+    chance: 0,
+  });
+  game.setHouseRule(state, host.id, "luckySevenPayout", 350);
+  game.setHouseRule(state, host.id, rule, false);
+  let result;
+  for (const id of [host.id, guest.id]) game.place(state, id, "pass", 500);
+  result = roll(state, [3, 4]);
+  assert.deepEqual(
+    result.events.map(({ delta }) => delta),
+    [1000, 500],
+  );
+  assert.equal(result.houseRuleAttempts[0].chance, 100);
+  assert.equal(result.houseRuleAttempts[0].playerId, host.id);
+
+  const saved = captureRoomSave(state, new Map([["host", host.id]]), []);
+  const resumed = readRoomSave(JSON.stringify(saved)).state;
+  assert.equal(resumed.players[0].houseRulePasses[rule].expiresAfterRoll, 2);
+  assert.equal(resumed.players[0].houseRulePasses[rule].value, 200);
+  assert.equal(resumed.config.houseRules[rule], false);
+  assert.equal(resumed.config.houseRules.offers[rule].rolls, 7);
+  delete resumed.pausedAt;
+  for (const [next, expected] of [
+    [2, 1000],
+    [3, 500],
+  ]) {
+    game.place(resumed, host.id, "pass", 500);
+    result = roll(resumed, [3, 4]);
+    assert.equal(result.index, next);
+    assert.equal(result.events[0].delta, expected);
+  }
+});
+
+function manualRoom(t) {
+  const pending = new Map();
+  const hub = new RoomHub("TESTAB", {
+    timers: {
+      setTimeout(fn) {
+        const id = Symbol();
+        pending.set(id, fn);
+        return id;
+      },
+      clearTimeout: (id) => pending.delete(id),
+    },
+  });
+  t.after(() => hub.close());
+  const tick = () => {
+    const [id, fn] = pending.entries().next().value;
+    pending.delete(id);
+    fn();
+  };
+  const errors = [];
+  const join = (name) => {
+    hub.connect(name, (message) => {
+      if (message.type === "error") errors.push(message.message);
+    });
+    hub.receive(name, { type: "join", name, code: "TESTAB" });
+  };
+  return { hub, tick, join, errors };
+}
+
+test("only the drawn player can release a chance roll and settlement waits for the reveal", (t) => {
+  const { hub, join, tick, errors } = manualRoom(t);
+  join("Host");
+  join("Guest");
+  const state = hub.state;
+  const [host, guest] = state.players;
+  hub.receive("Host", { type: "house-rule", rule: "luckySeven", value: true });
+  hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
+  hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
+  hub.receive("Host", { type: "bet", betId: "pass", amount: 500 });
+  const values = [0, 0x10000000, 0xffffffff];
+  const native = crypto.getRandomValues.bind(crypto);
+  t.mock.method(crypto, "getRandomValues", (buffer) => {
+    if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
+      return native(buffer);
+    assert(values.length, "Unexpected redraw");
+    buffer[0] = values.shift();
+    return buffer;
+  });
+  hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
+  assert(state.rolling);
+  tick();
+  const prompt = state.houseRulePrompt;
+  assert.equal(prompt.rollerId, guest.id);
+  assert.equal(prompt.phase, "waiting");
+  assert.equal(prompt.roll, undefined);
+  assert.equal(host.bank, 99500);
+  hub.receive("Host", { type: "roll-house-rule", promptId: prompt.id });
+  assert.match(errors.pop(), /selected player/);
+  assert.equal(state.houseRulePrompt.phase, "waiting");
+  hub.receive("Guest", { type: "roll-house-rule", promptId: prompt.id });
+  assert.equal(state.houseRulePrompt.phase, "rolling");
+  assert.equal(state.houseRulePrompt.hit, undefined);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "revealed");
+  assert.equal(state.houseRulePrompt.roll, 7);
+  assert.equal(state.houseRulePrompt.hit, true);
+  assert.equal(host.bank, 99500);
+  tick();
+  assert.equal(state.houseRulePrompt, undefined);
+  assert.equal(host.bank, 101000);
+  assert.equal(state.lastRoll.houseRuleAttempts[0].roll, 7);
+  assert.equal(state.rolling, false);
+  assert.equal(values.length, 0);
+});
+
+test("an unanswered Second Wind check reveals its miss, then plays the original throw", (t) => {
+  const { hub, join, tick } = manualRoom(t);
+  join("Host");
+  hub.receive("Host", { type: "house-rule", rule: "secondWind", value: true });
+  hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
+  hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
+  const draws = [0, 0x40000000, 0];
+  const native = crypto.getRandomValues.bind(crypto);
+  t.mock.method(crypto, "getRandomValues", (buffer) => {
+    if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
+      return native(buffer);
+    assert(draws.length);
+    buffer[0] = draws.shift();
+    return buffer;
+  });
+  const { state } = hub;
+  hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
+  assert.equal(state.houseRulePrompt.phase, "waiting");
+  assert.equal(state.throw, null);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "rolling");
+  assert.equal(state.throw, null);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "revealed");
+  assert.equal(state.houseRulePrompt.hit, false);
+  assert.equal(state.houseRulePrompt.roll, 26);
+  tick();
+  assert.equal(state.houseRulePrompt, undefined);
+  assert.equal(state.throw.seed, 0);
+  tick();
+  assert.equal(state.lastRoll.total, 7);
+  assert.equal(state.lastRoll.houseRulesTriggered, undefined);
+  assert.equal(draws.length, 0);
 });
