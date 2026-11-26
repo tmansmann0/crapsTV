@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import {
   MAX_JUKEBOX_QUEUE,
   restoreJukeboxSettings,
@@ -12,6 +13,7 @@ const titleLimit = 160;
 const searchLimit = 8;
 const maxDuration = 15 * 60;
 const resultLifetime = 5 * 60_000;
+const videoStartTimeout = 45_000;
 
 export function youtubeTracks(data) {
   const tracks = new Map();
@@ -150,13 +152,31 @@ export class DesktopJukebox {
     this.queue = [];
     this.current = null;
     this.active = null;
+    this.videoDisplay = null;
     this.notice = null;
     this.defaultSettings = restoreJukeboxSettings({ enabled });
     this.settings = { ...this.defaultSettings };
   }
 
-  snapshot(joined) {
+  snapshot(joined, clientId) {
     const state = { playing: !!this.current };
+    if (
+      this.settings.enabled &&
+      (this.current || this.queue.length || this.notice)
+    )
+      state.tv = {
+        title: this.current?.title ?? null,
+        next: this.queue.find((track) => !track.pending)?.title ?? null,
+        queued: this.queue.length,
+        failed: !!this.notice,
+      };
+    if (
+      this.settings.enabled &&
+      clientId &&
+      clientId === this.videoDisplay &&
+      this.active?.video
+    )
+      state.video = this.active.video;
     if (joined)
       Object.assign(state, {
         ...this.settings,
@@ -165,6 +185,18 @@ export class DesktopJukebox {
         notice: this.notice,
       });
     return state;
+  }
+
+  setVideoDisplay(id) {
+    if (this.videoDisplay === id) return;
+    this.videoDisplay = id;
+    if (this.active?.video && !id) this.active.report("error");
+    this.publish();
+  }
+
+  reportVideo(id, attempt, status) {
+    if (id === this.videoDisplay && this.active?.video?.attempt === attempt)
+      this.active.report(status);
   }
 
   async search(player, query, stillJoined) {
@@ -310,28 +342,67 @@ export class DesktopJukebox {
     const index = this.queue.findIndex((track) => !track.pending);
     if (index === -1) return;
     const [track] = this.queue.splice(index, 1);
-    let playback;
+    this.current = track;
     try {
-      playback = this.backend.play(track);
+      this.followPlayback(track, this.backend.play(track));
     } catch {
-      this.refund(track);
-      this.notice = `${track.title} was skipped. mpv could not start playback.`;
-      this.advance();
-      return;
+      if (!this.startVideo(track))
+        this.finishTrack(track, "mpv could not start playback.");
     }
+  }
+
+  startVideo(track) {
+    if (!this.videoDisplay) return false;
+    const video = { id: track.id, attempt: randomUUID() };
+    let resolve, timer;
+    const done = new Promise((done) => {
+      resolve = done;
+    });
+    const finish = (error) => {
+      clearTimeout(timer);
+      resolve(error);
+    };
+    const expire = (wait) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => finish("The YouTube player timed out."), wait);
+      timer.unref();
+    };
+    expire(videoStartTimeout);
+    this.followPlayback(track, {
+      video,
+      done,
+      stop: () => finish(null),
+      report(status) {
+        if (status === "playing") expire((track.duration + 180) * 1000);
+        else if (status === "ended") finish(null);
+        else if (status === "error")
+          finish("The YouTube player could not play this track.");
+      },
+    });
+    return true;
+  }
+
+  followPlayback(track, playback) {
     const active = { ...playback, stopped: false };
     this.active = active;
-    this.current = track;
     active.done.then((error) => {
       if (this.active !== active) return;
-      if (!active.stopped) {
-        if (error) this.refund(track);
-        this.notice = error ? `${track.title} was skipped. ${error}` : null;
+      if (!active.stopped && error && !active.video && this.startVideo(track)) {
+        this.publish();
+        return;
       }
-      this.active = this.current = null;
-      this.advance();
+      this.finishTrack(track, error, active.stopped);
       this.publish();
     });
+  }
+
+  finishTrack(track, error, stopped = false) {
+    if (!stopped) {
+      if (error) this.refund(track);
+      this.notice = error ? `${track.title} was skipped. ${error}` : null;
+    }
+    this.active = this.current = null;
+    this.advance();
   }
 
   stopCurrent() {
