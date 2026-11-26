@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import "./house-rule-chance-art.css";
 
 // Full-screen CHANCE ROLL scene. Everything before `revealed` is identical
@@ -71,26 +71,76 @@ function Die({ kind, value }) {
   );
 }
 
-function Bolt() {
-  const channel = [
-    "M1535 43 L1491 76 L1458 73 L1437 105 L1392 117 L1383 144 L1332 158",
-    "L1310 187 L1261 185 L1254 219 L1201 243 L1186 233 L1158 282 L1106 295",
-    "L1085 329 L1049 336 L1020 373 L969 383 L945 428 L897 427 L876 467",
-    "L841 480 L828 508 L781 519 L758 562 L719 574 L730 593 L673 618",
-    "L659 642 L613 658 L596 686 L564 688 L546 729 L496 755 L479 746",
-    "L443 789 L392 805 L365 835 L318 839 L277 859",
-  ].join(" ");
-  const forks = [
-    "M1383 144 L1360 168 L1314 164 L1295 182 L1251 177 L1226 193 L1177 196",
-    "M1158 282 L1171 319 L1134 352 L1142 378 L1100 410 L1087 442",
-    "M945 428 L914 405 L870 414 L848 390 L809 394 L774 368 L718 373",
-    "M828 508 L846 538 L827 557 L834 588 L809 623",
-    "M673 618 L622 609 L597 629 L561 624 L538 645 L488 640 L452 665",
+// Midpoint subdivision and offset branches adapted from Sahil K's
+// Lightning-VFX (MIT), https://github.com/SahilK-027/Lightning-VFX.
+// See public/licenses/Lightning-VFX-MIT.txt.
+function lightningPath(start, end, depth, roughness, random) {
+  if (!depth) return [start, end];
+  const [x, y] = start;
+  const dx = end[0] - x;
+  const dy = end[1] - y;
+  const along = 0.45 + random() * 0.1;
+  const offset = (random() - 0.5) * roughness;
+  const middle = [x + dx * along + dy * offset, y + dy * along - dx * offset];
+  const left = lightningPath(
+    start,
+    middle,
+    depth - 1,
+    roughness * 0.88,
+    random,
+  );
+  const right = lightningPath(middle, end, depth - 1, roughness * 0.88, random);
+  return [...left.slice(0, -1), ...right];
+}
+
+function createStrike() {
+  let seed = 1627;
+  const random = () => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 0x100000000;
+  };
+  const impact = [800, 550];
+  const main = lightningPath([1335, -28], impact, 6, 0.96, random);
+  const arcs = [
+    main,
+    lightningPath([1386, -26], impact, 5, 0.86, random),
+    ...[
+      [12, [1538, 120]],
+      [19, [1117, 148]],
+      [30, [1300, 264]],
+      [38, [952, 284]],
+      [44, [1163, 478]],
+      [53, [628, 486]],
+    ].map(([point, end]) => lightningPath(main[point], end, 4, 1.1, random)),
   ];
-  const filaments =
-    "M1251 177 L1238 152 L1209 154 M1134 352 L1165 362 L1158 402 " +
-    "M848 390 L828 360 L795 342 M799 372 L781 331 L752 325 " +
-    "M561 624 L548 597 L516 586 M392 805 L345 802 L327 817 L294 814";
+  return arcs.map((arc) =>
+    arc
+      .map(([x, y], i) => `${i ? "L" : "M"}${Math.round(x)} ${Math.round(y)}`)
+      .join(" "),
+  );
+}
+
+const STRIKE_PATHS = createStrike();
+const SPARKS = [
+  [-127, 20],
+  [-99, -24],
+  [-77, -52],
+  [-51, -23],
+  [-31, -72],
+  [-9, -57],
+  [14, -33],
+  [41, -63],
+  [70, -37],
+  [105, -11],
+  [134, 12],
+  [92, 31],
+  [43, 35],
+  [-56, 43],
+  [-105, 35],
+];
+
+function Bolt() {
+  const id = useId();
   return (
     <svg
       className="hrc-bolt"
@@ -98,34 +148,42 @@ function Bolt() {
       preserveAspectRatio="none"
       focusable="false"
     >
+      <defs>
+        <radialGradient id={id}>
+          <stop stopColor="#fffdf2" stopOpacity="0.95" />
+          <stop offset="0.23" className="hrc-strike-color" stopOpacity="0.7" />
+          <stop offset="1" className="hrc-strike-color" stopOpacity="0" />
+        </radialGradient>
+      </defs>
       <g className="hrc-bolt-strike">
-        <path
-          className="hrc-bolt-glow"
-          d={channel}
-          pathLength="1"
-          vectorEffect="non-scaling-stroke"
-        />
-        <path
-          className="hrc-bolt-core"
-          d={channel}
-          pathLength="1"
-          vectorEffect="non-scaling-stroke"
-        />
-        {forks.map((d, index) => (
+        <path className="hrc-bolt-glow" d={STRIKE_PATHS[0]} pathLength="1" />
+        {STRIKE_PATHS.map((d, index) => (
           <path
             key={d}
-            className="hrc-bolt-fork"
+            className={index === 0 ? "hrc-bolt-core" : "hrc-bolt-fork"}
             d={d}
             pathLength="1"
-            vectorEffect="non-scaling-stroke"
-            style={{ "--fork-delay": `${35 + index * 17}ms` }}
+            style={{ "--fork-delay": `${10 + index * 13}ms` }}
           />
         ))}
-        <path
-          className="hrc-bolt-filaments"
-          d={filaments}
-          vectorEffect="non-scaling-stroke"
+      </g>
+      <g transform="translate(800 550)">
+        <ellipse
+          className="hrc-strike-light"
+          rx="265"
+          ry="104"
+          fill={`url(#${id})`}
         />
+        <ellipse className="hrc-strike-ring" rx="178" ry="48" />
+        <g className="hrc-strike-sparks">
+          {SPARKS.map(([x, y]) => (
+            <path
+              key={x}
+              d={`M${x * 0.38} ${y * 0.38} L${x * 0.61} ${y * 0.61}`}
+              style={{ "--spark-x": `${x}px`, "--spark-y": `${y}px` }}
+            />
+          ))}
+        </g>
       </g>
     </svg>
   );
