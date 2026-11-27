@@ -1,10 +1,6 @@
 import * as game from "./game.js";
-import {
-  HOUSE_RULE_DIE_FLIGHT_MS,
-  HOUSE_RULE_DIE_LANDING_MS,
-  HOUSE_RULE_INTRO_MS,
-  HOUSE_RULE_REVEAL_MS,
-} from "./house-rules.js";
+import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
+import { HOUSE_RULE_INTRO_MS, HOUSE_RULE_REVEAL_MS } from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
@@ -457,17 +453,23 @@ export class RoomHub {
     let index = 0;
     let roller;
     const setPrompt = (phase, extra) => {
-      const { dice, roll, hit, ...details } = attempts[index];
+      const attempt = attempts[index];
+      const { dice, roll, hit, ...details } = attempt;
+      const second = phase.startsWith("second-");
+      const revealed = phase === "revealed";
+      const [firstHop, secondHop] = game.houseRuleHops(attempt);
       state.houseRulePrompt = {
         ...details,
         id: `${id}:${index}`,
         phase,
         rollerId: roller?.id,
         rollerName: roller?.name,
-        ...(phase.startsWith("second-") || phase === "revealed"
-          ? { firstDie: dice[0] }
-          : {}),
-        ...(phase === "revealed" && { dice, roll, hit }),
+        poses: [
+          firstHop.frames.at(second || revealed ? -1 : 0),
+          secondHop.frames.at(revealed ? -1 : 0),
+        ],
+        ...((second || revealed) && { firstDie: dice[0] }),
+        ...(revealed && { dice, roll, hit }),
         ...extra,
       };
       this.broadcast();
@@ -492,16 +494,14 @@ export class RoomHub {
       const name = die === 1 ? "first" : "second";
       const launch = () => {
         this.houseRuleThrow = null;
-        setPrompt(`${name}-rolling`);
-        advance(() => {
-          setPrompt(`${name}-landing`, {
-            landingFace: attempts[index].dice[die - 1],
-          });
-          advance(
-            die === 1 ? () => waitForThrow(2) : reveal,
-            HOUSE_RULE_DIE_LANDING_MS,
-          );
-        }, HOUSE_RULE_DIE_FLIGHT_MS);
+        const { frames, contacts } = game.houseRuleHops(attempts[index])[
+          die - 1
+        ];
+        const duration = (frames.length - 1) * CHANCE_DIE_FRAME_MS;
+        setPrompt(`${name}-rolling`, {
+          flight: { die, startAt: Date.now(), frames, contacts },
+        });
+        advance(die === 1 ? () => waitForThrow(2) : reveal, duration);
       };
       const available = roller?.connected && !roller.left;
       this.houseRuleThrow = available ? launch : null;

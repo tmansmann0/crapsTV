@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as game from "../src/game.js";
 import { DEFAULT_HOUSE_RULES, houseRuleOffer } from "../src/house-rules.js";
+import {
+  CHANCE_HOP_BUCKET,
+  createChanceDiceHops,
+} from "../src/house-rule-dice-motion.js";
+import { upperDieFace } from "../src/throw-motion.js";
 import { RoomHub } from "../src/hub.js";
 import { mobilePayouts } from "../src/mobile-settlement.js";
 import { sampleTableCamera } from "../src/throw-camera.js";
@@ -11,6 +16,15 @@ function chanceDraw(first, second) {
   const pair = (first - 1) * 6 + (second - 1);
   return Math.floor(((pair + 0.5) * 0x100000000) / 36);
 }
+
+// The two launches share the same seed while their pip orientations vary.
+const hopDraw = {
+  "1,1": 1289983039,
+  "2,3": 193871659,
+  "2,4": 178958579,
+  "5,6": 589068279,
+  "6,6": 946982199,
+};
 
 function table() {
   const state = game.createState("RULES2");
@@ -85,14 +99,14 @@ for (const {
   {
     name: "keeps the first seven above the default total of five",
     enabled: true,
-    draws: [0, chanceDraw(2, 4)],
+    draws: [0, hopDraw["2,4"]],
     finalSeed: 0,
     result: 7,
   },
   {
     name: "replaces a seven at the default total of five",
     enabled: true,
-    draws: [0, chanceDraw(2, 3), 2],
+    draws: [0, hopDraw["2,3"], 2],
     finalSeed: 2,
     result: 5,
   },
@@ -109,7 +123,7 @@ for (const {
     name: "keeps the replacement when it is another seven",
     enabled: true,
     target: 12,
-    draws: [0, chanceDraw(6, 6), 1],
+    draws: [0, hopDraw["6,6"], 1],
     finalSeed: 1,
     result: 7,
   },
@@ -117,7 +131,7 @@ for (const {
     name: "keeps an initial seven when the trigger is set to Never",
     enabled: true,
     target: 1,
-    draws: [0, chanceDraw(1, 1)],
+    draws: [0, hopDraw["1,1"]],
     finalSeed: 0,
     result: 7,
   },
@@ -475,7 +489,7 @@ test("only the drawn player can launch each die, and settlement waits for the se
   hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
   hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
   hub.receive("Host", { type: "bet", betId: "pass", amount: 500 });
-  const values = [0, chanceDraw(2, 3), 0xffffffff];
+  const values = [0, hopDraw["2,3"], 0xffffffff];
   const native = crypto.getRandomValues.bind(crypto);
   t.mock.method(crypto, "getRandomValues", (buffer) => {
     if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
@@ -506,18 +520,18 @@ test("only the drawn player can launch each die, and settlement waits for the se
   throwDie("Guest", 1);
   assert.equal(state.houseRulePrompt.phase, "first-rolling");
   assert.equal(state.houseRulePrompt.firstDie, undefined);
-  assert.equal(state.houseRulePrompt.landingFace, undefined);
+  const firstFlight = state.houseRulePrompt.flight;
+  assert.equal(firstFlight.die, 1);
+  assert.deepEqual(firstFlight.frames[0], prompt.poses[0]);
   assert.equal(state.houseRulePrompt.dice, undefined);
   throwDie("Guest", 2);
   assert.equal(state.houseRulePrompt.phase, "first-rolling");
   tick();
-  assert.equal(state.houseRulePrompt.phase, "first-landing");
-  assert.equal(state.houseRulePrompt.landingFace, 2);
-  assert.equal(state.houseRulePrompt.throwDie, undefined);
-  assert.equal(state.houseRulePrompt.firstDie, undefined);
-  tick();
   assert.equal(state.houseRulePrompt.phase, "second-ready");
   assert.equal(state.houseRulePrompt.firstDie, 2);
+  assert.deepEqual(state.houseRulePrompt.poses[0], firstFlight.frames.at(-1));
+  assert.deepEqual(state.houseRulePrompt.poses[1], prompt.poses[1]);
+  assert.equal(state.houseRulePrompt.flight, undefined);
   assert.equal(state.houseRulePrompt.throwDie, 2);
   throwDie("Guest", 1);
   assert.equal(state.houseRulePrompt.phase, "second-ready");
@@ -527,12 +541,13 @@ test("only the drawn player can launch each die, and settlement waits for the se
   assert.equal(state.houseRulePrompt.roll, undefined);
   assert.equal(state.houseRulePrompt.hit, undefined);
   assert.equal(state.houseRulePrompt.dice, undefined);
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "second-landing");
-  assert.equal(state.houseRulePrompt.landingFace, 3);
-  assert.equal(state.houseRulePrompt.hit, undefined);
+  const secondFlight = state.houseRulePrompt.flight;
+  assert.equal(secondFlight.die, 2);
+  assert.deepEqual(secondFlight.frames[0], prompt.poses[1]);
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
+  assert.deepEqual(state.houseRulePrompt.poses[1], secondFlight.frames.at(-1));
+  assert.equal(upperDieFace(state.houseRulePrompt.poses[1].slice(3)).value, 3);
   assert.deepEqual(state.houseRulePrompt.dice, [2, 3]);
   assert.equal(state.houseRulePrompt.roll, 5);
   assert.equal(state.houseRulePrompt.hit, true);
@@ -551,7 +566,7 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   hub.receive("Host", { type: "house-rule", rule: "secondWind", value: true });
   hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
   hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
-  const draws = [0, chanceDraw(5, 6), 0];
+  const draws = [0, hopDraw["5,6"], 0];
   const native = crypto.getRandomValues.bind(crypto);
   t.mock.method(crypto, "getRandomValues", (buffer) => {
     if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
@@ -569,16 +584,12 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   tick();
   assert.equal(state.houseRulePrompt.phase, "first-rolling");
   tick();
-  assert.equal(state.houseRulePrompt.phase, "first-landing");
-  tick();
   assert.equal(state.houseRulePrompt.phase, "second-ready");
   assert.equal(state.houseRulePrompt.firstDie, 5);
   assert.equal(state.houseRulePrompt.dice, undefined);
   assert.equal(state.throw, null);
   tick();
   assert.equal(state.houseRulePrompt.phase, "second-rolling");
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "second-landing");
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.equal(state.houseRulePrompt.hit, false);
@@ -590,4 +601,26 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   assert.equal(state.lastRoll.total, 7);
   assert.equal(state.lastRoll.houseRulesTriggered, undefined);
   assert.equal(draws.length, 0);
+});
+
+test("physical chance hops roll out all 36 pairs at equal odds", () => {
+  const counts = new Map();
+  for (let orientation = 0; orientation < 24 ** 2; orientation++) {
+    const hops = createChanceDiceHops(orientation * CHANCE_HOP_BUCKET + 1619);
+    const pair = hops
+      .map(({ frames, face }) => {
+        assert(
+          frames.some((pose) => pose[1] > 0.8),
+          "Die must hop off the felt",
+        );
+        const final = upperDieFace(frames.at(-1).slice(3));
+        assert(final.alignment > 0.995);
+        assert.equal(final.value, face);
+        return face;
+      })
+      .join(",");
+    counts.set(pair, (counts.get(pair) ?? 0) + 1);
+  }
+  assert.equal(counts.size, 36);
+  assert([...counts.values()].every((count) => count === 16));
 });

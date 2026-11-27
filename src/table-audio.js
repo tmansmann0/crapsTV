@@ -1,8 +1,4 @@
 import {
-  HOUSE_RULE_DIE_CONTACTS,
-  HOUSE_RULE_DIE_FLIGHT_MS,
-} from "./house-rules.js";
-import {
   DEFAULT_TABLE_AUDIO,
   normalizeTableAudio,
 } from "./table-audio-settings.js";
@@ -249,19 +245,21 @@ export function createTableAudio() {
     play(count > 1 ? "shuffle" : "lay", 0.66, x);
   }
 
-  function houseRuleRoll(phase, hit) {
+  function houseRuleRoll({ phase, hit, flight }, serverNow) {
     if (context?.state !== "running" || !settings.effects || document.hidden)
       return;
     if (phase === "entering") {
       const now = context.currentTime;
       if (!play("thunder", 0.75, 0, now)) play("rail", 0.48, 0, now);
-    } else if (phase === "first-rolling" || phase === "second-rolling") {
+    } else if (flight) {
       const now = context.currentTime;
-      const side = phase === "first-rolling" ? -1.2 : 1.2;
-      HOUSE_RULE_DIE_CONTACTS.forEach((contact, index) => {
-        const when = now + contact * (HOUSE_RULE_DIE_FLIGHT_MS / 1000);
-        play("dice", index === 0 ? 0.62 : 0.36, side, when);
-      });
+      const side = flight.die === 1 ? -1.2 : 1.2;
+      for (const { ms, speed } of flight.contacts) {
+        const delay = flight.startAt + ms - serverNow;
+        if (delay < -freshImpactMs) continue;
+        const volume = Math.max(0.17, Math.min(0.7, speed / 7));
+        play("dice", volume, side, now + Math.max(0, delay) / 1000);
+      }
     } else if (phase === "second-ready") {
       play("tension", 0.48, 0.8);
     } else if (phase === "revealed") {

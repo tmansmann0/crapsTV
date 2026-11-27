@@ -280,7 +280,7 @@
   left: 50%;
   bottom: 3vmin;
   width: min(96vw, 86vmin);
-  height: 42vmin;
+  height: 49vmin;
   transform: translateX(-50%);
 }
 .hrc-dice canvas {

@@ -1,3 +1,7 @@
+import {
+  CHANCE_HOP_LIMIT,
+  createChanceDiceHops,
+} from "./house-rule-dice-motion.js";
 import { planOutcomeTour } from "./round-presentation.js";
 import { puckHome } from "./puck-layout.js";
 import { mergeTableAudio } from "./table-audio-settings.js";
@@ -1329,15 +1333,25 @@ function throwSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-function rollHouseRule(rule, access, player) {
-  // Use equally sized buckets for all 36 ordered pairs.
+// Keep unthrown paths off the public room state and out of saved histories.
+const chanceHops = new WeakMap();
+export function houseRuleHops(attempt) {
+  return chanceHops.get(attempt);
+}
+
+function rollHouseRule(rule, access, player, announce) {
   const bucketSize = Math.floor(0x100000000 / 36);
+  const limit = announce ? CHANCE_HOP_LIMIT : bucketSize * 36;
   let draw = throwSeed();
-  while (draw >= bucketSize * 36) draw = throwSeed();
+  while (draw >= limit) draw = throwSeed();
+  const hops = announce ? createChanceDiceHops(draw) : null;
   const pair = Math.floor(draw / bucketSize);
-  const dice = [1 + Math.floor(pair / 6), 1 + (pair % 6)];
+  const dice = hops?.map((hop) => hop.face) ?? [
+    1 + Math.floor(pair / 6),
+    1 + (pair % 6),
+  ];
   const roll = dice[0] + dice[1];
-  return {
+  const attempt = {
     rule,
     label: HOUSE_RULES[rule].label,
     target: access.target,
@@ -1347,6 +1361,8 @@ function rollHouseRule(rule, access, player) {
     value: access.value,
     ...(access.personal && { playerId: player.id, playerName: player.name }),
   };
+  if (hops) chanceHops.set(attempt, hops);
+  return attempt;
 }
 
 function settledThrow(options) {
@@ -1391,7 +1407,7 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
     (access.target > 1 || announce) &&
     timeline.dice[0] + timeline.dice[1] === 7
   ) {
-    const attempt = rollHouseRule("secondWind", access, shooter);
+    const attempt = rollHouseRule("secondWind", access, shooter, announce);
     if (attempt.hit) {
       timeline = settledThrow(options);
       assert(timeline, "The dice did not settle. Please throw again.");
@@ -1475,7 +1491,7 @@ export function finishRoll(
     if (!access) return null;
     const key = access.personal ? `${rule}:${player.id}` : rule;
     if (!chanceRolls.has(key))
-      chanceRolls.set(key, rollHouseRule(rule, access, player));
+      chanceRolls.set(key, rollHouseRule(rule, access, player, rules.announce));
     attempts.set(key, chanceRolls.get(key));
     const attempt = attempts.get(key);
     return attempt.hit ? attempt : null;

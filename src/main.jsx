@@ -516,7 +516,10 @@ function App() {
   );
   useEffect(() => {
     if (houseRulePrompt)
-      tableAudio.houseRuleRoll(houseRulePrompt.phase, houseRulePrompt.hit);
+      tableAudio.houseRuleRoll(
+        houseRulePrompt,
+        Date.now() + (state.clockOffsetMs || 0),
+      );
   }, [tableAudio, houseRulePrompt?.id, houseRulePrompt?.phase]);
   const audioRevision = state?.display?.audioRevision;
   useEffect(() => {
@@ -726,6 +729,7 @@ function App() {
           <HouseRuleChanceShowcase
             key={houseRulePrompt.id}
             prompt={houseRulePrompt}
+            clockOffsetMs={state.clockOffsetMs}
           />
         )}
         {!houseRulePrompt && houseRuleShowcase && (

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetURL } from "./asset-url.js";
-import { createChanceDieMotion } from "./house-rule-dice-motion.js";
+import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
 import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
 
@@ -20,20 +20,21 @@ function contactShadowTexture() {
 }
 
 export default function HouseRuleDice({
-  phase,
+  poses,
+  flight,
+  clockOffsetMs = 0,
   firstDie,
   secondDie,
-  landingFace,
 }) {
   const host = useRef(null);
-  const update = useRef(null);
-  const latest = useRef({ phase, firstDie, secondDie, landingFace });
+  const invalidateRef = useRef(null);
+  const latest = useRef({ poses, flight, clockOffsetMs });
   const [failed, setFailed] = useState(false);
 
   useLayoutEffect(() => {
-    latest.current = { phase, firstDie, secondDie, landingFace };
-    update.current?.();
-  }, [phase, firstDie, secondDie, landingFace]);
+    latest.current = { poses, flight, clockOffsetMs };
+    invalidateRef.current?.();
+  }, [poses, flight, clockOffsetMs]);
 
   useEffect(() => {
     const element = host.current;
@@ -69,7 +70,7 @@ export default function HouseRuleDice({
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const shadowTexture = contactShadowTexture();
     const shadowGeometry = new THREE.PlaneGeometry(1.72, 1.72);
-    const dice = [0, 1].map((index) => {
+    const dice = [0, 1].map(() => {
       const mesh = new THREE.Group();
       const shadow = new THREE.Mesh(
         shadowGeometry,
@@ -85,7 +86,6 @@ export default function HouseRuleDice({
       return {
         mesh,
         shadow,
-        motion: createChanceDieMotion(index),
         materials: [],
       };
     });
@@ -93,53 +93,52 @@ export default function HouseRuleDice({
     let disposed = false;
     let lost = false;
     let frame = 0;
-    let previousTime = null;
-
+    const nextPosition = new THREE.Vector3();
+    const nextRotation = new THREE.Quaternion();
     const invalidate = () => {
       if (!frame && !disposed && !lost) frame = requestAnimationFrame(render);
     };
-    function render(now) {
+    function render() {
       frame = 0;
-      const seconds = previousTime === null ? 0 : (now - previousTime) / 1000;
-      let moving = false;
-      for (const { mesh, shadow, motion } of dice) {
-        moving = motion.advance(seconds) || moving;
-        mesh.position.copy(motion.position);
-        mesh.quaternion.copy(motion.orientation);
+      if (!model) return;
+      const { poses, flight, clockOffsetMs } = latest.current;
+      const active = flight && !reduceMotion.matches;
+      const last = active ? flight.frames.length - 1 : 0;
+      const elapsed = active ? Date.now() + clockOffsetMs - flight.startAt : 0;
+      const cursor = Math.max(0, Math.min(elapsed / CHANCE_DIE_FRAME_MS, last));
+      const lower = Math.floor(cursor);
+      dice.forEach(({ mesh, shadow }, index) => {
+        const moving = active && flight.die === index + 1;
+        const pose = moving ? flight.frames[lower] : poses[index];
+        mesh.position.fromArray(pose);
+        mesh.quaternion.fromArray(pose, 3).normalize();
+        if (moving && lower < last) {
+          const next = flight.frames[lower + 1];
+          const part = cursor - lower;
+          mesh.position.lerp(nextPosition.fromArray(next), part);
+          mesh.quaternion.slerp(
+            nextRotation.fromArray(next, 3).normalize(),
+            part,
+          );
+        }
         shadow.position.set(mesh.position.x, 0.005, mesh.position.z);
-      }
-      if (model) renderer.render(scene, camera);
-      previousTime = moving ? now : null;
-      if (moving) invalidate();
-    }
-    function sync() {
-      if (!model || lost) return;
-      const { phase, firstDie, secondDie, landingFace } = latest.current;
-      dice[0].motion.sync({
-        throwing: phase === "first-rolling",
-        face: phase === "first-landing" ? landingFace : undefined,
-        value: firstDie,
-        reduceMotion: reduceMotion.matches,
       });
-      dice[1].motion.sync({
-        throwing: phase === "second-rolling",
-        face: phase === "second-landing" ? landingFace : undefined,
-        value: secondDie,
-        reduceMotion: reduceMotion.matches,
-      });
-      invalidate();
+      renderer.render(scene, camera);
+      if (active && cursor < last) invalidate();
     }
-    update.current = sync;
+    invalidateRef.current = invalidate;
 
     function resize() {
       const { clientWidth: width, clientHeight: height } = element;
       if (!width || !height || lost) return;
-      const halfHeight = 1.24;
-      const halfWidth = halfHeight * (width / height);
+      // Keep the dice's resting positions and give the hop overhead clearance.
+      const floor = -1.24;
+      const ceiling = 1.24 + 2.48 * (7 / 42);
+      const halfWidth = ((ceiling - floor) / 2) * (width / height);
       camera.left = -halfWidth;
       camera.right = halfWidth;
-      camera.top = halfHeight;
-      camera.bottom = -halfHeight;
+      camera.top = ceiling;
+      camera.bottom = floor;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
       invalidate();
@@ -175,7 +174,7 @@ export default function HouseRuleDice({
           });
           mesh.add(die);
         });
-        sync();
+        invalidate();
       })
       .catch(() => {
         if (!disposed) setFailed(true);
@@ -183,7 +182,7 @@ export default function HouseRuleDice({
 
     return () => {
       disposed = true;
-      update.current = null;
+      invalidateRef.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
       if (model) disposeModel(model);

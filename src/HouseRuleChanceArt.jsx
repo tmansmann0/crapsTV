@@ -243,7 +243,9 @@ export default function HouseRuleChanceArt({
   hit,
   phase,
   throwDie,
-  landingFace,
+  poses,
+  flight,
+  clockOffsetMs,
 }) {
   // Joining mid-roll should show the current dice without replaying the intro.
   const lateReveal = useRef(phase !== "entering").current;
@@ -255,11 +257,9 @@ export default function HouseRuleChanceArt({
   const cue = {
     entering: "Get ready",
     "first-ready": throwDie ? "Throw the first die" : "Auto throw",
-    "first-rolling": "First die in the air",
-    "first-landing": "First die landing",
+    "first-rolling": "First die rolling",
     "second-ready": throwDie ? "Throw the second die" : "Auto throw",
-    "second-rolling": "Second die in the air",
-    "second-landing": "Second die landing",
+    "second-rolling": "Second die rolling",
   }[phase];
   const trackPosition = (total) => `${((total - 1.5) / 11) * 100}%`;
 
@@ -307,10 +307,11 @@ export default function HouseRuleChanceArt({
           )}
           {won && <div className="hrc-halo" />}
           <HouseRuleDice
-            phase={phase}
+            poses={poses}
+            flight={flight}
+            clockOffsetMs={clockOffsetMs}
             firstDie={firstDie}
             secondDie={dice?.[1]}
-            landingFace={landingFace}
           />
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">
