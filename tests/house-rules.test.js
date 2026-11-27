@@ -765,6 +765,36 @@ test("fast finger circles drive independent spin that coasts after a pause", () 
   assert(spin().every((speed, die) => speed < coasting[die] * 0.6));
 });
 
+test("an upward flick throws both dice into an arc from their release poses", () => {
+  const poses = [
+    [-0.84, 1.15, -0.32, 0, 0, 0, 1],
+    [0.84, 1.2, -0.38, 0, 0, 0, 1],
+  ];
+  const velocities = [
+    [0, -1.7, -0.6, 5, 4, 3],
+    [0, -1.2, -0.5, 5, -4, 3],
+  ];
+  const gently = simulateChanceDrop(poses, velocities);
+  assert(gently.hops.every(({ frames }) => frames[1][1] < frames[0][1]));
+
+  const { hops, dice } = simulateChanceDrop(poses, velocities, 1, 1);
+  assert(dice);
+  assert.deepEqual(
+    hops.map(({ frames }) => frames[0]),
+    poses,
+  );
+  for (const { frames } of hops) {
+    assert(frames[4][1] - frames[0][1] > 0.3);
+    assert(frames[1][2] < frames[0][2]);
+    assert(frames.at(-1)[1] < 0.51);
+  }
+  assert(
+    hops.some(({ contacts }) =>
+      contacts.some(({ surface, speed }) => surface === "back" && speed >= 4),
+    ),
+  );
+});
+
 test("a released die keeps moving across the felt before settling", () => {
   const poses = [
     [-1.6, 0.497, -0.55, 0, 0, 0, 1],

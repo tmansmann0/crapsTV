@@ -50,7 +50,11 @@ export function chanceDiceStart(seed) {
   ]);
 }
 
-export function createDiceSuspension(poses, velocities) {
+export function createDiceSuspension(
+  poses,
+  velocities,
+  { ceiling = CEILING } = {},
+) {
   const world = new World({
     gravity: new Vec3(0, -GRAVITY, 0),
     allowSleep: true,
@@ -63,8 +67,9 @@ export function createDiceSuspension(poses, velocities) {
   const felt = new Material("felt");
   world.addContactMaterial(
     new ContactMaterial(resin, resin, {
-      friction: 0.23,
-      restitution: 0.58,
+      friction: 0.17,
+      restitution: 0.4,
+      contactEquationRelaxation: 5,
     }),
   );
   const feltContact = new ContactMaterial(resin, felt, {
@@ -94,9 +99,9 @@ export function createDiceSuspension(poses, velocities) {
   boundary(0, 0, 0, new Vec3(0, 1, 0), "felt");
   boundary(-SIDE_RAIL, 0, 0, new Vec3(1, 0, 0));
   boundary(SIDE_RAIL, 0, 0, new Vec3(-1, 0, 0));
-  boundary(0, 0, BACK_RAIL, new Vec3(0, 0, 1));
+  boundary(0, 0, BACK_RAIL, new Vec3(0, 0, 1), "back");
   boundary(0, 0, FRONT_RAIL, new Vec3(0, 0, -1), "glass");
-  boundary(0, CEILING, 0, new Vec3(0, -1, 0));
+  boundary(0, ceiling, 0, new Vec3(0, -1, 0));
 
   const dice = poses.map(([x, y, z, qx, qy, qz, qw], index) => {
     const body = new Body({
@@ -135,6 +140,8 @@ export function createDiceSuspension(poses, velocities) {
   const force = new Vec3();
   const point = new Vec3();
   const pointVelocity = new Vec3();
+  const contactDirection = new Vec3();
+  let touchingSteps = 0;
   let pulling = false;
   let remaining = 0;
   let sinceDrag = Infinity;
@@ -284,12 +291,21 @@ export function createDiceSuspension(poses, velocities) {
             ),
             force.z * pull - body.velocity.z * 0.42 - handVelocity.z * 1.1,
           );
+          // A held collision needs time to separate. Release the pressure
+          // toward the other die while preserving lift and tangential force.
+          if (touchingSteps) {
+            const sign = index === 0 ? 1 : -1;
+            const inward = Math.max(0, sign * force.dot(contactDirection));
+            force.x -= sign * inward * contactDirection.x;
+            force.z -= sign * inward * contactDirection.z;
+          }
           body.applyForce(force, arm);
-          const coupling = index === 0 ? 1.95 : 1.65;
+          const spinGrip = touchingSteps ? 0.5 : 1;
+          const coupling = (index === 0 ? 1.95 : 1.65) * spinGrip;
           body.torque.x +=
             spinDrive.x * coupling - angularDrag * body.angularVelocity.x;
           body.torque.y +=
-            spinDrive.y * (2 - 0.18 * index) -
+            spinDrive.y * (2 - 0.18 * index) * spinGrip -
             angularDrag * body.angularVelocity.y;
           body.torque.z +=
             spinDrive.z * coupling - angularDrag * body.angularVelocity.z;
@@ -297,6 +313,14 @@ export function createDiceSuspension(poses, velocities) {
       }
       world.step(STEP);
       if (pulling) {
+        if (world.contacts.some(({ bi, bj }) => bi.mass && bj.mass)) {
+          dice[1].position.vsub(dice[0].position, contactDirection);
+          contactDirection.y = 0;
+          contactDirection.normalize();
+          touchingSteps = 6;
+        } else if (touchingSteps) {
+          touchingSteps--;
+        }
         spinDrive.scale(SPIN_INPUT_DECAY, spinDrive);
         sinceDrag += STEP;
         // Bound the energy from extreme finger motion to the same limits the
@@ -351,6 +375,7 @@ export function createDiceSuspension(poses, velocities) {
       pulling = false;
       feltContact.friction = RELEASED_FELT_FRICTION;
       sinceDrag = Infinity;
+      touchingSteps = 0;
       spinDrive.setZero();
       dice.forEach((body, index) => {
         const handVelocity = handVelocities[index];
@@ -385,16 +410,19 @@ export function chanceDiceLaunchVelocities(seed) {
   ]);
 }
 
-export function simulateChanceDrop(poses, velocities, flick = 0) {
-  const released = velocities.map(([vx, vy, vz, wx, wy, wz]) => [
+export function simulateChanceDrop(poses, velocities, flick = 0, upward = 0) {
+  const loft = flick * upward;
+  const release = velocities.map(([vx, vy, vz, wx, wy, wz]) => [
     vx,
-    vy,
-    vz + 8.5 * flick,
+    vy + Math.max(0, 6.1 - vy) * loft,
+    vz + 8.5 * flick - 17.2 * loft,
     wx,
     wy,
     wz,
   ]);
-  const physics = createDiceSuspension(poses, released);
+  const physics = createDiceSuspension(poses, release, {
+    ceiling: loft > 0 ? CHANCE_DICE_BOUNDS.throwCeiling : CEILING,
+  });
   const contacts = [[], []];
   const hops = poses.map((pose, index) => ({
     frames: [pose],

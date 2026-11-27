@@ -74,9 +74,9 @@ export default function HouseRuleDice({
     if (phone) camera.lookAt(0, 0.57, 0.14);
     else camera.lookAt(0, 0.48, 0.03);
     camera.updateMatrixWorld(true);
-    const { front, back, ceiling } = CHANCE_DICE_BOUNDS;
+    const { front, back, throwCeiling } = CHANCE_DICE_BOUNDS;
     const topEdge =
-      new THREE.Vector3(0, ceiling, back).applyMatrix4(
+      new THREE.Vector3(0, throwCeiling, back).applyMatrix4(
         camera.matrixWorldInverse,
       ).y + 0.06;
     const bottomEdge =
@@ -212,7 +212,7 @@ export default function HouseRuleDice({
         flight.hops.some(({ contacts }) =>
           contacts.some(
             ({ ms, surface, speed }) =>
-              surface === "glass" &&
+              (surface === "glass" || surface === "back") &&
               speed >= 4 &&
               elapsed >= ms &&
               elapsed < ms + 165,

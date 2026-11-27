@@ -545,12 +545,12 @@ export class RoomHub {
       }, 800);
     };
     const waitForThrow = () => {
-      const launch = ({ poses, velocities, flick } = {}) => {
+      const launch = ({ poses, velocities, flick, upward } = {}) => {
         this.houseRuleThrow = null;
         const fromGesture = Boolean(poses && velocities);
         let flight;
         if (fromGesture) {
-          flight = simulateChanceDrop(poses, velocities, flick);
+          flight = simulateChanceDrop(poses, velocities, flick, upward);
         } else {
           const seed = chanceSeed();
           for (let i = 0; i < 12; i++) {
@@ -627,12 +627,15 @@ export class RoomHub {
     const flick = Number.isFinite(message.flick)
       ? Math.max(0, Math.min(1, message.flick))
       : 0;
+    const upward = Number.isFinite(message.upward)
+      ? Math.max(0, Math.min(1, message.upward))
+      : 0;
     const poses = suspensionPoses(message.poses);
     const velocities = suspensionVelocities(message.velocities);
     this.clearTimer(this.timer);
     if (poses && velocities)
       this.relayChanceMotion(prompt.id, poses, Date.now());
-    this.houseRuleThrow({ poses, velocities, flick });
+    this.houseRuleThrow({ poses, velocities, flick, upward });
   }
   botsCanAct() {
     return (

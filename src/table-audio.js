@@ -259,7 +259,7 @@ export function createTableAudio() {
           if (delay < -freshImpactMs) continue;
           const volume = Math.max(0.17, Math.min(0.92, speed / 7));
           play(
-            surface === "glass" ? "rail" : surface,
+            surface === "glass" || surface === "back" ? "rail" : surface,
             volume,
             index === 0 ? -1.2 : 1.2,
             now + Math.max(0, delay) / 1000,

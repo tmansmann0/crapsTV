@@ -6,6 +6,7 @@ export const CHANCE_DICE_BOUNDS = {
   back: -1.66,
   front: 1.85,
   ceiling: 2.32,
+  throwCeiling: 3.08,
 };
 export const CHANCE_PHONE_HALF_WIDTH = CHANCE_DICE_BOUNDS.side + 0.06;
 export const SUSPENSION_MAX_SPEED = 14;

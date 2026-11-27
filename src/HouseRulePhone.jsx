@@ -125,6 +125,7 @@ export default function HouseRulePhone({
       lastY: event.clientY,
       lastAt: now,
       velocity: 0,
+      upward: 0,
       travel: 0,
     };
     position(drag, event);
@@ -144,6 +145,10 @@ export default function HouseRulePhone({
     const dt = Math.max(8, now - drag.lastAt);
     const speed = distance / dt;
     drag.velocity = Math.min(2.5, drag.velocity * 0.4 + speed * 0.6);
+    if (distance > 2) {
+      const upward = Math.max(0, -dy / distance);
+      drag.upward = drag.upward * 0.3 + upward * 0.7;
+    }
 
     drag.travel += distance;
     drag.lastX = event.clientX;
@@ -152,13 +157,13 @@ export default function HouseRulePhone({
     position(drag, event, dt / 1000);
   }
 
-  function sendFling(flick) {
+  function sendFling(flick, upward = 0) {
     if (!canFling) return;
     const poses = suspensionPoses(suspension.current?.sample());
     const velocities = suspensionVelocities(suspension.current?.velocities());
     const release =
       Number.isFinite(flick) && poses && velocities
-        ? { poses, velocities, flick }
+        ? { poses, velocities, flick, upward }
         : undefined;
     setPending(true);
     send({ type: "roll-house-rule", promptId: id, ...release });
@@ -168,6 +173,7 @@ export default function HouseRulePhone({
         release.poses,
         release.velocities,
         flick,
+        upward,
       );
       setLocalDrop({ startAt, hops });
     }
@@ -190,7 +196,7 @@ export default function HouseRulePhone({
       (drag.travel > 18 || performance.now() - drag.startedAt > 180)
     ) {
       const flick = Math.min(1, Math.max(0, (drag.velocity - 0.72) / 1.2));
-      sendFling(flick);
+      sendFling(flick, drag.upward);
     }
   }
 
