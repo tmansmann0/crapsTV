@@ -130,7 +130,7 @@
   opacity: 1;
 }
 .chance-phone.is-spinning .chance-phone__stage::before {
-  border-color: var(--a);
+  opacity: 0;
 }
 .chance-phone__orbit {
   position: absolute;

@@ -153,7 +153,7 @@ export default function HouseRulePhone({
   } else if (canFling) {
     instruction = holding
       ? "Flick and lift to throw."
-      : "Hold to pull both dice into orbit.";
+      : "Hold to lift both dice.";
   }
   if (!connected) instruction = "Reconnecting…";
 

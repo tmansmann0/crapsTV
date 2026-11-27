@@ -25,41 +25,6 @@ function contactShadowTexture() {
   return new THREE.CanvasTexture(canvas);
 }
 
-function createVortex(color) {
-  const geometry = new THREE.PlaneGeometry(3.4, 3.4);
-  const material = new THREE.ShaderMaterial({
-    transparent: true,
-    depthWrite: false,
-    uniforms: { ink: { value: new THREE.Color(color) }, turn: { value: 0 } },
-    vertexShader: `
-      varying vec2 point;
-      void main() {
-        point = uv * 2.0 - 1.0;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: `
-      uniform vec3 ink;
-      uniform float turn;
-      varying vec2 point;
-      void main() {
-        float radius = length(point);
-        float phi = atan(point.y, point.x);
-        float envelope = 1.0 - smoothstep(0.72, 0.99, radius);
-        float hole = smoothstep(0.18, 0.24, radius);
-        float twist = phi * 3.0 + 13.0 * radius - turn * 3.0;
-        float arms = pow(max(0.0, cos(twist)), 3.0);
-        float distanceFromRidge = (radius - 0.30) * 12.0;
-        float ridge = exp(-distanceFromRidge * distanceFromRidge);
-        float glow = (arms * 0.58 + ridge * 0.42) * hole;
-        gl_FragColor = vec4(ink * glow, envelope * (glow + 0.92 * (1.0 - hole)));
-        #include <colorspace_fragment>
-      }`,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.rotation.x = -Math.PI / 2;
-  return mesh;
-}
-
 export default function HouseRuleDice({
   poses,
   flight,
@@ -121,9 +86,7 @@ export default function HouseRuleDice({
     const css = getComputedStyle(element);
     const colors = ["#f3e2bd", css.getPropertyValue("--dice-resin").trim()];
     const pips = ["#16382c", css.getPropertyValue("--dice-pips").trim()];
-    const vortex = createVortex(css.getPropertyValue("--a").trim());
     const stage = element.closest(".hrc, .chance-phone");
-    scene.add(vortex);
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const shadowTexture = contactShadowTexture();
     const shadowGeometry = new THREE.PlaneGeometry(1.72, 1.72);
@@ -157,25 +120,32 @@ export default function HouseRuleDice({
     const launchPosition = new THREE.Vector3();
     const launchRotation = new THREE.Quaternion();
     const rollAxis = new THREE.Vector3();
+    const hangingTilt = new THREE.Euler(0, 0, 0, "YXZ");
     const easedAnchor = new THREE.Vector2();
     const pivot = new THREE.Vector2();
     let lastFrameAt = null;
-    let orbitWasLive = false;
+    let suspended = 0;
+    let heldOrbit = null;
+    let heldAngle = 0;
     let hitGlass = false;
     const invalidate = () => {
       if (!frame && !disposed && !lost) frame = requestAnimationFrame(render);
     };
 
-    function orbitPose(index, orbit, angle) {
+    function hangingPose(index, orbit, angle) {
       const theta = angle + index * Math.PI;
-      const radius = 0.96 + 0.19 * orbit.energy;
+      const swing = Math.sin(theta);
+      const arc = Math.cos(theta);
+      const radius = 0.9 + 0.18 * orbit.energy;
       windPosition.set(
-        pivot.x + Math.cos(theta) * radius,
-        0.78 + 0.17 * Math.sin(theta * 2 + 0.55),
-        pivot.y + Math.sin(theta) * radius * 0.86,
+        pivot.x + swing * radius,
+        1.04 + 0.23 * arc + 0.11 * swing * swing,
+        pivot.y + 0.35 + arc * radius * 0.78,
       );
-      rollAxis.set(Math.cos(theta), 0.35, Math.sin(theta)).normalize();
-      windRotation.setFromAxisAngle(rollAxis, theta * 1.8);
+      // The die leans into its swing and rocks back under the pivot.
+      hangingTilt.set(-0.28 * arc, theta * 0.53, -0.68 * swing);
+      windRotation.setFromEuler(hangingTilt);
+      rollAxis.set(arc, 0.35, swing).normalize();
     }
 
     function render(time) {
@@ -198,28 +168,29 @@ export default function HouseRuleDice({
       const dt = lastFrameAt === null ? 16.7 : Math.min(time - lastFrameAt, 42);
       lastFrameAt = time;
       if (orbitLive) {
-        if (!orbitWasLive) easedAnchor.set(sample.orbit.x, sample.orbit.y);
-        const follow = 1 - Math.exp(-dt / 22);
+        if (!suspended) easedAnchor.set(sample.orbit.x, sample.orbit.y);
+        const follow = 1 - Math.exp(-dt / 62);
         easedAnchor.x += (sample.orbit.x - easedAnchor.x) * follow;
         easedAnchor.y += (sample.orbit.y - easedAnchor.y) * follow;
+        heldOrbit = { ...sample.orbit, x: easedAnchor.x, y: easedAnchor.y };
+        heldAngle =
+          heldOrbit.turn +
+          Math.max(0, now - sample.at) * orbitSpeed(heldOrbit.energy);
+      } else if (heldOrbit) {
+        heldAngle += dt * orbitSpeed(heldOrbit.energy) * suspended;
       }
-      orbitWasLive = Boolean(orbitLive);
-
+      suspended = THREE.MathUtils.clamp(
+        suspended + (orbitLive ? dt / 230 : -dt / 205),
+        0,
+        1,
+      );
+      const lift = suspended * suspended * (3 - 2 * suspended);
       const orbit = fling
         ? flight.orbit
-        : orbitLive && {
-            ...sample.orbit,
-            x: easedAnchor.x,
-            y: easedAnchor.y,
-          };
-      const angle = orbit
-        ? orbit.turn +
-          (fling ? 0 : Math.max(0, now - sample.at) * orbitSpeed(orbit.energy))
-        : 0;
-      vortex.visible = Boolean(orbit && !fling);
+        : !moving && suspended > 0 && heldOrbit;
+      const angle = fling ? flight.orbit.turn : heldAngle;
       if (orbit) {
-        // Project the pointer onto the felt instead of offsetting the swirl
-        // from the touch. Keep the TV's pivot within its title and score panel.
+        // Use the touch as an invisible pivot and keep the TV swing in frame.
         const vertical =
           (camera.top + camera.bottom) / 2 -
           ((orbit.y * (camera.top - camera.bottom)) / 2) * (phone ? 1 : 0.43);
@@ -229,8 +200,6 @@ export default function HouseRuleDice({
           camera.position.z +
             (vertical - upY * (0.12 - camera.position.y)) / upZ,
         );
-        vortex.position.set(pivot.x, 0.12, pivot.y);
-        vortex.material.uniforms.turn.value = angle;
       }
 
       let stillRolling = false;
@@ -242,7 +211,6 @@ export default function HouseRuleDice({
         const pose = moving ? posesInFlight[lower] : poses[index];
         mesh.position.fromArray(pose);
         mesh.quaternion.fromArray(pose, 3).normalize();
-        mesh.scale.setScalar(1);
         if (moving && lower < last) {
           const next = posesInFlight[lower + 1];
           const part = cursor - lower;
@@ -255,7 +223,7 @@ export default function HouseRuleDice({
         }
         if (orbit) {
           const base = mesh.quaternion;
-          orbitPose(index, orbit, angle);
+          hangingPose(index, orbit, angle);
           windRotation.multiply(base);
           if (fling) {
             const side = index === 0 ? -1 : 1;
@@ -271,9 +239,9 @@ export default function HouseRuleDice({
             const towardsGlass = approach ** 2.6;
             const rebound = 1 - (1 - recoil) ** 2;
             launchPosition.set(
-              side * 1.64 + orbit.x * 0.15,
-              1.42,
-              0.86 + orbit.y * 0.15,
+              side * 1.31 + orbit.x * 0.15,
+              1.18,
+              1.09 + orbit.y * 0.12,
             );
             const spread = 1 - (1 - approach) ** 2;
             const glassX = THREE.MathUtils.lerp(
@@ -292,14 +260,15 @@ export default function HouseRuleDice({
               launchRotation.slerp(nextRotation.identity(), 1 - towardsGlass),
             );
             windRotation.slerp(base, rebound);
-            mesh.scale.setScalar(
-              1 + (1.05 + flight.flick * 0.65) * towardsGlass * (1 - rebound),
-            );
           }
-          mesh.position.copy(windPosition);
-          mesh.quaternion.copy(windRotation);
+          const pull = fling ? 1 : lift;
+          mesh.position.lerp(windPosition, pull);
+          mesh.quaternion.slerp(windRotation, pull);
         }
+        const aboveFelt = Math.max(0, mesh.position.y - 0.5);
         shadow.position.set(mesh.position.x, 0.005, mesh.position.z);
+        shadow.material.opacity = 1 / (1 + 1.6 * aboveFelt);
+        shadow.scale.setScalar(1 + 0.3 * aboveFelt);
       });
       const impact =
         moving && elapsed >= FLING_IMPACT_MS && elapsed < FLING_IMPACT_MS + 165;
@@ -308,7 +277,7 @@ export default function HouseRuleDice({
         stage?.classList.toggle("is-dice-impact", impact);
       }
       renderer.render(scene, camera);
-      if (orbitLive || fling || stillRolling) invalidate();
+      if (orbitLive || suspended > 0 || fling || stillRolling) invalidate();
       else lastFrameAt = null;
     }
     invalidateRef.current = invalidate;
@@ -375,8 +344,6 @@ export default function HouseRuleDice({
       if (model) disposeModel(model);
       shadowTexture.dispose();
       shadowGeometry.dispose();
-      vortex.geometry.dispose();
-      vortex.material.dispose();
       stage?.classList.remove("is-dice-impact");
       for (const { shadow, materials } of dice) {
         shadow.material.dispose();
