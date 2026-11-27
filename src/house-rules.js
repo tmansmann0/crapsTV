@@ -91,8 +91,10 @@ export const HOUSE_RULE_SETTINGS = {
   },
 };
 
-export const HOUSE_RULE_FIRST_STOP_MS = 1100;
-export const HOUSE_RULE_BETWEEN_DICE_MS = 540;
+export const HOUSE_RULE_INTRO_MS = 850;
+export const HOUSE_RULE_DIE_FLIGHT_MS = 780;
+export const HOUSE_RULE_DIE_LANDING_MS = 260;
+export const HOUSE_RULE_DIE_CONTACTS = [0.58, 0.86];
 export const HOUSE_RULE_REVEAL_MS = 1450;
 export const HOUSE_RULE_OFFER_SETTINGS = {
   price: { label: "Price in chips ($)", min: 100, max: 100000000, scale: 100 },

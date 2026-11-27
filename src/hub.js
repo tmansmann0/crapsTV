@@ -1,7 +1,8 @@
 import * as game from "./game.js";
 import {
-  HOUSE_RULE_BETWEEN_DICE_MS,
-  HOUSE_RULE_FIRST_STOP_MS,
+  HOUSE_RULE_DIE_FLIGHT_MS,
+  HOUSE_RULE_DIE_LANDING_MS,
+  HOUSE_RULE_INTRO_MS,
   HOUSE_RULE_REVEAL_MS,
 } from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
@@ -42,7 +43,7 @@ export class RoomHub {
     this.tokens = new Map(restored?.tokens);
     this.rollDelay = rollDelay;
     this.timer = null;
-    this.houseRuleRoll = null;
+    this.houseRuleThrow = null;
     this.botTimer = null;
     this.botWindows = new Map();
     this.botTurn = null;
@@ -272,7 +273,7 @@ export class RoomHub {
         else if (type === "buy-house-rule")
           game.buyHouseRule(s, pid, message.rule, message.quote);
         else if (type === "roll-house-rule") {
-          this.stopHouseRuleDie(pid, message.promptId, message.die);
+          this.throwHouseRuleDie(pid, message.promptId, message.die);
           return;
         } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
@@ -455,7 +456,7 @@ export class RoomHub {
     const id = game.uid();
     let index = 0;
     let roller;
-    const setPrompt = (phase, stopDie) => {
+    const setPrompt = (phase, extra) => {
       const { dice, roll, hit, ...details } = attempts[index];
       state.houseRulePrompt = {
         ...details,
@@ -463,12 +464,11 @@ export class RoomHub {
         phase,
         rollerId: roller?.id,
         rollerName: roller?.name,
-        ...(stopDie && { stopDie }),
-        ...(phase !== "entering" &&
-          phase !== "first-rolling" && {
-            firstDie: dice[0],
-          }),
+        ...(phase.startsWith("second-") || phase === "revealed"
+          ? { firstDie: dice[0] }
+          : {}),
         ...(phase === "revealed" && { dice, roll, hit }),
+        ...extra,
       };
       this.broadcast();
     };
@@ -478,14 +478,7 @@ export class RoomHub {
         if (!this.closed && this.state === state && state.rolling) fn();
       }, delay);
     };
-    const waitForStop = (phase, die, stop) => {
-      const available = roller?.connected && !roller.left;
-      this.houseRuleRoll = available ? stop : null;
-      advance(stop, available ? HOUSE_RULE_ROLL_TIMEOUT_MS : 950);
-      setPrompt(phase, available ? die : undefined);
-    };
     const reveal = () => {
-      this.houseRuleRoll = null;
       setPrompt("revealed");
       advance(() => {
         if (++index < attempts.length) start();
@@ -495,13 +488,25 @@ export class RoomHub {
         }
       }, HOUSE_RULE_REVEAL_MS);
     };
-    const stopFirst = () => {
-      this.houseRuleRoll = null;
-      setPrompt("between");
-      advance(
-        () => waitForStop("second-rolling", 2, reveal),
-        HOUSE_RULE_BETWEEN_DICE_MS,
-      );
+    const waitForThrow = (die) => {
+      const name = die === 1 ? "first" : "second";
+      const launch = () => {
+        this.houseRuleThrow = null;
+        setPrompt(`${name}-rolling`);
+        advance(() => {
+          setPrompt(`${name}-landing`, {
+            landingFace: attempts[index].dice[die - 1],
+          });
+          advance(
+            die === 1 ? () => waitForThrow(2) : reveal,
+            HOUSE_RULE_DIE_LANDING_MS,
+          );
+        }, HOUSE_RULE_DIE_FLIGHT_MS);
+      };
+      const available = roller?.connected && !roller.left;
+      this.houseRuleThrow = available ? launch : null;
+      advance(launch, available ? HOUSE_RULE_ROLL_TIMEOUT_MS : 450);
+      setPrompt(`${name}-ready`, available ? { throwDie: die } : undefined);
     };
     const start = () => {
       const people = state.players.filter(
@@ -512,22 +517,19 @@ export class RoomHub {
         : 0;
       roller = people[Math.floor(random * people.length)];
       setPrompt("entering");
-      advance(
-        () => waitForStop("first-rolling", 1, stopFirst),
-        HOUSE_RULE_FIRST_STOP_MS,
-      );
+      advance(() => waitForThrow(1), HOUSE_RULE_INTRO_MS);
     };
     start();
   }
-  stopHouseRuleDie(playerId, promptId, die) {
+  throwHouseRuleDie(playerId, promptId, die) {
     const prompt = this.state.houseRulePrompt;
-    if (prompt?.id !== promptId || !prompt) return;
+    if (!prompt || prompt.id !== promptId) return;
     if (prompt.rollerId !== playerId)
-      throw Error("Only the selected player can stop these dice.");
-    // A repeated tap for the first die cannot stop the second one.
-    if (!this.houseRuleRoll || prompt.stopDie !== die) return;
+      throw Error("Only the selected player can throw these dice.");
+    // A repeated tap for the first die cannot launch the second one.
+    if (!this.houseRuleThrow || prompt.throwDie !== die) return;
     this.clearTimer(this.timer);
-    this.houseRuleRoll();
+    this.houseRuleThrow();
   }
   botsCanAct() {
     return (
@@ -672,7 +674,7 @@ export class RoomHub {
     this.clearTimer(this.timer);
     this.clearTimer(this.botTimer);
     this.timer = this.botTimer = null;
-    this.houseRuleRoll = null;
+    this.houseRuleThrow = null;
     this.botWindows.clear();
     this.botTurn = null;
     this.state.botRollAt = null;

@@ -1,4 +1,8 @@
 import {
+  HOUSE_RULE_DIE_CONTACTS,
+  HOUSE_RULE_DIE_FLIGHT_MS,
+} from "./house-rules.js";
+import {
   DEFAULT_TABLE_AUDIO,
   normalizeTableAudio,
 } from "./table-audio-settings.js";
@@ -251,14 +255,17 @@ export function createTableAudio() {
     if (phase === "entering") {
       const now = context.currentTime;
       if (!play("thunder", 0.75, 0, now)) play("rail", 0.48, 0, now);
-      play("dice", 0.54, -1.2, now + 0.43);
-    } else if (phase === "between") {
-      const landing = context.currentTime + 0.23;
-      play("dice", 0.54, -1.2, landing);
-      play("tension", 0.48, 0.8, landing);
+    } else if (phase === "first-rolling" || phase === "second-rolling") {
+      const now = context.currentTime;
+      const side = phase === "first-rolling" ? -1.2 : 1.2;
+      HOUSE_RULE_DIE_CONTACTS.forEach((contact, index) => {
+        const when = now + contact * (HOUSE_RULE_DIE_FLIGHT_MS / 1000);
+        play("dice", index === 0 ? 0.62 : 0.36, side, when);
+      });
+    } else if (phase === "second-ready") {
+      play("tension", 0.48, 0.8);
     } else if (phase === "revealed") {
-      play("dice", 0.48, 1.2, context.currentTime + 0.23);
-      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.4);
+      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.08);
     }
   }
 

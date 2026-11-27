@@ -2159,21 +2159,23 @@ export default function PhoneGame({
                 <button
                   type="button"
                   className="button"
-                  disabled={!connected || !houseRulePrompt.stopDie}
+                  disabled={!connected || !houseRulePrompt.throwDie}
                   onClick={() =>
                     send({
                       type: "roll-house-rule",
                       promptId: houseRulePrompt.id,
-                      die: houseRulePrompt.stopDie,
+                      die: houseRulePrompt.throwDie,
                     })
                   }
                 >
                   <Dices size={18} aria-hidden="true" />
-                  {houseRulePrompt.stopDie === 1
-                    ? "Stop first die"
-                    : houseRulePrompt.stopDie === 2
-                      ? "Stop second die"
-                      : "Get ready"}
+                  {houseRulePrompt.throwDie === 1
+                    ? "Throw first die"
+                    : houseRulePrompt.throwDie === 2
+                      ? "Throw second die"
+                      : houseRulePrompt.phase === "entering"
+                        ? "Get ready"
+                        : "Dice in motion"}
                 </button>
               </aside>
             )}

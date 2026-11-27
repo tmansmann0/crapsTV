@@ -7,7 +7,7 @@
   --gold: #f2c55c;
   --ivory: #fff4dc;
   --die: 17vmin;
-  --reveal-delay: 240ms;
+  --reveal-delay: 0ms;
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -528,7 +528,7 @@
 .is-hit .hrc-verdict {
   color: #ffd970;
 }
-.is-between .hrc-verdict {
+.is-second-ready .hrc-verdict {
   color: var(--gold);
 }
 .hrc-meter {

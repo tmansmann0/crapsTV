@@ -465,7 +465,7 @@ function manualRoom(t) {
   return { hub, tick, join, errors };
 }
 
-test("only the drawn player can stop each die, and settlement waits for the second reveal", (t) => {
+test("only the drawn player can launch each die, and settlement waits for the second landing", (t) => {
   const { hub, join, tick, errors } = manualRoom(t);
   join("Host");
   join("Guest");
@@ -492,31 +492,46 @@ test("only the drawn player can stop each die, and settlement waits for the seco
   assert.equal(prompt.phase, "entering");
   assert.equal(prompt.roll, undefined);
   assert.equal(host.bank, 99500);
-  const stop = (name, die) =>
+  const throwDie = (name, die) =>
     hub.receive(name, { type: "roll-house-rule", promptId: prompt.id, die });
-  stop("Guest", 1);
+  throwDie("Guest", 1);
   assert.equal(state.houseRulePrompt.phase, "entering");
   tick();
-  assert.equal(state.houseRulePrompt.phase, "first-rolling");
-  stop("Host", 1);
+  assert.equal(state.houseRulePrompt.phase, "first-ready");
+  assert.equal(state.houseRulePrompt.throwDie, 1);
+  throwDie("Host", 1);
   assert.match(errors.pop(), /selected player/);
-  stop("Guest", 2);
+  throwDie("Guest", 2);
+  assert.equal(state.houseRulePrompt.phase, "first-ready");
+  throwDie("Guest", 1);
   assert.equal(state.houseRulePrompt.phase, "first-rolling");
-  assert.equal(state.houseRulePrompt.hit, undefined);
   assert.equal(state.houseRulePrompt.firstDie, undefined);
+  assert.equal(state.houseRulePrompt.landingFace, undefined);
   assert.equal(state.houseRulePrompt.dice, undefined);
-  stop("Guest", 1);
-  assert.equal(state.houseRulePrompt.phase, "between");
+  throwDie("Guest", 2);
+  assert.equal(state.houseRulePrompt.phase, "first-rolling");
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "first-landing");
+  assert.equal(state.houseRulePrompt.landingFace, 2);
+  assert.equal(state.houseRulePrompt.throwDie, undefined);
+  assert.equal(state.houseRulePrompt.firstDie, undefined);
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "second-ready");
   assert.equal(state.houseRulePrompt.firstDie, 2);
+  assert.equal(state.houseRulePrompt.throwDie, 2);
+  throwDie("Guest", 1);
+  assert.equal(state.houseRulePrompt.phase, "second-ready");
+  assert.equal(host.bank, 99500);
+  throwDie("Guest", 2);
+  assert.equal(state.houseRulePrompt.phase, "second-rolling");
   assert.equal(state.houseRulePrompt.roll, undefined);
   assert.equal(state.houseRulePrompt.hit, undefined);
   assert.equal(state.houseRulePrompt.dice, undefined);
   tick();
-  assert.equal(state.houseRulePrompt.phase, "second-rolling");
-  stop("Guest", 1);
-  assert.equal(state.houseRulePrompt.phase, "second-rolling");
-  assert.equal(host.bank, 99500);
-  stop("Guest", 2);
+  assert.equal(state.houseRulePrompt.phase, "second-landing");
+  assert.equal(state.houseRulePrompt.landingFace, 3);
+  assert.equal(state.houseRulePrompt.hit, undefined);
+  tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.deepEqual(state.houseRulePrompt.dice, [2, 3]);
   assert.equal(state.houseRulePrompt.roll, 5);
@@ -550,14 +565,20 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   assert.equal(state.houseRulePrompt.phase, "entering");
   assert.equal(state.throw, null);
   tick();
+  assert.equal(state.houseRulePrompt.phase, "first-ready");
+  tick();
   assert.equal(state.houseRulePrompt.phase, "first-rolling");
   tick();
-  assert.equal(state.houseRulePrompt.phase, "between");
+  assert.equal(state.houseRulePrompt.phase, "first-landing");
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "second-ready");
   assert.equal(state.houseRulePrompt.firstDie, 5);
   assert.equal(state.houseRulePrompt.dice, undefined);
   assert.equal(state.throw, null);
   tick();
   assert.equal(state.houseRulePrompt.phase, "second-rolling");
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "second-landing");
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.equal(state.houseRulePrompt.hit, false);

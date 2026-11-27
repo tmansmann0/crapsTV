@@ -23,17 +23,17 @@ export default function HouseRuleDice({
   phase,
   firstDie,
   secondDie,
-  lateReveal,
+  landingFace,
 }) {
   const host = useRef(null);
   const update = useRef(null);
-  const latest = useRef({ phase, firstDie, secondDie });
+  const latest = useRef({ phase, firstDie, secondDie, landingFace });
   const [failed, setFailed] = useState(false);
 
   useLayoutEffect(() => {
-    latest.current = { phase, firstDie, secondDie };
+    latest.current = { phase, firstDie, secondDie, landingFace };
     update.current?.();
-  }, [phase, firstDie, secondDie]);
+  }, [phase, firstDie, secondDie, landingFace]);
 
   useEffect(() => {
     const element = host.current;
@@ -114,15 +114,16 @@ export default function HouseRuleDice({
     }
     function sync() {
       if (!model || lost) return;
-      const { phase, firstDie, secondDie } = latest.current;
+      const { phase, firstDie, secondDie, landingFace } = latest.current;
       dice[0].motion.sync({
-        rolling: phase === "entering" || phase === "first-rolling",
+        throwing: phase === "first-rolling",
+        face: phase === "first-landing" ? landingFace : undefined,
         value: firstDie,
-        enter: !lateReveal,
         reduceMotion: reduceMotion.matches,
       });
       dice[1].motion.sync({
-        rolling: phase === "second-rolling",
+        throwing: phase === "second-rolling",
+        face: phase === "second-landing" ? landingFace : undefined,
         value: secondDie,
         reduceMotion: reduceMotion.matches,
       });
@@ -200,7 +201,7 @@ export default function HouseRuleDice({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [lateReveal]);
+  }, []);
 
   return (
     <div className="hrc-dice" ref={host}>
