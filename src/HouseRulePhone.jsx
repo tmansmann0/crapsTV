@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Dices, RotateCw } from "lucide-react";
 import HouseRuleDice from "./HouseRuleDice.jsx";
@@ -53,6 +53,18 @@ export default function HouseRulePhone({
     }
   }, [canFling, connected]);
 
+  const publishMotion = useCallback(
+    (poses) => {
+      motionFeed.current.samples[0] = {
+        promptId: id,
+        poses,
+        at: Date.now() + clockOffsetMs,
+      };
+      motionFeed.current.wake?.();
+    },
+    [clockOffsetMs, id],
+  );
+
   useEffect(() => {
     if (!simulating || !canFling) return;
     let frame;
@@ -66,12 +78,7 @@ export default function HouseRulePhone({
       if (drag) drag.velocity *= Math.exp((-dt * 1000) / 125);
       const moving = physics.step(dt);
       const poses = physics.sample();
-      motionFeed.current.samples[0] = {
-        promptId: id,
-        poses,
-        at: Date.now() + clockOffsetMs,
-      };
-      motionFeed.current.wake?.();
+      publishMotion(poses);
       if (!moving || time - lastSend >= SUSPENSION_SEND_MS) {
         lastSend = time;
         send({ type: "house-rule-motion", promptId: id, poses });
@@ -81,15 +88,18 @@ export default function HouseRulePhone({
     }
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
-  }, [canFling, clockOffsetMs, id, send, simulating]);
+  }, [canFling, id, publishMotion, send, simulating]);
 
-  function position(drag, event) {
+  function position(drag, event, seconds) {
     const x = (event.clientX - drag.centerX) / drag.halfWidth;
     const y = (event.clientY - drag.centerY) / drag.halfHeight;
     suspension.current.pullToward(
       Math.max(-1, Math.min(1, x)),
       Math.max(-1, Math.min(1, y)),
+      seconds,
     );
+    // A pending draw can use this pointer sample on the very next frame.
+    publishMotion(suspension.current.sample());
   }
 
   function hold(event) {
@@ -108,7 +118,9 @@ export default function HouseRulePhone({
       centerX: rect.left + rect.width / 2,
       centerY: rect.top + rect.height / 2,
       halfWidth: rect.width / 2,
-      halfHeight: rect.height / 2,
+      // The angled camera foreshortens depth. Use the horizontal display
+      // scale for both axes, with room for that projection.
+      halfHeight: rect.width * 0.3,
       lastX: event.clientX,
       lastY: event.clientY,
       lastAt: now,
@@ -137,7 +149,7 @@ export default function HouseRulePhone({
     drag.lastX = event.clientX;
     drag.lastY = event.clientY;
     drag.lastAt = now;
-    position(drag, event);
+    position(drag, event, dt / 1000);
   }
 
   function sendFling(flick) {
@@ -164,6 +176,11 @@ export default function HouseRulePhone({
   function end(event, released) {
     const drag = gesture.current;
     if (drag?.pointer !== event.pointerId) return;
+    if (
+      released &&
+      (event.clientX !== drag.lastX || event.clientY !== drag.lastY)
+    )
+      move(event);
     gesture.current = null;
     setHolding(false);
     suspension.current.letGo();

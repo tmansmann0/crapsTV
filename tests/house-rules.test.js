@@ -673,6 +673,44 @@ test("physical chance hops roll out all 36 pairs at equal odds", () => {
   assert([...counts.values()].every((count) => count === 16));
 });
 
+test("held dice follow a pointer reversal before the next physics step", () => {
+  const start = [
+    [-0.84, 1, 0.14, 0, 0, 0, 1],
+    [0.84, 1, 0.14, 0, 0, 0, 1],
+  ];
+  const held = createDiceSuspension(start);
+  held.pullToward(0, 0);
+  held.pullToward(0.27, 0.22, 1 / 60);
+  const dragged = held.sample();
+  for (let i = 0; i < start.length; i++) {
+    assert(dragged[i][0] - start[i][0] > 0.59);
+    assert(dragged[i][2] - start[i][2] > 0.34);
+    assert.deepEqual(dragged[i].slice(3), start[i].slice(3));
+  }
+  held.pullToward(-0.27, -0.22, 1 / 60);
+  const reversed = held.sample();
+  for (let i = 0; i < start.length; i++) {
+    assert(start[i][0] - reversed[i][0] > 0.59);
+    assert(start[i][2] - reversed[i][2] > 0.34);
+  }
+  held.letGo();
+  assert(suspensionVelocities(held.velocities()));
+  assert(held.velocities().every(([x, , z]) => x < -5 && z < -3));
+  const { hops } = simulateChanceDrop(reversed, held.velocities());
+  assert.deepEqual(
+    hops.map(({ frames }) => frames[0]),
+    reversed,
+  );
+  assert(hops.every(({ frames }) => frames[1][0] < frames[0][0]));
+
+  const atRail = createDiceSuspension([start[0], [1.83, ...start[1].slice(1)]]);
+  atRail.pullToward(0, 0);
+  atRail.pullToward(0.27, 0, 1 / 60);
+  const [free, pinned] = atRail.sample();
+  assert(free[0] - start[0][0] > 0.59);
+  assert(pinned[0] <= 1.834);
+});
+
 test("suspended dice lift, collide and fall under gravity", () => {
   const start = [
     [-0.84, 0.5, 0.14, 0, 0, 0, 1],

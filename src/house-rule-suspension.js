@@ -10,6 +10,7 @@ import {
 import { correctContactFriction, seededRandom } from "./dice-physics.js";
 import { diceQuaternion, upperDieFace } from "./throw-motion.js";
 import {
+  CHANCE_PHONE_HALF_WIDTH,
   SUSPENSION_MAX_SPEED,
   SUSPENSION_MAX_SPIN,
 } from "./house-rule-fling.js";
@@ -21,6 +22,11 @@ const TETHER_LENGTHS = [0.93, 1.04];
 const PICKUP_SPIN = [new Vec3(-6, 11, -7), new Vec3(7, -10, 5.4)];
 export const CHANCE_DIE_FRAME_MS = 1000 / 60;
 const GRAVITY = 17;
+const SIDE_RAIL = 2.33;
+const BACK_RAIL = -1.46;
+const FRONT_RAIL = 1.61;
+const DRAG_FOLLOW = 0.95;
+const MAX_RAIL_SLIP = 0.65;
 
 function capSpeed(vector, limit) {
   const speed = vector.length();
@@ -80,10 +86,10 @@ export function createDiceSuspension(poses, velocities) {
   }
 
   boundary(0, 0, 0, new Vec3(0, 1, 0), "felt");
-  boundary(-2.33, 0, 0, new Vec3(1, 0, 0));
-  boundary(2.33, 0, 0, new Vec3(-1, 0, 0));
-  boundary(0, 0, -1.46, new Vec3(0, 0, 1));
-  boundary(0, 0, 1.61, new Vec3(0, 0, -1), "glass");
+  boundary(-SIDE_RAIL, 0, 0, new Vec3(1, 0, 0));
+  boundary(SIDE_RAIL, 0, 0, new Vec3(-1, 0, 0));
+  boundary(0, 0, BACK_RAIL, new Vec3(0, 0, 1));
+  boundary(0, 0, FRONT_RAIL, new Vec3(0, 0, -1), "glass");
   boundary(0, 2.32, 0, new Vec3(0, -1, 0));
 
   const dice = poses.map(([x, y, z, qx, qy, qz, qw], index) => {
@@ -99,6 +105,7 @@ export function createDiceSuspension(poses, velocities) {
     body.position.set(x, y, z);
     body.quaternion.set(qx, qy, qz, qw);
     body.quaternion.normalize();
+    body.aabbNeedsUpdate = true;
     const velocity = velocities?.[index];
     if (velocity) {
       body.velocity.set(...velocity.slice(0, 3));
@@ -110,6 +117,12 @@ export function createDiceSuspension(poses, velocities) {
 
   const attachment = [new Vec3(0.16, 0.25, 0.12), new Vec3(-0.2, 0.2, -0.12)];
   const target = new Vec3();
+  const handVelocities = dice.map(() => new Vec3());
+  const moves = dice.map(() => new Vec3());
+  const railSlip = dice.map(() => new Vec3());
+  const shared = new Vec3();
+  const candidate = dice.map(() => new Vec3());
+  const axis = new Vec3();
   const arm = new Vec3();
   const force = new Vec3();
   const point = new Vec3();
@@ -117,15 +130,89 @@ export function createDiceSuspension(poses, velocities) {
   let pulling = false;
   let remaining = 0;
 
-  function pullToward(x, y) {
-    target.set(x * 1.82, 1.81, 0.15 + y * 1.38);
-    if (!pulling) {
+  function boxesOverlap(fraction) {
+    const [a, b] = dice;
+    for (let i = 0; i < dice.length; i++) {
+      railSlip[i].scale(fraction, candidate[i]);
+      candidate[i].vadd(dice[i].position, candidate[i]);
+    }
+    return a.shapes[0].convexPolyhedronRepresentation.findSeparatingAxis(
+      b.shapes[0].convexPolyhedronRepresentation,
+      candidate[0],
+      a.quaternion,
+      candidate[1],
+      b.quaternion,
+      axis,
+    );
+  }
+
+  function carryWithHand(dx, dz, seconds) {
+    // Follow the pointer delta now. At a rail, the free die can still move
+    // as long as its hull has clearance from the die that hit the rail.
+    shared.set(dx, 0, dz);
+    for (let i = 0; i < dice.length; i++) {
+      const body = dice[i];
+      if (body.aabbNeedsUpdate) body.updateAABB();
+      const { lowerBound, upperBound } = body.aabb;
+      moves[i].set(
+        Math.max(
+          Math.min(0, -SIDE_RAIL - lowerBound.x),
+          Math.min(Math.max(0, SIDE_RAIL - upperBound.x), dx),
+        ),
+        0,
+        Math.max(
+          Math.min(0, BACK_RAIL - lowerBound.z),
+          Math.min(Math.max(0, FRONT_RAIL - upperBound.z), dz),
+        ),
+      );
+      if (Math.abs(moves[i].x) < Math.abs(shared.x)) shared.x = moves[i].x;
+      if (Math.abs(moves[i].z) < Math.abs(shared.z)) shared.z = moves[i].z;
+    }
+    let slip = 1;
+    if (dice.length === 2 && moves.some((move) => !move.almostEquals(shared))) {
+      for (let i = 0; i < dice.length; i++) {
+        moves[i].vsub(shared, railSlip[i]);
+        capSpeed(railSlip[i], MAX_RAIL_SLIP);
+      }
+      if (boxesOverlap(0)) slip = 0;
+      else if (boxesOverlap(1)) {
+        let blocked = 1;
+        slip = 0;
+        for (let i = 0; i < 5; i++) {
+          const fraction = (slip + blocked) / 2;
+          if (boxesOverlap(fraction)) blocked = fraction;
+          else slip = fraction;
+        }
+      }
+      for (let i = 0; i < dice.length; i++) {
+        railSlip[i].scale(slip, moves[i]);
+        moves[i].vadd(shared, moves[i]);
+      }
+    }
+    for (let i = 0; i < dice.length; i++) {
+      const body = dice[i];
+      body.position.vadd(moves[i], body.position);
+      body.aabbNeedsUpdate = true;
+      moves[i].scale(1 / seconds, handVelocities[i]);
+      capSpeed(handVelocities[i], SUSPENSION_MAX_SPEED);
+    }
+  }
+
+  function pullToward(x, y, seconds = STEP) {
+    const nextX = x * CHANCE_PHONE_HALF_WIDTH;
+    const nextZ = 0.15 + y * 1.65;
+    if (pulling) {
+      const dx = (nextX - target.x) * DRAG_FOLLOW;
+      const dz = (nextZ - target.z) * DRAG_FOLLOW;
+      if (dx || dz) carryWithHand(dx, dz, Math.max(STEP, seconds));
+    } else {
       dice.forEach((body, index) => {
         body.wakeUp();
         body.velocity.y += 1.95;
         body.angularVelocity.vadd(PICKUP_SPIN[index], body.angularVelocity);
       });
     }
+    target.set(nextX, 1.81, nextZ);
     pulling = true;
   }
 
@@ -153,13 +240,14 @@ export function createDiceSuspension(poses, velocities) {
               stretch * (TETHER_SPRING + 24 * stretch) - 1.7 * closingSpeed;
             pull = Math.max(0, Math.min(120, tension)) / distance;
           }
+          const handVelocity = handVelocities[index];
           force.set(
-            force.x * pull - body.velocity.x * 0.42,
+            force.x * pull - body.velocity.x * 0.42 - handVelocity.x * 1.1,
             Math.max(
               0,
               Math.min(110, force.y * LIFT_SPRING - pointVelocity.y * 5.6),
             ),
-            force.z * pull - body.velocity.z * 0.42,
+            force.z * pull - body.velocity.z * 0.42 - handVelocity.z * 1.1,
           );
           body.applyForce(force, arm);
         });
@@ -168,10 +256,12 @@ export function createDiceSuspension(poses, velocities) {
       if (pulling) {
         // Bound the energy from extreme finger motion to the same limits the
         // authority accepts, so a fast flick can carry its actual momentum.
-        for (const body of dice) {
+        dice.forEach((body, index) => {
+          const handVelocity = handVelocities[index];
+          handVelocity.scale(Math.exp(-STEP / 0.065), handVelocity);
           capSpeed(body.velocity, SUSPENSION_MAX_SPEED);
           capSpeed(body.angularVelocity, SUSPENSION_MAX_SPIN);
-        }
+        });
       }
       remaining -= STEP;
     }
@@ -212,7 +302,16 @@ export function createDiceSuspension(poses, velocities) {
   return {
     pullToward,
     letGo() {
+      if (!pulling) return;
       pulling = false;
+      dice.forEach((body, index) => {
+        const handVelocity = handVelocities[index];
+        handVelocity.scale(0.75, handVelocity);
+        body.velocity.vadd(handVelocity, body.velocity);
+        capSpeed(body.velocity, SUSPENSION_MAX_SPEED);
+        capSpeed(body.angularVelocity, SUSPENSION_MAX_SPIN);
+        handVelocity.setZero();
+      });
     },
     step,
     sample,

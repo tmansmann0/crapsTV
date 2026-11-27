@@ -2,7 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetURL } from "./asset-url.js";
-import { SUSPENSION_BUFFER_MS } from "./house-rule-fling.js";
+import {
+  CHANCE_PHONE_HALF_WIDTH,
+  SUSPENSION_BUFFER_MS,
+} from "./house-rule-fling.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-suspension.js";
 import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
@@ -218,10 +221,10 @@ export default function HouseRuleDice({
       const { clientWidth: width, clientHeight: height } = element;
       if (!width || !height || lost) return;
       // Keep the dice's resting positions and give the hop overhead clearance.
-      const floor = phone ? -2.32 * (height / width) : -1.24;
+      const floor = phone ? -CHANCE_PHONE_HALF_WIDTH * (height / width) : -1.24;
       const ceiling = phone ? -floor : 1.24 + 2.48 * (7 / 42);
       const halfWidth = phone
-        ? 2.32
+        ? CHANCE_PHONE_HALF_WIDTH
         : ((ceiling - floor) / 2) * (width / height);
       camera.left = -halfWidth;
       camera.right = halfWidth;
