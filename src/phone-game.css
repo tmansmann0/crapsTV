@@ -1659,34 +1659,6 @@ body:has(.pg-shell) {
 .pg-rule-active {
   color: var(--pg-win);
 }
-.pg-rule-prompt {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  margin: 6px 0 0;
-  padding: 10px 12px;
-  border: 1px solid var(--pg-brass);
-  border-radius: 12px;
-  background: var(--pg-felt-deep);
-  color: var(--pg-ivory);
-}
-.pg-rule-prompt span {
-  display: block;
-  color: var(--pg-brass-bright);
-  font-size: 13px;
-}
-.pg-rule-prompt .button {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  min-height: 44px;
-  gap: 6px;
-  align-items: center;
-  background: var(--pg-brass-bright);
-  color: var(--pg-ink);
-}
-
 /* Bottom nav */
 .pg-nav {
   display: grid;

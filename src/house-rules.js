@@ -92,7 +92,8 @@ export const HOUSE_RULE_SETTINGS = {
 };
 
 export const HOUSE_RULE_INTRO_MS = 850;
-export const HOUSE_RULE_REVEAL_MS = 1450;
+export const HOUSE_RULE_REVEAL_PAUSE_MS = 720;
+export const HOUSE_RULE_REVEAL_MS = 2000;
 export const HOUSE_RULE_OFFER_SETTINGS = {
   price: { label: "Price in chips ($)", min: 100, max: 100000000, scale: 100 },
   rolls: { label: "Duration (table rolls)", min: 1, max: 100, scale: 1 },

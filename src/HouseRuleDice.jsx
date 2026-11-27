@@ -25,16 +25,18 @@ export default function HouseRuleDice({
   clockOffsetMs = 0,
   firstDie,
   secondDie,
+  controller,
 }) {
   const host = useRef(null);
   const invalidateRef = useRef(null);
-  const latest = useRef({ poses, flight, clockOffsetMs });
+  const latest = useRef({ poses, flight, clockOffsetMs, controller });
+  const phone = Boolean(controller);
   const [failed, setFailed] = useState(false);
 
   useLayoutEffect(() => {
-    latest.current = { poses, flight, clockOffsetMs };
+    latest.current = { poses, flight, clockOffsetMs, controller };
     invalidateRef.current?.();
-  }, [poses, flight, clockOffsetMs]);
+  }, [poses, flight, clockOffsetMs, controller]);
 
   useEffect(() => {
     const element = host.current;
@@ -55,7 +57,8 @@ export default function HouseRuleDice({
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-2, 2, 1, -1, 0.1, 30);
     camera.position.set(0, 6.8, 4.2);
-    camera.lookAt(0, 0.48, 0.03);
+    if (phone) camera.lookAt(0, 0.57, 0.14);
+    else camera.lookAt(0, 0.48, 0.03);
     scene.add(new THREE.HemisphereLight(0xfff5df, 0x5d746e, 1.8));
     const key = new THREE.DirectionalLight(0xfff3e2, 2.5);
     key.position.set(-3, 5, 2);
@@ -95,19 +98,25 @@ export default function HouseRuleDice({
     let frame = 0;
     const nextPosition = new THREE.Vector3();
     const nextRotation = new THREE.Quaternion();
+    const previewPosition = new THREE.Vector3();
+    const previewRotation = new THREE.Quaternion();
     const invalidate = () => {
       if (!frame && !disposed && !lost) frame = requestAnimationFrame(render);
     };
     function render() {
       frame = 0;
       if (!model) return;
-      const { poses, flight, clockOffsetMs } = latest.current;
-      const active = flight && !reduceMotion.matches;
+      const { poses, flight, clockOffsetMs, controller } = latest.current;
+      const animate = !reduceMotion.matches;
+      const active = flight && animate;
       const last = active ? flight.frames.length - 1 : 0;
       const elapsed = active ? Date.now() + clockOffsetMs - flight.startAt : 0;
       const cursor = Math.max(0, Math.min(elapsed / CHANCE_DIE_FRAME_MS, last));
       const lower = Math.floor(cursor);
       dice.forEach(({ mesh, shadow }, index) => {
+        mesh.visible = !controller?.die || controller.die === index + 1;
+        shadow.visible = mesh.visible;
+        if (!mesh.visible) return;
         const moving = active && flight.die === index + 1;
         const pose = moving ? flight.frames[lower] : poses[index];
         mesh.position.fromArray(pose);
@@ -121,10 +130,34 @@ export default function HouseRuleDice({
             part,
           );
         }
+        if (controller?.die) {
+          const base = poses[index];
+          mesh.position.x -= base[0];
+          const touch = controller.gesture.current;
+          if (animate && touch?.die === controller.die && touch.travel) {
+            const mix = active ? Math.max(0, Math.min(elapsed / 170, 1)) : 0;
+            if (mix < 1) {
+              previewRotation
+                .fromArray(base, 3)
+                .normalize()
+                .premultiply(touch.rotation);
+              const { x, y, z, w } = previewRotation;
+              const height =
+                (Math.abs(2 * (x * y + z * w)) +
+                  Math.abs(1 - 2 * (x * x + z * z)) +
+                  Math.abs(2 * (y * z - x * w))) /
+                2;
+              previewPosition.set(touch.x, height + 0.045, base[2] + touch.z);
+              mesh.position.lerp(previewPosition, 1 - mix);
+              mesh.quaternion.slerp(previewRotation, 1 - mix);
+            }
+          }
+        }
         shadow.position.set(mesh.position.x, 0.005, mesh.position.z);
       });
       renderer.render(scene, camera);
-      if (active && cursor < last) invalidate();
+      if ((active && cursor < last) || (animate && controller?.dragging))
+        invalidate();
     }
     invalidateRef.current = invalidate;
 
@@ -132,9 +165,11 @@ export default function HouseRuleDice({
       const { clientWidth: width, clientHeight: height } = element;
       if (!width || !height || lost) return;
       // Keep the dice's resting positions and give the hop overhead clearance.
-      const floor = -1.24;
-      const ceiling = 1.24 + 2.48 * (7 / 42);
-      const halfWidth = ((ceiling - floor) / 2) * (width / height);
+      const floor = phone ? -2.32 * (height / width) : -1.24;
+      const ceiling = phone ? -floor : 1.24 + 2.48 * (7 / 42);
+      const halfWidth = phone
+        ? 2.32
+        : ((ceiling - floor) / 2) * (width / height);
       camera.left = -halfWidth;
       camera.right = halfWidth;
       camera.top = ceiling;
@@ -200,15 +235,17 @@ export default function HouseRuleDice({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, []);
+  }, [phone]);
 
   return (
     <div className="hrc-dice" ref={host}>
       {failed && (
         <div className="hrc-dice-fallback">
-          {[firstDie, secondDie].map((value, index) => (
-            <span key={index}>{value ?? "–"}</span>
-          ))}
+          {[firstDie, secondDie].map((value, index) =>
+            !controller?.die || controller.die === index + 1 ? (
+              <span key={index}>{value ?? "–"}</span>
+            ) : null,
+          )}
         </div>
       )}
     </div>

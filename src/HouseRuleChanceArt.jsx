@@ -260,6 +260,7 @@ export default function HouseRuleChanceArt({
     "first-rolling": "First die rolling",
     "second-ready": throwDie ? "Throw the second die" : "Auto throw",
     "second-rolling": "Second die rolling",
+    resolving: "Dice are down",
   }[phase];
   const trackPosition = (total) => `${((total - 1.5) / 11) * 100}%`;
 

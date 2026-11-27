@@ -3,6 +3,7 @@ import { assetURL } from "./asset-url.js";
 import DrinkIcon from "./DrinkIcon.jsx";
 import DrinksPanel from "./DrinksPanel.jsx";
 import HouseRulesShop from "./HouseRulesShop.jsx";
+import HouseRulePhone from "./HouseRulePhone.jsx";
 import {
   createContext,
   useCallback,
@@ -39,7 +40,6 @@ import {
   HOUSE_RULES,
   activeHouseRulePass,
   canPassDice,
-  describeHouseRuleTarget,
   isHouseRuleForSale,
 } from "./house-rules.js";
 import {
@@ -2141,44 +2141,6 @@ export default function PhoneGame({
             expanded={detailOpen}
             onToggle={() => setDetailOpen((open) => !open)}
           />
-          {houseRulePrompt &&
-            houseRulePrompt.rollerId === player.id &&
-            houseRulePrompt.phase !== "revealed" && (
-              <aside
-                className="pg-rule-prompt"
-                aria-label="Your house rule roll"
-              >
-                <div>
-                  <strong>{houseRulePrompt.label}</strong>
-                  <span>
-                    {houseRulePrompt.firstDie
-                      ? `First die: ${houseRulePrompt.firstDie}`
-                      : describeHouseRuleTarget(houseRulePrompt.target)}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  className="button"
-                  disabled={!connected || !houseRulePrompt.throwDie}
-                  onClick={() =>
-                    send({
-                      type: "roll-house-rule",
-                      promptId: houseRulePrompt.id,
-                      die: houseRulePrompt.throwDie,
-                    })
-                  }
-                >
-                  <Dices size={18} aria-hidden="true" />
-                  {houseRulePrompt.throwDie === 1
-                    ? "Throw first die"
-                    : houseRulePrompt.throwDie === 2
-                      ? "Throw second die"
-                      : houseRulePrompt.phase === "entering"
-                        ? "Get ready"
-                        : "Dice in motion"}
-                </button>
-              </aside>
-            )}
           {!state.rolling && triggeredRules.length > 0 && (
             <div
               className="pg-house-results"
@@ -2327,6 +2289,15 @@ export default function PhoneGame({
         </nav>
         {presentation?.active && (
           <MobilePayout presentation={presentation} onLand={landPayout} />
+        )}
+        {houseRulePrompt?.rollerId === player.id && (
+          <HouseRulePhone
+            key={houseRulePrompt.id}
+            prompt={houseRulePrompt}
+            connected={connected}
+            clockOffsetMs={state.clockOffsetMs}
+            send={send}
+          />
         )}
         {settingsArea && (
           <SettingsSheet

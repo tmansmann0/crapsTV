@@ -545,6 +545,12 @@ test("only the drawn player can launch each die, and settlement waits for the se
   assert.equal(secondFlight.die, 2);
   assert.deepEqual(secondFlight.frames[0], prompt.poses[1]);
   tick();
+  assert.equal(state.houseRulePrompt.phase, "resolving");
+  assert.deepEqual(state.houseRulePrompt.poses[1], secondFlight.frames.at(-1));
+  assert.equal(state.houseRulePrompt.hit, undefined);
+  assert.equal(state.houseRulePrompt.dice, undefined);
+  assert.equal(host.bank, 99500);
+  tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.deepEqual(state.houseRulePrompt.poses[1], secondFlight.frames.at(-1));
   assert.equal(upperDieFace(state.houseRulePrompt.poses[1].slice(3)).value, 3);
@@ -590,6 +596,8 @@ test("an unanswered Second Wind check reveals its miss, then plays the original 
   assert.equal(state.throw, null);
   tick();
   assert.equal(state.houseRulePrompt.phase, "second-rolling");
+  tick();
+  assert.equal(state.houseRulePrompt.phase, "resolving");
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
   assert.equal(state.houseRulePrompt.hit, false);

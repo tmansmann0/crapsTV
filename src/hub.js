@@ -1,12 +1,16 @@
 import * as game from "./game.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
-import { HOUSE_RULE_INTRO_MS, HOUSE_RULE_REVEAL_MS } from "./house-rules.js";
+import {
+  HOUSE_RULE_INTRO_MS,
+  HOUSE_RULE_REVEAL_MS,
+  HOUSE_RULE_REVEAL_PAUSE_MS,
+} from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
 import { restoreJukeboxSettings } from "./jukebox-settings.js";
 
-const HOUSE_RULE_ROLL_TIMEOUT_MS = 6500;
+const HOUSE_RULE_ROLL_TIMEOUT_MS = 18000;
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
@@ -457,6 +461,7 @@ export class RoomHub {
       const { dice, roll, hit, ...details } = attempt;
       const second = phase.startsWith("second-");
       const revealed = phase === "revealed";
+      const bothLanded = phase === "resolving" || revealed;
       const [firstHop, secondHop] = game.houseRuleHops(attempt);
       state.houseRulePrompt = {
         ...details,
@@ -465,10 +470,10 @@ export class RoomHub {
         rollerId: roller?.id,
         rollerName: roller?.name,
         poses: [
-          firstHop.frames.at(second || revealed ? -1 : 0),
-          secondHop.frames.at(revealed ? -1 : 0),
+          firstHop.frames.at(second || bothLanded ? -1 : 0),
+          secondHop.frames.at(bothLanded ? -1 : 0),
         ],
-        ...((second || revealed) && { firstDie: dice[0] }),
+        ...((second || bothLanded) && { firstDie: dice[0] }),
         ...(revealed && { dice, roll, hit }),
         ...extra,
       };
@@ -490,6 +495,10 @@ export class RoomHub {
         }
       }, HOUSE_RULE_REVEAL_MS);
     };
+    const resolve = () => {
+      setPrompt("resolving");
+      advance(reveal, HOUSE_RULE_REVEAL_PAUSE_MS);
+    };
     const waitForThrow = (die) => {
       const name = die === 1 ? "first" : "second";
       const launch = () => {
@@ -501,7 +510,7 @@ export class RoomHub {
         setPrompt(`${name}-rolling`, {
           flight: { die, startAt: Date.now(), frames, contacts },
         });
-        advance(die === 1 ? () => waitForThrow(2) : reveal, duration);
+        advance(die === 1 ? () => waitForThrow(2) : resolve, duration);
       };
       const available = roller?.connected && !roller.left;
       this.houseRuleThrow = available ? launch : null;
