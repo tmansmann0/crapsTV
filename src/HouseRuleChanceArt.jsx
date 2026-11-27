@@ -232,20 +232,21 @@ function StageFx({ variant }) {
 }
 
 export default function HouseRuleChanceArt({
+  id,
   rule,
   label,
   playerName,
   rollerName,
   target,
-  firstDie,
   dice,
   roll,
   hit,
   phase,
-  throwDie,
+  canFling,
   poses,
   flight,
   clockOffsetMs,
+  orbitFeed,
 }) {
   // Joining mid-roll should show the current dice without replaying the intro.
   const lateReveal = useRef(phase !== "entering").current;
@@ -256,10 +257,8 @@ export default function HouseRuleChanceArt({
   const targetText = describeHouseRuleTarget(target);
   const cue = {
     entering: "Get ready",
-    "first-ready": throwDie ? "Throw the first die" : "Auto throw",
-    "first-rolling": "First die rolling",
-    "second-ready": throwDie ? "Throw the second die" : "Auto throw",
-    "second-rolling": "Second die rolling",
+    ready: canFling ? "Waiting for the fling" : "Auto throw",
+    rolling: "Rolling",
     resolving: "Dice are down",
   }[phase];
   const trackPosition = (total) => `${((total - 1.5) / 11) * 100}%`;
@@ -275,7 +274,6 @@ export default function HouseRuleChanceArt({
     "hrc",
     `hrc-v-${variant}`,
     shown ? "is-revealed" : "is-rolling",
-    phase === "second-ready" ? "is-second-ready" : "",
     shown ? (won ? "is-hit" : "is-miss") : "",
     lateReveal ? "is-late" : "",
   ]
@@ -298,7 +296,6 @@ export default function HouseRuleChanceArt({
 
         <div className="hrc-stage">
           <div className="hrc-burst" />
-          {phase === "second-ready" && <div className="hrc-hold-light" />}
           <StageFx variant={variant} />
           {variant === "passTheDice" && (
             <div className="hrc-seat">
@@ -311,8 +308,9 @@ export default function HouseRuleChanceArt({
             poses={poses}
             flight={flight}
             clockOffsetMs={clockOffsetMs}
-            firstDie={firstDie}
-            secondDie={dice?.[1]}
+            result={dice}
+            promptId={id}
+            orbitFeed={phase === "ready" ? orbitFeed : undefined}
           />
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">
@@ -354,7 +352,7 @@ export default function HouseRuleChanceArt({
             {shown ? (
               <span className="hrc-v hrc-roll">{roll}</span>
             ) : (
-              <span className="hrc-v hrc-pending">{firstDie ?? "–"} + –</span>
+              <span className="hrc-v hrc-pending">– + –</span>
             )}
             <span className="hrc-k hrc-verdict">
               {shown ? (won ? "Hit" : "Miss") : cue}
@@ -365,7 +363,7 @@ export default function HouseRuleChanceArt({
       <div className="hrc-sr" role="status" aria-live="polite">
         {shown
           ? `${title}: rolled ${dice.join(" and ")}, total ${roll}. ${won ? "Hit" : "Miss"}.`
-          : `${title}. ${targetText}. ${firstDie ? `First die: ${firstDie}. ` : ""}${cue}.`}
+          : `${title}. ${targetText}. ${cue}.`}
       </div>
     </div>
   );

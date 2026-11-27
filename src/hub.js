@@ -1,4 +1,11 @@
 import * as game from "./game.js";
+import {
+  FLING_LEAD_MS,
+  FLING_REBOUND_MS,
+  ORBIT_SEND_MS,
+  orbitInput,
+  restOrbit,
+} from "./house-rule-fling.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
 import {
   HOUSE_RULE_INTRO_MS,
@@ -165,6 +172,10 @@ export class RoomHub {
   receive(id, message) {
     const c = this.clients.get(id);
     if (!c) return;
+    if (message?.type === "house-rule-orbit") {
+      this.receiveHouseRuleOrbit(c, message);
+      return;
+    }
     try {
       if (Date.now() - c.window > 1000) {
         c.window = Date.now();
@@ -175,6 +186,10 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (type === "house-rule-display") {
+        c.chanceDisplay = message.visible === true;
+        return;
+      }
       if (type === "jukebox-display" || type === "jukebox-video") {
         if (!c.localDisplay || !this.jukebox) return;
         if (type === "jukebox-display" && typeof message.ready === "boolean") {
@@ -273,7 +288,7 @@ export class RoomHub {
         else if (type === "buy-house-rule")
           game.buyHouseRule(s, pid, message.rule, message.quote);
         else if (type === "roll-house-rule") {
-          this.throwHouseRuleDie(pid, message.promptId, message.die);
+          this.throwHouseRuleDice(pid, message);
           return;
         } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
@@ -459,21 +474,17 @@ export class RoomHub {
     const setPrompt = (phase, extra) => {
       const attempt = attempts[index];
       const { dice, roll, hit, ...details } = attempt;
-      const second = phase.startsWith("second-");
       const revealed = phase === "revealed";
       const bothLanded = phase === "resolving" || revealed;
-      const [firstHop, secondHop] = game.houseRuleHops(attempt);
       state.houseRulePrompt = {
         ...details,
         id: `${id}:${index}`,
         phase,
         rollerId: roller?.id,
         rollerName: roller?.name,
-        poses: [
-          firstHop.frames.at(second || bothLanded ? -1 : 0),
-          secondHop.frames.at(bothLanded ? -1 : 0),
-        ],
-        ...((second || bothLanded) && { firstDie: dice[0] }),
+        poses: game
+          .houseRuleHops(attempt)
+          .map(({ frames }) => frames.at(bothLanded ? -1 : 0)),
         ...(revealed && { dice, roll, hit }),
         ...extra,
       };
@@ -499,23 +510,26 @@ export class RoomHub {
       setPrompt("resolving");
       advance(reveal, HOUSE_RULE_REVEAL_PAUSE_MS);
     };
-    const waitForThrow = (die) => {
-      const name = die === 1 ? "first" : "second";
-      const launch = () => {
+    const waitForThrow = () => {
+      const launch = ({ orbit = restOrbit, flick = 0.48 } = {}) => {
         this.houseRuleThrow = null;
-        const { frames, contacts } = game.houseRuleHops(attempts[index])[
-          die - 1
-        ];
-        const duration = (frames.length - 1) * CHANCE_DIE_FRAME_MS;
-        setPrompt(`${name}-rolling`, {
-          flight: { die, startAt: Date.now(), frames, contacts },
-        });
-        advance(die === 1 ? () => waitForThrow(2) : resolve, duration);
+        const hops = game
+          .houseRuleHops(attempts[index])
+          .map(({ frames, contacts }) => ({
+            frames,
+            contacts,
+          }));
+        const duration =
+          (Math.max(...hops.map(({ frames }) => frames.length)) - 1) *
+          CHANCE_DIE_FRAME_MS;
+        const startAt = Date.now() + FLING_LEAD_MS;
+        setPrompt("rolling", { flight: { startAt, hops, orbit, flick } });
+        advance(resolve, FLING_LEAD_MS + FLING_REBOUND_MS + duration);
       };
       const available = roller?.connected && !roller.left;
       this.houseRuleThrow = available ? launch : null;
       advance(launch, available ? HOUSE_RULE_ROLL_TIMEOUT_MS : 450);
-      setPrompt(`${name}-ready`, available ? { throwDie: die } : undefined);
+      setPrompt("ready", { canFling: Boolean(available) });
     };
     const start = () => {
       const people = state.players.filter(
@@ -526,19 +540,50 @@ export class RoomHub {
         : 0;
       roller = people[Math.floor(random * people.length)];
       setPrompt("entering");
-      advance(() => waitForThrow(1), HOUSE_RULE_INTRO_MS);
+      advance(waitForThrow, HOUSE_RULE_INTRO_MS);
     };
     start();
   }
-  throwHouseRuleDie(playerId, promptId, die) {
+  receiveHouseRuleOrbit(client, message) {
     const prompt = this.state.houseRulePrompt;
-    if (!prompt || prompt.id !== promptId) return;
+    if (
+      !this.houseRuleThrow ||
+      prompt?.id !== message.promptId ||
+      prompt.rollerId !== client.playerId
+    )
+      return;
+    const now = Date.now();
+    const orbit = message.orbit === null ? null : orbitInput(message.orbit);
+    if (
+      message.orbit !== null &&
+      (!orbit || now - (client.orbitAt ?? 0) < ORBIT_SEND_MS - 3)
+    )
+      return;
+    if (message.orbit === null && client.orbitPrompt !== prompt.id) return;
+    client.orbitAt = now;
+    client.orbitPrompt = orbit ? prompt.id : null;
+    // Live pointer data is disposable; keep it out of room snapshots and React state.
+    for (const [id, watcher] of this.clients)
+      if (!watcher.playerId || watcher.chanceDisplay)
+        this.send(id, {
+          type: "house-rule-orbit",
+          promptId: prompt.id,
+          orbit,
+          at: now,
+        });
+  }
+  throwHouseRuleDice(playerId, message) {
+    const prompt = this.state.houseRulePrompt;
+    if (!prompt || prompt.id !== message.promptId) return;
     if (prompt.rollerId !== playerId)
       throw Error("Only the selected player can throw these dice.");
-    // A repeated tap for the first die cannot launch the second one.
-    if (!this.houseRuleThrow || prompt.throwDie !== die) return;
+    if (!this.houseRuleThrow) return;
+    const orbit = orbitInput(message.orbit) ?? restOrbit;
+    const flick = Number.isFinite(message.flick)
+      ? Math.max(0.35, Math.min(1, message.flick))
+      : 0.48;
     this.clearTimer(this.timer);
-    this.houseRuleThrow();
+    this.houseRuleThrow({ orbit, flick });
   }
   botsCanAct() {
     return (

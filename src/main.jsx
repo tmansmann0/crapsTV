@@ -305,6 +305,7 @@ function App() {
     return () => window.removeEventListener("crapstv:back", back);
   }, [androidHost, androidPanel, audioOpen, settingsOpen]);
   const confirmDialog = useRef(null);
+  const chanceOrbit = useRef({ sample: null, wake: null });
   useEffect(() => {
     if (confirm) confirmDialog.current?.showModal();
   }, [confirm]);
@@ -388,6 +389,11 @@ function App() {
       clockStarted = false;
     const clockTimers = [];
     const onMessage = (m) => {
+      if (m.type === "house-rule-orbit") {
+        chanceOrbit.current.sample = m;
+        chanceOrbit.current.wake?.();
+        return;
+      }
       if (m.type === "state") {
         if (!clockStarted && Object.hasOwn(m.state, "throw")) {
           clockStarted = true;
@@ -500,6 +506,13 @@ function App() {
   useEffect(() => {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
+  useEffect(() => {
+    if (status === "connected")
+      transport.current?.send({
+        type: "house-rule-display",
+        visible: view === "tv",
+      });
+  }, [status, view]);
   const announceHouseRules =
     view === "tv" && state?.config.houseRules?.announce === true;
   const houseRulePrompt =
@@ -709,6 +722,7 @@ function App() {
           joinURL={joinLink}
           fallbackJoinURL={fallbackJoinLink}
           tableAudio={tableAudio}
+          coveredByChanceRoll={!!houseRulePrompt}
           onAction={sceneAction}
         />
         {DESKTOP_DISPLAY &&
@@ -730,6 +744,7 @@ function App() {
             key={houseRulePrompt.id}
             prompt={houseRulePrompt}
             clockOffsetMs={state.clockOffsetMs}
+            orbitFeed={chanceOrbit}
           />
         )}
         {!houseRulePrompt && houseRuleShowcase && (

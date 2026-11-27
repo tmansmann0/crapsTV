@@ -1,3 +1,4 @@
+import { FLING_IMPACT_MS, FLING_REBOUND_MS } from "./house-rule-fling.js";
 import {
   DEFAULT_TABLE_AUDIO,
   normalizeTableAudio,
@@ -253,15 +254,26 @@ export function createTableAudio() {
       if (!play("thunder", 0.75, 0, now)) play("rail", 0.48, 0, now);
     } else if (flight) {
       const now = context.currentTime;
-      const side = flight.die === 1 ? -1.2 : 1.2;
-      for (const { ms, speed } of flight.contacts) {
-        const delay = flight.startAt + ms - serverNow;
-        if (delay < -freshImpactMs) continue;
-        const volume = Math.max(0.17, Math.min(0.7, speed / 7));
-        play("dice", volume, side, now + Math.max(0, delay) / 1000);
+      const impact = flight.startAt + FLING_IMPACT_MS - serverNow;
+      if (impact >= -freshImpactMs) {
+        const when = now + Math.max(0, impact) / 1000;
+        play("rail", 0.92, 0, when);
+        play("dice", 0.58, -0.65, when + 0.022);
+        play("felt", 0.7, 0.55, when + 0.046);
       }
-    } else if (phase === "second-ready") {
-      play("tension", 0.48, 0.8);
+      flight.hops.forEach(({ contacts }, index) => {
+        for (const { ms, speed } of contacts) {
+          const delay = flight.startAt + FLING_REBOUND_MS + ms - serverNow;
+          if (delay < -freshImpactMs) continue;
+          const volume = Math.max(0.17, Math.min(0.7, speed / 7));
+          play(
+            "dice",
+            volume,
+            index === 0 ? -1.2 : 1.2,
+            now + Math.max(0, delay) / 1000,
+          );
+        }
+      });
     } else if (phase === "revealed") {
       play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.08);
     }

@@ -309,27 +309,6 @@
 }
 
 /* ---------- reveal (only after `revealed`) ---------- */
-.hrc-hold-light {
-  position: absolute;
-  left: calc(50% - var(--die) * 0.74);
-  bottom: calc(9vmin + var(--die) * 0.36);
-  width: calc(var(--die) * 3);
-  height: calc(var(--die) * 2.2);
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--a), transparent 74%);
-  opacity: 0.15;
-  transform: translate(-50%, 50%);
-  animation: hrc-tension 700ms ease-out both;
-}
-@keyframes hrc-tension {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 50%) scale(0.62);
-  }
-  to {
-    opacity: 0.37;
-  }
-}
 .hrc-halo {
   position: absolute;
   left: 50%;
@@ -527,9 +506,6 @@
 }
 .is-hit .hrc-verdict {
   color: #ffd970;
-}
-.is-second-ready .hrc-verdict {
-  color: var(--gold);
 }
 .hrc-meter {
   display: grid;
@@ -1047,5 +1023,48 @@
   .hrc .hrc-halo,
   .hrc .hrc-marker-lane {
     animation: hrc-fade 300ms var(--reveal-delay) ease-out both !important;
+  }
+}
+
+/* One quick screen shock at the shared impact timestamp. */
+.is-dice-impact::after {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      color-mix(in srgb, var(--a) 45%, transparent)
+    ),
+    radial-gradient(ellipse at center, #fff5d466, transparent 48%);
+  content: "";
+  animation: chance-impact-flash 165ms ease-out both;
+}
+.hrc.is-dice-impact .hrc-scene,
+.chance-phone.is-dice-impact .chance-phone__layout {
+  animation: chance-impact-shake 165ms ease-out both;
+}
+@keyframes chance-impact-flash {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes chance-impact-shake {
+  0% {
+    transform: translate(0.65vmin, -0.5vmin);
+  }
+  24% {
+    transform: translate(-0.45vmin, 0.32vmin);
+  }
+  55% {
+    transform: translate(0.22vmin, -0.18vmin);
+  }
+  100% {
+    transform: none;
   }
 }

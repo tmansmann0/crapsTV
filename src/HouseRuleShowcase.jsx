@@ -118,14 +118,18 @@ export function useHouseRuleShowcase(state, enabled) {
   return card;
 }
 
-export function HouseRuleChanceShowcase({ prompt, clockOffsetMs }) {
+export function HouseRuleChanceShowcase({ prompt, clockOffsetMs, orbitFeed }) {
   const { label, rule } = prompt;
   return (
     <aside
       className={`house-rule-showcase is-house-rule-chance is-${rule}`}
       aria-label={`${label} chance roll`}
     >
-      <HouseRuleChanceArt {...prompt} clockOffsetMs={clockOffsetMs} />
+      <HouseRuleChanceArt
+        {...prompt}
+        clockOffsetMs={clockOffsetMs}
+        orbitFeed={orbitFeed}
+      />
     </aside>
   );
 }

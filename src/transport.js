@@ -62,6 +62,11 @@ export function localTransport(onMessage, onStatus) {
   open();
   return {
     send(m) {
+      if (
+        m.type === "house-rule-orbit" &&
+        (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount > 4096)
+      )
+        return;
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(m));
       else if (m.type === "join" || m.type === "watch") queue.push(m);
       else
@@ -99,6 +104,11 @@ export function onlineTransport(
     while (queue.length) send(queue.shift());
   };
   function send(m) {
+    if (
+      m.type === "house-rule-orbit" &&
+      (!ready || (conn?.dataChannel?.bufferedAmount ?? 0) > 4096)
+    )
+      return;
     if (!ready) {
       if (["join", "watch"].includes(m.type)) queue.push(m);
       else
