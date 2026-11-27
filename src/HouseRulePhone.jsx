@@ -3,8 +3,15 @@ import { createPortal } from "react-dom";
 import { Dices, RotateCw } from "lucide-react";
 import HouseRuleDice from "./HouseRuleDice.jsx";
 import { describeHouseRuleTarget } from "./house-rules.js";
-import { SUSPENSION_SEND_MS } from "./house-rule-fling.js";
-import { createDiceSuspension } from "./house-rule-suspension.js";
+import {
+  SUSPENSION_SEND_MS,
+  suspensionPoses,
+  suspensionVelocities,
+} from "./house-rule-fling.js";
+import {
+  createDiceSuspension,
+  simulateChanceDrop,
+} from "./house-rule-suspension.js";
 import "./house-rule-phone.css";
 
 export default function HouseRulePhone({
@@ -20,6 +27,7 @@ export default function HouseRulePhone({
   const [simulating, setSimulating] = useState(false);
   const [holding, setHolding] = useState(false);
   const [pending, setPending] = useState(false);
+  const [localDrop, setLocalDrop] = useState(null);
   const title = useId();
   const help = useId();
   const { id, rule, label, target, phase, dice, hit, roll } = prompt;
@@ -39,7 +47,10 @@ export default function HouseRulePhone({
       setHolding(false);
       setSimulating(false);
     }
-    if (!connected) setPending(false);
+    if (!connected) {
+      setPending(false);
+      setLocalDrop(null);
+    }
   }, [canFling, connected]);
 
   useEffect(() => {
@@ -52,7 +63,7 @@ export default function HouseRulePhone({
       const dt = Math.max(0, time - previous) / 1000;
       previous = time;
       const drag = gesture.current;
-      if (drag) drag.velocity *= Math.exp((-dt * 1000) / 260);
+      if (drag) drag.velocity *= Math.exp((-dt * 1000) / 125);
       const moving = physics.step(dt);
       const poses = physics.sample();
       motionFeed.current.samples[0] = {
@@ -90,7 +101,9 @@ export default function HouseRulePhone({
       return;
     const rect = event.currentTarget.getBoundingClientRect();
     suspension.current ??= createDiceSuspension(prompt.poses);
+    const now = performance.now();
     const drag = {
+      startedAt: now,
       pointer: event.pointerId,
       centerX: rect.left + rect.width / 2,
       centerY: rect.top + rect.height / 2,
@@ -98,7 +111,7 @@ export default function HouseRulePhone({
       halfHeight: rect.height / 2,
       lastX: event.clientX,
       lastY: event.clientY,
-      lastAt: performance.now(),
+      lastAt: now,
       velocity: 0,
       travel: 0,
     };
@@ -129,13 +142,23 @@ export default function HouseRulePhone({
 
   function sendFling(flick) {
     if (!canFling) return;
+    const poses = suspensionPoses(suspension.current?.sample());
+    const velocities = suspensionVelocities(suspension.current?.velocities());
+    const release =
+      Number.isFinite(flick) && poses && velocities
+        ? { poses, velocities, flick }
+        : undefined;
     setPending(true);
-    send({
-      type: "roll-house-rule",
-      promptId: id,
-      poses: suspension.current?.sample(),
-      flick,
-    });
+    send({ type: "roll-house-rule", promptId: id, ...release });
+    if (release) {
+      const startAt = Date.now() + clockOffsetMs;
+      const { hops } = simulateChanceDrop(
+        release.poses,
+        release.velocities,
+        flick,
+      );
+      setLocalDrop({ startAt, hops });
+    }
   }
 
   function end(event, released) {
@@ -144,10 +167,20 @@ export default function HouseRulePhone({
     gesture.current = null;
     setHolding(false);
     suspension.current.letGo();
-    if (released && canFling && drag.travel > 18)
-      sendFling(Math.min(1, 0.55 + drag.velocity * 0.55));
+    if (
+      released &&
+      canFling &&
+      (drag.travel > 18 || performance.now() - drag.startedAt > 180)
+    ) {
+      const flick = Math.min(1, Math.max(0, (drag.velocity - 0.72) / 1.2));
+      sendFling(flick);
+    }
   }
 
+  const drop =
+    localDrop && ((pending && phase === "ready") || phase === "rolling")
+      ? localDrop
+      : prompt.flight;
   const revealed = phase === "revealed";
   let status = "Both dice";
   let instruction = "Get ready.";
@@ -157,12 +190,15 @@ export default function HouseRulePhone({
   } else if (phase === "resolving") {
     status = "Dice are down";
     instruction = "Reading the roll…";
+  } else if (phase === "cocked") {
+    status = "Cocked dice";
+    instruction = "Roll again.";
   } else if (phase === "rolling" || pending) {
     status = "Rolling";
     instruction = "Watch them land.";
   } else if (canFling) {
     instruction = holding
-      ? "Flick and lift to throw."
+      ? "Let go to drop or flick to throw."
       : "Hold to lift both dice.";
   }
   if (!connected) instruction = "Reconnecting…";
@@ -206,11 +242,11 @@ export default function HouseRulePhone({
           )}
           <HouseRuleDice
             poses={prompt.poses}
-            flight={prompt.flight}
+            flight={drop}
             clockOffsetMs={clockOffsetMs}
             result={dice}
             promptId={id}
-            motionFeed={phase === "ready" ? motionFeed : undefined}
+            motionFeed={phase === "ready" && !drop ? motionFeed : undefined}
             phone
           />
         </div>

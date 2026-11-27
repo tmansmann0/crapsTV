@@ -701,8 +701,7 @@ function openBettingWindow(s) {
   s.botRollAt = null;
   s.bettingOpenedAt = Date.now();
   s.nextRollAt =
-    s.bettingOpenedAt +
-    rollCooldownSecondsFor(s.config, !!s.point) * 1000;
+    s.bettingOpenedAt + rollCooldownSecondsFor(s.config, !!s.point) * 1000;
 }
 function validateBotDelay(seconds) {
   assert(
@@ -879,7 +878,10 @@ export function place(s, id, betId, amount) {
     typeof betId === "string" &&
     (betId === "odds" || betId.startsWith("odds:"))
   )
-    assert(item?.parent, "Odds require your own line or Come bet with a point.");
+    assert(
+      item?.parent,
+      "Odds require your own line or Come bet with a point.",
+    );
   assert(
     item && item.available,
     item?.unavailableReason || "That bet is not available on this roll.",
@@ -1333,10 +1335,14 @@ function throwSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// Keep unthrown paths off the public room state and out of saved histories.
-const chanceHops = new WeakMap();
-export function houseRuleHops(attempt) {
-  return chanceHops.get(attempt);
+function houseRuleAttempt(rule, access, player) {
+  return {
+    rule,
+    label: HOUSE_RULES[rule].label,
+    target: access.target,
+    value: access.value,
+    ...(access.personal && { playerId: player.id, playerName: player.name }),
+  };
 }
 
 function rollHouseRule(rule, access, player, announce) {
@@ -1352,16 +1358,11 @@ function rollHouseRule(rule, access, player, announce) {
   ];
   const roll = dice[0] + dice[1];
   const attempt = {
-    rule,
-    label: HOUSE_RULES[rule].label,
-    target: access.target,
+    ...houseRuleAttempt(rule, access, player),
     dice,
     roll,
     hit: roll <= access.target,
-    value: access.value,
-    ...(access.personal && { playerId: player.id, playerName: player.name }),
   };
-  if (hops) chanceHops.set(attempt, hops);
   return attempt;
 }
 
@@ -1377,7 +1378,24 @@ function settledThrow(options) {
   return null;
 }
 
-export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
+const secondWindThrows = new WeakMap();
+export function applySecondWind(flight) {
+  if (!flight.houseRuleAttempt?.hit) return flight;
+  const replacement = settledThrow(secondWindThrows.get(flight));
+  if (!replacement) return flight;
+  return {
+    ...replacement,
+    secondWind: true,
+    houseRuleAttempt: flight.houseRuleAttempt,
+  };
+}
+
+export function beginRoll(
+  s,
+  id,
+  gesture,
+  { duration = THROW_DURATION, deferHouseRules = false } = {},
+) {
   throwController(s, id);
   const puck =
     s.puck?.point === s.point ? s.puck : puckHome(s.point, s.config.mode);
@@ -1407,13 +1425,22 @@ export function beginRoll(s, id, gesture, { duration = THROW_DURATION } = {}) {
     (access.target > 1 || announce) &&
     timeline.dice[0] + timeline.dice[1] === 7
   ) {
-    const attempt = rollHouseRule("secondWind", access, shooter, announce);
-    if (attempt.hit) {
-      timeline = settledThrow(options);
-      assert(timeline, "The dice did not settle. Please throw again.");
-      if (announce) timeline.secondWind = true;
+    if (announce && deferHouseRules) {
+      timeline.houseRuleAttempt = houseRuleAttempt(
+        "secondWind",
+        access,
+        shooter,
+      );
+      secondWindThrows.set(timeline, options);
+    } else {
+      const attempt = rollHouseRule("secondWind", access, shooter, announce);
+      if (attempt.hit) {
+        timeline = settledThrow(options);
+        assert(timeline, "The dice did not settle. Please throw again.");
+        if (announce) timeline.secondWind = true;
+      }
+      if (announce) timeline.houseRuleAttempt = attempt;
     }
-    if (announce) timeline.houseRuleAttempt = attempt;
   }
   timeline.startAt = Date.now();
   timeline.settledAt += timeline.startAt;
@@ -1446,7 +1473,7 @@ function settle(p, b, result, multiplier = 1, stay = false) {
 export function finishRoll(
   s,
   dice = s.throw?.dice,
-  { chanceRolls = new Map(), preview = false } = {},
+  { chanceRolls = new Map(), preview = false, deferHouseRules = false } = {},
 ) {
   assert(s.rolling, "No roll in progress.");
   assert(
@@ -1469,9 +1496,11 @@ export function finishRoll(
     : !crapless && [2, 3, 12].includes(total);
   const early =
     s.rolls.length < 3 ||
-    s.rolls.slice(-3).some(
-      (roll) => roll.shooterId !== shooterId || roll.kind === "seven-out",
-    );
+    s.rolls
+      .slice(-3)
+      .some(
+        (roll) => roll.shooterId !== shooterId || roll.kind === "seven-out",
+      );
   s.bonus ??= { hits: [] };
   s.bonus.hits =
     total === 7
@@ -1491,7 +1520,12 @@ export function finishRoll(
     if (!access) return null;
     const key = access.personal ? `${rule}:${player.id}` : rule;
     if (!chanceRolls.has(key))
-      chanceRolls.set(key, rollHouseRule(rule, access, player, rules.announce));
+      chanceRolls.set(
+        key,
+        deferHouseRules
+          ? houseRuleAttempt(rule, access, player)
+          : rollHouseRule(rule, access, player, rules.announce),
+      );
     attempts.set(key, chanceRolls.get(key));
     const attempt = attempts.get(key);
     return attempt.hit ? attempt : null;

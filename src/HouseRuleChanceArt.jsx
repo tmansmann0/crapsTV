@@ -260,6 +260,7 @@ export default function HouseRuleChanceArt({
     ready: canFling ? "Waiting for the fling" : "Auto throw",
     rolling: "Rolling",
     resolving: "Dice are down",
+    cocked: "Cocked dice · roll again",
   }[phase];
   const trackPosition = (total) => `${((total - 1.5) / 11) * 100}%`;
 
@@ -310,7 +311,9 @@ export default function HouseRuleChanceArt({
             clockOffsetMs={clockOffsetMs}
             result={dice}
             promptId={id}
-            motionFeed={phase === "ready" ? motionFeed : undefined}
+            motionFeed={
+              phase === "ready" || phase === "rolling" ? motionFeed : undefined
+            }
           />
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">

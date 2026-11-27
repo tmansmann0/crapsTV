@@ -1,8 +1,6 @@
 export const SUSPENSION_SEND_MS = 28;
 export const SUSPENSION_BUFFER_MS = 42;
-export const FLING_LEAD_MS = 90;
-export const FLING_IMPACT_MS = 245;
-export const FLING_REBOUND_MS = 445;
+export const DROP_LEAD_MS = 55;
 
 export function suspensionPoses(poses) {
   if (!Array.isArray(poses) || poses.length !== 2) return null;
@@ -26,4 +24,20 @@ export function suspensionPoses(poses) {
       return null;
   }
   return poses;
+}
+
+export function suspensionVelocities(velocities) {
+  if (!Array.isArray(velocities) || velocities.length !== 2) return null;
+  if (
+    !velocities.every(
+      (velocity) =>
+        Array.isArray(velocity) &&
+        velocity.length === 6 &&
+        velocity.every((n) => Number.isFinite(n)) &&
+        Math.hypot(...velocity.slice(0, 3)) <= 14 &&
+        Math.hypot(...velocity.slice(3)) <= 28,
+    )
+  )
+    return null;
+  return velocities;
 }

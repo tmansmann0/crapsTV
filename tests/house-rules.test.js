@@ -7,7 +7,10 @@ import {
   createChanceDiceHops,
 } from "../src/house-rule-dice-motion.js";
 import { suspensionPoses } from "../src/house-rule-fling.js";
-import { createDiceSuspension } from "../src/house-rule-suspension.js";
+import {
+  createDiceSuspension,
+  simulateChanceDrop,
+} from "../src/house-rule-suspension.js";
 import { upperDieFace } from "../src/throw-motion.js";
 import { RoomHub } from "../src/hub.js";
 import { mobilePayouts } from "../src/mobile-settlement.js";
@@ -493,7 +496,7 @@ test("only the drawn player can suspend and fling both dice", (t) => {
   hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
   hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
   hub.receive("Host", { type: "bet", betId: "pass", amount: 500 });
-  const values = [0, hopDraw["2,3"], 0xffffffff];
+  const values = [0, 0xffffffff, 0];
   const native = crypto.getRandomValues.bind(crypto);
   t.mock.method(crypto, "getRandomValues", (buffer) => {
     if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
@@ -519,7 +522,12 @@ test("only the drawn player can suspend and fling both dice", (t) => {
     type: "roll-house-rule",
     promptId: prompt.id,
     poses,
+    velocities: [
+      [0, 0, 0, 0.5, 0, 0],
+      [0, 0, 0, 0, 0, 0],
+    ],
     flick: 0.8,
+    dice: [6, 6],
   };
   hub.receive("Guest", launch);
   assert.equal(state.houseRulePrompt.phase, "entering");
@@ -544,11 +552,18 @@ test("only the drawn player can suspend and fling both dice", (t) => {
   hub.receive("Guest", launch);
   assert.equal(state.houseRulePrompt.phase, "rolling");
   const { flight } = state.houseRulePrompt;
-  assert.equal(flight.flick, 0.8);
-  assert.deepEqual(flight.releasePoses, poses);
   assert.deepEqual(
     flight.hops.map(({ frames }) => frames[0]),
-    prompt.poses,
+    poses,
+  );
+  assert.deepEqual(
+    watched.findLast((m) => m.type === "house-rule-motion").poses,
+    poses,
+  );
+  assert(
+    flight.hops.some(({ contacts }) =>
+      contacts.some(({ surface }) => surface === "glass"),
+    ),
   );
   assert.equal(state.houseRulePrompt.dice, undefined);
   hub.receive("Guest", launch);
@@ -562,60 +577,76 @@ test("only the drawn player can suspend and fling both dice", (t) => {
     state.houseRulePrompt.poses,
     flight.hops.map(({ frames }) => frames.at(-1)),
   );
-  assert.equal(upperDieFace(state.houseRulePrompt.poses[1].slice(3)).value, 3);
+  const faces = state.houseRulePrompt.poses.map(
+    (pose) => upperDieFace(pose.slice(3)).value,
+  );
+  assert.deepEqual(faces, [2, 1]);
   tick();
   assert.equal(state.houseRulePrompt.phase, "revealed");
-  assert.deepEqual(state.houseRulePrompt.dice, [2, 3]);
-  assert.equal(state.houseRulePrompt.roll, 5);
+  assert.deepEqual(state.houseRulePrompt.dice, faces);
+  assert.equal(state.houseRulePrompt.roll, 3);
   assert.equal(state.houseRulePrompt.hit, true);
   assert.equal(host.bank, 99500);
   tick();
   assert.equal(state.houseRulePrompt, undefined);
   assert.equal(host.bank, 101000);
-  assert.equal(state.lastRoll.houseRuleAttempts[0].roll, 5);
+  assert.equal(state.lastRoll.houseRuleAttempts[0].roll, 3);
   assert.equal(state.rolling, false);
   assert.equal(values.length, 0);
 });
 
-test("an unanswered Second Wind check reveals its miss, then plays the original throw", (t) => {
-  const { hub, join, tick } = manualRoom(t);
-  join("Host");
-  hub.receive("Host", { type: "house-rule", rule: "secondWind", value: true });
-  hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
-  hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
-  const draws = [0, hopDraw["5,6"], 0];
-  const native = crypto.getRandomValues.bind(crypto);
-  t.mock.method(crypto, "getRandomValues", (buffer) => {
-    if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
-      return native(buffer);
-    assert(draws.length);
-    buffer[0] = draws.shift();
-    return buffer;
+for (const [launchSeed, chanceTotal, hit] of [
+  [8, 11, false],
+  [4, 4, true],
+]) {
+  test(`an unanswered Second Wind check reveals the ${hit ? "hit" : "miss"} before the main throw`, (t) => {
+    const { hub, join, tick } = manualRoom(t);
+    join("Host");
+    hub.receive("Host", {
+      type: "house-rule",
+      rule: "secondWind",
+      value: true,
+    });
+    hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
+    hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
+    const draws = [0, 0, launchSeed, launchSeed, ...(hit ? [2] : [])];
+    const native = crypto.getRandomValues.bind(crypto);
+    t.mock.method(crypto, "getRandomValues", (buffer) => {
+      if (!(buffer instanceof Uint32Array) || buffer.length !== 1)
+        return native(buffer);
+      assert(draws.length);
+      buffer[0] = draws.shift();
+      return buffer;
+    });
+    const { state } = hub;
+    hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
+    assert.equal(state.houseRulePrompt.phase, "entering");
+    assert.equal(state.throw, null);
+    tick();
+    assert.equal(state.houseRulePrompt.phase, "ready");
+    assert.equal(state.throw, null);
+    tick();
+    assert.equal(state.houseRulePrompt.phase, "rolling");
+    assert.equal(state.houseRulePrompt.flight.hops.length, 2);
+    tick();
+    assert.equal(state.houseRulePrompt.phase, "resolving");
+    tick();
+    assert.equal(state.houseRulePrompt.phase, "revealed");
+    assert.equal(state.houseRulePrompt.hit, hit);
+    assert.equal(state.houseRulePrompt.roll, chanceTotal);
+    assert.equal(state.throw, null);
+    tick();
+    assert.equal(state.houseRulePrompt, undefined);
+    assert.equal(state.throw.seed, hit ? 2 : 0);
+    tick();
+    assert.equal(state.lastRoll.total, hit ? 5 : 7);
+    assert.deepEqual(
+      state.lastRoll.houseRulesTriggered,
+      hit ? ["secondWind"] : undefined,
+    );
+    assert.equal(draws.length, 0);
   });
-  const { state } = hub;
-  hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
-  assert.equal(state.houseRulePrompt.phase, "entering");
-  assert.equal(state.throw, null);
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "ready");
-  assert.equal(state.throw, null);
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "rolling");
-  assert.equal(state.houseRulePrompt.flight.hops.length, 2);
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "resolving");
-  tick();
-  assert.equal(state.houseRulePrompt.phase, "revealed");
-  assert.equal(state.houseRulePrompt.hit, false);
-  assert.equal(state.houseRulePrompt.roll, 11);
-  tick();
-  assert.equal(state.houseRulePrompt, undefined);
-  assert.equal(state.throw.seed, 0);
-  tick();
-  assert.equal(state.lastRoll.total, 7);
-  assert.equal(state.lastRoll.houseRulesTriggered, undefined);
-  assert.equal(draws.length, 0);
-});
+}
 
 test("physical chance hops roll out all 36 pairs at equal odds", () => {
   const counts = new Map();
@@ -648,6 +679,13 @@ test("suspended dice lift, collide and fall under gravity", () => {
   const leftAlone = createDiceSuspension([start[0]]);
   const rightAlone = createDiceSuspension([start[1]]);
   const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const centered = createDiceSuspension(start);
+  for (let frame = 0; frame < 120; frame++) {
+    centered.pullToward(0, 0);
+    centered.step(1 / 60);
+  }
+  assert(distance(...centered.sample()) > 1.4, "A steady hold leaves a gap");
+
   const heights = [];
   const separations = [];
   let collided = false;
@@ -670,7 +708,22 @@ test("suspended dice lift, collide and fall under gravity", () => {
   );
   assert(Math.max(...heights) > 1.15);
   assert(Math.max(...separations) - Math.min(...separations) > 0.4);
-  const lifted = pair.sample().reduce((sum, pose) => sum + pose[1], 0);
+  const released = pair.sample();
+  const lifted = released.reduce((sum, pose) => sum + pose[1], 0);
+  const velocities = pair.velocities();
+  const { hops } = simulateChanceDrop(released, velocities);
+  assert.deepEqual(
+    hops.map(({ frames }) => frames[0]),
+    released,
+  );
+  const continued = createDiceSuspension(released, velocities);
+  for (let frame = 1; frame <= 12; frame++) {
+    continued.step(1 / 60);
+    assert.deepEqual(
+      hops.map(({ frames }) => frames[frame]),
+      continued.sample(),
+    );
+  }
   pair.letGo();
   for (let frame = 0; frame < 48; frame++) pair.step(1 / 60);
   const lowered = pair.sample().reduce((sum, pose) => sum + pose[1], 0);

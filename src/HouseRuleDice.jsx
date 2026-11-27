@@ -2,12 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetURL } from "./asset-url.js";
-import {
-  FLING_IMPACT_MS,
-  FLING_REBOUND_MS,
-  SUSPENSION_BUFFER_MS,
-} from "./house-rule-fling.js";
-import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
+import { SUSPENSION_BUFFER_MS } from "./house-rule-fling.js";
+import { CHANCE_DIE_FRAME_MS } from "./house-rule-suspension.js";
 import { configureRenderer } from "./render-quality.js";
 import { disposeModel } from "./three-resources.js";
 
@@ -113,11 +109,6 @@ export default function HouseRuleDice({
     let frame = 0;
     const nextPosition = new THREE.Vector3();
     const nextRotation = new THREE.Quaternion();
-    const releasePosition = new THREE.Vector3();
-    const releaseRotation = new THREE.Quaternion();
-    const impactPosition = new THREE.Vector3();
-    const impactRotation = new THREE.Quaternion();
-    const rollAxis = new THREE.Vector3();
     let hitGlass = false;
     const invalidate = () => {
       if (!frame && !disposed && !lost) frame = requestAnimationFrame(render);
@@ -130,14 +121,15 @@ export default function HouseRuleDice({
         latest.current;
       const now = Date.now() + clockOffsetMs;
       const animate = !reduceMotion.matches;
-      const moving = Boolean(flight && animate);
-      const elapsed = moving ? now - flight.startAt : 0;
-      const flightTime = Math.max(0, elapsed - FLING_REBOUND_MS);
-      const fling = moving && elapsed < FLING_REBOUND_MS;
+      const elapsed = flight ? now - flight.startAt : 0;
+      const waitingToDrop = Boolean(flight && animate && elapsed < 0);
+      const moving = Boolean(flight && animate && !waitingToDrop);
+      const landed = flight && !animate;
       const samples = motionFeed?.current.samples;
       const newest = samples?.at(-1);
       const sampleAt = phone ? now : now - SUSPENSION_BUFFER_MS;
-      let live = animate && newest?.promptId === promptId ? newest : null;
+      let live =
+        animate && !moving && newest?.promptId === promptId ? newest : null;
       let before = null;
       if (live && !phone) {
         // Keep a short buffer so a refresh-rate frame can interpolate between
@@ -160,11 +152,18 @@ export default function HouseRuleDice({
       dice.forEach(({ mesh, shadow }, index) => {
         const posesInFlight = moving ? flight.hops[index].frames : null;
         const last = posesInFlight ? posesInFlight.length - 1 : 0;
-        const cursor = Math.min(flightTime / CHANCE_DIE_FRAME_MS, last);
+        const cursor = Math.min(
+          Math.max(0, elapsed) / CHANCE_DIE_FRAME_MS,
+          last,
+        );
         const lower = Math.floor(cursor);
         const pose = moving
           ? posesInFlight[lower]
-          : (live?.poses[index] ?? poses[index]);
+          : landed
+            ? flight.hops[index].frames.at(-1)
+            : (live?.poses[index] ??
+              flight?.hops[index].frames[0] ??
+              poses[index]);
         mesh.position.fromArray(pose);
         mesh.quaternion.fromArray(pose, 3).normalize();
         if (moving && lower < last) {
@@ -176,7 +175,7 @@ export default function HouseRuleDice({
             part,
           );
           stillRolling = true;
-        } else if (before && blend < 1) {
+        } else if (!moving && before && blend < 1) {
           const previousPose = before.poses[index];
           mesh.position.lerp(nextPosition.fromArray(previousPose), 1 - blend);
           mesh.quaternion.slerp(
@@ -185,54 +184,32 @@ export default function HouseRuleDice({
           );
         }
 
-        if (fling) {
-          // Continue from the exact rigid-body pose where the player let go.
-          const released = flight.releasePoses[index];
-          releasePosition.fromArray(released);
-          releaseRotation.fromArray(released, 3).normalize();
-          const side = index === 0 ? -1 : 1;
-          const approach = THREE.MathUtils.clamp(
-            elapsed / FLING_IMPACT_MS,
-            0,
-            1,
-          );
-          const recoil = Math.max(
-            0,
-            (elapsed - FLING_IMPACT_MS) / (FLING_REBOUND_MS - FLING_IMPACT_MS),
-          );
-          const towardsGlass = approach ** 2.6;
-          const rebound = 1 - (1 - recoil) ** 2;
-          impactPosition.set(side * 1.31, 1.18, 1.09);
-          const glassX = THREE.MathUtils.lerp(
-            releasePosition.x,
-            impactPosition.x,
-            1 - (1 - approach) ** 2,
-          );
-          releasePosition.lerp(impactPosition, towardsGlass);
-          releasePosition.x = glassX;
-          mesh.position.lerp(releasePosition, 1 - rebound);
-
-          rollAxis.set(0.48, side * 0.28, 0.83).normalize();
-          impactRotation.setFromAxisAngle(
-            rollAxis,
-            side * (0.7 + flight.flick) * towardsGlass,
-          );
-          releaseRotation.premultiply(impactRotation);
-          mesh.quaternion.slerp(releaseRotation, 1 - rebound);
-        }
         const aboveFelt = Math.max(0, mesh.position.y - 0.5);
         shadow.position.set(mesh.position.x, 0.005, mesh.position.z);
         shadow.material.opacity = 1 / (1 + 1.6 * aboveFelt);
         shadow.scale.setScalar(1 + 0.3 * aboveFelt);
       });
       const impact =
-        moving && elapsed >= FLING_IMPACT_MS && elapsed < FLING_IMPACT_MS + 165;
+        moving &&
+        flight.hops.some(({ contacts }) =>
+          contacts.some(
+            ({ ms, surface, speed }) =>
+              surface === "glass" &&
+              speed >= 4 &&
+              elapsed >= ms &&
+              elapsed < ms + 165,
+          ),
+        );
       if (impact !== hitGlass) {
         hitGlass = impact;
         stage?.classList.toggle("is-dice-impact", impact);
       }
       renderer.render(scene, camera);
-      if ((live && (live !== newest || blend < 1)) || fling || stillRolling)
+      if (
+        (live && (live !== newest || blend < 1)) ||
+        waitingToDrop ||
+        stillRolling
+      )
         invalidate();
     }
     invalidateRef.current = invalidate;
