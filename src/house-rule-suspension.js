@@ -9,13 +9,23 @@ import {
 } from "cannon-es";
 import { correctContactFriction, seededRandom } from "./dice-physics.js";
 import { diceQuaternion, upperDieFace } from "./throw-motion.js";
+import {
+  SUSPENSION_MAX_SPEED,
+  SUSPENSION_MAX_SPIN,
+} from "./house-rule-fling.js";
 
 const STEP = 1 / 120;
-const LIFT_SPRING = 50;
-const PULL_SPRING = 24;
-const PULL_RADIUS = 0.92;
+const LIFT_SPRING = 96;
+const TETHER_SPRING = 78;
+const TETHER_LENGTHS = [0.93, 1.04];
+const PICKUP_SPIN = [new Vec3(-6, 11, -7), new Vec3(7, -10, 5.4)];
 export const CHANCE_DIE_FRAME_MS = 1000 / 60;
 const GRAVITY = 17;
+
+function capSpeed(vector, limit) {
+  const speed = vector.length();
+  if (speed > limit) vector.scale((limit - 0.001) / speed, vector);
+}
 
 export function chanceDiceStart(seed) {
   const random = seededRandom(seed);
@@ -99,7 +109,6 @@ export function createDiceSuspension(poses, velocities) {
   });
 
   const attachment = [new Vec3(0.16, 0.25, 0.12), new Vec3(-0.2, 0.2, -0.12)];
-  const anchor = new Vec3();
   const target = new Vec3();
   const arm = new Vec3();
   const force = new Vec3();
@@ -109,10 +118,13 @@ export function createDiceSuspension(poses, velocities) {
   let remaining = 0;
 
   function pullToward(x, y) {
-    target.set(x * 1.35, 1.83, 0.15 + y * 0.89);
+    target.set(x * 1.82, 1.81, 0.15 + y * 1.38);
     if (!pulling) {
-      anchor.copy(target);
-      dice.forEach((body) => body.wakeUp());
+      dice.forEach((body, index) => {
+        body.wakeUp();
+        body.velocity.y += 1.95;
+        body.angularVelocity.vadd(PICKUP_SPIN[index], body.angularVelocity);
+      });
     }
     pulling = true;
   }
@@ -121,31 +133,46 @@ export function createDiceSuspension(poses, velocities) {
     remaining = Math.min(0.075, remaining + Math.max(0, seconds));
     while (remaining + 1e-9 >= STEP) {
       if (pulling) {
-        anchor.lerp(target, 0.24, anchor);
         dice.forEach((body, index) => {
-          // Within reach of the finger, stop pulling sideways and let contact
-          // and inertia decide how the dice spread. Both share the same lift.
+          // A slack tether only pulls when stretched. Between tugs each die
+          // is free to coast, overshoot the finger and hit the other die.
           body.quaternion.vmult(attachment[index], arm);
           body.position.vadd(arm, point);
-          anchor.vsub(point, force);
+          target.vsub(point, force);
           const distance = Math.hypot(force.x, force.z);
-          const pull =
-            distance > PULL_RADIUS
-              ? PULL_SPRING * (1 - PULL_RADIUS / distance)
-              : 0;
+          const stretch = distance - TETHER_LENGTHS[index];
           body.angularVelocity.cross(arm, pointVelocity);
           pointVelocity.vadd(body.velocity, pointVelocity);
+
+          let pull = 0;
+          if (stretch > 0) {
+            const closingSpeed =
+              (force.x * pointVelocity.x + force.z * pointVelocity.z) /
+              distance;
+            const tension =
+              stretch * (TETHER_SPRING + 24 * stretch) - 1.7 * closingSpeed;
+            pull = Math.max(0, Math.min(120, tension)) / distance;
+          }
           force.set(
-            force.x * pull - body.velocity.x * 0.35,
-            Math.max(0, force.y * LIFT_SPRING - pointVelocity.y * 3.1),
-            force.z * pull - body.velocity.z * 0.35,
+            force.x * pull - body.velocity.x * 0.42,
+            Math.max(
+              0,
+              Math.min(110, force.y * LIFT_SPRING - pointVelocity.y * 5.6),
+            ),
+            force.z * pull - body.velocity.z * 0.42,
           );
-          const magnitude = force.length();
-          if (magnitude > 58) force.scale(58 / magnitude, force);
           body.applyForce(force, arm);
         });
       }
       world.step(STEP);
+      if (pulling) {
+        // Bound the energy from extreme finger motion to the same limits the
+        // authority accepts, so a fast flick can carry its actual momentum.
+        for (const body of dice) {
+          capSpeed(body.velocity, SUSPENSION_MAX_SPEED);
+          capSpeed(body.angularVelocity, SUSPENSION_MAX_SPIN);
+        }
+      }
       remaining -= STEP;
     }
     return pulling || dice.some((body) => body.sleepState !== Body.SLEEPING);

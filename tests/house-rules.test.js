@@ -6,7 +6,10 @@ import {
   CHANCE_HOP_BUCKET,
   createChanceDiceHops,
 } from "../src/house-rule-dice-motion.js";
-import { suspensionPoses } from "../src/house-rule-fling.js";
+import {
+  suspensionPoses,
+  suspensionVelocities,
+} from "../src/house-rule-fling.js";
 import {
   createDiceSuspension,
   simulateChanceDrop,
@@ -680,11 +683,28 @@ test("suspended dice lift, collide and fall under gravity", () => {
   const rightAlone = createDiceSuspension([start[1]]);
   const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
   const centered = createDiceSuspension(start);
-  for (let frame = 0; frame < 120; frame++) {
-    centered.pullToward(0, 0);
-    centered.step(1 / 60);
+  centered.pullToward(0, 0);
+  assert(centered.velocities().every((v) => Math.hypot(...v.slice(3)) > 12));
+  for (let frame = 1; frame <= 120; frame++) {
+    centered.step(1 / 120);
+    if (frame === 12) assert(centered.sample().every((pose) => pose[1] > 0.9));
   }
-  assert(distance(...centered.sample()) > 1.4, "A steady hold leaves a gap");
+  const initial = centered.sample();
+  assert(distance(...initial) > 1.4, "A steady hold leaves a gap");
+
+  for (let frame = 0; frame < 18; frame++) {
+    centered.pullToward(0.8, 0.35);
+    centered.step(1 / 120);
+    assert(suspensionVelocities(centered.velocities()));
+  }
+  const [leftTravel, rightTravel] = centered
+    .sample()
+    .map((pose, index) => pose[0] - initial[index][0]);
+  assert(leftTravel > 0.4, "A quick swipe promptly catches the trailing die");
+  assert(
+    leftTravel - rightTravel > 0.25,
+    "Each die takes up slack independently",
+  );
 
   const heights = [];
   const separations = [];

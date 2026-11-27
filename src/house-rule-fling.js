@@ -1,6 +1,8 @@
 export const SUSPENSION_SEND_MS = 28;
 export const SUSPENSION_BUFFER_MS = 42;
 export const DROP_LEAD_MS = 55;
+export const SUSPENSION_MAX_SPEED = 14;
+export const SUSPENSION_MAX_SPIN = 28;
 
 export function suspensionPoses(poses) {
   if (!Array.isArray(poses) || poses.length !== 2) return null;
@@ -34,8 +36,8 @@ export function suspensionVelocities(velocities) {
         Array.isArray(velocity) &&
         velocity.length === 6 &&
         velocity.every((n) => Number.isFinite(n)) &&
-        Math.hypot(...velocity.slice(0, 3)) <= 14 &&
-        Math.hypot(...velocity.slice(3)) <= 28,
+        Math.hypot(...velocity.slice(0, 3)) <= SUSPENSION_MAX_SPEED &&
+        Math.hypot(...velocity.slice(3)) <= SUSPENSION_MAX_SPIN,
     )
   )
     return null;
