@@ -5,9 +5,7 @@ import { assetURL } from "./asset-url.js";
 import {
   FLING_IMPACT_MS,
   FLING_REBOUND_MS,
-  ORBIT_TIMEOUT_MS,
-  orbitSpinAfter,
-  orbitTurnAfter,
+  SUSPENSION_BUFFER_MS,
 } from "./house-rule-fling.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
 import { configureRenderer } from "./render-quality.js";
@@ -32,27 +30,27 @@ export default function HouseRuleDice({
   clockOffsetMs = 0,
   result,
   promptId,
-  orbitFeed,
+  motionFeed,
   phone = false,
 }) {
   const host = useRef(null);
   const invalidateRef = useRef(null);
-  const latest = useRef({ poses, flight, clockOffsetMs, promptId, orbitFeed });
+  const latest = useRef({ poses, flight, clockOffsetMs, promptId, motionFeed });
   const [failed, setFailed] = useState(false);
 
   useLayoutEffect(() => {
-    latest.current = { poses, flight, clockOffsetMs, promptId, orbitFeed };
+    latest.current = { poses, flight, clockOffsetMs, promptId, motionFeed };
     invalidateRef.current?.();
-  }, [poses, flight, clockOffsetMs, promptId, orbitFeed]);
+  }, [poses, flight, clockOffsetMs, promptId, motionFeed]);
 
   useLayoutEffect(() => {
-    if (!orbitFeed) return;
-    const feed = orbitFeed.current;
+    if (!motionFeed) return;
+    const feed = motionFeed.current;
     feed.wake = () => invalidateRef.current?.();
     return () => {
       feed.wake = null;
     };
-  }, [orbitFeed]);
+  }, [motionFeed]);
 
   useEffect(() => {
     const element = host.current;
@@ -75,7 +73,6 @@ export default function HouseRuleDice({
     camera.position.set(0, 6.8, 4.2);
     if (phone) camera.lookAt(0, 0.57, 0.14);
     else camera.lookAt(0, 0.48, 0.03);
-    camera.updateMatrixWorld();
     scene.add(new THREE.HemisphereLight(0xfff5df, 0x5d746e, 1.8));
     const key = new THREE.DirectionalLight(0xfff3e2, 2.5);
     key.position.set(-3, 5, 2);
@@ -116,44 +113,20 @@ export default function HouseRuleDice({
     let frame = 0;
     const nextPosition = new THREE.Vector3();
     const nextRotation = new THREE.Quaternion();
-    const windPosition = new THREE.Vector3();
-    const windRotation = new THREE.Quaternion();
-    const launchPosition = new THREE.Vector3();
-    const launchRotation = new THREE.Quaternion();
+    const releasePosition = new THREE.Vector3();
+    const releaseRotation = new THREE.Quaternion();
+    const impactPosition = new THREE.Vector3();
+    const impactRotation = new THREE.Quaternion();
     const rollAxis = new THREE.Vector3();
-    const hangingTilt = new THREE.Euler(0, 0, 0, "YXZ");
-    const easedAnchor = new THREE.Vector2();
-    const pivot = new THREE.Vector2();
-    let lastFrameAt = null;
-    let suspended = 0;
-    let heldOrbit = null;
-    let heldAngle = 0;
     let hitGlass = false;
     const invalidate = () => {
       if (!frame && !disposed && !lost) frame = requestAnimationFrame(render);
     };
 
-    function hangingPose(index, orbit, angle) {
-      const theta = angle + index * Math.PI;
-      const swing = Math.sin(theta);
-      const arc = Math.cos(theta);
-      const radius = 0.9 + 0.18 * orbit.energy;
-      windPosition.set(
-        pivot.x + swing * radius,
-        1.04 + 0.23 * arc + 0.11 * swing * swing,
-        pivot.y + 0.35 + arc * radius * 0.78,
-      );
-      // The die leans into its swing and rocks back under the pivot.
-      const tumble = 0.32 * orbit.energy * Math.sin(theta * 1.8);
-      hangingTilt.set(-0.28 * arc + tumble, theta * 1.34, -0.68 * swing);
-      windRotation.setFromEuler(hangingTilt);
-      rollAxis.set(arc, 0.35, swing).normalize();
-    }
-
-    function render(time) {
+    function render() {
       frame = 0;
       if (!model) return;
-      const { poses, flight, clockOffsetMs, promptId, orbitFeed } =
+      const { poses, flight, clockOffsetMs, promptId, motionFeed } =
         latest.current;
       const now = Date.now() + clockOffsetMs;
       const animate = !reduceMotion.matches;
@@ -161,53 +134,27 @@ export default function HouseRuleDice({
       const elapsed = moving ? now - flight.startAt : 0;
       const flightTime = Math.max(0, elapsed - FLING_REBOUND_MS);
       const fling = moving && elapsed < FLING_REBOUND_MS;
-      const sample = orbitFeed?.current.sample;
-      const orbitLive =
-        animate &&
-        sample?.promptId === promptId &&
-        sample?.orbit &&
-        now - sample.at <= ORBIT_TIMEOUT_MS;
-      const dt = lastFrameAt === null ? 16.7 : Math.min(time - lastFrameAt, 42);
-      lastFrameAt = time;
-      if (orbitLive) {
-        if (!suspended) easedAnchor.set(sample.orbit.x, sample.orbit.y);
-        const follow = 1 - Math.exp(-dt / 62);
-        easedAnchor.x += (sample.orbit.x - easedAnchor.x) * follow;
-        easedAnchor.y += (sample.orbit.y - easedAnchor.y) * follow;
-        heldOrbit = { ...sample.orbit, x: easedAnchor.x, y: easedAnchor.y };
-        const elapsedSinceSample = Math.max(0, now - sample.at);
-        heldAngle = orbitTurnAfter(
-          heldOrbit.turn,
-          heldOrbit.spin,
-          elapsedSinceSample,
-        );
-        heldOrbit.spin = orbitSpinAfter(heldOrbit.spin, elapsedSinceSample);
-      } else if (heldOrbit) {
-        heldAngle = orbitTurnAfter(heldAngle, heldOrbit.spin, dt);
-        heldOrbit.spin = orbitSpinAfter(heldOrbit.spin, dt);
+      const samples = motionFeed?.current.samples;
+      const newest = samples?.at(-1);
+      const sampleAt = phone ? now : now - SUSPENSION_BUFFER_MS;
+      let live = animate && newest?.promptId === promptId ? newest : null;
+      let before = null;
+      if (live && !phone) {
+        // Keep a short buffer so a refresh-rate frame can interpolate between
+        // actual physics samples, even when packets don't arrive every frame.
+        let index = samples.length - 1;
+        while (index > 0 && samples[index - 1].at >= sampleAt) index--;
+        live = samples[index];
+        before = samples[index - 1];
       }
-      suspended = THREE.MathUtils.clamp(
-        suspended + (orbitLive ? dt / 230 : -dt / 205),
-        0,
-        1,
-      );
-      const lift = suspended * suspended * (3 - 2 * suspended);
-      const orbit = fling
-        ? flight.orbit
-        : !moving && suspended > 0 && heldOrbit;
-      const angle = fling ? flight.orbit.turn : heldAngle;
-      if (orbit) {
-        // Use the touch as an invisible pivot and keep the TV swing in frame.
-        const vertical =
-          (camera.top + camera.bottom) / 2 -
-          ((orbit.y * (camera.top - camera.bottom)) / 2) * (phone ? 1 : 0.43);
-        const [, , , , , upY, upZ] = camera.matrixWorld.elements;
-        pivot.set(
-          orbit.x * camera.right * (phone ? 1 : 0.63),
-          camera.position.z +
-            (vertical - upY * (0.12 - camera.position.y)) / upZ,
-        );
-      }
+      const blend =
+        before && live.at > before.at
+          ? THREE.MathUtils.clamp(
+              (sampleAt - before.at) / (live.at - before.at),
+              0,
+              1,
+            )
+          : 1;
 
       let stillRolling = false;
       dice.forEach(({ mesh, shadow }, index) => {
@@ -215,7 +162,9 @@ export default function HouseRuleDice({
         const last = posesInFlight ? posesInFlight.length - 1 : 0;
         const cursor = Math.min(flightTime / CHANCE_DIE_FRAME_MS, last);
         const lower = Math.floor(cursor);
-        const pose = moving ? posesInFlight[lower] : poses[index];
+        const pose = moving
+          ? posesInFlight[lower]
+          : (live?.poses[index] ?? poses[index]);
         mesh.position.fromArray(pose);
         mesh.quaternion.fromArray(pose, 3).normalize();
         if (moving && lower < last) {
@@ -227,50 +176,49 @@ export default function HouseRuleDice({
             part,
           );
           stillRolling = true;
+        } else if (before && blend < 1) {
+          const previousPose = before.poses[index];
+          mesh.position.lerp(nextPosition.fromArray(previousPose), 1 - blend);
+          mesh.quaternion.slerp(
+            nextRotation.fromArray(previousPose, 3).normalize(),
+            1 - blend,
+          );
         }
-        if (orbit) {
-          const base = mesh.quaternion;
-          hangingPose(index, orbit, angle);
-          windRotation.multiply(base);
-          if (fling) {
-            const side = index === 0 ? -1 : 1;
-            const approach = Math.max(
-              0,
-              Math.min(elapsed / FLING_IMPACT_MS, 1),
-            );
-            const recoil = Math.max(
-              0,
-              (elapsed - FLING_IMPACT_MS) /
-                (FLING_REBOUND_MS - FLING_IMPACT_MS),
-            );
-            const towardsGlass = approach ** 2.6;
-            const rebound = 1 - (1 - recoil) ** 2;
-            launchPosition.set(
-              side * 1.31 + orbit.x * 0.15,
-              1.18,
-              1.09 + orbit.y * 0.12,
-            );
-            const spread = 1 - (1 - approach) ** 2;
-            const glassX = THREE.MathUtils.lerp(
-              windPosition.x,
-              launchPosition.x,
-              spread,
-            );
-            windPosition.lerp(launchPosition, towardsGlass);
-            windPosition.x = glassX;
-            windPosition.lerp(mesh.position, rebound);
-            launchRotation.setFromAxisAngle(
-              rollAxis,
-              side * (0.7 + flight.flick),
-            );
-            windRotation.premultiply(
-              launchRotation.slerp(nextRotation.identity(), 1 - towardsGlass),
-            );
-            windRotation.slerp(base, rebound);
-          }
-          const pull = fling ? 1 : lift;
-          mesh.position.lerp(windPosition, pull);
-          mesh.quaternion.slerp(windRotation, pull);
+
+        if (fling) {
+          // Continue from the exact rigid-body pose where the player let go.
+          const released = flight.releasePoses[index];
+          releasePosition.fromArray(released);
+          releaseRotation.fromArray(released, 3).normalize();
+          const side = index === 0 ? -1 : 1;
+          const approach = THREE.MathUtils.clamp(
+            elapsed / FLING_IMPACT_MS,
+            0,
+            1,
+          );
+          const recoil = Math.max(
+            0,
+            (elapsed - FLING_IMPACT_MS) / (FLING_REBOUND_MS - FLING_IMPACT_MS),
+          );
+          const towardsGlass = approach ** 2.6;
+          const rebound = 1 - (1 - recoil) ** 2;
+          impactPosition.set(side * 1.31, 1.18, 1.09);
+          const glassX = THREE.MathUtils.lerp(
+            releasePosition.x,
+            impactPosition.x,
+            1 - (1 - approach) ** 2,
+          );
+          releasePosition.lerp(impactPosition, towardsGlass);
+          releasePosition.x = glassX;
+          mesh.position.lerp(releasePosition, 1 - rebound);
+
+          rollAxis.set(0.48, side * 0.28, 0.83).normalize();
+          impactRotation.setFromAxisAngle(
+            rollAxis,
+            side * (0.7 + flight.flick) * towardsGlass,
+          );
+          releaseRotation.premultiply(impactRotation);
+          mesh.quaternion.slerp(releaseRotation, 1 - rebound);
         }
         const aboveFelt = Math.max(0, mesh.position.y - 0.5);
         shadow.position.set(mesh.position.x, 0.005, mesh.position.z);
@@ -284,8 +232,8 @@ export default function HouseRuleDice({
         stage?.classList.toggle("is-dice-impact", impact);
       }
       renderer.render(scene, camera);
-      if (orbitLive || suspended > 0 || fling || stillRolling) invalidate();
-      else lastFrameAt = null;
+      if ((live && (live !== newest || blend < 1)) || fling || stillRolling)
+        invalidate();
     }
     invalidateRef.current = invalidate;
 

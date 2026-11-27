@@ -246,7 +246,7 @@ export default function HouseRuleChanceArt({
   poses,
   flight,
   clockOffsetMs,
-  orbitFeed,
+  motionFeed,
 }) {
   // Joining mid-roll should show the current dice without replaying the intro.
   const lateReveal = useRef(phase !== "entering").current;
@@ -310,7 +310,7 @@ export default function HouseRuleChanceArt({
             clockOffsetMs={clockOffsetMs}
             result={dice}
             promptId={id}
-            orbitFeed={phase === "ready" ? orbitFeed : undefined}
+            motionFeed={phase === "ready" ? motionFeed : undefined}
           />
           {rollerTag && variant !== "passTheDice" && (
             <div className="hrc-roller">

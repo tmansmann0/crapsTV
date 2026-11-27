@@ -305,7 +305,7 @@ function App() {
     return () => window.removeEventListener("crapstv:back", back);
   }, [androidHost, androidPanel, audioOpen, settingsOpen]);
   const confirmDialog = useRef(null);
-  const chanceOrbit = useRef({ sample: null, wake: null });
+  const chanceMotion = useRef({ samples: [], wake: null });
   useEffect(() => {
     if (confirm) confirmDialog.current?.showModal();
   }, [confirm]);
@@ -389,9 +389,13 @@ function App() {
       clockStarted = false;
     const clockTimers = [];
     const onMessage = (m) => {
-      if (m.type === "house-rule-orbit") {
-        chanceOrbit.current.sample = m;
-        chanceOrbit.current.wake?.();
+      if (m.type === "house-rule-motion") {
+        const feed = chanceMotion.current;
+        if (feed.samples.at(-1)?.promptId !== m.promptId)
+          feed.samples.length = 0;
+        feed.samples.push(m);
+        if (feed.samples.length > 5) feed.samples.shift();
+        feed.wake?.();
         return;
       }
       if (m.type === "state") {
@@ -744,7 +748,7 @@ function App() {
             key={houseRulePrompt.id}
             prompt={houseRulePrompt}
             clockOffsetMs={state.clockOffsetMs}
-            orbitFeed={chanceOrbit}
+            motionFeed={chanceMotion}
           />
         )}
         {!houseRulePrompt && houseRuleShowcase && (

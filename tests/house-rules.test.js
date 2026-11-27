@@ -6,7 +6,8 @@ import {
   CHANCE_HOP_BUCKET,
   createChanceDiceHops,
 } from "../src/house-rule-dice-motion.js";
-import { orbitSpinAfter, orbitTurnAfter } from "../src/house-rule-fling.js";
+import { suspensionPoses } from "../src/house-rule-fling.js";
+import { createDiceSuspension } from "../src/house-rule-suspension.js";
 import { upperDieFace } from "../src/throw-motion.js";
 import { RoomHub } from "../src/hub.js";
 import { mobilePayouts } from "../src/mobile-settlement.js";
@@ -480,7 +481,7 @@ function manualRoom(t) {
   return { hub, tick, join, errors };
 }
 
-test("only the drawn player can orbit and fling both dice", (t) => {
+test("only the drawn player can suspend and fling both dice", (t) => {
   const { hub, join, tick, errors } = manualRoom(t);
   const watched = [];
   hub.connect("TV", (message) => watched.push(message));
@@ -508,12 +509,16 @@ test("only the drawn player can orbit and fling both dice", (t) => {
   assert.equal(prompt.rollerId, guest.id);
   assert.equal(prompt.phase, "entering");
   assert.equal(prompt.dice, undefined);
-  const orbit = { x: -0.45, y: 0.25, turn: 0.4, spin: -0.016, energy: 0.8 };
-  const touch = { type: "house-rule-orbit", promptId: prompt.id, orbit };
+  const poses = prompt.poses.map((pose, index) => [
+    pose[0],
+    1.05 + index * 0.2,
+    ...pose.slice(2),
+  ]);
+  const touch = { type: "house-rule-motion", promptId: prompt.id, poses };
   const launch = {
     type: "roll-house-rule",
     promptId: prompt.id,
-    orbit,
+    poses,
     flick: 0.8,
   };
   hub.receive("Guest", launch);
@@ -527,9 +532,9 @@ test("only the drawn player can orbit and fling both dice", (t) => {
   assert.equal(watched.length, observedBefore);
   hub.receive("Guest", touch);
   assert.equal(watched.length, observedBefore + 1);
-  assert.equal(watched.at(-1).type, "house-rule-orbit");
-  assert.deepEqual(watched.at(-1).orbit, orbit);
-  assert.equal(state.houseRulePrompt.orbit, undefined);
+  assert.equal(watched.at(-1).type, "house-rule-motion");
+  assert.deepEqual(watched.at(-1).poses, poses);
+  assert.deepEqual(state.houseRulePrompt.poses, prompt.poses);
   hub.receive("Guest", touch);
   assert.equal(watched.length, observedBefore + 1);
 
@@ -540,7 +545,7 @@ test("only the drawn player can orbit and fling both dice", (t) => {
   assert.equal(state.houseRulePrompt.phase, "rolling");
   const { flight } = state.houseRulePrompt;
   assert.equal(flight.flick, 0.8);
-  assert.deepEqual(flight.orbit, orbit);
+  assert.deepEqual(flight.releasePoses, poses);
   assert.deepEqual(
     flight.hops.map(({ frames }) => frames[0]),
     prompt.poses,
@@ -634,16 +639,41 @@ test("physical chance hops roll out all 36 pairs at equal odds", () => {
   assert([...counts.values()].every((count) => count === 16));
 });
 
-test("the orbit coasts to a stop and packet interpolation preserves its momentum", () => {
-  const turn = -0.3;
-  const spin = -0.024;
-  const elapsed = 360;
-  const midpoint = orbitTurnAfter(turn, spin, elapsed);
-  const laterSpin = orbitSpinAfter(spin, elapsed);
-  assert(Math.abs(laterSpin) < Math.abs(spin));
-  assert(midpoint < turn);
-  const twice = orbitTurnAfter(midpoint, laterSpin, elapsed);
-  assert(Math.abs(twice - orbitTurnAfter(turn, spin, elapsed * 2)) < 1e-9);
-  assert(Math.abs(orbitSpinAfter(spin, 1750)) < 0.0002);
-  assert.equal(orbitTurnAfter(turn, 0, 500), turn);
+test("suspended dice lift, collide and fall under gravity", () => {
+  const start = [
+    [-0.84, 0.5, 0.14, 0, 0, 0, 1],
+    [0.84, 0.5, 0.14, 0, 0, 0, 1],
+  ];
+  const pair = createDiceSuspension(start);
+  const leftAlone = createDiceSuspension([start[0]]);
+  const rightAlone = createDiceSuspension([start[1]]);
+  const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const heights = [];
+  const separations = [];
+  let collided = false;
+  for (let frame = 0; frame < 100; frame++) {
+    for (const physics of [pair, leftAlone, rightAlone]) {
+      physics.pullToward(0.24, -0.1);
+      physics.step(1 / 60);
+    }
+    const [left, right] = pair.sample();
+    const together = distance(left, right);
+    const apart = distance(leftAlone.sample()[0], rightAlone.sample()[0]);
+    if (together > 0.95 && apart < 0.65) collided = true;
+    heights.push(left[1], right[1]);
+    separations.push(together);
+    assert(suspensionPoses([left, right]));
+  }
+  assert(
+    collided,
+    "The dice repel through contact when pulled to the same point",
+  );
+  assert(Math.max(...heights) > 1.15);
+  assert(Math.max(...separations) - Math.min(...separations) > 0.4);
+  const lifted = pair.sample().reduce((sum, pose) => sum + pose[1], 0);
+  pair.letGo();
+  for (let frame = 0; frame < 48; frame++) pair.step(1 / 60);
+  const lowered = pair.sample().reduce((sum, pose) => sum + pose[1], 0);
+  assert(lowered < lifted - 0.3);
+  assert.equal(suspensionPoses([[0, 0, 0, 0, 0, 0, 0], start[1]]), null);
 });

@@ -63,7 +63,7 @@ export function localTransport(onMessage, onStatus) {
   return {
     send(m) {
       if (
-        m.type === "house-rule-orbit" &&
+        m.type === "house-rule-motion" &&
         (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount > 4096)
       )
         return;
@@ -105,7 +105,7 @@ export function onlineTransport(
   };
   function send(m) {
     if (
-      m.type === "house-rule-orbit" &&
+      m.type === "house-rule-motion" &&
       (!ready || (conn?.dataChannel?.bufferedAmount ?? 0) > 4096)
     )
       return;

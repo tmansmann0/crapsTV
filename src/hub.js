@@ -2,9 +2,8 @@ import * as game from "./game.js";
 import {
   FLING_LEAD_MS,
   FLING_REBOUND_MS,
-  ORBIT_SEND_MS,
-  orbitInput,
-  restOrbit,
+  SUSPENSION_SEND_MS,
+  suspensionPoses,
 } from "./house-rule-fling.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
 import {
@@ -172,8 +171,8 @@ export class RoomHub {
   receive(id, message) {
     const c = this.clients.get(id);
     if (!c) return;
-    if (message?.type === "house-rule-orbit") {
-      this.receiveHouseRuleOrbit(c, message);
+    if (message?.type === "house-rule-motion") {
+      this.receiveHouseRuleMotion(c, message);
       return;
     }
     try {
@@ -188,6 +187,12 @@ export class RoomHub {
         s = this.state;
       if (type === "house-rule-display") {
         c.chanceDisplay = message.visible === true;
+        if (
+          c.chanceDisplay &&
+          this.chanceMotion?.promptId === s.houseRulePrompt?.id &&
+          s.houseRulePrompt?.phase === "ready"
+        )
+          this.send(id, this.chanceMotion);
         return;
       }
       if (type === "jukebox-display" || type === "jukebox-video") {
@@ -511,7 +516,7 @@ export class RoomHub {
       advance(reveal, HOUSE_RULE_REVEAL_PAUSE_MS);
     };
     const waitForThrow = () => {
-      const launch = ({ orbit = restOrbit, flick = 0.48 } = {}) => {
+      const launch = ({ poses, flick = 0.48 } = {}) => {
         this.houseRuleThrow = null;
         const hops = game
           .houseRuleHops(attempts[index])
@@ -523,7 +528,14 @@ export class RoomHub {
           (Math.max(...hops.map(({ frames }) => frames.length)) - 1) *
           CHANCE_DIE_FRAME_MS;
         const startAt = Date.now() + FLING_LEAD_MS;
-        setPrompt("rolling", { flight: { startAt, hops, orbit, flick } });
+        const releasePoses =
+          poses ??
+          this.chanceMotion?.poses ??
+          hops.map(({ frames }) => frames[0]);
+        this.chanceMotion = null;
+        setPrompt("rolling", {
+          flight: { startAt, hops, releasePoses, flick },
+        });
         advance(resolve, FLING_LEAD_MS + FLING_REBOUND_MS + duration);
       };
       const available = roller?.connected && !roller.left;
@@ -532,6 +544,7 @@ export class RoomHub {
       setPrompt("ready", { canFling: Boolean(available) });
     };
     const start = () => {
+      this.chanceMotion = null;
       const people = state.players.filter(
         (p) => !p.left && !p.bot && p.connected,
       );
@@ -544,7 +557,7 @@ export class RoomHub {
     };
     start();
   }
-  receiveHouseRuleOrbit(client, message) {
+  receiveHouseRuleMotion(client, message) {
     const prompt = this.state.houseRulePrompt;
     if (
       !this.houseRuleThrow ||
@@ -553,24 +566,20 @@ export class RoomHub {
     )
       return;
     const now = Date.now();
-    const orbit = message.orbit === null ? null : orbitInput(message.orbit);
-    if (
-      message.orbit !== null &&
-      (!orbit || now - (client.orbitAt ?? 0) < ORBIT_SEND_MS - 3)
-    )
-      return;
-    if (message.orbit === null && client.orbitPrompt !== prompt.id) return;
-    client.orbitAt = now;
-    client.orbitPrompt = orbit ? prompt.id : null;
-    // Live pointer data is disposable; keep it out of room snapshots and React state.
+    if (now - (client.chanceMotionAt ?? 0) < SUSPENSION_SEND_MS - 3) return;
+    const poses = suspensionPoses(message.poses);
+    if (!poses) return;
+    client.chanceMotionAt = now;
+    // These poses only drive the preview. The game authority owns the roll.
+    const sample = {
+      type: "house-rule-motion",
+      promptId: prompt.id,
+      poses,
+      at: now,
+    };
+    this.chanceMotion = sample;
     for (const [id, watcher] of this.clients)
-      if (!watcher.playerId || watcher.chanceDisplay)
-        this.send(id, {
-          type: "house-rule-orbit",
-          promptId: prompt.id,
-          orbit,
-          at: now,
-        });
+      if (!watcher.playerId || watcher.chanceDisplay) this.send(id, sample);
   }
   throwHouseRuleDice(playerId, message) {
     const prompt = this.state.houseRulePrompt;
@@ -578,12 +587,11 @@ export class RoomHub {
     if (prompt.rollerId !== playerId)
       throw Error("Only the selected player can throw these dice.");
     if (!this.houseRuleThrow) return;
-    const orbit = orbitInput(message.orbit) ?? restOrbit;
     const flick = Number.isFinite(message.flick)
       ? Math.max(0.35, Math.min(1, message.flick))
       : 0.48;
     this.clearTimer(this.timer);
-    this.houseRuleThrow({ orbit, flick });
+    this.houseRuleThrow({ poses: suspensionPoses(message.poses), flick });
   }
   botsCanAct() {
     return (

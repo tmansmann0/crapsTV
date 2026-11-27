@@ -118,7 +118,7 @@ export function useHouseRuleShowcase(state, enabled) {
   return card;
 }
 
-export function HouseRuleChanceShowcase({ prompt, clockOffsetMs, orbitFeed }) {
+export function HouseRuleChanceShowcase({ prompt, clockOffsetMs, motionFeed }) {
   const { label, rule } = prompt;
   return (
     <aside
@@ -128,7 +128,7 @@ export function HouseRuleChanceShowcase({ prompt, clockOffsetMs, orbitFeed }) {
       <HouseRuleChanceArt
         {...prompt}
         clockOffsetMs={clockOffsetMs}
-        orbitFeed={orbitFeed}
+        motionFeed={motionFeed}
       />
     </aside>
   );
