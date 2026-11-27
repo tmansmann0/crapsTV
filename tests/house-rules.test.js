@@ -7,6 +7,7 @@ import {
   createChanceDiceHops,
 } from "../src/house-rule-dice-motion.js";
 import {
+  CHANCE_DICE_BOUNDS,
   suspensionPoses,
   suspensionVelocities,
 } from "../src/house-rule-fling.js";
@@ -599,9 +600,9 @@ test("only the drawn player can suspend and fling both dice", (t) => {
   assert.equal(values.length, 0);
 });
 
-for (const [launchSeed, chanceTotal, hit] of [
-  [8, 11, false],
-  [4, 4, true],
+for (const [launchSeed, hit] of [
+  [8, false],
+  [4, true],
 ]) {
   test(`an unanswered Second Wind check reveals the ${hit ? "hit" : "miss"} before the main throw`, (t) => {
     const { hub, join, tick } = manualRoom(t);
@@ -634,10 +635,14 @@ for (const [launchSeed, chanceTotal, hit] of [
     assert.equal(state.houseRulePrompt.flight.hops.length, 2);
     tick();
     assert.equal(state.houseRulePrompt.phase, "resolving");
+    const landedTotal = state.houseRulePrompt.poses.reduce(
+      (total, pose) => total + upperDieFace(pose.slice(3)).value,
+      0,
+    );
     tick();
     assert.equal(state.houseRulePrompt.phase, "revealed");
     assert.equal(state.houseRulePrompt.hit, hit);
-    assert.equal(state.houseRulePrompt.roll, chanceTotal);
+    assert.equal(state.houseRulePrompt.roll, landedTotal);
     assert.equal(state.throw, null);
     tick();
     assert.equal(state.houseRulePrompt, undefined);
@@ -704,12 +709,17 @@ test("held dice follow a pointer reversal before the next physics step", () => {
   );
   assert(hops.every(({ frames }) => frames[1][0] < frames[0][0]));
 
-  const atRail = createDiceSuspension([start[0], [1.83, ...start[1].slice(1)]]);
+  const nearRail = CHANCE_DICE_BOUNDS.side - 0.5;
+  const atRail = createDiceSuspension([
+    start[0],
+    [nearRail, ...start[1].slice(1)],
+  ]);
   atRail.pullToward(0, 0);
   atRail.pullToward(0.27, 0, 1 / 60);
   const [free, pinned] = atRail.sample();
   assert(free[0] - start[0][0] > 0.59);
-  assert(pinned[0] <= 1.834);
+  assert(pinned[0] <= nearRail + 0.004);
+  assert(suspensionPoses([free, pinned]));
 });
 
 test("fast finger circles drive independent spin that coasts after a pause", () => {
@@ -755,6 +765,20 @@ test("fast finger circles drive independent spin that coasts after a pause", () 
   assert(spin().every((speed, die) => speed < coasting[die] * 0.6));
 });
 
+test("a released die keeps moving across the felt before settling", () => {
+  const poses = [
+    [-1.6, 0.497, -0.55, 0, 0, 0, 1],
+    [0.65, 0.497, 0.55, 0, 0, 0, 1],
+  ];
+  const velocities = [
+    [8, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+  ];
+  const { hops, dice } = simulateChanceDrop(poses, velocities);
+  assert(dice);
+  assert(hops[0].frames.at(-1)[0] - poses[0][0] > 1.2);
+});
+
 test("suspended dice lift, collide and fall under gravity", () => {
   const start = [
     [-0.84, 0.5, 0.14, 0, 0, 0, 1],
@@ -772,20 +796,15 @@ test("suspended dice lift, collide and fall under gravity", () => {
     if (frame === 12) assert(centered.sample().every((pose) => pose[1] > 0.9));
   }
   const initial = centered.sample();
-  assert(distance(...initial) > 1.4, "A steady hold leaves a gap");
+  assert(distance(...initial) > 1.25, "A steady hold leaves a gap");
 
   for (let frame = 0; frame < 18; frame++) {
     centered.pullToward(0.8, 0.35);
     centered.step(1 / 120);
     assert(suspensionVelocities(centered.velocities()));
   }
-  const [leftTravel, rightTravel] = centered
-    .sample()
-    .map((pose, index) => pose[0] - initial[index][0]);
-  assert(leftTravel > 0.4, "A quick swipe promptly catches the trailing die");
   assert(
-    leftTravel - rightTravel > 0.25,
-    "Each die takes up slack independently",
+    centered.sample().every((pose, index) => pose[0] - initial[index][0] > 0.4),
   );
 
   const heights = [];

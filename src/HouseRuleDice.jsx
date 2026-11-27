@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { assetURL } from "./asset-url.js";
 import {
+  CHANCE_DICE_BOUNDS,
   CHANCE_PHONE_HALF_WIDTH,
   SUSPENSION_BUFFER_MS,
 } from "./house-rule-fling.js";
@@ -72,6 +73,20 @@ export default function HouseRuleDice({
     camera.position.set(0, 6.8, 4.2);
     if (phone) camera.lookAt(0, 0.57, 0.14);
     else camera.lookAt(0, 0.48, 0.03);
+    camera.updateMatrixWorld(true);
+    const { front, back, ceiling } = CHANCE_DICE_BOUNDS;
+    const topEdge =
+      new THREE.Vector3(0, ceiling, back).applyMatrix4(
+        camera.matrixWorldInverse,
+      ).y + 0.06;
+    const bottomEdge =
+      new THREE.Vector3(0, 0, front).applyMatrix4(camera.matrixWorldInverse).y -
+      0.06;
+    const viewCenter = phone ? 0 : (topEdge + bottomEdge) / 2;
+    const trayHalfHeight = Math.max(
+      topEdge - viewCenter,
+      viewCenter - bottomEdge,
+    );
     scene.add(new THREE.HemisphereLight(0xfff5df, 0x5d746e, 1.8));
     const key = new THREE.DirectionalLight(0xfff3e2, 2.5);
     key.position.set(-3, 5, 2);
@@ -220,16 +235,17 @@ export default function HouseRuleDice({
     function resize() {
       const { clientWidth: width, clientHeight: height } = element;
       if (!width || !height || lost) return;
-      // Keep the dice's resting positions and give the hop overhead clearance.
-      const floor = phone ? -CHANCE_PHONE_HALF_WIDTH * (height / width) : -1.24;
-      const ceiling = phone ? -floor : 1.24 + 2.48 * (7 / 42);
-      const halfWidth = phone
-        ? CHANCE_PHONE_HALF_WIDTH
-        : ((ceiling - floor) / 2) * (width / height);
+      // Frame the whole tray at a fixed scale throughout the gesture and roll.
+      const aspect = width / height;
+      const halfHeight = Math.max(
+        trayHalfHeight,
+        CHANCE_PHONE_HALF_WIDTH / aspect,
+      );
+      const halfWidth = halfHeight * aspect;
       camera.left = -halfWidth;
       camera.right = halfWidth;
-      camera.top = ceiling;
-      camera.bottom = floor;
+      camera.top = viewCenter + halfHeight;
+      camera.bottom = viewCenter - halfHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
       invalidate();

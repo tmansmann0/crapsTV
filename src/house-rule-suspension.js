@@ -10,6 +10,7 @@ import {
 import { correctContactFriction, seededRandom } from "./dice-physics.js";
 import { diceQuaternion, upperDieFace } from "./throw-motion.js";
 import {
+  CHANCE_DICE_BOUNDS,
   CHANCE_PHONE_HALF_WIDTH,
   SUSPENSION_MAX_SPEED,
   SUSPENSION_MAX_SPIN,
@@ -23,11 +24,16 @@ const PICKUP_SPIN = [new Vec3(-11, 17, -10), new Vec3(12, -16, 9)];
 const SPIN_INPUT_DECAY = Math.exp(-STEP / 0.11);
 export const CHANCE_DIE_FRAME_MS = 1000 / 60;
 const GRAVITY = 17;
-const SIDE_RAIL = 2.33;
-const BACK_RAIL = -1.46;
-const FRONT_RAIL = 1.61;
+const {
+  side: SIDE_RAIL,
+  back: BACK_RAIL,
+  front: FRONT_RAIL,
+  ceiling: CEILING,
+} = CHANCE_DICE_BOUNDS;
 const DRAG_FOLLOW = 0.95;
 const MAX_RAIL_SLIP = 0.65;
+const HELD_FELT_FRICTION = 0.38;
+const RELEASED_FELT_FRICTION = 0.075;
 
 function capSpeed(vector, limit) {
   const speed = vector.length();
@@ -61,12 +67,11 @@ export function createDiceSuspension(poses, velocities) {
       restitution: 0.58,
     }),
   );
-  world.addContactMaterial(
-    new ContactMaterial(resin, felt, {
-      friction: 0.38,
-      restitution: 0.23,
-    }),
-  );
+  const feltContact = new ContactMaterial(resin, felt, {
+    friction: velocities ? RELEASED_FELT_FRICTION : HELD_FELT_FRICTION,
+    restitution: 0.23,
+  });
+  world.addContactMaterial(feltContact);
 
   const rail = new Material("rail");
   world.addContactMaterial(
@@ -91,7 +96,7 @@ export function createDiceSuspension(poses, velocities) {
   boundary(SIDE_RAIL, 0, 0, new Vec3(-1, 0, 0));
   boundary(0, 0, BACK_RAIL, new Vec3(0, 0, 1));
   boundary(0, 0, FRONT_RAIL, new Vec3(0, 0, -1), "glass");
-  boundary(0, 2.32, 0, new Vec3(0, -1, 0));
+  boundary(0, CEILING, 0, new Vec3(0, -1, 0));
 
   const dice = poses.map(([x, y, z, qx, qy, qz, qw], index) => {
     const body = new Body({
@@ -234,6 +239,7 @@ export function createDiceSuspension(poses, velocities) {
         steerSpin(dx, dz, interval);
       }
     } else {
+      feltContact.friction = HELD_FELT_FRICTION;
       dice.forEach((body, index) => {
         body.wakeUp();
         body.velocity.y += 1.95;
@@ -343,6 +349,7 @@ export function createDiceSuspension(poses, velocities) {
     letGo() {
       if (!pulling) return;
       pulling = false;
+      feltContact.friction = RELEASED_FELT_FRICTION;
       sinceDrag = Infinity;
       spinDrive.setZero();
       dice.forEach((body, index) => {
