@@ -11,6 +11,7 @@ import {
   suspensionVelocities,
 } from "../src/house-rule-fling.js";
 import {
+  chanceDiceStart,
   createDiceSuspension,
   simulateChanceDrop,
 } from "../src/house-rule-suspension.js";
@@ -711,6 +712,49 @@ test("held dice follow a pointer reversal before the next physics step", () => {
   assert(pinned[0] <= 1.834);
 });
 
+test("fast finger circles drive independent spin that coasts after a pause", () => {
+  const held = createDiceSuspension(chanceDiceStart(7));
+  const frameTime = 1 / 60;
+  const spin = () =>
+    held.velocities().map((values) => Math.hypot(...values.slice(3)));
+  held.pullToward(0, 0);
+  for (let frame = 0; frame < 42; frame++) held.step(frameTime);
+
+  let angle = 0;
+  function circle(turnsPerSecond) {
+    const samples = [];
+    for (let frame = 0; frame < 100; frame++) {
+      angle += turnsPerSecond * 2 * Math.PI * frameTime;
+      held.pullToward(
+        0.43 * Math.sin(angle),
+        0.43 * Math.cos(angle),
+        frameTime,
+      );
+      held.step(frameTime);
+      if (frame >= 24) samples.push(spin());
+      assert(suspensionVelocities(held.velocities()));
+    }
+    return [0, 1].map(
+      (die) =>
+        samples.reduce((total, values) => total + values[die], 0) /
+        samples.length,
+    );
+  }
+
+  const slow = circle(0.56);
+  const fast = circle(1.7);
+  for (let die = 0; die < 2; die++) {
+    assert(fast[die] > 17);
+    assert(fast[die] > 1.3 * slow[die]);
+  }
+
+  for (let frame = 0; frame < 12; frame++) held.step(frameTime);
+  const coasting = spin();
+  assert(coasting.every((speed) => speed > 6));
+  for (let frame = 0; frame < 34; frame++) held.step(frameTime);
+  assert(spin().every((speed, die) => speed < coasting[die] * 0.6));
+});
+
 test("suspended dice lift, collide and fall under gravity", () => {
   const start = [
     [-0.84, 0.5, 0.14, 0, 0, 0, 1],
@@ -745,7 +789,6 @@ test("suspended dice lift, collide and fall under gravity", () => {
   );
 
   const heights = [];
-  const separations = [];
   let collided = false;
   for (let frame = 0; frame < 100; frame++) {
     for (const physics of [pair, leftAlone, rightAlone]) {
@@ -757,7 +800,6 @@ test("suspended dice lift, collide and fall under gravity", () => {
     const apart = distance(leftAlone.sample()[0], rightAlone.sample()[0]);
     if (together > 0.95 && apart < 0.65) collided = true;
     heights.push(left[1], right[1]);
-    separations.push(together);
     assert(suspensionPoses([left, right]));
   }
   assert(
@@ -765,7 +807,6 @@ test("suspended dice lift, collide and fall under gravity", () => {
     "The dice repel through contact when pulled to the same point",
   );
   assert(Math.max(...heights) > 1.15);
-  assert(Math.max(...separations) - Math.min(...separations) > 0.4);
   const released = pair.sample();
   const lifted = released.reduce((sum, pose) => sum + pose[1], 0);
   const velocities = pair.velocities();

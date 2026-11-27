@@ -3,7 +3,7 @@ export const SUSPENSION_BUFFER_MS = 42;
 export const DROP_LEAD_MS = 55;
 export const CHANCE_PHONE_HALF_WIDTH = 2.32;
 export const SUSPENSION_MAX_SPEED = 14;
-export const SUSPENSION_MAX_SPIN = 28;
+export const SUSPENSION_MAX_SPIN = 44;
 
 export function suspensionPoses(poses) {
   if (!Array.isArray(poses) || poses.length !== 2) return null;

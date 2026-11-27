@@ -19,7 +19,8 @@ const STEP = 1 / 120;
 const LIFT_SPRING = 96;
 const TETHER_SPRING = 78;
 const TETHER_LENGTHS = [0.93, 1.04];
-const PICKUP_SPIN = [new Vec3(-6, 11, -7), new Vec3(7, -10, 5.4)];
+const PICKUP_SPIN = [new Vec3(-11, 17, -10), new Vec3(12, -16, 9)];
+const SPIN_INPUT_DECAY = Math.exp(-STEP / 0.11);
 export const CHANCE_DIE_FRAME_MS = 1000 / 60;
 const GRAVITY = 17;
 const SIDE_RAIL = 2.33;
@@ -118,6 +119,8 @@ export function createDiceSuspension(poses, velocities) {
   const attachment = [new Vec3(0.16, 0.25, 0.12), new Vec3(-0.2, 0.2, -0.12)];
   const target = new Vec3();
   const handVelocities = dice.map(() => new Vec3());
+  const lastDirection = new Vec3();
+  const spinDrive = new Vec3();
   const moves = dice.map(() => new Vec3());
   const railSlip = dice.map(() => new Vec3());
   const shared = new Vec3();
@@ -129,6 +132,7 @@ export function createDiceSuspension(poses, velocities) {
   const pointVelocity = new Vec3();
   let pulling = false;
   let remaining = 0;
+  let sinceDrag = Infinity;
 
   function boxesOverlap(fraction) {
     const [a, b] = dice;
@@ -198,13 +202,37 @@ export function createDiceSuspension(poses, velocities) {
     }
   }
 
+  function steerSpin(dx, dz, seconds) {
+    const travel = Math.hypot(dx, dz);
+    const x = dx / travel;
+    const z = dz / travel;
+    // A curved swipe winds up the yaw. A straight swipe still tumbles the
+    // dice along its direction. Use raw input so a rail can't kill the spin.
+    const speed = travel / seconds;
+    const grip = Math.max(0, Math.min(1, (speed - 0.45) / 1.5));
+    const turn =
+      sinceDrag < 0.12 ? (lastDirection.z * x - lastDirection.x * z) * grip : 0;
+    spinDrive.set(
+      (3.8 * dz) / seconds,
+      (3.2 * turn) / seconds,
+      (-3.8 * dx) / seconds,
+    );
+    capSpeed(spinDrive, 38);
+    lastDirection.set(x, 0, z);
+    sinceDrag = 0;
+  }
+
   function pullToward(x, y, seconds = STEP) {
     const nextX = x * CHANCE_PHONE_HALF_WIDTH;
     const nextZ = 0.15 + y * 1.65;
     if (pulling) {
       const dx = (nextX - target.x) * DRAG_FOLLOW;
       const dz = (nextZ - target.z) * DRAG_FOLLOW;
-      if (dx || dz) carryWithHand(dx, dz, Math.max(STEP, seconds));
+      if (dx || dz) {
+        const interval = Math.max(STEP, seconds);
+        carryWithHand(dx, dz, interval);
+        steerSpin(dx, dz, interval);
+      }
     } else {
       dice.forEach((body, index) => {
         body.wakeUp();
@@ -220,6 +248,7 @@ export function createDiceSuspension(poses, velocities) {
     remaining = Math.min(0.075, remaining + Math.max(0, seconds));
     while (remaining + 1e-9 >= STEP) {
       if (pulling) {
+        const angularDrag = 0.32 + 1.08 * Math.min(1, spinDrive.length() / 20);
         dice.forEach((body, index) => {
           // A slack tether only pulls when stretched. Between tugs each die
           // is free to coast, overshoot the finger and hit the other die.
@@ -250,10 +279,20 @@ export function createDiceSuspension(poses, velocities) {
             force.z * pull - body.velocity.z * 0.42 - handVelocity.z * 1.1,
           );
           body.applyForce(force, arm);
+          const coupling = index === 0 ? 1.95 : 1.65;
+          body.torque.x +=
+            spinDrive.x * coupling - angularDrag * body.angularVelocity.x;
+          body.torque.y +=
+            spinDrive.y * (2 - 0.18 * index) -
+            angularDrag * body.angularVelocity.y;
+          body.torque.z +=
+            spinDrive.z * coupling - angularDrag * body.angularVelocity.z;
         });
       }
       world.step(STEP);
       if (pulling) {
+        spinDrive.scale(SPIN_INPUT_DECAY, spinDrive);
+        sinceDrag += STEP;
         // Bound the energy from extreme finger motion to the same limits the
         // authority accepts, so a fast flick can carry its actual momentum.
         dice.forEach((body, index) => {
@@ -304,6 +343,8 @@ export function createDiceSuspension(poses, velocities) {
     letGo() {
       if (!pulling) return;
       pulling = false;
+      sinceDrag = Infinity;
+      spinDrive.setZero();
       dice.forEach((body, index) => {
         const handVelocity = handVelocities[index];
         handVelocity.scale(0.75, handVelocity);
