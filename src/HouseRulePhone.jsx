@@ -3,8 +3,24 @@ import { createPortal } from "react-dom";
 import { Dices, RotateCw } from "lucide-react";
 import HouseRuleDice from "./HouseRuleDice.jsx";
 import { describeHouseRuleTarget } from "./house-rules.js";
-import { ORBIT_SEND_MS, orbitInput, orbitSpeed } from "./house-rule-fling.js";
+import {
+  MAX_ORBIT_SPIN,
+  ORBIT_SEND_MS,
+  orbitInput,
+  orbitSpinAfter,
+  orbitTurnAfter,
+  restOrbit,
+} from "./house-rule-fling.js";
 import "./house-rule-phone.css";
+
+function coast(drag, time) {
+  const dt = Math.max(0, time - drag.spinAt);
+  drag.turn = orbitTurnAfter(drag.turn, drag.spin, dt);
+  drag.spin = orbitSpinAfter(drag.spin, dt);
+  drag.spinAt = Math.max(time, drag.spinAt);
+}
+
+const momentumEnergy = (drag) => Math.abs(drag.spin) / MAX_ORBIT_SPIN;
 
 export default function HouseRulePhone({
   prompt,
@@ -47,10 +63,9 @@ export default function HouseRulePhone({
       if (!drag) return;
       const dt = Math.min(40, time - previous);
       previous = time;
-      const energy = Math.min(1, 0.3 + drag.velocity * 0.8);
       drag.velocity *= Math.exp(-dt / 260);
-      drag.turn += dt * orbitSpeed(energy);
-      const orbit = orbitInput({ ...drag, energy });
+      coast(drag, time);
+      const orbit = orbitInput({ ...drag, energy: momentumEnergy(drag) });
       orbitFeed.current.sample = {
         promptId: id,
         orbit,
@@ -80,6 +95,7 @@ export default function HouseRulePhone({
     )
       return;
     const rect = event.currentTarget.getBoundingClientRect();
+    const now = performance.now();
     const drag = {
       pointer: event.pointerId,
       centerX: rect.left + rect.width / 2,
@@ -88,10 +104,15 @@ export default function HouseRulePhone({
       halfHeight: rect.height / 2,
       lastX: event.clientX,
       lastY: event.clientY,
-      lastAt: performance.now(),
+      lastAt: now,
+      spinAt: now,
       velocity: 0,
+      spin: 0,
+      direction: 1,
+      lastDx: 0,
+      lastDy: 0,
       travel: 0,
-      turn: 0,
+      turn: restOrbit.turn,
     };
     position(drag, event);
     gesture.current = drag;
@@ -103,12 +124,26 @@ export default function HouseRulePhone({
     const drag = gesture.current;
     if (!canFling || drag?.pointer !== event.pointerId) return;
     const now = performance.now();
-    const distance = Math.hypot(
-      event.clientX - drag.lastX,
-      event.clientY - drag.lastY,
-    );
-    const speed = distance / Math.max(10, now - drag.lastAt);
+    const dx = event.clientX - drag.lastX;
+    const dy = event.clientY - drag.lastY;
+    const distance = Math.hypot(dx, dy);
+    const dt = Math.max(8, now - drag.lastAt);
+    const speed = distance / dt;
     drag.velocity = Math.min(2.5, drag.velocity * 0.4 + speed * 0.6);
+
+    coast(drag, now);
+    if (distance >= 0.65) {
+      // The bend between consecutive movement segments gives the direction
+      // of even a small circle drawn away from the center of the controller.
+      const cross = drag.lastDx * dy - drag.lastDy * dx;
+      const lengths = Math.hypot(drag.lastDx, drag.lastDy) * distance;
+      if (Math.abs(cross) > lengths * 0.09) drag.direction = Math.sign(cross);
+      drag.lastDx = dx;
+      drag.lastDy = dy;
+      const targetSpin =
+        drag.direction * Math.min(MAX_ORBIT_SPIN, speed * 0.021);
+      drag.spin += (targetSpin - drag.spin) * -Math.expm1(-dt / 64);
+    }
     drag.travel += distance;
     drag.lastX = event.clientX;
     drag.lastY = event.clientY;
@@ -128,8 +163,8 @@ export default function HouseRulePhone({
     gesture.current = null;
     setHolding(false);
     if (released && canFling && drag.travel > 18) {
-      const sample = orbitFeed.current.sample?.orbit;
-      const orbit = orbitInput({ ...drag, energy: sample?.energy ?? 0.34 });
+      coast(drag, performance.now());
+      const orbit = orbitInput({ ...drag, energy: momentumEnergy(drag) });
       sendFling(orbit, Math.min(1, 0.55 + drag.velocity * 0.55));
     } else if (canFling) {
       orbitFeed.current.sample = null;

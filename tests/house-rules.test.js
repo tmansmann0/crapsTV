@@ -6,6 +6,7 @@ import {
   CHANCE_HOP_BUCKET,
   createChanceDiceHops,
 } from "../src/house-rule-dice-motion.js";
+import { orbitSpinAfter, orbitTurnAfter } from "../src/house-rule-fling.js";
 import { upperDieFace } from "../src/throw-motion.js";
 import { RoomHub } from "../src/hub.js";
 import { mobilePayouts } from "../src/mobile-settlement.js";
@@ -507,7 +508,7 @@ test("only the drawn player can orbit and fling both dice", (t) => {
   assert.equal(prompt.rollerId, guest.id);
   assert.equal(prompt.phase, "entering");
   assert.equal(prompt.dice, undefined);
-  const orbit = { x: -0.45, y: 0.25, turn: 0.4, energy: 0.8 };
+  const orbit = { x: -0.45, y: 0.25, turn: 0.4, spin: -0.016, energy: 0.8 };
   const touch = { type: "house-rule-orbit", promptId: prompt.id, orbit };
   const launch = {
     type: "roll-house-rule",
@@ -631,4 +632,18 @@ test("physical chance hops roll out all 36 pairs at equal odds", () => {
   }
   assert.equal(counts.size, 36);
   assert([...counts.values()].every((count) => count === 16));
+});
+
+test("the orbit coasts to a stop and packet interpolation preserves its momentum", () => {
+  const turn = -0.3;
+  const spin = -0.024;
+  const elapsed = 360;
+  const midpoint = orbitTurnAfter(turn, spin, elapsed);
+  const laterSpin = orbitSpinAfter(spin, elapsed);
+  assert(Math.abs(laterSpin) < Math.abs(spin));
+  assert(midpoint < turn);
+  const twice = orbitTurnAfter(midpoint, laterSpin, elapsed);
+  assert(Math.abs(twice - orbitTurnAfter(turn, spin, elapsed * 2)) < 1e-9);
+  assert(Math.abs(orbitSpinAfter(spin, 1750)) < 0.0002);
+  assert.equal(orbitTurnAfter(turn, 0, 500), turn);
 });

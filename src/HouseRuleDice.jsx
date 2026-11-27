@@ -6,7 +6,8 @@ import {
   FLING_IMPACT_MS,
   FLING_REBOUND_MS,
   ORBIT_TIMEOUT_MS,
-  orbitSpeed,
+  orbitSpinAfter,
+  orbitTurnAfter,
 } from "./house-rule-fling.js";
 import { CHANCE_DIE_FRAME_MS } from "./house-rule-dice-motion.js";
 import { configureRenderer } from "./render-quality.js";
@@ -143,7 +144,8 @@ export default function HouseRuleDice({
         pivot.y + 0.35 + arc * radius * 0.78,
       );
       // The die leans into its swing and rocks back under the pivot.
-      hangingTilt.set(-0.28 * arc, theta * 0.53, -0.68 * swing);
+      const tumble = 0.32 * orbit.energy * Math.sin(theta * 1.8);
+      hangingTilt.set(-0.28 * arc + tumble, theta * 1.34, -0.68 * swing);
       windRotation.setFromEuler(hangingTilt);
       rollAxis.set(arc, 0.35, swing).normalize();
     }
@@ -173,11 +175,16 @@ export default function HouseRuleDice({
         easedAnchor.x += (sample.orbit.x - easedAnchor.x) * follow;
         easedAnchor.y += (sample.orbit.y - easedAnchor.y) * follow;
         heldOrbit = { ...sample.orbit, x: easedAnchor.x, y: easedAnchor.y };
-        heldAngle =
-          heldOrbit.turn +
-          Math.max(0, now - sample.at) * orbitSpeed(heldOrbit.energy);
+        const elapsedSinceSample = Math.max(0, now - sample.at);
+        heldAngle = orbitTurnAfter(
+          heldOrbit.turn,
+          heldOrbit.spin,
+          elapsedSinceSample,
+        );
+        heldOrbit.spin = orbitSpinAfter(heldOrbit.spin, elapsedSinceSample);
       } else if (heldOrbit) {
-        heldAngle += dt * orbitSpeed(heldOrbit.energy) * suspended;
+        heldAngle = orbitTurnAfter(heldAngle, heldOrbit.spin, dt);
+        heldOrbit.spin = orbitSpinAfter(heldOrbit.spin, dt);
       }
       suspended = THREE.MathUtils.clamp(
         suspended + (orbitLive ? dt / 230 : -dt / 205),
