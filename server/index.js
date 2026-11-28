@@ -1,3 +1,4 @@
+import { POCKETFACE_MESSAGE_LIMIT } from "../src/pocketface-state.js";
 import express from "express";
 import { createServer } from "node:http";
 import { networkInterfaces } from "node:os";
@@ -60,7 +61,11 @@ app.get("/api/config", async (_req, res) => {
   await appReady;
   res.json({ local: true, code, kiosk, ...discovery.config() });
 });
-const wss = new WebSocketServer({ server, path: "/socket", maxPayload: 8192 });
+const wss = new WebSocketServer({
+  server,
+  path: "/socket",
+  maxPayload: POCKETFACE_MESSAGE_LIMIT,
+});
 wss.on("connection", (ws, req) => {
   // Prevent third-party web pages from silently connecting to a LAN room.
   if (req.headers.origin) {
@@ -90,7 +95,16 @@ wss.on("connection", (ws, req) => {
   );
   ws.on("message", (data) => {
     try {
-      hub.receive(id, JSON.parse(data.toString()));
+      const message = JSON.parse(data.toString());
+      if (
+        data.length > 8192 &&
+        message?.type !== "pocketface" &&
+        message?.type !== "add-bot"
+      ) {
+        ws.close(1009, "Message too large");
+        return;
+      }
+      hub.receive(id, message);
     } catch {
       ws.send(JSON.stringify({ type: "error", message: "Invalid message." }));
     }

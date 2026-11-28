@@ -1,3 +1,4 @@
+import { normalizePocketface } from "./pocketface-state.js";
 import { createState } from "./game.js";
 import { botPersonalityOptions } from "./bot-options.js";
 import { DEFAULT_DRINKING_RULES } from "./drinking-mode.js";
@@ -21,7 +22,10 @@ function withoutMotion(state) {
   delete state.houseRulePrompt;
   state.nextRollAt = null;
   state.botRollAt = null;
-  for (const player of state.players) player.betPreview = null;
+  for (const player of state.players) {
+    player.betPreview = null;
+    delete player.avatarEmote;
+  }
   return state;
 }
 
@@ -90,6 +94,7 @@ export function readRoomSave(serialized) {
 
   const config = { ...defaults.config, ...previous.config };
   config.houseRules = normalizeHouseRules(previous.config.houseRules);
+  config.avatarsEnabled = config.avatarsEnabled === true;
   if (config.drinkingMode)
     config.drinkingRules = {
       ...DEFAULT_DRINKING_RULES,
@@ -124,18 +129,27 @@ export function readRoomSave(serialized) {
     display,
     physicsVersion: defaults.physicsVersion,
     puck,
-    players: previous.players.map((player) => ({
-      ...player,
-      ...(player.bot && { bot: botPersonalityOptions(player.bot) }),
-      dice: { color: "red", finish: "solid", ...player.dice },
-      connected: !!player.bot && !player.left,
-      ...(player.houseRulePasses && {
-        houseRulePasses: normalizeHouseRulePasses(
-          player.houseRulePasses,
-          previous.rolls.length,
-        ),
-      }),
-    })),
+    players: previous.players.map((player) => {
+      const { pocketface, avatarVersion, ...seat } = player;
+      const avatar = normalizePocketface(pocketface);
+      return {
+        ...seat,
+        ...(avatar &&
+          typeof avatarVersion === "string" && {
+            pocketface: avatar,
+            avatarVersion,
+          }),
+        ...(player.bot && { bot: botPersonalityOptions(player.bot) }),
+        dice: { color: "red", finish: "solid", ...player.dice },
+        connected: !!player.bot && !player.left,
+        ...(player.houseRulePasses && {
+          houseRulePasses: normalizeHouseRulePasses(
+            player.houseRulePasses,
+            previous.rolls.length,
+          ),
+        }),
+      };
+    }),
     pausedAt,
   });
   return {

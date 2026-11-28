@@ -1,4 +1,12 @@
-import { Fragment, useEffect, useId, useRef, useState } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -7,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
+  CircleUserRound,
   Coins,
   Crown,
   Dices,
@@ -50,6 +59,10 @@ import {
   normalizeBotOptions,
 } from "./bot-options.js";
 import "./admin-panel.css";
+
+const AvatarDialog = lazy(() =>
+  import("./Pocketface.jsx").then((m) => ({ default: m.PocketfaceDialog })),
+);
 
 const NAMES = [
   "Lucky Lou",
@@ -365,6 +378,7 @@ function PlayerSeats({
   onNotice,
   onFormChange,
   serverError,
+  avatarProfiles,
   drinkingMode,
 }) {
   const adjustmentId = useId();
@@ -375,6 +389,9 @@ function PlayerSeats({
     [personality, setPersonality] = useState(() => normalizeBotOptions()),
     [pending, setPending] = useState(false);
   const previousIds = useRef(new Set());
+  const [newAvatar, setNewAvatar] = useState(null);
+  const [avatarEditor, setAvatarEditor] = useState(null);
+  const avatarMode = state.config.avatarsEnabled;
   const players = state.players.filter((p) => !p.left);
   const full = players.length >= 12;
   const disabled = !connected || state.rolling;
@@ -418,17 +435,48 @@ function PlayerSeats({
   }, [pending]);
   function add(event) {
     event.preventDefault();
-    if (disabled || pending || (!editing && (full || !name.trim()))) return;
+    if (
+      disabled ||
+      pending ||
+      (!editing && (full || !name.trim() || (avatarMode && !newAvatar)))
+    )
+      return;
     previousIds.current = new Set(players.map((p) => p.id));
     setPending(true);
     send(
       editing
         ? { type: "update-bot", playerId: editing, ...personality }
-        : { type: "add-bot", name: name.trim(), ...personality },
+        : {
+            type: "add-bot",
+            name: name.trim(),
+            ...personality,
+            ...(avatarMode && { avatar: newAvatar }),
+          },
     );
   }
   return (
     <div className="ha-players">
+      {avatarMode && avatarEditor && (
+        <Suspense fallback={null}>
+          <AvatarDialog
+            key={avatarEditor.id}
+            label={`${avatarEditor.name}’s avatar`}
+            initial={
+              avatarEditor.id === "new"
+                ? newAvatar
+                : avatarProfiles?.[avatarEditor.id]
+            }
+            disabled={disabled}
+            onClose={() => setAvatarEditor(null)}
+            onSave={(avatar) => {
+              if (avatarEditor.id === "new") setNewAvatar(avatar);
+              else
+                send({ type: "pocketface", playerId: avatarEditor.id, avatar });
+              setAvatarEditor(null);
+            }}
+          />
+        </Suspense>
+      )}
       <div className="ha-section-heading">
         <h3>At the table</h3>
       </div>
@@ -462,6 +510,17 @@ function PlayerSeats({
                     {canAdjust && ` · ${money(p.bank)} available`}
                   </small>
                 </div>
+                {p.bot && avatarMode && (
+                  <button
+                    type="button"
+                    className="ha-remove pf-bot-status"
+                    aria-label={`${p.avatarVersion ? "Edit" : "Set up"} ${p.name} avatar`}
+                    disabled={disabled}
+                    onClick={() => setAvatarEditor({ id: p.id, name: p.name })}
+                  >
+                    <CircleUserRound size={18} />
+                  </button>
+                )}
                 {p.bot && (
                   <button
                     type="button"
@@ -534,6 +593,7 @@ function PlayerSeats({
             setAdjusting(null);
             setEditing(null);
             setName(nextName(players));
+            setNewAvatar(null);
             setPersonality(normalizeBotOptions());
             setAdding(true);
           }}
@@ -568,6 +628,18 @@ function PlayerSeats({
                 onChange={(event) => setName(event.target.value)}
               />
             </label>
+          )}
+          {!editing && avatarMode && (
+            <button
+              type="button"
+              className="button outline"
+              onClick={() =>
+                setAvatarEditor({ id: "new", name: name.trim() || "New bot" })
+              }
+            >
+              <CircleUserRound size={17} />
+              {newAvatar ? "Edit bot avatar" : "Set up bot avatar"}
+            </button>
           )}
           <fieldset disabled={pending}>
             <legend>Personality preset</legend>
@@ -621,7 +693,9 @@ function PlayerSeats({
             type="submit"
             className="button dark"
             disabled={
-              disabled || pending || (!editing && (full || !name.trim()))
+              disabled ||
+              pending ||
+              (!editing && (full || !name.trim() || (avatarMode && !newAvatar)))
             }
           >
             {editing
@@ -1094,6 +1168,7 @@ export default function AdminPanel({
   onMusicSettings,
   fallbackJoinURL,
   serverError,
+  avatarProfiles,
 }) {
   const id = useId();
   const savedDrinkRules = state.config.drinkingRules ?? DEFAULT_DRINKING_RULES;
@@ -1237,6 +1312,24 @@ export default function AdminPanel({
       >
         {tab === "table" && (
           <>
+            <label className="toggle-label ha-teach">
+              <span>
+                <CircleUserRound size={18} />
+                <span>Pocketface avatars</span>
+              </span>
+              <input
+                type="checkbox"
+                aria-label="Pocketface avatars"
+                checked={state.config.avatarsEnabled === true}
+                disabled={disabled}
+                onChange={(event) =>
+                  send({
+                    type: "avatars-enabled",
+                    enabled: event.target.checked,
+                  })
+                }
+              />
+            </label>
             {lobby ? (
               <form id={`${id}-setup`} onSubmit={start} className="ha-rules">
                 <fieldset className="ha-stakes" disabled={disabled}>
@@ -1432,6 +1525,7 @@ export default function AdminPanel({
               onNotice={setNotice}
               onFormChange={setBotFormOpen}
               serverError={serverError}
+              avatarProfiles={avatarProfiles}
               drinkingMode={lobby ? drinkingMode : state.config.drinkingMode}
             />
             {!botFormOpen && (

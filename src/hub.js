@@ -79,7 +79,7 @@ export class RoomHub {
     });
     send({
       type: "state",
-      state: game.snapshot(this.state),
+      state: game.roomSnapshot(this.state),
       sentAt: Date.now(),
     });
     this.sendJukebox(id);
@@ -153,7 +153,7 @@ export class RoomHub {
     this.scheduleBots();
     const message = {
       type: "state",
-      state: game.snapshot(this.state),
+      state: game.roomSnapshot(this.state),
       sentAt: Date.now(),
     };
     for (const id of this.clients.keys()) this.send(id, message);
@@ -191,6 +191,32 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (type === "avatar-request") {
+        if (!s.config.avatarsEnabled || (!c.playerId && !c.chanceDisplay))
+          return;
+        if (!Array.isArray(message.players) || message.players.length > 12)
+          return;
+        const wanted = new Set(message.players);
+        for (const player of s.players) {
+          const mayView =
+            c.chanceDisplay ||
+            c.playerId === player.id ||
+            (c.playerId === s.adminId && player.bot);
+          if (
+            mayView &&
+            !player.left &&
+            player.pocketface &&
+            wanted.has(player.id)
+          )
+            this.send(id, {
+              type: "avatar-data",
+              id: player.id,
+              version: player.avatarVersion,
+              profile: player.pocketface,
+            });
+        }
+        return;
+      }
       if (type === "house-rule-display") {
         c.chanceDisplay = message.visible === true;
         if (
@@ -286,6 +312,12 @@ export class RoomHub {
         else if (type === "start") {
           if (message.config) game.configure(s, pid, message.config);
           game.start(s, pid);
+        } else if (type === "avatars-enabled")
+          game.setAvatarsEnabled(s, pid, message.enabled);
+        else if (type === "pocketface")
+          game.setPocketface(s, pid, message.playerId, message.avatar);
+        else if (type === "avatar-emote") {
+          if (!game.setAvatarEmote(s, pid, message.name)) return;
         } else if (type === "teach") game.setTeach(s, pid, message.value);
         else if (type === "house-rule")
           game.setHouseRule(

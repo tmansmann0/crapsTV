@@ -29,3 +29,6 @@ android/build-info.json
 android/THIRD-PARTY-NOTICES.txt
 
 *.hprof
+
+# MediaPipe browser binaries copied from the locked npm dependency
+/public/pocketface/wasm/
