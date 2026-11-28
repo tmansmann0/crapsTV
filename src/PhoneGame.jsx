@@ -1072,7 +1072,7 @@ function PlayPanel({
   ].filter(Boolean);
   return (
     <div className="pg-play">
-      <div className="pg-rack">
+      <div className={`pg-rack${needsDrinkCredit ? " is-drink-credit" : ""}`}>
         {needsDrinkCredit ? (
           <div className="pg-reup is-rack">
             <span>Below the table minimum.</span>
@@ -2180,6 +2180,7 @@ export default function PhoneGame({
           />
         )}
         <main
+          key={tab}
           className="pg-main"
           role="tabpanel"
           id={`pg-panel-${tab}`}

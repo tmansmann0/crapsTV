@@ -440,14 +440,23 @@ body:has(.pg-shell) {
 .pg-main {
   position: relative;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-padding-block: 6px;
 }
 .pg-play {
+  --pg-board-min-height: 324px;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(var(--pg-board-min-height), 1fr);
   gap: 6px;
   height: 100%;
   padding: 0 10px 6px;
+}
+.pg-play:has(.pg-more) {
+  grid-template-rows: auto auto minmax(min-content, 1fr);
+  height: auto;
+  min-height: 100%;
 }
 .pg-board-switch,
 .pg-segments {
@@ -498,7 +507,7 @@ body:has(.pg-shell) {
 /* Felt and board */
 .pg-felt {
   min-height: 0;
-  overflow: hidden;
+  overflow: clip;
   border-radius: 16px;
   background:
     radial-gradient(120% 90% at 50% 18%, var(--pg-felt-lift), transparent 70%),
@@ -507,10 +516,6 @@ body:has(.pg-shell) {
     inset 0 0 0 2px var(--pg-felt-deep),
     inset 0 0 0 3px rgba(224, 192, 120, 0.55);
   transition: filter 180ms ease;
-}
-.pg-felt:has(.pg-more) {
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 .pg-felt.is-locked {
   filter: saturate(0.5) brightness(0.86);
@@ -523,7 +528,7 @@ body:has(.pg-shell) {
     minmax(38px, 0.7fr) minmax(56px, 1.1fr) minmax(40px, 0.7fr);
   gap: 1.5px;
   height: 100%;
-  min-height: 324px;
+  min-height: var(--pg-board-min-height);
   padding: 6px;
 }
 .pg-board.is-crapless {
@@ -1199,10 +1204,9 @@ body:has(.pg-shell) {
 /* Bets */
 .pg-bets {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
   align-content: start;
   gap: 8px;
-  height: 100%;
+  min-height: 100%;
   padding: 0 10px 6px;
 }
 .pg-bets-summary {
@@ -1217,9 +1221,6 @@ body:has(.pg-shell) {
   background: var(--pg-paper);
 }
 .pg-bets-list {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   border: 1px solid var(--pg-rule);
   border-radius: 14px;
   background: var(--pg-paper);
@@ -1327,9 +1328,7 @@ body:has(.pg-shell) {
 
 /* Dice */
 .pg-dice {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
+  padding: 0 10px 6px;
 }
 
 /* Learn */
@@ -2068,6 +2067,12 @@ body:has(.pg-shell) {
 .pg-rack > .pg-reup.is-rack {
   grid-row: 1 / -1;
 }
+.pg-rack.is-drink-credit {
+  grid-template-rows: auto 44px;
+}
+.pg-rack.is-drink-credit > .pg-reup {
+  grid-row: auto;
+}
 .pg-feedback {
   height: 44px;
   min-height: 44px;
@@ -2128,6 +2133,7 @@ body:has(.pg-shell) {
     min-height: 60px;
   }
   .pg-play {
+    --pg-board-min-height: 282px;
     gap: 2px;
     padding-bottom: 2px;
   }
@@ -2159,7 +2165,7 @@ body:has(.pg-shell) {
     padding-bottom: 1px;
   }
   .pg-board {
-    min-height: 282px;
+    min-height: var(--pg-board-min-height);
     padding: 5px;
     grid-template-rows:
       minmax(44px, 1.5fr) minmax(44px, 1fr) minmax(44px, 1fr)
