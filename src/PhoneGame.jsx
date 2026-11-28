@@ -1755,6 +1755,7 @@ export default function PhoneGame({
     );
   const [presentation, setPresentation] = useState(null);
   const [drinkDrafts, setDrinkDrafts] = useState({});
+  const previousBuyIn = useRef(player.buyIn);
   const previousSnapshot = useRef(null);
   const reconnectBaseline = useRef(null);
   const amount = sum(bundle);
@@ -1762,6 +1763,20 @@ export default function PhoneGame({
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
   const stake = sum(player.bets.map((b) => b.amount));
   const drinkingMode = !!state.config.drinkingMode;
+  const pendingTopUpId = state.drinkRequests?.find(
+    (request) => request.kind === "credit" && request.from === player.id,
+  )?.id;
+  useEffect(() => {
+    // Bot-approved top-ups arrive already credited, with no pending request.
+    const credited = player.buyIn > previousBuyIn.current;
+    previousBuyIn.current = player.buyIn;
+    if (!drinkingMode || (!pendingTopUpId && !credited)) return;
+    setDrinkDrafts((current) =>
+      (current.credit?.quantity ?? "1") === "1"
+        ? current
+        : { ...current, credit: { ...current.credit, quantity: "1" } },
+    );
+  }, [drinkingMode, pendingTopUpId, player.buyIn]);
   const learnEnabled = !!state.config.teach;
   const shopRules = Object.keys(HOUSE_RULES).filter(
     (rule) =>
