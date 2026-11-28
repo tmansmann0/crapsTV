@@ -7,7 +7,9 @@ import {
   openPocketface,
 } from "./pocketface-runtime.js";
 
-const AVATAR_SCALE = 1.63;
+const AVATAR_SCALE = 1.42;
+const FOOTREST_Y = -1.24;
+const FLOOR_Y = -2.5;
 const REACTION_MS = 5200;
 const RELEASE_MS = 480;
 const THROW_MS = 940;
@@ -40,7 +42,11 @@ function mood(player, roll, now) {
 
 function seatPosition(seat) {
   const { center, outward } = seat;
-  return [center[0] + outward[0] * 1.08, -2.07, center[2] + outward[2] * 1.08];
+  return [
+    center[0] + outward[0] * 1.02,
+    FOOTREST_Y,
+    center[2] + outward[2] * 1.02,
+  ];
 }
 
 function stamp(label, player, caption, shooter) {
@@ -95,7 +101,7 @@ function makeLabel() {
       toneMapped: false,
     }),
   );
-  sprite.position.y = 5.04 / AVATAR_SCALE;
+  sprite.position.y = 4.35 / AVATAR_SCALE;
   sprite.scale.set(2.08 / AVATAR_SCALE, 0.53 / AVATAR_SCALE, 1);
   return { canvas, context: canvas.getContext("2d"), sprite };
 }
@@ -105,6 +111,17 @@ export function createPocketfaceTable(scene) {
   group.name = "Pocketface players at the rail";
   scene.add(group);
   const actors = new Map();
+  const footrestHeight = (FOOTREST_Y - FLOOR_Y) / AVATAR_SCALE;
+  const footrestGeometry = new THREE.CylinderGeometry(
+    0.46,
+    0.56,
+    footrestHeight,
+    14,
+  );
+  const footrestMaterial = new THREE.MeshStandardMaterial({
+    color: "#482a20",
+    roughness: 0.66,
+  });
   const diceStart = new THREE.Vector3();
   const direction = new THREE.Vector3();
   const reduce = matchMedia("(prefers-reduced-motion: reduce)");
@@ -161,7 +178,9 @@ export function createPocketfaceTable(scene) {
             -seat.outward[2],
           );
           actor.root.scale.setScalar(AVATAR_SCALE);
-          actor.root.add(rig.object);
+          const footrest = new THREE.Mesh(footrestGeometry, footrestMaterial);
+          footrest.position.y = -footrestHeight / 2;
+          actor.root.add(footrest, rig.object);
           actor.label = makeLabel();
           actor.root.add(actor.label.sprite);
           group.add(actor.root);
@@ -318,8 +337,8 @@ export function createPocketfaceTable(scene) {
           ? `avatar-throw:${flight.id}`
           : `avatar-reaction:${last.id}`,
         position: [x - ox * 4.9 + tx * 1.45, 2.8, z - oz * 4.9 + tz * 1.45],
-        target: [x - ox * 0.57, 1.18, z - oz * 0.57],
-        fov: 44,
+        target: [x - ox * 0.57, 1.42, z - oz * 0.57],
+        fov: 47,
       };
     }
     if (flight || age < 1350) return null;
@@ -343,6 +362,8 @@ export function createPocketfaceTable(scene) {
       disposed = true;
       for (const actor of actors.values()) releaseActor(actor);
       actors.clear();
+      footrestGeometry.dispose();
+      footrestMaterial.dispose();
       dice?.traverse((part) => part.isMesh && part.material.dispose());
       group.removeFromParent();
     },
