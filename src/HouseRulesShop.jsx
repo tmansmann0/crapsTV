@@ -1,4 +1,14 @@
-import { Sparkles } from "lucide-react";
+import {
+  Clover,
+  Coins,
+  Dices,
+  Flame,
+  Hourglass,
+  Repeat2,
+  Sparkles,
+  Trophy,
+  Wind,
+} from "lucide-react";
 import { money } from "./game.js";
 import {
   DEFAULT_HOUSE_RULES,
@@ -17,6 +27,16 @@ const describeValue = {
   tableJackpot: (value) => `${money(value)} jackpot`,
 };
 
+const ruleIcons = {
+  secondWind: Wind,
+  hardPoint: Dices,
+  hotHand: Flame,
+  crapsCashback: Coins,
+  luckySeven: Clover,
+  passTheDice: Repeat2,
+  tableJackpot: Trophy,
+};
+
 export default function HouseRulesShop({
   state,
   player,
@@ -26,17 +46,21 @@ export default function HouseRulesShop({
 }) {
   const config = state.config.houseRules;
   return (
-    <section className="pg-rule-shop" aria-label="House Rules">
-      <h2>
-        <Sparkles aria-hidden="true" /> House Rules
-      </h2>
-      <p>
-        Buy personal perks with chips. Each completed table roll counts toward
-        their duration.
-      </p>
+    <section
+      className="pg-rule-shop"
+      aria-labelledby="pg-rule-shop-title"
+      tabIndex={0}
+    >
+      <header className="pg-rule-shop-heading">
+        <h2 id="pg-rule-shop-title">
+          <Sparkles size={22} aria-hidden="true" /> House Rules
+        </h2>
+        <p>Use chips to buy perks that last for a set number of table rolls.</p>
+      </header>
       <ul>
         {rules.map((rule) => {
           const { label, detail, setting } = HOUSE_RULES[rule];
+          const Icon = ruleIcons[rule] ?? Sparkles;
           const offer = houseRuleOffer(config, rule);
           const pass = activeHouseRulePass(player, rule, state.rolls.length);
           const terms = pass ?? offer;
@@ -49,34 +73,48 @@ export default function HouseRulesShop({
               ? (config?.[setting] ?? DEFAULT_HOUSE_RULES[setting])
               : undefined);
           return (
-            <li key={rule} className="pg-rule-shop-card">
-              <h3>{label}</h3>
+            <li
+              key={rule}
+              className={`pg-rule-shop-card${pass ? " is-active" : ""}`}
+            >
+              <div className="pg-rule-card-heading">
+                <span className="pg-rule-icon">
+                  <Icon size={18} aria-hidden="true" />
+                </span>
+                <h3>{label}</h3>
+                {pass && <span className="pg-rule-active">Active</span>}
+              </div>
               <p>
                 {rule === "secondWind"
                   ? "When you shoot, an initial 7 can be rerolled once."
                   : detail}
               </p>
               {describeValue[rule] && (
-                <strong>{describeValue[rule](value)}</strong>
+                <strong className="pg-rule-value">
+                  {describeValue[rule](value)}
+                </strong>
               )}
               <dl>
                 <div>
-                  <dt>Trigger total</dt>
+                  <dt>
+                    <Dices size={13} aria-hidden="true" /> Trigger total
+                  </dt>
                   <dd>{describeHouseRuleTarget(terms.target)}</dd>
                 </div>
                 <div>
-                  <dt>{pass ? "Rolls left" : "Duration"}</dt>
+                  <dt>
+                    <Hourglass size={13} aria-hidden="true" />
+                    {pass ? "Rolls left" : "Duration"}
+                  </dt>
                   <dd>
                     {remaining} {remaining === 1 ? "roll" : "rolls"}
                   </dd>
                 </div>
               </dl>
-              {pass ? (
-                <strong className="pg-rule-active">Active</strong>
-              ) : (
+              {!pass && (
                 <button
                   type="button"
-                  className="button"
+                  className="button pg-rule-buy"
                   aria-label={`Buy ${label} for ${money(offer.price)} in chips`}
                   disabled={
                     !connected ||
