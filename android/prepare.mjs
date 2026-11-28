@@ -134,7 +134,7 @@ execFileSync(
 with zipfile.ZipFile('android/app/src/main/assets/payload.zip','w',zipfile.ZIP_DEFLATED) as z:
  z.write('android/host.cjs','host.cjs');z.write('android/host.html','host.html');z.write('android/build-info.json','build-info.json');z.write('android/NODE-LICENSE.txt','NODE-LICENSE.txt');z.write('android/THIRD-PARTY-NOTICES.txt','THIRD-PARTY-NOTICES.txt')
  z.write('dist/index.html','dist/index.html')
- for folder in ('assets','audio','licenses'):
+ for folder in ('assets','audio','licenses','pocketface'):
   for p in pathlib.Path('dist',folder).rglob('*'):
    if p.is_file(): z.write(p,str(p))
 `,

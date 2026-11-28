@@ -210,6 +210,8 @@ export default function Table3D(props) {
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#09100e");
+    let pocketface, pocketfaceLoading;
+    let pocketfaceCount = 0;
     const camera = new THREE.PerspectiveCamera(43, 1, 0.035, 160);
     camera.position.set(10, 6.5, 18);
     const fadeScene = new THREE.Scene();
@@ -1060,6 +1062,31 @@ export default function Table3D(props) {
         settlingUntil = time + 1100;
       }
       const throwTime = Date.now() + (s?.clockOffsetMs || 0);
+      const avatars =
+        live?.config.avatarsEnabled &&
+        !live.pausedAt &&
+        live.status !== "ended";
+      if (avatars && !pocketfaceLoading) {
+        pocketfaceLoading = import("./pocketface-table.js")
+          .then(({ createPocketfaceTable }) => {
+            if (alive) pocketface = createPocketfaceTable(scene);
+          })
+          .catch((error) => console.warn("Pocketface could not load", error));
+      }
+      const avatarState = avatars && !testing ? live : null;
+      if (pocketface) {
+        pocketface.update(
+          avatarState,
+          current.avatarProfiles,
+          throwTime,
+          Math.min(frameDelta, 0.08),
+        );
+        const count = pocketface.count;
+        if (pocketfaceCount !== count) {
+          pocketfaceCount = count;
+          el.dataset.avatarsAtTable = String(count);
+        }
+      }
       const shared = s?.throw ? sampleThrow(s.throw, throwTime) : null;
       current.tableAudio?.updateIntroThrow(
         introSample?.state.throw,
@@ -1119,6 +1146,10 @@ export default function Table3D(props) {
               reducedMotion: reduced.matches,
             })
           : null;
+      const avatarView =
+        automaticCamera && cameraMode === "auto"
+          ? pocketface?.cameraShot(avatarState, throwTime, camera.aspect)
+          : null;
       const playerShot = !cameraShot && autoView?.shotKey ? autoView : null;
       const openingShot = introSample && {
         ...introSample.camera,
@@ -1134,7 +1165,10 @@ export default function Table3D(props) {
           shotKey: `calibration:${liveCalibrationHold.startAt}`,
         };
       const directedShot =
-        openingShot || calibrationShot || cameraShot || playerShot;
+        openingShot ||
+        calibrationShot ||
+        (avatarView?.shotKey ? avatarView : null) ||
+        (!avatarView && (cameraShot || playerShot));
       const cinematic = !!directedShot;
       controls.minDistance = cinematic ? 0.18 : 0.35;
       controls.minPolarAngle = cinematic ? 0.0001 : 0.15;
@@ -1143,12 +1177,15 @@ export default function Table3D(props) {
       const shotKey =
         openingShot || calibrationShot
           ? directedShot.shotKey
-          : cameraShot
-            ? `${s.throw.id}:${cameraShot.phase}`
-            : playerShot?.shotKey || null;
+          : avatarView
+            ? (avatarView.shotKey ?? null)
+            : cameraShot
+              ? `${s.throw.id}:${cameraShot.phase}`
+              : playerShot?.shotKey || null;
       const targetFov = !automaticCamera
         ? camera.fov
         : (directedShot?.fov ??
+          avatarView?.fov ??
           autoView?.fov ??
           (cameraMode === "room" ? 60 : 43));
       if (automaticCamera) {
@@ -1163,19 +1200,19 @@ export default function Table3D(props) {
           camera.position.copy(targetPosition);
           camera.fov = targetFov;
         } else {
-          if (autoView) shotTarget.fromArray(autoView.target);
+          const view = avatarView || autoView;
+          if (view) shotTarget.fromArray(view.target);
           else shotTarget.copy(tableTarget);
           if (cameraMode === "table") targetPosition.set(0.01, 8.1, 1.2);
           else if (cameraMode === "room") targetPosition.set(11, 4.5, 19);
-          else if (autoView) targetPosition.fromArray(autoView.position);
+          else if (view) targetPosition.fromArray(view.position);
           else if (aiming) targetPosition.set(1.2, 3.2, 7.5);
           else {
             const drift = reduced.matches ? 0 : Math.sin(elapsed * 0.09) * 2.2;
             targetPosition.set(drift, 6.0, 16.2);
           }
-          if (camera.aspect < 1 && !autoView)
-            targetPosition.multiplyScalar(1.45);
-          const key = `${cameraMode}:${autoView?.phase || (aiming ? "aiming" : "lobby")}`;
+          if (camera.aspect < 1 && !view) targetPosition.multiplyScalar(1.45);
+          const key = `${cameraMode}:${view?.phase || (aiming ? "aiming" : "lobby")}`;
           if (!overviewSlide || overviewSlide.key !== key)
             overviewSlide = {
               key,
@@ -1762,6 +1799,7 @@ export default function Table3D(props) {
         compositor.dispose();
         fadeQuad.geometry.dispose();
         fadeMaterial.dispose();
+        pocketface?.dispose();
         pieces.dispose();
         tableMaterials?.dispose();
         boardArtwork.dispose();

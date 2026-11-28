@@ -1,0 +1,148 @@
+.pf-dialog {
+  width: min(95vw, 540px);
+  max-height: min(92dvh, 800px);
+  overflow: auto;
+  border-radius: 20px;
+  padding: 18px;
+  background: #f7f0e1;
+  color: #28382d;
+}
+.pf-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.pf-dialog > header span {
+  color: #745b36;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+.pf-dialog h2 {
+  margin: 2px 0;
+}
+.pf-editor {
+  display: grid;
+  gap: 14px;
+}
+.pf-editor .pf-view {
+  height: min(27dvh, 230px);
+  border: 1px solid #cbb688;
+  border-radius: 14px;
+  background: radial-gradient(ellipse, #4f6051, #25352c);
+}
+.pf-view {
+  position: relative;
+  width: 100%;
+}
+.pf-render,
+.pf-view canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pf-loading {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  color: #ede1c6;
+  font-size: 0.85rem;
+}
+.pf-controls {
+  display: grid;
+  gap: 10px;
+}
+.pf-controls fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.pf-controls legend,
+.pf-style label {
+  font-weight: 700;
+}
+.pf-faces,
+.pf-style {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pf-faces button {
+  padding: 8px 10px;
+  border: 1px solid #a99b82;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+}
+.pf-faces button[aria-pressed="true"] {
+  background: #315547;
+  color: white;
+  border-color: #315547;
+}
+.pf-style {
+  gap: 12px;
+}
+.pf-style input[type="color"] {
+  display: inline-block;
+  width: 32px;
+  height: 34px;
+  vertical-align: middle;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.pf-style select {
+  max-width: 125px;
+  padding: 7px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid #bcaf96;
+  border-radius: 7px;
+}
+.pf-controls .button {
+  justify-self: start;
+}
+.pf-controls > p {
+  margin: 0;
+  color: #8b3325;
+  font-size: 0.85rem;
+}
+.pf-spinner {
+  animation: pf-spin 850ms infinite linear;
+}
+@keyframes pf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pf-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.pf-actions details {
+  position: relative;
+}
+.pf-actions summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+}
+.pf-actions details > div {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.pf-bot-status {
+  color: inherit;
+}

@@ -1292,6 +1292,8 @@ export function createTablePieces(
     }
   }
   function updateLabels(state, players, now) {
+    if (state.config.avatarsEnabled)
+      players = players.filter((player) => !player.avatarVersion);
     const displayedBanks = new Map(
       players.map((p) => [
         p.id,

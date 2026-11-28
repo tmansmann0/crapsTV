@@ -30,6 +30,14 @@ import HouseRuleShowcase, {
 } from "./HouseRuleShowcase.jsx";
 import { DESKTOP_DISPLAY } from "./display-build.js";
 const TableScene = lazy(() => import("./Table3D.jsx"));
+const avatarModule = () => import("./Pocketface.jsx");
+const AvatarDialog = lazy(() =>
+  avatarModule().then((m) => ({ default: m.PocketfaceDialog })),
+);
+const AvatarActions = lazy(() =>
+  avatarModule().then((m) => ({ default: m.PocketfaceActions })),
+);
+
 const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
 const JukeboxVideo = DESKTOP_DISPLAY
   ? lazy(() => import("./JukeboxVideo.jsx"))
@@ -279,6 +287,7 @@ function App() {
     [jukeboxOpen, setJukeboxOpen] = useState(false),
     [musicSearch, setMusicSearch] = useState(EMPTY_MUSIC_SEARCH),
     [tableAudio] = useState(createTableAudio),
+    [avatars, setAvatars] = useState({}),
     [joinName, setJoinName] = useState(""),
     [joinCode, setJoinCode] = useState(initialCode),
     [confirm, setConfirm] = useState(null);
@@ -307,6 +316,7 @@ function App() {
   }, [androidHost, androidPanel, audioOpen, settingsOpen]);
   const confirmDialog = useRef(null);
   const chanceMotion = useRef({ samples: [], wake: null });
+  const requestedAvatars = useRef(new Map());
   useEffect(() => {
     if (confirm) confirmDialog.current?.showModal();
   }, [confirm]);
@@ -384,6 +394,8 @@ function App() {
     if (!session) return;
     setState(null);
     setPlayerId(null);
+    setAvatars({});
+    requestedAvatars.current.clear();
     const key = `crapstv:${session.code}`;
     let clockOffset = null,
       bestRoundTrip = Infinity,
@@ -441,6 +453,11 @@ function App() {
             current ? { ...current, clockOffsetMs: clockOffset } : current,
           );
         }
+      } else if (m.type === "avatar-data") {
+        setAvatars((current) => ({
+          ...current,
+          [m.id]: { version: m.version, profile: m.profile },
+        }));
       } else if (m.type === "welcome") {
         setPlayerId(m.playerId);
         const old = getSaved(key) || {};
@@ -458,6 +475,8 @@ function App() {
       } else if (m.type === "error") toast(m.message);
       else if (m.type === "reset") {
         setPlayerId(null);
+        setAvatars({});
+        requestedAvatars.current.clear();
         if (DESKTOP_DISPLAY) {
           setJukeboxOpen(false);
           setMusicSearch(EMPTY_MUSIC_SEARCH);
@@ -526,6 +545,45 @@ function App() {
         visible: view === "tv",
       });
   }, [status, view]);
+  const profiles = {};
+  const missingAvatars = [];
+  if (state?.config.avatarsEnabled) {
+    for (const seat of state.players) {
+      if (seat.left || !seat.avatarVersion) continue;
+      if (
+        view !== "tv" &&
+        seat.id !== playerId &&
+        !(state.adminId === playerId && seat.bot)
+      )
+        continue;
+      if (avatars[seat.id]?.version === seat.avatarVersion)
+        profiles[seat.id] = avatars[seat.id].profile;
+      else missingAvatars.push(seat.id);
+    }
+  }
+  const avatarRequests = state?.players
+    .filter((seat) => missingAvatars.includes(seat.id))
+    .map((seat) => `${seat.id}:${seat.avatarVersion}`)
+    .join(",");
+  useEffect(() => {
+    if (status !== "connected") {
+      requestedAvatars.current.clear();
+      return;
+    }
+    if (!avatarRequests) return;
+    const players = state.players.filter(
+      (seat) =>
+        missingAvatars.includes(seat.id) &&
+        requestedAvatars.current.get(seat.id) !== seat.avatarVersion,
+    );
+    if (!players.length) return;
+    for (const seat of players)
+      requestedAvatars.current.set(seat.id, seat.avatarVersion);
+    transport.current?.send({
+      type: "avatar-request",
+      players: players.map((seat) => seat.id),
+    });
+  }, [status, avatarRequests, session?.code]);
   const announceHouseRules =
     view === "tv" && state?.config.houseRules?.announce === true;
   const houseRulePrompt =
@@ -725,6 +783,7 @@ function App() {
       >
         <Table3D
           state={state}
+          avatarProfiles={profiles}
           code={roomCode}
           status={checking ? "connecting" : status}
           error={visibleError}
@@ -934,6 +993,7 @@ function App() {
           state={state}
           player={player}
           isAdmin={isAdmin}
+          profiles={profiles}
           send={send}
           confirm={setConfirm}
           connected={status === "connected"}
@@ -1079,6 +1139,7 @@ function Phone({
   state,
   player,
   isAdmin,
+  profiles,
   send,
   confirm,
   connected,
@@ -1092,6 +1153,27 @@ function Phone({
   fallbackJoinURL,
 }) {
   const disabled = state.rolling || !connected;
+  const [editingAvatar, setEditingAvatar] = useState(false);
+  const avatarRequired = state.config.avatarsEnabled && !player.avatarVersion;
+  const avatarDialog = state.config.avatarsEnabled &&
+    !state.rolling &&
+    !state.pausedAt &&
+    (avatarRequired || editingAvatar) && (
+      <Suspense fallback={null}>
+        <AvatarDialog
+          key={player.id}
+          label={avatarRequired ? "Make your avatar" : "Edit your avatar"}
+          initial={profiles[player.id]}
+          disabled={!connected}
+          error={serverError}
+          onClose={avatarRequired ? undefined : () => setEditingAvatar(false)}
+          onSave={(avatar) => {
+            send({ type: "pocketface", avatar });
+            setEditingAvatar(false);
+          }}
+        />
+      </Suspense>
+    );
   const adminProps = {
     state,
     player,
@@ -1104,13 +1186,24 @@ function Phone({
     onMusicSettings,
     fallbackJoinURL,
     serverError,
+    avatarProfiles: profiles,
   };
+  const avatarActions = state.config.avatarsEnabled && (
+    <Suspense fallback={null}>
+      <AvatarActions
+        open={() => setEditingAvatar(true)}
+        ready={!!player.avatarVersion}
+        send={send}
+      />
+    </Suspense>
+  );
   const settingsArea = (
     <details className="session-controls">
       <summary>
         {isAdmin ? "Host controls" : "Your session"}
         <ChevronDown size={15} />
       </summary>
+      {avatarActions}
       {isAdmin ? (
         <AdminPanel {...adminProps} />
       ) : (
@@ -1128,27 +1221,32 @@ function Phone({
 
   if (state.status === "playing")
     return (
-      <PhoneGame
-        state={state}
-        player={player}
-        isAdmin={isAdmin}
-        send={send}
-        connected={connected}
-        settingsArea={settingsArea}
-        serverError={serverError}
-        musicArea={musicArea}
-        rollArea={
-          <DiceThrow
-            state={state}
-            player={player}
-            send={send}
-            connected={connected}
-          />
-        }
-      />
+      <>
+        {avatarDialog}
+        <PhoneGame
+          state={state}
+          player={player}
+          isAdmin={isAdmin}
+          send={send}
+          connected={connected}
+          settingsArea={settingsArea}
+          serverError={serverError}
+          musicArea={musicArea}
+          rollArea={
+            <DiceThrow
+              state={state}
+              player={player}
+              send={send}
+              connected={connected}
+            />
+          }
+        />
+      </>
     );
   return (
     <main className="phone-page">
+      {avatarDialog}
+      {isAdmin && avatarActions}
       {isAdmin ? (
         <AdminPanel {...adminProps} />
       ) : (

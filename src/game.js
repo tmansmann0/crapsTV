@@ -1,3 +1,4 @@
+import { normalizePocketface, POCKETFACE_EMOTES } from "./pocketface-state.js";
 import {
   CHANCE_HOP_LIMIT,
   createChanceDiceHops,
@@ -162,6 +163,7 @@ export function createState(code = "LOCAL") {
       startingBank: 100000,
       minBet: 500,
       teach: false,
+      avatarsEnabled: false,
       houseRules: { ...DEFAULT_HOUSE_RULES },
       rollCooldownSeconds: DEFAULT_ROLL_COOLDOWN_SECONDS,
       botRollDelaySeconds: DEFAULT_BOT_ROLL_DELAY_SECONDS,
@@ -206,6 +208,50 @@ export function drinkOfferLimit(player, price) {
 }
 export function snapshot(state) {
   return structuredClone(state);
+}
+export function roomSnapshot(state) {
+  return snapshot({
+    ...state,
+    players: state.players.map(({ pocketface, ...player }) => player),
+  });
+}
+
+export function setAvatarsEnabled(s, id, enabled) {
+  admin(s, id);
+  assert(!s.rolling && s.status !== "ended", "Wait until the table is open.");
+  assert(typeof enabled === "boolean", "Choose whether avatars are enabled.");
+  s.config.avatarsEnabled = enabled;
+}
+function assignPocketface(player, avatar) {
+  const profile = normalizePocketface(avatar);
+  assert(profile, "Finish the Pocketface setup first.");
+  player.pocketface = profile;
+  player.avatarVersion = uid();
+}
+export function setPocketface(s, id, targetId, avatar) {
+  const requester = active(s, id);
+  const player = targetId === undefined ? requester : active(s, targetId);
+  assert(
+    s.config.avatarsEnabled && s.status !== "ended",
+    "Avatars are off at this table.",
+  );
+  assert(
+    player.id === id || (s.adminId === id && player.bot),
+    "You can only edit your own avatar or a bot you host.",
+  );
+  assignPocketface(player, avatar);
+}
+export function setAvatarEmote(s, id, name) {
+  const player = active(s, id);
+  assert(
+    s.config.avatarsEnabled && player.pocketface && s.status !== "ended",
+    "Make your avatar first.",
+  );
+  assert(Object.hasOwn(POCKETFACE_EMOTES, name), "Choose an emote.");
+  const now = Date.now();
+  if (now - (player.avatarEmote?.at ?? 0) < 1500) return false;
+  player.avatarEmote = { name, at: now };
+  return true;
 }
 /** This table excludes directly opposing entry bets; other casino hedges remain legal. */
 export function betConflict(player, betId) {
@@ -577,7 +623,16 @@ export function addBot(s, id, options = {}) {
   const host = active(s, id);
   assert(!host.bot, "Only a human host can add bots.");
   const bot = normalizeBotOptions(options);
-  return join(s, options.name, bot);
+  const profile = s.config.avatarsEnabled
+    ? normalizePocketface(options.avatar)
+    : null;
+  assert(
+    !s.config.avatarsEnabled || profile,
+    "Set up this bot’s Pocketface avatar first.",
+  );
+  const player = join(s, options.name, bot);
+  if (profile) assignPocketface(player, profile);
+  return player;
 }
 export function updateBot(s, id, playerId, options) {
   admin(s, id);
@@ -662,6 +717,7 @@ export function configure(s, id, changes) {
     drinkingMode,
     ...(drinkingMode && { drinkingRules: normalizedDrinkRules }),
     teach,
+    avatarsEnabled: s.config.avatarsEnabled === true,
     houseRules: s.config.houseRules ?? { ...DEFAULT_HOUSE_RULES },
     rollCooldownSeconds,
     pointRollCooldownSeconds,
