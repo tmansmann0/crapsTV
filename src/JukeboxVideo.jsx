@@ -32,13 +32,16 @@ function loadYouTube() {
 export default function JukeboxVideo({ video, onReport }) {
   const slot = useRef(null);
   const report = useRef(onReport);
+  const paused = useRef(video.paused);
+  const syncPlayback = useRef(null);
   report.current = onReport;
+  paused.current = video.paused;
   const { id, attempt } = video;
 
   useEffect(() => {
     let disposed = false,
       visible = false,
-      started = false,
+      playingRequested = false,
       readyPlayer,
       player;
     const container = slot.current;
@@ -62,21 +65,26 @@ export default function JukeboxVideo({ video, onReport }) {
     const notify = (state) => {
       if (!disposed) report.current(attempt, state);
     };
-    function playWhenVisible() {
-      if (disposed || !readyPlayer || !visible || document.hidden || started)
-        return;
-      started = true;
-      readyPlayer.playVideo();
+    function sync() {
+      if (disposed || !readyPlayer) return;
+      if (paused.current) {
+        if (playingRequested) readyPlayer.pauseVideo();
+        playingRequested = false;
+      } else if (visible && !document.hidden && !playingRequested) {
+        playingRequested = true;
+        readyPlayer.playVideo();
+      }
     }
+    syncPlayback.current = sync;
     const observer = new IntersectionObserver(
       ([entry]) => {
         visible = entry.intersectionRatio >= 0.51;
-        playWhenVisible();
+        sync();
       },
       { threshold: 0.51 },
     );
     observer.observe(frame);
-    document.addEventListener("visibilitychange", playWhenVisible);
+    document.addEventListener("visibilitychange", sync);
 
     loadYouTube()
       .then((api) => {
@@ -85,10 +93,16 @@ export default function JukeboxVideo({ video, onReport }) {
           events: {
             onReady(event) {
               readyPlayer = event.target;
-              playWhenVisible();
+              sync();
             },
             onStateChange(event) {
-              if (event.data === api.PlayerState.PLAYING) notify("playing");
+              if (event.data === api.PlayerState.PLAYING) {
+                if (paused.current) event.target.pauseVideo();
+                else {
+                  playingRequested = true;
+                  notify("playing");
+                }
+              }
               if (event.data === api.PlayerState.ENDED) notify("ended");
             },
             onError: () => notify("error"),
@@ -99,12 +113,15 @@ export default function JukeboxVideo({ video, onReport }) {
 
     return () => {
       disposed = true;
+      syncPlayback.current = null;
       observer.disconnect();
-      document.removeEventListener("visibilitychange", playWhenVisible);
+      document.removeEventListener("visibilitychange", sync);
       player?.destroy();
       frame.remove();
     };
   }, [id, attempt]);
+
+  useEffect(() => syncPlayback.current?.(), [video.paused]);
 
   return (
     <aside className="jukebox-video" ref={slot} aria-label="Music video" />

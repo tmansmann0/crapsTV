@@ -37,12 +37,15 @@ test("desktop jukebox protects transport controls, shares the queue and advances
       const done = new Promise((resolve) => {
         finish = resolve;
       });
-      const playback = { track, finish, done, stopped: false };
+      const playback = { track, finish, done, stopped: false, paused: false };
       played.push(playback);
       return {
         done,
         stop: () => {
           playback.stopped = true;
+        },
+        setPaused: (paused) => {
+          playback.paused = paused;
         },
       };
     },
@@ -82,6 +85,7 @@ test("desktop jukebox protects transport controls, shares the queue and advances
   send("host", "jukebox-control", { action: "mode", mode: "approval" });
   send("guest", "jukebox-request", { trackId: first.id, cost: 500 });
   assert.match(last("guest", "jukebox-error").message, /Search again/);
+  assert.equal(last("guest", "jukebox-queued"), undefined);
 
   send("guest", "jukebox-search", { query: "jazz" });
   await next();
@@ -89,6 +93,8 @@ test("desktop jukebox protects transport controls, shares the queue and advances
   assert.equal(last("tv", "jukebox-results"), undefined);
   send("guest", "jukebox-request", { trackId: first.id, cost: 500 });
   send("guest", "jukebox-request", { trackId: second.id, cost: 500 });
+  assert.equal(last("guest", "jukebox-queued").trackId, second.id);
+  assert.equal(last("host", "jukebox-queued"), undefined);
   assert.equal(played.length, 0);
   assert.equal(guest.bank, initial - 1000);
   assert.equal(last("host", "jukebox-state").jukebox.queue[0].pending, true);
@@ -115,6 +121,22 @@ test("desktop jukebox protects transport controls, shares the queue and advances
     playing: true,
     tv: { title: second.title, next: first.title, queued: 1, failed: false },
   });
+  send("guest", "jukebox-control", { action: "pause" });
+  assert.match(last("guest", "jukebox-error").message, /Only the table host/);
+  assert.equal(played[0].paused, false);
+  send("host", "jukebox-control", { action: "pause" });
+  await next();
+  assert.equal(played[0].paused, true);
+  assert.equal(last("guest", "jukebox-state").jukebox.paused, true);
+  assert.equal(last("tv", "jukebox-state").jukebox.playing, false);
+  assert.equal(last("host", "jukebox-state").jukebox.current.id, second.id);
+  assert.equal(played.length, 1);
+  send("host", "jukebox-control", { action: "play" });
+  await next();
+  assert.equal(played[0].paused, false);
+  assert.equal(last("tv", "jukebox-state").jukebox.playing, true);
+  assert.equal(played.length, 1);
+
   send("host", "jukebox-control", { action: "skip" });
   assert.equal(played[0].stopped, true);
   assert.equal(played.length, 1);
@@ -274,7 +296,26 @@ test("a failed audio-only request tries the same song on the local TV before adv
     attempt: firstVideo.attempt,
     status: "playing",
   });
+  send("host", "jukebox-control", { action: "pause" });
+  await next();
+  assert.deepEqual(music("tv").video, { ...firstVideo, paused: true });
+  assert.equal(music("tv").playing, false);
+  assert.equal(music("host").current.id, first.id);
+  send("host", "jukebox-control", { action: "play" });
+  await next();
+  assert.deepEqual(music("tv").video, firstVideo);
+  assert.equal(music("tv").playing, true);
+  send("host", "jukebox-control", { action: "pause" });
+  await next();
   send("tv", "jukebox-video", { attempt: firstVideo.attempt, status: "ended" });
+  await next();
+  assert.equal(native.length, 1);
+  assert.equal(music("host").paused, true);
+  assert.deepEqual(
+    music("host").queue.map((track) => track.id),
+    [second.id],
+  );
+  send("host", "jukebox-control", { action: "play" });
   await next();
   assert.deepEqual(
     native.map(({ id }) => id),
