@@ -30,7 +30,7 @@ const LOOSE_WAGER_CHIPS = 3;
 const MINIMUM_CHIP_IMPACT_SPEED = 2.1;
 const LOOSE_CHIP_MASS = 0.023;
 const PHYSICS_STEP = 1 / 120;
-function correctContactFriction(world) {
+export function correctContactFriction(world) {
   // cannon-es 0.20's averaged-friction path swaps body-local contact arms.
   // Use each original contact instead, sharing the manifold's Coulomb force
   // budget across its points. This keeps the correct lever arms and resists

@@ -1,0 +1,1070 @@
+/* Full-screen chance roll with two independently stopped six-sided dice. */
+
+.hrc {
+  --a: #e8b04a;
+  --dice-resin: var(--a);
+  --dice-pips: #173227;
+  --gold: #f2c55c;
+  --ivory: #fff4dc;
+  --die: 17vmin;
+  --reveal-delay: 0ms;
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--ivory);
+  font-family: Manrope, "DM Sans", Arial, sans-serif;
+  text-align: center;
+}
+.hrc.is-late *,
+.hrc.is-late *::before,
+.hrc.is-late *::after {
+  animation: none !important;
+  transition: none !important;
+}
+.hrc-v-secondWind {
+  --a: #7fe6d4;
+}
+.hrc-v-hardPoint {
+  --a: #ff5d6c;
+  --dice-resin: #d6293d;
+  --dice-pips: #fff4dc;
+}
+.hrc-v-hotHand {
+  --a: #ff8a2b;
+  --dice-resin: #f78d31;
+}
+.hrc-v-crapsCashback {
+  --a: #8fd3ff;
+  --dice-resin: #78bff1;
+}
+.hrc-v-luckySeven {
+  --a: #c9f27a;
+  --dice-resin: #b9df5f;
+}
+.hrc-v-passTheDice {
+  --a: #c6a6ff;
+}
+.hrc-v-tableJackpot {
+  --a: #ffcf4a;
+  --dice-resin: #eab448;
+}
+
+.hrc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- layout ---------- */
+.hrc-scene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  padding: 6.5vmin 6vmin 5.5vmin;
+}
+.hrc-wash {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 55% 45% at 50% 62%,
+      color-mix(in srgb, var(--a) 20%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      #00000040,
+      transparent 30%,
+      transparent 70%,
+      #00000059
+    );
+}
+.hrc-wash::after {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 80% 70% at 70% 30%,
+    color-mix(in srgb, var(--a) 45%, #fff),
+    transparent 70%
+  );
+  opacity: 0;
+  content: "";
+  animation: hrc-flash 520ms ease-out both;
+}
+@keyframes hrc-flash {
+  0% {
+    opacity: 0.32;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---------- lightning strike ---------- */
+.hrc-bolt {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hrc-bolt-strike {
+  opacity: 0;
+  transform-box: view-box;
+  transform-origin: 100% 0;
+  animation: hrc-strike 620ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.hrc-bolt path {
+  fill: none;
+  stroke-linejoin: miter;
+  stroke-linecap: round;
+}
+.hrc-bolt-glow {
+  stroke: var(--a);
+  stroke-width: 3vmin;
+  opacity: 0.4;
+}
+.hrc-bolt-core {
+  stroke: #fffbea;
+  stroke-width: 1vmin;
+}
+.hrc-bolt-fork {
+  stroke: #fffbea;
+  stroke-width: 0.45vmin;
+  opacity: 0.8;
+}
+@keyframes hrc-strike {
+  0% {
+    opacity: 1;
+    transform: scale(0.06);
+  }
+  16% {
+    opacity: 1;
+    transform: none;
+  }
+  45% {
+    opacity: 0.9;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: none;
+  }
+}
+
+/* ---------- title block ---------- */
+.hrc-head {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  justify-items: center;
+  max-width: 92vw;
+}
+.hrc-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  font-size: 2.3vmin;
+  font-weight: 800;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold);
+  animation: hrc-rise 320ms ease-out both;
+}
+.hrc-eyebrow::before,
+.hrc-eyebrow::after {
+  width: 5vmin;
+  height: 0.3vmin;
+  background: linear-gradient(90deg, transparent, var(--a));
+  content: "";
+}
+.hrc-eyebrow::after {
+  transform: scaleX(-1);
+}
+.hrc-title {
+  max-width: 100%;
+  margin-top: 0.08em;
+  font-size: min(11vmin, 8.5vw);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow:
+    0 0.045em 0 #00000090,
+    0 0 0.45em color-mix(in srgb, var(--a) 40%, transparent);
+  animation: hrc-slam 380ms 30ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.hrc-holder {
+  max-width: 80vw;
+  margin-top: 0.55em;
+  overflow: hidden;
+  font-size: 3.2vmin;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--a) 40%, var(--ivory));
+  animation: hrc-rise 360ms 200ms ease-out both;
+}
+@keyframes hrc-slam {
+  from {
+    opacity: 0;
+    transform: scale(1.16);
+  }
+}
+@keyframes hrc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+  }
+}
+@keyframes hrc-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- stage ---------- */
+.hrc-stage {
+  position: relative;
+  z-index: 2;
+  width: 100vw;
+  min-height: 34vmin;
+}
+.hrc-fx {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.hrc-burst {
+  position: absolute;
+  left: 50%;
+  bottom: calc(9vmin + var(--die) / 2);
+  width: 96vmin;
+  height: 96vmin;
+  margin: 0 0 -48vmin -48vmin;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--a) 55%, #fff) 0%,
+    color-mix(in srgb, var(--a) 25%, transparent) 45%,
+    transparent 100%
+  );
+  opacity: 0;
+  animation: hrc-burst 900ms 60ms ease-out both;
+}
+@keyframes hrc-burst {
+  0% {
+    opacity: 0.85;
+    transform: scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+/* The same GLB as the table dice is rendered over the rule's artwork. */
+.hrc-dice {
+  position: absolute;
+  left: 50%;
+  bottom: -2vmin;
+  width: min(96vw, 100vmin);
+  height: 60vmin;
+  transform: translateX(-50%);
+}
+.hrc-dice canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hrc-dice-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3vmin;
+}
+.hrc-dice-fallback span {
+  display: grid;
+  place-items: center;
+  width: var(--die);
+  aspect-ratio: 1;
+  border: 0.25vmin solid var(--a);
+  border-radius: 1.8vmin;
+  background: #0a2219;
+  font-size: 8vmin;
+  font-weight: 800;
+}
+
+/* ---------- reveal (only after `revealed`) ---------- */
+.hrc-halo {
+  position: absolute;
+  left: 50%;
+  bottom: calc(9vmin + var(--die) / 2);
+  width: 64vmin;
+  height: 64vmin;
+  margin: 0 0 -32vmin -32vmin;
+  border-radius: 50%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--a) 45%, transparent),
+    color-mix(in srgb, var(--gold) 14%, transparent) 60%,
+    transparent
+  );
+  animation: hrc-halo 700ms calc(var(--reveal-delay) + 80ms) ease-out both;
+}
+.hrc-halo::after {
+  position: absolute;
+  inset: 18%;
+  border: 0.5vmin solid color-mix(in srgb, var(--gold) 70%, transparent);
+  border-radius: 50%;
+  opacity: 0;
+  content: "";
+  animation: hrc-ring-out 760ms calc(var(--reveal-delay) + 80ms) ease-out both;
+}
+@keyframes hrc-halo {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+@keyframes hrc-ring-out {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+.hrc-stamp {
+  position: absolute;
+  z-index: 5;
+  left: calc(50% + 41vmin);
+  bottom: calc(9vmin + var(--die) * 0.32);
+  transform: rotate(-7deg);
+  transform-origin: 0 50%;
+}
+.hrc-stamp span {
+  position: relative;
+  display: block;
+  padding: 0.04em 0.34em 0.06em;
+  border: 0.65vmin solid currentColor;
+  border-radius: 1.6vmin;
+  font-size: 9vmin;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  background: #0a2219e0;
+  animation: hrc-stamp 400ms calc(var(--reveal-delay) + 140ms)
+    cubic-bezier(0.5, 0, 0.4, 1.4) both;
+}
+@media (max-aspect-ratio: 4/3) {
+  .hrc-stamp {
+    right: 6vmin;
+    bottom: 43vmin;
+    left: auto;
+  }
+  .hrc-stamp span {
+    font-size: 6vmin;
+  }
+}
+.is-hit .hrc-stamp span {
+  color: #ffd970;
+  text-shadow: 0 0 0.35em #f2b93b90;
+  box-shadow: 0 0 4vmin #f2b93b55;
+}
+.is-miss .hrc-stamp span {
+  color: #d9ccb0;
+}
+.is-miss .hrc-stamp span::after {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 52%;
+  height: 0.6vmin;
+  border-radius: 1vmin;
+  background: currentColor;
+  transform: rotate(-4deg);
+  content: "";
+}
+@keyframes hrc-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(2.3);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.92);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.hrc-roller {
+  position: absolute;
+  left: 50%;
+  bottom: 0.6vmin;
+  max-width: 60vw;
+  overflow: hidden;
+  font-size: 2.3vmin;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #d9ccb0;
+  transform: translateX(-50%);
+  animation: hrc-fade 400ms 500ms ease-out both;
+}
+.hrc-roller span {
+  margin-right: 0.35em;
+  font-size: 0.8em;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+/* ---------- target / result panel ---------- */
+.hrc-panel {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: 20vmin minmax(0, 64vmin) 20vmin;
+  gap: 4vmin;
+  align-items: center;
+  max-width: 94vw;
+  padding: 1.6vmin 4vmin;
+  border: 0.22vmin solid color-mix(in srgb, var(--gold) 45%, transparent);
+  border-radius: 3vmin;
+  background: #061710d9;
+  box-shadow: 0 1.5vmin 4vmin #00000070;
+  animation: hrc-rise 420ms 260ms ease-out both;
+}
+.hrc-target,
+.hrc-result {
+  display: grid;
+  justify-items: center;
+}
+.hrc-k {
+  font-size: 1.9vmin;
+  font-weight: 800;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.hrc-need {
+  margin-top: 0.3em;
+  font-size: 1.7vmin;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: #cbbd9f;
+}
+.hrc-v {
+  font-size: 7.4vmin;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--ivory);
+}
+.hrc-pending {
+  font-size: 5vmin;
+  color: #cbbd9f;
+}
+.hrc-roll {
+  animation: hrc-stamp 380ms var(--reveal-delay) cubic-bezier(0.5, 0, 0.4, 1.4)
+    both;
+}
+.is-hit .hrc-roll {
+  color: #ffd970;
+  text-shadow: 0 0 0.3em #f2b93b80;
+}
+.is-miss .hrc-roll {
+  color: #e3d6ba;
+}
+.hrc-verdict {
+  margin-top: 0.3em;
+  font-size: 1.7vmin;
+  letter-spacing: 0.2em;
+  color: #cbbd9f;
+}
+.is-revealed .hrc-verdict {
+  animation: hrc-fade 240ms var(--reveal-delay) ease-out both;
+}
+.is-hit .hrc-verdict {
+  color: #ffd970;
+}
+.hrc-meter {
+  display: grid;
+  gap: 1vmin;
+}
+.hrc-track {
+  position: relative;
+  height: 2.4vmin;
+  border-radius: 2vmin;
+  background: #ffffff16;
+  box-shadow: inset 0 0.3vmin 0.6vmin #00000080;
+}
+.hrc-zone {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--hrc-target);
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--a) 60%, #000),
+    var(--a)
+  );
+  box-shadow: 0 0 2vmin color-mix(in srgb, var(--a) 55%, transparent);
+  transform-origin: left;
+  animation: hrc-zone 600ms 420ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+@keyframes hrc-zone {
+  from {
+    transform: scaleX(0);
+  }
+}
+.hrc-marker-lane {
+  position: absolute;
+  inset: 0;
+  transform: translateX(var(--hrc-pos));
+  animation: hrc-marker 620ms var(--reveal-delay)
+    cubic-bezier(0.2, 0.8, 0.3, 1.1) both;
+}
+@keyframes hrc-marker {
+  from {
+    transform: translateX(0);
+  }
+}
+.hrc-marker {
+  position: absolute;
+  left: -0.5vmin;
+  top: -1.9vmin;
+  width: 1vmin;
+  height: 6.2vmin;
+  border-radius: 1vmin;
+  background: var(--ivory);
+  box-shadow:
+    0 0 0 0.3vmin #06170f,
+    0 0 2vmin #fff8;
+}
+.is-hit .hrc-marker {
+  background: #ffd970;
+}
+.hrc-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.7vmin;
+  font-weight: 700;
+  color: #9fb8a9;
+}
+
+/* =========================================================
+   Rule-specific scenery and lighting accents.
+   ========================================================= */
+
+/* ----- Second Wind: air trails ----- */
+.hrc-wind path {
+  stroke: var(--a);
+  opacity: 0.32;
+  animation: hrc-wind 1100ms ease-out both;
+}
+.hrc-wind-1 {
+  stroke-width: 7;
+}
+.hrc-wind-2 {
+  stroke-width: 12;
+  animation-delay: 90ms !important;
+}
+.hrc-wind-3 {
+  stroke-width: 5;
+  animation-delay: 170ms !important;
+}
+@keyframes hrc-wind {
+  0% {
+    opacity: 0;
+    transform: translateX(-700px);
+  }
+  35% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.32;
+    transform: none;
+  }
+}
+
+/* ----- Hard Point: ring stamp and impact cracks ----- */
+.hrc-v-hardPoint .hrc-stage {
+  animation: hrc-shake 340ms 660ms linear both;
+}
+@keyframes hrc-shake {
+  0%,
+  100% {
+    transform: none;
+  }
+  20% {
+    transform: translate(0.8vmin, 1.1vmin);
+  }
+  40% {
+    transform: translate(-0.7vmin, -0.5vmin);
+  }
+  60% {
+    transform: translate(0.4vmin, 0.3vmin);
+  }
+  80% {
+    transform: translate(-0.2vmin, -0.1vmin);
+  }
+}
+.hrc-stamp-ring,
+.hrc-cracks {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.hrc-stamp-ring {
+  animation: hrc-ring-stamp 380ms 640ms cubic-bezier(0.6, 0, 0.6, 1.3) both;
+}
+.hrc-ring-outer {
+  fill: none;
+  stroke: #f5c757;
+  stroke-width: 14;
+}
+.hrc-ring-inner {
+  fill: color-mix(in srgb, var(--a) 12%, transparent);
+  stroke: var(--a);
+  stroke-width: 4;
+}
+@keyframes hrc-ring-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.96);
+  }
+  100% {
+    transform: none;
+  }
+}
+.hrc-cracks path {
+  fill: none;
+  stroke: #ffd970;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+.hrc-cracks {
+  animation: hrc-fade 200ms 680ms both;
+}
+
+/* ----- Hot Hand: heat streak and embers ----- */
+.hrc-sear {
+  position: absolute;
+  left: 50%;
+  bottom: 10vmin;
+  width: 70vw;
+  height: 8vmin;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #ff7a1f90 25%,
+    #ffc65ce0 65%,
+    #fff8e0 100%
+  );
+  box-shadow: 0 0 5vmin #ff8a2b80;
+  opacity: 0;
+  transform: rotate(-17deg);
+  transform-origin: 0 50%;
+  animation: hrc-sear 900ms 120ms ease-out both;
+}
+@keyframes hrc-sear {
+  0% {
+    opacity: 1;
+    transform: rotate(-17deg) translateX(60vw) scaleX(0.2);
+  }
+  45% {
+    opacity: 1;
+    transform: rotate(-17deg) translateX(0) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-17deg) translateX(-6vw) scaleX(0.6);
+  }
+}
+.hrc-scorch {
+  fill: #ff6a1f;
+  opacity: 0.28;
+  animation: hrc-fade 500ms 700ms ease-out both;
+}
+.hrc-ember {
+  fill: #ffcf6a;
+  opacity: 0;
+  animation: hrc-ember 820ms calc(700ms + var(--i) * 60ms) ease-out both;
+}
+@keyframes hrc-ember {
+  0% {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-110px);
+  }
+}
+
+/* ----- Craps Cashback: frost sweep ----- */
+.hrc-frost-sweep {
+  position: absolute;
+  inset: -10% -40%;
+  background: linear-gradient(
+    100deg,
+    transparent 38%,
+    #dff4ff30 46%,
+    #ffffffa0 50%,
+    #dff4ff30 54%,
+    transparent 62%
+  );
+  opacity: 0;
+  animation: hrc-sweep 900ms 260ms ease-in-out both;
+}
+@keyframes hrc-sweep {
+  0% {
+    opacity: 1;
+    transform: translateX(-60%);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60%);
+  }
+}
+.hrc-chip-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hrc-ring-in 520ms 560ms cubic-bezier(0.2, 0.8, 0.3, 1.2) both;
+}
+.hrc-chip-edge {
+  fill: #2f6fc422;
+  stroke: #2f6fc4;
+  stroke-width: 24;
+}
+.hrc-chip-dash {
+  fill: none;
+  stroke: #fff2d0;
+  stroke-width: 9;
+  stroke-dasharray: 26 44;
+  opacity: 0.85;
+}
+@keyframes hrc-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.hrc-crystal {
+  fill: none;
+  stroke: #e6f6ff;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  opacity: 0.85;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hrc-pop 420ms calc(380ms + var(--i) * 90ms) ease-out both;
+}
+@keyframes hrc-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-90deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* ----- Lucky Seven: foil rays and clovers ----- */
+.hrc-foil-rays {
+  fill: var(--a);
+  opacity: 0.16;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hrc-rays 1100ms 420ms cubic-bezier(0.1, 0.7, 0.3, 1) both;
+}
+@keyframes hrc-rays {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(-70deg);
+  }
+  35% {
+    opacity: 0.35;
+  }
+}
+.hrc-clover {
+  fill: var(--a);
+  stroke: var(--a);
+  opacity: 0.85;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hrc-pop 460ms calc(700ms + var(--i) * 80ms) ease-out both;
+}
+
+/* ----- Pass the Dice: roller’s seat and trail ----- */
+.hrc-trail {
+  fill: var(--a);
+  opacity: 0.5;
+  animation: hrc-trail 520ms calc(140ms + var(--i) * 80ms) ease-out both;
+}
+@keyframes hrc-trail {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+.hrc-seat {
+  position: absolute;
+  left: calc(50% - 38vw);
+  bottom: 1vmin;
+  display: grid;
+  justify-items: center;
+  gap: 1vmin;
+  width: 24vmin;
+  transform: translateX(-50%);
+  animation: hrc-rise 360ms 60ms ease-out both;
+}
+.hrc-seat-figure {
+  position: relative;
+  width: 11vmin;
+  height: 11vmin;
+  border: 0.5vmin solid var(--a);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, #fff2d0 0 19%, transparent 20%),
+    radial-gradient(
+      ellipse 34% 26% at 50% 86%,
+      #fff2d0 0 98%,
+      transparent 100%
+    ),
+    #133528;
+  box-shadow: 0 0 3vmin color-mix(in srgb, var(--a) 45%, transparent);
+}
+.hrc-seat span {
+  max-width: 100%;
+  padding: 0.35em 0.9em;
+  overflow: hidden;
+  border: 0.22vmin solid var(--a);
+  border-radius: 99px;
+  font-size: 2.1vmin;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #0b241b;
+}
+
+/* ----- Table Jackpot: the vault frame charges around the dice ----- */
+.hrc-vault {
+  position: absolute;
+  left: 50%;
+  top: 3.5vmin;
+  bottom: 4.5vmin;
+  width: min(84vw, 118vmin);
+  border: 0.25vmin solid #f5c75738;
+  border-radius: 2.4vmin;
+  background: radial-gradient(ellipse at 50% 80%, #f2b93b1c, transparent 70%);
+  transform: translateX(-50%);
+}
+.hrc-bar {
+  position: absolute;
+  background: linear-gradient(90deg, #fff1b8, #f4c64e, #b8801f);
+  box-shadow: 0 0 1.6vmin #f2b93b90;
+}
+.hrc-bar-top,
+.hrc-bar-bottom {
+  left: 0;
+  right: 0;
+  height: 0.8vmin;
+}
+.hrc-bar-left,
+.hrc-bar-right {
+  top: 0;
+  bottom: 0;
+  width: 0.8vmin;
+}
+.hrc-bar-top {
+  top: -0.3vmin;
+  transform-origin: 0 50%;
+  animation: hrc-charge-x 260ms 120ms linear both;
+}
+.hrc-bar-right {
+  right: -0.3vmin;
+  transform-origin: 50% 0;
+  animation: hrc-charge-y 220ms 380ms linear both;
+}
+.hrc-bar-bottom {
+  bottom: -0.3vmin;
+  transform-origin: 100% 50%;
+  animation: hrc-charge-x 260ms 600ms linear both;
+}
+.hrc-bar-left {
+  left: -0.3vmin;
+  transform-origin: 50% 100%;
+  animation: hrc-charge-y 220ms 860ms linear both;
+}
+@keyframes hrc-charge-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes hrc-charge-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+.hrc-bolt-stud {
+  position: absolute;
+  width: 3.2vmin;
+  height: 3.2vmin;
+  margin: -1.6vmin;
+  border: 0.4vmin solid #fff1b8;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff6d0, #d99a26 60%, #6b440b);
+  box-shadow: 0 0 2vmin #f2b93b;
+  animation: hrc-stud 300ms ease-out both;
+}
+.hrc-stud-0 {
+  left: 0;
+  top: 0;
+  animation-delay: 1080ms;
+}
+.hrc-stud-1 {
+  right: 0;
+  top: 0;
+  margin-right: -1.6vmin;
+  animation-delay: 380ms;
+}
+.hrc-stud-2 {
+  right: 0;
+  bottom: 0;
+  margin: 0 -1.6vmin -1.6vmin 0;
+  animation-delay: 600ms;
+}
+.hrc-stud-3 {
+  left: 0;
+  bottom: 0;
+  margin-bottom: -1.6vmin;
+  animation-delay: 860ms;
+}
+@keyframes hrc-stud {
+  0% {
+    opacity: 0.25;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  100% {
+    transform: none;
+  }
+}
+.hrc-v-tableJackpot.is-miss .hrc-vault {
+  opacity: 0.55;
+  transition: opacity 500ms calc(var(--reveal-delay) + 200ms);
+}
+
+/* ----- default: a clean felt ring for any future rule ----- */
+.hrc-felt-ring {
+  fill: color-mix(in srgb, var(--a) 8%, transparent);
+  stroke: var(--gold);
+  stroke-width: 4;
+  stroke-dasharray: 14 18;
+  opacity: 0.55;
+  animation: hrc-fade 500ms 620ms ease-out both;
+}
+
+/* ---------- reduced motion: settled frames, soft fades only ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .hrc *,
+  .hrc *::before,
+  .hrc *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .hrc-bolt-strike {
+    opacity: 0.22;
+  }
+  .hrc .hrc-stamp span,
+  .hrc .hrc-roll,
+  .hrc .hrc-halo,
+  .hrc .hrc-marker-lane {
+    animation: hrc-fade 300ms var(--reveal-delay) ease-out both !important;
+  }
+}
+
+/* One quick screen shock at the shared impact timestamp. */
+.is-dice-impact::after {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      transparent 40%,
+      color-mix(in srgb, var(--a) 45%, transparent)
+    ),
+    radial-gradient(ellipse at center, #fff5d466, transparent 48%);
+  content: "";
+  animation: chance-impact-flash 165ms ease-out both;
+}
+.hrc.is-dice-impact .hrc-scene,
+.chance-phone.is-dice-impact .chance-phone__layout {
+  animation: chance-impact-shake 165ms ease-out both;
+}
+@keyframes chance-impact-flash {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes chance-impact-shake {
+  0% {
+    transform: translate(0.65vmin, -0.5vmin);
+  }
+  24% {
+    transform: translate(-0.45vmin, 0.32vmin);
+  }
+  55% {
+    transform: translate(0.22vmin, -0.18vmin);
+  }
+  100% {
+    transform: none;
+  }
+}

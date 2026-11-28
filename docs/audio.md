@@ -39,6 +39,8 @@ The original phrase scripts and generated clips are included as project assets. 
 
 ## Verification completed
 
-All 51 files decoded successfully with FFmpeg and were checked with FFprobe for MP3 encoding, mono output, and 44.1 kHz sampling. Total duration is 118.29 seconds; the pack is about 1.9 MiB. Individual clips run from 1.00 to 4.30 seconds. A local Whisper `tiny.en` transcription spot-check recognized the welcome, betting, seven-out, recap, shooter, dice totals, and extreme-point announcements. Casino slang can be transcribed phonetically by the small recognizer; the source text remains authoritative.
+The 51 original files decoded successfully with FFmpeg and were checked with FFprobe for MP3 encoding, mono output, and 44.1 kHz sampling. Total duration is 118.29 seconds; the pack is about 1.9 MiB. Individual clips run from 1.00 to 4.30 seconds. A local Whisper `tiny.en` transcription spot-check recognized the welcome, betting, seven-out, recap, shooter, dice totals, and extreme-point announcements. Casino slang can be transcribed phonetically by the small recognizer; the source text remains authoritative.
+
+The seven optional house-rule calls use the same voice and accompany full-screen TV animations. Enable them under **Host controls → Game Rules → Announce house rules**. They can play with the regular announcer muted. Each starts with an original sound accent composed for that rule. All seven decoded successfully as mono MP3s at 44.1 kHz.
 
 The model files are pinned to Hugging Face revision `f3ff3571791e39611d31c381e3a41a3af07b4987` for regeneration. The full upstream Apache license is included in `public/audio/LICENSE-Kokoro.txt` for reference.

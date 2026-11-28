@@ -8,13 +8,28 @@ export function mobilePayouts(roll, beforeBets, playerId) {
   const outcomes =
     roll?.events?.find((event) => event.playerId === playerId)?.bets || [];
   return outcomes.flatMap((outcome) => {
-    if (!["win", "push"].includes(outcome.result)) return [];
+    if (outcome.award)
+      return [
+        {
+          id: `${roll.id}:${outcome.betId}`,
+          betId: outcome.betId,
+          label: outcome.label,
+          profit: outcome.delta,
+          returnedStake: 0,
+          standing: false,
+          total: outcome.delta,
+          anchors: [],
+        },
+      ];
+    if (!outcome.returnedStake && !["win", "push"].includes(outcome.result))
+      return [];
     const bet = beforeBets.find((candidate) => candidate.id === outcome.betId);
     if (!bet) return []; // Never invent a position or stake after a reconnect.
     const standing =
       outcome.result === "win" && /^(place|hard|big)-/.test(bet.type);
     const profit = outcome.result === "win" ? Math.max(0, outcome.delta) : 0;
-    const returnedStake = standing ? 0 : outcome.amount;
+    const returnedStake =
+      outcome.returnedStake ?? (standing ? 0 : outcome.amount);
     const parent = beforeBets.find((candidate) => candidate.id === bet.parent);
     const source = bet.type === "odds" ? parent : bet;
     let anchors = [bet.type];

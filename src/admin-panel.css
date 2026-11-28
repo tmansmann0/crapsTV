@@ -433,6 +433,59 @@
   font-size: 11px;
   margin-top: 3px;
 }
+.ha-game-rules .toggle-label {
+  margin: 0;
+  padding: 12px 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+.ha-game-rules .toggle-label input {
+  flex-shrink: 0;
+}
+.ha-rule-value {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin: 14px 0;
+}
+.ha-rule-value input {
+  width: 100%;
+}
+.ha-game-rules .ha-rule-mode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  margin: 0;
+  border-bottom: 1px solid #d4cbb9;
+}
+.ha-rule-mode small {
+  display: block;
+  margin-top: 3px;
+  color: var(--ha-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.ha-rule-offer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+  align-items: end;
+  margin: 10px 0;
+}
+.ha-rule-offer label {
+  min-width: 0;
+  margin: 0;
+}
+.ha-rule-offer label:has(select) {
+  grid-column: 1 / -1;
+}
+.ha-rule-offer input,
+.ha-rule-offer select {
+  width: 100%;
+}
 .ha-disclosure {
   border-top: 1px solid #d4cbb9;
   border-bottom: 1px solid #d4cbb9;

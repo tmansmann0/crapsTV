@@ -784,6 +784,13 @@ export default function Table3D(props) {
     function animate(time) {
       frame = requestAnimationFrame(animate);
       if (restarting) return;
+      if (latest.current.coveredByChanceRoll && introDone.current) {
+        previousAnimationAt = time;
+        previousEffectFrame = null;
+        lastTime = time;
+        nextFrameAt = 0;
+        return;
+      }
       const animationGap =
         previousAnimationAt === null ? 1000 / 60 : time - previousAnimationAt;
       previousAnimationAt = time;

@@ -1,0 +1,11 @@
+CrapsTV house-thunder.mp3
+
+Source: “230713 Thunder, close crack crash big, mixpre6 AT875r EM272s,
+Stratford ON 2am” by TRP on Freesound.
+https://freesound.org/people/TRP/sounds/717907/
+
+License: CC0 1.0 Universal
+https://creativecommons.org/publicdomain/zero/1.0/
+
+CrapsTV uses a 1.5-second excerpt, with low-frequency filtering, a
+level adjustment, and short fades.

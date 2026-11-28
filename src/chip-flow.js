@@ -162,6 +162,7 @@ export function planChipFlows(previous, next, { now = Date.now() } = {}) {
       ? next.lastRoll.events?.find((e) => e.playerId === player.id)
       : null;
     for (const outcome of event?.bets || []) {
+      if (outcome.award) continue;
       const before = oldBets.find((b) => b.id === outcome.betId);
       if (!before || !roll) {
         settled.set(outcome.betId, 0);

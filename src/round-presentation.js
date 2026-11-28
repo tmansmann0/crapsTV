@@ -13,12 +13,16 @@ const freeze = (value) => {
 };
 function actorsFor(state, sources = {}) {
   return (state.lastRoll?.events || [])
-    .filter((event) => event.bets?.some((bet) => bet.amount > 0))
+    .filter((event) =>
+      event.bets?.some((bet) => bet.amount > 0 || bet.award === true),
+    )
     .map((event) => {
       const player = state.players?.find(
         (player) => player.id === event.playerId,
       );
-      const settlements = event.bets.filter((bet) => bet.amount > 0);
+      const settlements = event.bets.filter(
+        (bet) => bet.amount > 0 || bet.award === true,
+      );
       const results = new Set(settlements.map((bet) => bet.result));
       return {
         playerId: event.playerId,
@@ -228,41 +232,42 @@ function transfersFor(roll, actors, slots, immediate) {
   for (const actor of actors) {
     const slot = slots.find((slot) => slot.playerIds.includes(actor.playerId));
     for (const outcome of actor.bets) {
-      if (!outcome.sourceBet) continue; // Old-host fallback can still direct its camera.
-      const standing = outcome.standing === true;
-      const returned =
-        outcome.result === "win" && standing ? 0 : outcome.amount;
-      const kind =
-        outcome.result === "win"
-          ? "win"
-          : outcome.result === "lose"
-            ? "loss"
-            : "return";
-      const amount =
-        outcome.result === "win"
-          ? Math.max(0, outcome.delta) + returned
-          : outcome.amount;
-      if (!(amount > 0)) continue;
-      transfers.push({
-        id: `settlement:${roll.id}:${actor.playerId}:${outcome.betId}:${kind}`,
-        rollId: roll.id,
-        kind,
-        playerId: actor.playerId,
-        betId: outcome.betId,
-        amount,
-        sourceAmount: returned,
-        from: {
-          kind: "bet",
+      if (!outcome.sourceBet && !outcome.award) continue;
+      const from = outcome.award
+        ? { kind: "dealer" }
+        : {
+            kind: "bet",
+            playerId: actor.playerId,
+            bet: structuredClone(outcome.sourceBet),
+          };
+      const add = (kind, amount, sourceAmount, origin = from) => {
+        if (!(amount > 0)) return;
+        transfers.push({
+          id: `settlement:${roll.id}:${actor.playerId}:${outcome.betId}:${kind}`,
+          rollId: roll.id,
+          kind,
           playerId: actor.playerId,
-          bet: structuredClone(outcome.sourceBet),
-        },
-        to:
-          kind === "loss"
-            ? { kind: "dealer" }
-            : { kind: "bank", playerId: actor.playerId },
-        startAt: immediate ? roll.at + 90 + actor.seat * 28 : slot.transferAt,
-        duration: immediate ? SETTLEMENT_FLIGHT_MS : slot.flightMs,
-      });
+          betId: outcome.betId,
+          amount,
+          sourceAmount,
+          from: origin,
+          to:
+            kind === "loss"
+              ? { kind: "dealer" }
+              : { kind: "bank", playerId: actor.playerId },
+          startAt: immediate ? roll.at + 90 + actor.seat * 28 : slot.transferAt,
+          duration: immediate ? SETTLEMENT_FLIGHT_MS : slot.flightMs,
+        });
+      };
+      if (outcome.result === "lose") {
+        add("loss", outcome.amount, outcome.amount);
+        // Return change from the dealer so the same wager chips never depart twice.
+        if (outcome.returnedStake)
+          add("return", outcome.returnedStake, 0, { kind: "dealer" });
+      } else if (outcome.result === "win") {
+        const returned = outcome.standing === true ? 0 : outcome.amount;
+        add("win", Math.max(0, outcome.delta) + returned, returned);
+      } else add("return", outcome.amount, outcome.amount);
     }
   }
   return transfers;

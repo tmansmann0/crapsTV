@@ -27,6 +27,14 @@ import {
   validDrinkingRules,
 } from "./drinking-mode.js";
 import { DEFAULT_GRAPHICS } from "./graphics-settings.js";
+import {
+  HOUSE_RULES,
+  HOUSE_RULE_OFFER_SETTINGS,
+  HOUSE_RULE_SETTINGS,
+  describeHouseRuleTarget,
+  houseRuleOffer,
+  validHouseRuleValue,
+} from "./house-rules.js";
 import { MAX_JUKEBOX_QUEUE, MAX_SONG_COST } from "./jukebox-settings.js";
 import {
   DESKTOP_DISPLAY,
@@ -886,6 +894,194 @@ function TVSettings({
   );
 }
 
+function HouseRuleSetting({ setting, saved, disabled, onSave }) {
+  const [draft, setDraft] = useState(null);
+  const { label, min, max, scale, defaultValue } = setting;
+  const current = saved ?? defaultValue;
+  const amount = draft ?? String(current / scale);
+  const value = Math.round(Number(amount) * scale);
+  const canSave =
+    !disabled &&
+    amount !== "" &&
+    validHouseRuleValue(setting, value) &&
+    value !== current;
+  return (
+    <form
+      className="ha-rule-value"
+      aria-label={label}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSave) return;
+        onSave(value);
+        setDraft(null);
+      }}
+    >
+      <label>
+        {label}
+        <input
+          type="number"
+          min={min / scale}
+          max={max / scale}
+          step={1 / scale}
+          required
+          disabled={disabled}
+          value={amount}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+      </label>
+      <button type="submit" className="button outline" disabled={!canSave}>
+        Save
+      </button>
+    </form>
+  );
+}
+
+function HouseRuleOfferFields({ rule, purchase, offer, disabled, onSave }) {
+  const [draft, setDraft] = useState({});
+  const settings = Object.entries(HOUSE_RULE_OFFER_SETTINGS).filter(
+    ([key]) => purchase || key === "target",
+  );
+  const fields = settings.map(([key, setting]) => {
+    const text = draft[key] ?? String(offer[key] / setting.scale);
+    const value = text.trim() ? Math.round(Number(text) * setting.scale) : NaN;
+    return { key, setting, text, value };
+  });
+  const canSave =
+    !disabled &&
+    fields.every(({ setting, value }) => validHouseRuleValue(setting, value)) &&
+    fields.some(({ key, value }) => value !== offer[key]);
+  return (
+    <form
+      aria-label={`${HOUSE_RULES[rule].label} terms`}
+      className="ha-rule-offer"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!canSave) return;
+        onSave({
+          ...offer,
+          ...Object.fromEntries(fields.map(({ key, value }) => [key, value])),
+        });
+        setDraft({});
+      }}
+    >
+      {fields.map(({ key, setting, text }) => (
+        <label key={key}>
+          {setting.label}
+          {key === "target" ? (
+            <select
+              value={text}
+              disabled={disabled}
+              onChange={(event) =>
+                setDraft({ ...draft, target: event.target.value })
+              }
+            >
+              {Array.from({ length: setting.max }, (_, index) => {
+                const total = index + 1;
+                return (
+                  <option value={total} key={total}>
+                    {describeHouseRuleTarget(total)}
+                  </option>
+                );
+              })}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={setting.min / setting.scale}
+              max={setting.max / setting.scale}
+              step={1 / setting.scale}
+              required
+              disabled={disabled}
+              value={text}
+              onChange={(event) =>
+                setDraft({ ...draft, [key]: event.target.value })
+              }
+            />
+          )}
+        </label>
+      ))}
+      <button type="submit" className="button outline" disabled={!canSave}>
+        Save {purchase ? "terms" : "target"}
+      </button>
+    </form>
+  );
+}
+
+function GameRulesPanel({ rules, disabled, send }) {
+  const setRule = (rule, value) => send({ type: "house-rule", rule, value });
+  const toggle = (rule, label, detail) => (
+    <label className="toggle-label">
+      <span>
+        {label}
+        <small>{detail}</small>
+      </span>
+      <input
+        aria-label={label}
+        type="checkbox"
+        checked={rules[rule] === true}
+        disabled={disabled}
+        onChange={(event) => setRule(rule, event.target.checked)}
+      />
+    </label>
+  );
+  return (
+    <div className="ha-game-rules">
+      {toggle(
+        "announce",
+        "Announce house rules",
+        "Show the trigger roll on the TV and announce rules that hit.",
+      )}
+      {Object.entries(HOUSE_RULES).map(([rule, { label, detail, setting }]) => (
+        <Fragment key={rule}>
+          <label className="ha-rule-mode">
+            <span>
+              <b>{label}</b>
+              <small>{detail}</small>
+            </span>
+            <select
+              aria-label={label}
+              value={rules[rule] === true ? "on" : rules[rule] || "off"}
+              disabled={disabled}
+              onChange={({ target }) =>
+                setRule(
+                  rule,
+                  target.value === "purchase"
+                    ? target.value
+                    : target.value === "on",
+                )
+              }
+            >
+              <option value="off">Off</option>
+              <option value="on">On</option>
+              <option value="purchase">Purchase</option>
+            </select>
+          </label>
+          {rules[rule] && (
+            <HouseRuleOfferFields
+              key={String(rules[rule])}
+              rule={rule}
+              purchase={rules[rule] === "purchase"}
+              offer={houseRuleOffer(rules, rule)}
+              disabled={disabled}
+              onSave={(terms) =>
+                send({ type: "house-rule-offer", rule, terms })
+              }
+            />
+          )}
+          {setting && rule !== "secondWind" && rules[rule] && (
+            <HouseRuleSetting
+              setting={HOUSE_RULE_SETTINGS[setting]}
+              saved={rules[setting]}
+              disabled={disabled}
+              onSave={(value) => setRule(setting, value)}
+            />
+          )}
+        </Fragment>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPanel({
   state,
   player,
@@ -1283,29 +1479,11 @@ export default function AdminPanel({
           </>
         )}
         {tab === "rules" && (
-          <div>
-            <label className="toggle-label">
-              <span>
-                Second Wind
-                <small>
-                  An initial 7 has a 50% chance of being rerolled once.
-                </small>
-              </span>
-              <input
-                aria-label="Second Wind"
-                type="checkbox"
-                checked={state.config.houseRules?.secondWind === true}
-                disabled={disabled}
-                onChange={(event) =>
-                  send({
-                    type: "house-rule",
-                    rule: "secondWind",
-                    enabled: event.target.checked,
-                  })
-                }
-              />
-            </label>
-          </div>
+          <GameRulesPanel
+            rules={state.config.houseRules ?? {}}
+            disabled={disabled}
+            send={send}
+          />
         )}
         {tab === "tv" && (
           <TVSettings

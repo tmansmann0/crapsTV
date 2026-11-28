@@ -198,6 +198,35 @@ body:has(.pg-shell) {
   z-index: 30;
   padding: 0 10px 6px;
 }
+.pg-house-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+.pg-house-results span {
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--pg-ivory-deep);
+  color: var(--pg-felt-deep);
+  font-size: 12px;
+  font-weight: 750;
+}
+.pg-shell .pg-house-pass {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 5px;
+  padding: 0 12px;
+  border: 1px solid var(--pg-rule);
+  border-radius: 10px;
+  background: var(--pg-paper);
+  color: var(--pg-felt-deep);
+  font-size: 13px;
+  font-weight: 750;
+}
 .pg-strip {
   display: flex;
   gap: 10px;
@@ -1579,6 +1608,57 @@ body:has(.pg-shell) {
   line-height: 1.25;
 }
 
+.pg-rule-shop,
+.pg-rule-shop ul {
+  display: grid;
+  gap: 12px;
+}
+.pg-rule-shop h2 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 26px;
+}
+.pg-rule-shop > p,
+.pg-rule-shop-card > p {
+  color: var(--pg-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.pg-rule-shop ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.pg-rule-shop-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--pg-rule);
+  border-radius: 12px;
+  background: var(--pg-paper);
+}
+.pg-rule-shop-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 2px 0;
+}
+.pg-rule-shop-card dt {
+  color: var(--pg-muted);
+  font-size: 11px;
+}
+.pg-rule-shop-card dd {
+  margin: 0;
+  font-weight: 800;
+}
+.pg-rule-shop-card .button,
+.pg-rule-shop-card .pg-rule-active {
+  justify-self: start;
+}
+.pg-rule-active {
+  color: var(--pg-win);
+}
 /* Bottom nav */
 .pg-nav {
   display: grid;
@@ -1600,6 +1680,11 @@ body:has(.pg-shell) {
   color: var(--pg-muted);
   font-size: 11.5px;
   font-weight: 700;
+}
+.pg-shell .pg-nav button[id="pg-tab-house-rules"] {
+  line-height: 1.12;
+  min-width: 0;
+  text-wrap: balance;
 }
 .pg-shell .pg-nav button[aria-selected="true"] {
   color: var(--pg-felt-deep);

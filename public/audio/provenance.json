@@ -9,6 +9,23 @@
   "sampleRate": 44100,
   "codec": "MP3 / libmp3lame",
   "bitrate": "128kbps mono",
+  "houseRuleStingers": "Original deterministic synthesis in scripts/house_rule_stingers.py",
+  "tableReactions": {
+    "table/crowd-cheer.mp3": {
+      "title": "Voice_Crowd_Small_Expression_Cheer_Stereo",
+      "creator": "Nox_Sound",
+      "source": "https://freesound.org/people/Nox_Sound/sounds/752708/",
+      "license": "CC0-1.0",
+      "edits": "Shortened and faded for the house rule hit reveal"
+    },
+    "table/crowd-groan.mp3": {
+      "title": "aww.wav",
+      "creator": "phmiller42",
+      "source": "https://freesound.org/people/phmiller42/sounds/124996/",
+      "license": "CC0-1.0",
+      "edits": "Shortened, level matched, and faded for the house rule miss reveal"
+    }
+  },
   "files": {
     "welcome": {
       "sha256": "3a3ce61412b66844e26c8622b021d3affe24249719a54ece2f0e9576f6aaa1c9",
@@ -113,6 +130,34 @@
     "hardway": {
       "sha256": "70d9aec9a1e5d0caec4c5dabfc19c8fca5db645556723a7294e21c72f9a09ba2",
       "text": "The hard way! Nice roll!"
+    },
+    "house-second-wind": {
+      "sha256": "305616752c16918517c5e8e82441a9a6ac5e2f9a2be6638dc18ad2227f8fbafc",
+      "text": "Second wind! The seven was rerolled."
+    },
+    "house-hard-point": {
+      "sha256": "4a670b74de616f77fbfacb78d2119a933217e1721b055cdd964234a2a238db6c",
+      "text": "Hard point! Doubles made the point. Pay the pass line!"
+    },
+    "house-hot-hand": {
+      "sha256": "90001e6989f28905ad1d65391048780845196f697f7074ecfb0f1a09d2a11896",
+      "text": "Hot hand! Three points in one turn. Bonus for the winners!"
+    },
+    "house-craps-cashback": {
+      "sha256": "068228641d37caed1a4dabe37037997d0461313ea44d88f3bbb9fcdc8287afbe",
+      "text": "Craps cashback! Get some of your pass line stake back."
+    },
+    "house-lucky-seven": {
+      "sha256": "d339b37275ebe1f0fec14a8e886bf7104d5325bc57afe6c06ac9f14ce599a839",
+      "text": "Lucky seven! Bonus payout on the pass line."
+    },
+    "house-pass-the-dice": {
+      "sha256": "be011dfe3dced34fc2abb84e95f49743bf949bd98df62bdb296628ad421f709d",
+      "text": "Pass the dice. A new shooter steps up."
+    },
+    "house-table-jackpot": {
+      "sha256": "14d7a1a8b922dd128d8d2922ae830fdd1e79d8be7d1408dc1e2aac2f68b7a5c6",
+      "text": "Table jackpot! Three different points made. Pay the jackpot!"
     },
     "roll-2": {
       "sha256": "480a3e642f2503756db80f02c71bd6048cd1c37fb91838273a6e5e95a0313284",

@@ -1,8 +1,28 @@
 import * as game from "./game.js";
+import {
+  DROP_LEAD_MS,
+  SUSPENSION_SEND_MS,
+  suspensionPoses,
+  suspensionVelocities,
+} from "./house-rule-fling.js";
+import {
+  CHANCE_DIE_FRAME_MS,
+  chanceDiceStart,
+  chanceDiceLaunchVelocities,
+  simulateChanceDrop,
+} from "./house-rule-suspension.js";
+import {
+  HOUSE_RULE_INTRO_MS,
+  HOUSE_RULE_REVEAL_MS,
+  HOUSE_RULE_REVEAL_PAUSE_MS,
+} from "./house-rules.js";
 import { planBotActions } from "./bot-strategies.js";
 import { DEFAULT_BOT_ROLL_DELAY_SECONDS } from "./betting-window.js";
 import { captureRoomSave } from "./room-save.js";
 import { restoreJukeboxSettings } from "./jukebox-settings.js";
+
+const HOUSE_RULE_ROLL_TIMEOUT_MS = 18000;
+const chanceSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
 
 /** Same room authority for the Node server and the optional browser-hosted WebRTC room. */
 export class RoomHub {
@@ -35,6 +55,7 @@ export class RoomHub {
     this.tokens = new Map(restored?.tokens);
     this.rollDelay = rollDelay;
     this.timer = null;
+    this.houseRuleThrow = null;
     this.botTimer = null;
     this.botWindows = new Map();
     this.botTurn = null;
@@ -156,6 +177,10 @@ export class RoomHub {
   receive(id, message) {
     const c = this.clients.get(id);
     if (!c) return;
+    if (message?.type === "house-rule-motion") {
+      this.receiveHouseRuleMotion(c, message);
+      return;
+    }
     try {
       if (Date.now() - c.window > 1000) {
         c.window = Date.now();
@@ -166,6 +191,16 @@ export class RoomHub {
         throw Error("Invalid message.");
       const { type } = message,
         s = this.state;
+      if (type === "house-rule-display") {
+        c.chanceDisplay = message.visible === true;
+        if (
+          c.chanceDisplay &&
+          this.chanceMotion?.promptId === s.houseRulePrompt?.id &&
+          s.houseRulePrompt?.phase === "ready"
+        )
+          this.send(id, this.chanceMotion);
+        return;
+      }
       if (type === "jukebox-display" || type === "jukebox-video") {
         if (!c.localDisplay || !this.jukebox) return;
         if (type === "jukebox-display" && typeof message.ready === "boolean") {
@@ -253,7 +288,20 @@ export class RoomHub {
           game.start(s, pid);
         } else if (type === "teach") game.setTeach(s, pid, message.value);
         else if (type === "house-rule")
-          game.setHouseRule(s, pid, message.rule, message.enabled);
+          game.setHouseRule(
+            s,
+            pid,
+            message.rule,
+            message.value ?? message.enabled,
+          );
+        else if (type === "house-rule-offer")
+          game.setHouseRuleOffer(s, pid, message.rule, message.terms);
+        else if (type === "buy-house-rule")
+          game.buyHouseRule(s, pid, message.rule, message.quote);
+        else if (type === "roll-house-rule") {
+          this.throwHouseRuleDice(c, message);
+          return;
+        } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
           game.setRollCooldown(s, pid, message.seconds, message.pointSeconds);
         else if (type === "bot-delay")
@@ -388,20 +436,231 @@ export class RoomHub {
   }
   beginRoll(playerId, gesture) {
     const state = this.state;
-    game.beginRoll(state, playerId, gesture, { duration: this.rollDelay });
-    const throwId = state.throw.id;
-    this.timer = this.setTimer(() => {
-      this.timer = null;
-      if (
-        this.closed ||
-        this.state !== state ||
-        !state.rolling ||
-        state.throw?.id !== throwId
-      )
-        return;
-      game.finishRoll(state);
+    let flight = game.beginRoll(state, playerId, gesture, {
+      duration: this.rollDelay,
+      deferHouseRules: true,
+    });
+    const startFlight = () => {
+      const now = Date.now();
+      flight.settledAt += now - flight.startAt;
+      flight.startAt = now;
+      state.throw = flight;
+      this.timer = this.setTimer(() => {
+        this.timer = null;
+        if (
+          this.closed ||
+          this.state !== state ||
+          !state.rolling ||
+          state.throw?.id !== flight.id
+        )
+          return;
+        const chanceRolls = new Map();
+        const settle = () => {
+          if (state.config.houseRules?.announce) {
+            const preview = game.finishRoll(game.snapshot(state), undefined, {
+              chanceRolls,
+              preview: true,
+              deferHouseRules: true,
+            });
+            // Resolve in settlement order. A payout from one check can make a
+            // later check eligible, so inspect the updated preview each time.
+            const pending = preview.houseRuleAttempts?.find(
+              (attempt) => attempt.hit === undefined,
+            );
+            if (pending) {
+              this.offerHouseRuleRoll(pending, settle);
+              return;
+            }
+          }
+          game.finishRoll(state, undefined, { chanceRolls });
+          this.broadcast();
+        };
+        settle();
+      }, this.rollDelay);
+    };
+    if (flight.houseRuleAttempt) {
+      state.throw = null;
+      this.offerHouseRuleRoll(flight.houseRuleAttempt, () => {
+        flight = game.applySecondWind(flight);
+        startFlight();
+        this.broadcast();
+      });
+    } else startFlight();
+  }
+  offerHouseRuleRoll(attempt, done) {
+    const state = this.state;
+    const id = game.uid();
+    const people = state.players.filter(
+      (p) => !p.left && !p.bot && p.connected,
+    );
+    const roller = people.length
+      ? people[Math.floor((chanceSeed() / 0x100000000) * people.length)]
+      : null;
+    let home = chanceDiceStart(chanceSeed());
+    let promptId = id;
+    let retries = 0;
+    let landing;
+
+    const setPrompt = (phase, extra) => {
+      const { dice, roll, hit, ...details } = attempt;
+      const revealed = phase === "revealed";
+      state.houseRulePrompt = {
+        ...details,
+        id: promptId,
+        phase,
+        rollerId: roller?.id,
+        rollerName: roller?.name,
+        poses:
+          phase === "resolving" || revealed || phase === "cocked"
+            ? landing
+            : home,
+        ...(revealed && { dice, roll, hit }),
+        ...extra,
+      };
       this.broadcast();
-    }, this.rollDelay);
+    };
+    const advance = (fn, delay) => {
+      this.timer = this.setTimer(() => {
+        this.timer = null;
+        if (!this.closed && this.state === state && state.rolling) fn();
+      }, delay);
+    };
+    const reveal = () => {
+      setPrompt("revealed");
+      advance(() => {
+        delete state.houseRulePrompt;
+        done();
+      }, HOUSE_RULE_REVEAL_MS);
+    };
+    const resolve = () => {
+      setPrompt("resolving");
+      advance(reveal, HOUSE_RULE_REVEAL_PAUSE_MS);
+    };
+    const retry = () => {
+      setPrompt("cocked");
+      advance(() => {
+        promptId = `${id}:${++retries}`;
+        home = chanceDiceStart(chanceSeed());
+        waitForThrow();
+      }, 800);
+    };
+    const waitForThrow = () => {
+      const launch = ({ poses, velocities, flick, upward } = {}) => {
+        this.houseRuleThrow = null;
+        const fromGesture = Boolean(poses && velocities);
+        let flight;
+        if (fromGesture) {
+          flight = simulateChanceDrop(poses, velocities, flick, upward);
+        } else {
+          const seed = chanceSeed();
+          for (let i = 0; i < 12; i++) {
+            flight = simulateChanceDrop(
+              home,
+              chanceDiceLaunchVelocities(seed + i),
+            );
+            if (flight.dice) break;
+          }
+          if (!flight.dice) {
+            // A low, unobstructed fallback hop still uses the original dice
+            // orientations and reads the resulting faces from the simulation.
+            flight = simulateChanceDrop(home, [
+              [0, 1.5, 0, 0, 0, 0],
+              [0, 1.6, 0, 0, 0, 0],
+            ]);
+          }
+        }
+        const { hops, dice } = flight;
+        landing = hops.map(({ frames }) => frames.at(-1));
+        if (dice) {
+          const roll = dice[0] + dice[1];
+          Object.assign(attempt, { dice, roll, hit: roll <= attempt.target });
+        }
+        const duration = (hops[0].frames.length - 1) * CHANCE_DIE_FRAME_MS;
+        this.chanceMotion = null;
+        setPrompt("rolling", {
+          flight: { startAt: Date.now() + DROP_LEAD_MS, hops },
+        });
+        advance(dice ? resolve : retry, DROP_LEAD_MS + duration);
+      };
+      const available = roller?.connected && !roller.left;
+      this.houseRuleThrow = available ? launch : null;
+      advance(launch, available ? HOUSE_RULE_ROLL_TIMEOUT_MS : 450);
+      setPrompt("ready", { canFling: Boolean(available) });
+    };
+    this.chanceMotion = null;
+    setPrompt("entering");
+    advance(waitForThrow, HOUSE_RULE_INTRO_MS);
+  }
+  chanceDiceImpact(client, message, now) {
+    const { diceImpact } = message;
+    if (
+      !Number.isFinite(diceImpact) ||
+      diceImpact < 0.85 ||
+      now - (client.chanceImpactAt ?? -Infinity) < 70
+    )
+      return undefined;
+    client.chanceImpactAt = now;
+    return Math.min(diceImpact, 14);
+  }
+  receiveHouseRuleMotion(client, message) {
+    const prompt = this.state.houseRulePrompt;
+    if (
+      !this.houseRuleThrow ||
+      prompt?.id !== message.promptId ||
+      prompt.rollerId !== client.playerId
+    )
+      return;
+    const now = Date.now();
+    if (now - (client.chanceMotionAt ?? 0) < SUSPENSION_SEND_MS - 3) return;
+    const poses = suspensionPoses(message.poses);
+    if (!poses) return;
+    client.chanceMotionAt = now;
+    this.relayChanceMotion(
+      prompt.id,
+      poses,
+      now,
+      this.chanceDiceImpact(client, message, now),
+    );
+  }
+  relayChanceMotion(promptId, poses, now, diceImpact) {
+    // Preview samples are transient and bypass the room snapshot.
+    const sample = {
+      type: "house-rule-motion",
+      promptId,
+      poses,
+      at: now,
+    };
+    this.chanceMotion = sample;
+    const packet =
+      diceImpact === undefined ? sample : { ...sample, diceImpact };
+    for (const [id, watcher] of this.clients)
+      if (!watcher.playerId || watcher.chanceDisplay) this.send(id, packet);
+  }
+  throwHouseRuleDice(client, message) {
+    const prompt = this.state.houseRulePrompt;
+    if (!prompt || prompt.id !== message.promptId) return;
+    if (prompt.rollerId !== client.playerId)
+      throw Error("Only the selected player can throw these dice.");
+    if (!this.houseRuleThrow) return;
+    const flick = Number.isFinite(message.flick)
+      ? Math.max(0, Math.min(1, message.flick))
+      : 0;
+    const upward = Number.isFinite(message.upward)
+      ? Math.max(0, Math.min(1, message.upward))
+      : 0;
+    const poses = suspensionPoses(message.poses);
+    const velocities = suspensionVelocities(message.velocities);
+    this.clearTimer(this.timer);
+    if (poses && velocities) {
+      const now = Date.now();
+      this.relayChanceMotion(
+        prompt.id,
+        poses,
+        now,
+        this.chanceDiceImpact(client, message, now),
+      );
+    }
+    this.houseRuleThrow({ poses, velocities, flick, upward });
   }
   botsCanAct() {
     return (
@@ -546,6 +805,7 @@ export class RoomHub {
     this.clearTimer(this.timer);
     this.clearTimer(this.botTimer);
     this.timer = this.botTimer = null;
+    this.houseRuleThrow = null;
     this.botWindows.clear();
     this.botTurn = null;
     this.state.botRollAt = null;
