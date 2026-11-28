@@ -69,6 +69,7 @@ import AdminPanel from "./AdminPanel.jsx";
 import TableAudioDialog from "./TableAudioDialog.jsx";
 import SavedTable, { ReconnectSeat } from "./SavedTable.jsx";
 import { normalizeTableAudio } from "./table-audio-settings.js";
+import { SUSPENSION_BUFFER_MS } from "./house-rule-fling.js";
 import AndroidHostPanel from "./AndroidHostPanel.jsx";
 import {
   createTableAudio,
@@ -396,6 +397,13 @@ function App() {
         feed.samples.push(m);
         if (feed.samples.length > 5) feed.samples.shift();
         feed.wake?.();
+        if (feed.audible && typeof m.diceImpact === "number") {
+          const now = Date.now() + (clockOffset ?? 0);
+          tableAudio.houseRuleContact(
+            m.diceImpact,
+            m.at + SUSPENSION_BUFFER_MS - now,
+          );
+        }
         return;
       }
       if (m.type === "state") {
@@ -511,6 +519,7 @@ function App() {
     if (state?.display) setSound(state.display.sound);
   }, [state?.display?.revision]);
   useEffect(() => {
+    chanceMotion.current.audible = view === "tv";
     if (status === "connected")
       transport.current?.send({
         type: "house-rule-display",

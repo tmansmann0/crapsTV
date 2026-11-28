@@ -522,7 +522,12 @@ test("only the drawn player can suspend and fling both dice", (t) => {
     1.05 + index * 0.2,
     ...pose.slice(2),
   ]);
-  const touch = { type: "house-rule-motion", promptId: prompt.id, poses };
+  const touch = {
+    type: "house-rule-motion",
+    promptId: prompt.id,
+    poses,
+    diceImpact: 4.2,
+  };
   const launch = {
     type: "roll-house-rule",
     promptId: prompt.id,
@@ -547,7 +552,16 @@ test("only the drawn player can suspend and fling both dice", (t) => {
   assert.equal(watched.length, observedBefore + 1);
   assert.equal(watched.at(-1).type, "house-rule-motion");
   assert.deepEqual(watched.at(-1).poses, poses);
+  assert.equal(watched.at(-1).diceImpact, 4.2);
   assert.deepEqual(state.houseRulePrompt.poses, prompt.poses);
+  const reconnected = [];
+  hub.connect("Second TV", (message) => reconnected.push(message));
+  hub.receive("Second TV", { type: "house-rule-display", visible: true });
+  const cachedMotion = reconnected.findLast(
+    (message) => message.type === "house-rule-motion",
+  );
+  assert.deepEqual(cachedMotion.poses, poses);
+  assert.equal(cachedMotion.diceImpact, undefined);
   hub.receive("Guest", touch);
   assert.equal(watched.length, observedBefore + 1);
 

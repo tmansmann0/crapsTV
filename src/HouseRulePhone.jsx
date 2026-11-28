@@ -23,6 +23,7 @@ export default function HouseRulePhone({
   const dialog = useRef(null);
   const gesture = useRef(null);
   const suspension = useRef(null);
+  const pendingImpact = useRef(0);
   const motionFeed = useRef({ samples: [], wake: null });
   const [simulating, setSimulating] = useState(false);
   const [holding, setHolding] = useState(false);
@@ -81,7 +82,14 @@ export default function HouseRulePhone({
       publishMotion(poses);
       if (!moving || time - lastSend >= SUSPENSION_SEND_MS) {
         lastSend = time;
-        send({ type: "house-rule-motion", promptId: id, poses });
+        const diceImpact = pendingImpact.current;
+        pendingImpact.current = 0;
+        send({
+          type: "house-rule-motion",
+          promptId: id,
+          poses,
+          ...(diceImpact > 0 && { diceImpact }),
+        });
       }
       if (moving) frame = requestAnimationFrame(update);
       else setSimulating(false);
@@ -110,7 +118,17 @@ export default function HouseRulePhone({
     )
       return;
     const rect = event.currentTarget.getBoundingClientRect();
-    suspension.current ??= createDiceSuspension(prompt.poses);
+    if (!suspension.current) {
+      const physics = createDiceSuspension(prompt.poses);
+      physics.recordContacts(
+        (_, { speed, surface }) => {
+          if (surface === "dice")
+            pendingImpact.current = Math.max(pendingImpact.current, speed);
+        },
+        () => performance.now(),
+      );
+      suspension.current = physics;
+    }
     const now = performance.now();
     const drag = {
       startedAt: now,
@@ -165,8 +183,15 @@ export default function HouseRulePhone({
       Number.isFinite(flick) && poses && velocities
         ? { poses, velocities, flick, upward }
         : undefined;
+    const diceImpact = pendingImpact.current;
+    pendingImpact.current = 0;
     setPending(true);
-    send({ type: "roll-house-rule", promptId: id, ...release });
+    send({
+      type: "roll-house-rule",
+      promptId: id,
+      ...release,
+      ...(diceImpact > 0 && { diceImpact }),
+    });
     if (release) {
       const startAt = Date.now() + clockOffsetMs;
       const { hops } = simulateChanceDrop(

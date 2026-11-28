@@ -12,6 +12,8 @@ const clips = {
   thunder: ["house-thunder"],
   tension: ["house-tension"],
   dice: ["dice-1", "dice-2"],
+  cheer: ["crowd-cheer"],
+  groan: ["crowd-groan"],
   puck: ["puck-1"],
   chips: ["chips-1", "chips-2"],
   lay: ["chip-lay-1", "chip-lay-2"],
@@ -245,6 +247,18 @@ export function createTableAudio() {
     play(count > 1 ? "shuffle" : "lay", 0.66, x);
   }
 
+  function houseRuleContact(speed, delay) {
+    if (context?.state !== "running" || !settings.effects || document.hidden)
+      return;
+    if (delay < -freshImpactMs) return;
+    play(
+      "dice",
+      Math.max(0.24, Math.min(0.8, speed / 6)),
+      0,
+      context.currentTime + Math.max(0, Math.min(100, delay)) / 1000,
+    );
+  }
+
   function houseRuleRoll({ phase, hit, flight }, serverNow) {
     if (context?.state !== "running" || !settings.effects || document.hidden)
       return;
@@ -267,7 +281,9 @@ export function createTableAudio() {
         }
       });
     } else if (phase === "revealed") {
-      play(hit ? "chips" : "felt", 0.6, 0, context.currentTime + 0.08);
+      const when = context.currentTime + 0.12;
+      if (!play(hit ? "cheer" : "groan", hit ? 0.72 : 0.63, 0, when))
+        play(hit ? "chips" : "felt", 0.6, 0, when);
     }
   }
 
@@ -311,6 +327,7 @@ export function createTableAudio() {
     updateIntroThrow,
     scheduleLiveThrow,
     chipLanding,
+    houseRuleContact,
     houseRuleRoll,
     preview,
     dispose,

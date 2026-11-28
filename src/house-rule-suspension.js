@@ -345,21 +345,18 @@ export function createDiceSuspension(
     );
   }
 
-  function recordContacts(contacts, time) {
+  function recordContacts(onContact, time) {
     dice.forEach((body, index) => {
+      const lastContactAt = new Map();
       body.addEventListener("collide", ({ body: other, contact }) => {
         const ms = time();
         const surface = surfaces.get(other) ?? "dice";
         if (surface === "dice" && index === 1) return;
         const speed = Math.abs(contact.getImpactVelocityAlongNormal());
         if (speed < 0.85 || (surface === "glass" && speed < 1.7)) return;
-        if (
-          contacts[index].some(
-            (entry) => entry.surface === surface && ms - entry.ms < 55,
-          )
-        )
-          return;
-        contacts[index].push({
+        if (ms - (lastContactAt.get(surface) ?? -Infinity) < 55) return;
+        lastContactAt.set(surface, ms);
+        onContact(index, {
           ms,
           speed: Math.round(speed * 100) / 100,
           surface,
@@ -429,7 +426,10 @@ export function simulateChanceDrop(poses, velocities, flick = 0, upward = 0) {
     contacts: contacts[index],
   }));
   let frame = 0;
-  physics.recordContacts(contacts, () => frame * CHANCE_DIE_FRAME_MS);
+  physics.recordContacts(
+    (index, contact) => contacts[index].push(contact),
+    () => frame * CHANCE_DIE_FRAME_MS,
+  );
 
   for (frame = 1; frame <= 210; frame++) {
     const moving = physics.step(1 / 60);

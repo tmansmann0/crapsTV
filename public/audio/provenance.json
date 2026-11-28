@@ -10,6 +10,22 @@
   "codec": "MP3 / libmp3lame",
   "bitrate": "128kbps mono",
   "houseRuleStingers": "Original deterministic synthesis in scripts/house_rule_stingers.py",
+  "tableReactions": {
+    "table/crowd-cheer.mp3": {
+      "title": "Voice_Crowd_Small_Expression_Cheer_Stereo",
+      "creator": "Nox_Sound",
+      "source": "https://freesound.org/people/Nox_Sound/sounds/752708/",
+      "license": "CC0-1.0",
+      "edits": "Shortened and faded for the house rule hit reveal"
+    },
+    "table/crowd-groan.mp3": {
+      "title": "aww.wav",
+      "creator": "phmiller42",
+      "source": "https://freesound.org/people/phmiller42/sounds/124996/",
+      "license": "CC0-1.0",
+      "edits": "Shortened, level matched, and faded for the house rule miss reveal"
+    }
+  },
   "files": {
     "welcome": {
       "sha256": "3a3ce61412b66844e26c8622b021d3affe24249719a54ece2f0e9576f6aaa1c9",

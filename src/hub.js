@@ -299,7 +299,7 @@ export class RoomHub {
         else if (type === "buy-house-rule")
           game.buyHouseRule(s, pid, message.rule, message.quote);
         else if (type === "roll-house-rule") {
-          this.throwHouseRuleDice(pid, message);
+          this.throwHouseRuleDice(c, message);
           return;
         } else if (type === "pass-dice") game.passDice(s, pid);
         else if (type === "cooldown")
@@ -591,6 +591,17 @@ export class RoomHub {
     setPrompt("entering");
     advance(waitForThrow, HOUSE_RULE_INTRO_MS);
   }
+  chanceDiceImpact(client, message, now) {
+    const { diceImpact } = message;
+    if (
+      !Number.isFinite(diceImpact) ||
+      diceImpact < 0.85 ||
+      now - (client.chanceImpactAt ?? -Infinity) < 70
+    )
+      return undefined;
+    client.chanceImpactAt = now;
+    return Math.min(diceImpact, 14);
+  }
   receiveHouseRuleMotion(client, message) {
     const prompt = this.state.houseRulePrompt;
     if (
@@ -604,9 +615,14 @@ export class RoomHub {
     const poses = suspensionPoses(message.poses);
     if (!poses) return;
     client.chanceMotionAt = now;
-    this.relayChanceMotion(prompt.id, poses, now);
+    this.relayChanceMotion(
+      prompt.id,
+      poses,
+      now,
+      this.chanceDiceImpact(client, message, now),
+    );
   }
-  relayChanceMotion(promptId, poses, now) {
+  relayChanceMotion(promptId, poses, now, diceImpact) {
     // Preview samples are transient and bypass the room snapshot.
     const sample = {
       type: "house-rule-motion",
@@ -615,13 +631,15 @@ export class RoomHub {
       at: now,
     };
     this.chanceMotion = sample;
+    const packet =
+      diceImpact === undefined ? sample : { ...sample, diceImpact };
     for (const [id, watcher] of this.clients)
-      if (!watcher.playerId || watcher.chanceDisplay) this.send(id, sample);
+      if (!watcher.playerId || watcher.chanceDisplay) this.send(id, packet);
   }
-  throwHouseRuleDice(playerId, message) {
+  throwHouseRuleDice(client, message) {
     const prompt = this.state.houseRulePrompt;
     if (!prompt || prompt.id !== message.promptId) return;
-    if (prompt.rollerId !== playerId)
+    if (prompt.rollerId !== client.playerId)
       throw Error("Only the selected player can throw these dice.");
     if (!this.houseRuleThrow) return;
     const flick = Number.isFinite(message.flick)
@@ -633,8 +651,15 @@ export class RoomHub {
     const poses = suspensionPoses(message.poses);
     const velocities = suspensionVelocities(message.velocities);
     this.clearTimer(this.timer);
-    if (poses && velocities)
-      this.relayChanceMotion(prompt.id, poses, Date.now());
+    if (poses && velocities) {
+      const now = Date.now();
+      this.relayChanceMotion(
+        prompt.id,
+        poses,
+        now,
+        this.chanceDiceImpact(client, message, now),
+      );
+    }
     this.houseRuleThrow({ poses, velocities, flick, upward });
   }
   botsCanAct() {
