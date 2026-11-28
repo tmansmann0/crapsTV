@@ -205,7 +205,7 @@ export function isHouseRuleForSale(config, rule) {
   );
 }
 
-export function activeHouseRulePass(player, rule, completedRolls) {
+function activeHouseRulePass(player, rule, completedRolls) {
   const pass = player?.houseRulePasses?.[rule];
   return pass?.expiresAfterRoll > completedRolls ? pass : null;
 }
@@ -238,9 +238,28 @@ export function normalizeHouseRulePasses(saved, completedRolls) {
   );
 }
 
-export function houseRuleAccess(rules, rule, player, completedRolls) {
-  const pass = activeHouseRulePass(player, rule, completedRolls);
-  if (pass) return { target: pass.target, value: pass.value, personal: true };
+export function activeTableHouseRulePass(state, rule) {
+  const completedRolls = state.rolls.length;
+  let active = null;
+  for (const player of state.players) {
+    const pass = activeHouseRulePass(player, rule, completedRolls);
+    if (!pass) continue;
+    // Older saves can contain overlapping purchases. Use the earlier terms
+    // until that pass expires, then use the next active pass.
+    if (
+      !active ||
+      pass.expiresAfterRoll - pass.rolls <
+        active.expiresAfterRoll - active.rolls
+    )
+      active = pass;
+  }
+  return active;
+}
+
+export function houseRuleAccess(state, rule) {
+  const pass = activeTableHouseRulePass(state, rule);
+  if (pass) return { target: pass.target, value: pass.value };
+  const rules = state.config.houseRules;
   if (rules?.[rule] !== true) return null;
   const { setting } = HOUSE_RULES[rule];
   return {
@@ -248,7 +267,6 @@ export function houseRuleAccess(rules, rule, player, completedRolls) {
     value: setting
       ? (rules[setting] ?? DEFAULT_HOUSE_RULES[setting])
       : undefined,
-    personal: false,
   };
 }
 

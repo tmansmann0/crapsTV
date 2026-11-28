@@ -34,14 +34,21 @@ const Jukebox = DESKTOP_DISPLAY ? lazy(() => import("./Jukebox.jsx")) : null;
 const JukeboxVideo = DESKTOP_DISPLAY
   ? lazy(() => import("./JukeboxVideo.jsx"))
   : null;
-const EMPTY_MUSIC_SEARCH = { pending: false, tracks: null, error: "" };
+const EMPTY_MUSIC_SEARCH = {
+  pending: false,
+  tracks: null,
+  error: "",
+  queueing: null,
+};
 function JukeboxTVStatus({ music }) {
   return (
     <div className="jukebox-tv-status" role="status" aria-label="Table music">
       <Music2 size={16} aria-hidden="true" />
       <div>
         {music.title && <strong title={music.title}>{music.title}</strong>}
-        {music.next ? (
+        {music.paused ? (
+          <span>Playback paused</span>
+        ) : music.next ? (
           <span title={music.next}>Next · {music.next}</span>
         ) : music.queued ? (
           <span>Awaiting approval</span>
@@ -447,12 +454,24 @@ function App() {
         save(key, { ...old, token: m.token, playerId: m.playerId });
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-state") {
         setJukebox(m.jukebox);
+        setMusicSearch((current) =>
+          current.queueing &&
+          (m.jukebox.current?.id === current.queueing ||
+            m.jukebox.queue?.some((track) => track.id === current.queueing))
+            ? EMPTY_MUSIC_SEARCH
+            : current,
+        );
+      } else if (DESKTOP_DISPLAY && m.type === "jukebox-queued") {
+        setMusicSearch((current) =>
+          current.queueing === m.trackId ? EMPTY_MUSIC_SEARCH : current,
+        );
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-results") {
-        setMusicSearch({ pending: false, tracks: m.tracks, error: "" });
+        setMusicSearch({ ...EMPTY_MUSIC_SEARCH, tracks: m.tracks });
       } else if (DESKTOP_DISPLAY && m.type === "jukebox-error") {
         setMusicSearch((current) => ({
           ...current,
           pending: m.operation === "jukebox-search" ? false : current.pending,
+          queueing: m.operation === "jukebox-request" ? null : current.queueing,
           error: m.message,
         }));
       } else if (m.type === "error") toast(m.message);
@@ -468,7 +487,11 @@ function App() {
     const onStatus = (value) => {
       setStatus(value);
       if (DESKTOP_DISPLAY && value !== "connected")
-        setMusicSearch((current) => ({ ...current, pending: false }));
+        setMusicSearch((current) => ({
+          ...current,
+          pending: false,
+          queueing: null,
+        }));
       if (value !== "connected") tableAudio.scheduleLiveThrow(null);
       if (value === "connected") {
         clockStarted = false;
@@ -658,8 +681,15 @@ function App() {
     if (status !== "connected") return;
     setMusicSearch((current) =>
       message.type === "jukebox-search"
-        ? { tracks: null, pending: true, error: "" }
-        : { ...current, error: "" },
+        ? { ...EMPTY_MUSIC_SEARCH, pending: true }
+        : {
+            ...current,
+            error: "",
+            queueing:
+              message.type === "jukebox-request"
+                ? message.trackId
+                : current.queueing,
+          },
     );
     send(message);
   };

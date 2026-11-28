@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as game from "../src/game.js";
-import { DEFAULT_HOUSE_RULES, houseRuleOffer } from "../src/house-rules.js";
+import {
+  DEFAULT_HOUSE_RULES,
+  HOUSE_RULES,
+  houseRuleOffer,
+} from "../src/house-rules.js";
 import {
   CHANCE_HOP_BUCKET,
   createChanceDiceHops,
@@ -388,12 +392,12 @@ function quote(state, rule) {
   const rules = state.config.houseRules;
   return {
     ...houseRuleOffer(rules, rule),
-    value: rules.luckySevenPayout,
+    value: rules[HOUSE_RULES[rule].setting],
     completedRolls: state.rolls.length,
   };
 }
 
-test("paid rules use chips, affect their buyer only, and keep their terms until expiry", () => {
+test("paid rules cover the table and keep their terms until expiry", () => {
   const { state, host } = table();
   const guest = game.join(state, "Guest");
   const rule = "luckySeven";
@@ -414,9 +418,14 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
   assert.equal(host.bank, 100000 - 750);
   assert.throws(
     () => game.buyHouseRule(state, host.id, rule, offer),
-    /already have/,
+    /already active for the table/,
+  );
+  assert.throws(
+    () => game.buyHouseRule(state, guest.id, rule, offer),
+    /already active for the table/,
   );
   assert.equal(host.bank, 100000 - 750);
+  assert.equal(guest.bank, 100000);
   game.setHouseRuleOffer(state, host.id, rule, {
     price: 1500,
     rolls: 7,
@@ -429,10 +438,11 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
   result = roll(state, [3, 4]);
   assert.deepEqual(
     result.events.map(({ delta }) => delta),
-    [1000, 500],
+    [1000, 1000],
   );
+  assert.equal(result.houseRuleAttempts.length, 1);
   assert.equal(result.houseRuleAttempts[0].target, 12);
-  assert.equal(result.houseRuleAttempts[0].playerId, host.id);
+  assert.equal(result.houseRuleAttempts[0].playerId, undefined);
 
   const saved = captureRoomSave(state, new Map([["host", host.id]]), []);
   // A paid pass from a previous save keeps its expiry and boost.
@@ -459,6 +469,97 @@ test("paid rules use chips, affect their buyer only, and keep their terms until 
     assert.equal(result.index, next);
     assert.equal(result.events[0].delta, expected);
   }
+});
+
+test("older overlapping purchases use one set of terms at a time after resume", () => {
+  const { state, host } = table();
+  const guest = game.join(state, "Guest");
+  const rule = "luckySeven";
+  game.setHouseRule(state, host.id, rule, "purchase");
+  game.setHouseRuleOffer(state, host.id, rule, {
+    price: 500,
+    rolls: 2,
+    target: 12,
+  });
+  game.start(state, host.id);
+  game.buyHouseRule(state, host.id, rule, quote(state, rule));
+  roll(state, [3, 4]);
+  // Old versions let the guest buy a second pass before the first expired.
+  guest.houseRulePasses = {
+    [rule]: {
+      price: 500,
+      rolls: 2,
+      target: 12,
+      value: 300,
+      expiresAfterRoll: 3,
+    },
+  };
+  game.leave(state, host.id);
+  const save = captureRoomSave(state, new Map([["guest", guest.id]]), []);
+  const resumed = readRoomSave(JSON.stringify(save)).state;
+  delete resumed.pausedAt;
+  for (const payout of [1000, 1500, 500]) {
+    game.place(resumed, guest.id, "pass", 500);
+    const result = roll(resumed, [3, 4]);
+    assert.equal(result.events[0].delta, payout);
+    assert.equal(result.houseRuleAttempts?.length ?? 0, payout === 500 ? 0 : 1);
+  }
+});
+
+test("a buyer enables each upgrade for other eligible shooters and bettors", () => {
+  const { state, host } = table();
+  const guest = game.join(state, "Guest");
+  const rules = [
+    "hardPoint",
+    "hotHand",
+    "crapsCashback",
+    "luckySeven",
+    "passTheDice",
+    "tableJackpot",
+  ];
+  for (const rule of rules) {
+    game.setHouseRule(state, host.id, rule, "purchase");
+    game.setHouseRuleOffer(state, host.id, rule, {
+      price: 500,
+      rolls: 20,
+      target: 12,
+    });
+  }
+  game.start(state, host.id);
+  for (const rule of rules)
+    game.buyHouseRule(state, host.id, rule, quote(state, rule));
+  game.rotateShooter(state);
+  assert.equal(state.shooterId, guest.id);
+
+  game.place(state, guest.id, "pass", 500);
+  assert.equal(roll(state, [3, 4]).events[0].delta, 1000);
+  game.place(state, guest.id, "pass", 500);
+  assert.equal(roll(state, [1, 2]).events[0].delta, -250);
+  for (const dice of [
+    [2, 2],
+    [3, 3],
+    [4, 4],
+  ]) {
+    game.place(state, guest.id, "pass", 500);
+    roll(state, dice);
+    const result = roll(state, dice);
+    assert.equal(result.events[0].playerId, guest.id);
+    assert(result.houseRulesTriggered.includes("hardPoint"));
+    assert.equal(result.housePassAvailable, true);
+  }
+  assert(state.lastRoll.houseRulesTriggered.includes("hotHand"));
+  assert(state.lastRoll.houseRulesTriggered.includes("tableJackpot"));
+  assert.deepEqual(
+    state.lastRoll.events[0].bets
+      .filter((bet) => bet.award)
+      .map((bet) => [bet.betId, bet.delta]),
+    [
+      ["hotHand", 156],
+      ["tableJackpot", 2500],
+    ],
+  );
+  game.passDice(state, guest.id);
+  assert.equal(state.shooterId, host.id);
 });
 
 function manualRoom(t) {
@@ -621,13 +722,21 @@ for (const [launchSeed, hit] of [
   test(`an unanswered Second Wind check reveals the ${hit ? "hit" : "miss"} before the main throw`, (t) => {
     const { hub, join, tick } = manualRoom(t);
     join("Host");
+    join("Guest");
     hub.receive("Host", {
       type: "house-rule",
       rule: "secondWind",
-      value: true,
+      value: "purchase",
     });
     hub.receive("Host", { type: "house-rule", rule: "announce", value: true });
     hub.receive("Host", { type: "start", config: { rollCooldownSeconds: 0 } });
+    const { state } = hub;
+    hub.receive("Host", {
+      type: "buy-house-rule",
+      rule: "secondWind",
+      quote: quote(state, "secondWind"),
+    });
+    game.rotateShooter(state);
     const draws = [0, 0, launchSeed, launchSeed, ...(hit ? [2] : [])];
     const native = crypto.getRandomValues.bind(crypto);
     t.mock.method(crypto, "getRandomValues", (buffer) => {
@@ -637,8 +746,8 @@ for (const [launchSeed, hit] of [
       buffer[0] = draws.shift();
       return buffer;
     });
-    const { state } = hub;
-    hub.receive("Host", { type: "roll", gesture: { x: 0, power: 0.7 } });
+    hub.receive("Guest", { type: "roll", gesture: { x: 0, power: 0.7 } });
+    assert.equal(state.houseRulePrompt.rule, "secondWind");
     assert.equal(state.houseRulePrompt.phase, "entering");
     assert.equal(state.throw, null);
     tick();
@@ -772,11 +881,20 @@ test("fast finger circles drive independent spin that coasts after a pause", () 
     assert(fast[die] > 1.3 * slow[die]);
   }
 
-  for (let frame = 0; frame < 12; frame++) held.step(frameTime);
-  const coasting = spin();
-  assert(coasting.every((speed) => speed > 6));
-  for (let frame = 0; frame < 34; frame++) held.step(frameTime);
-  assert(spin().every((speed, die) => speed < coasting[die] * 0.6));
+  // Compare windows so a glancing contact on one frame does not make the
+  // coast check depend on the runner's exact floating-point collision result.
+  const spinOver = (frames) => {
+    let sum = 0;
+    for (let frame = 0; frame < frames; frame++) {
+      held.step(frameTime);
+      sum += spin().reduce((total, speed) => total + speed, 0) / 2;
+    }
+    return sum / frames;
+  };
+  const coasting = spinOver(12);
+  assert(coasting > 6);
+  spinOver(30);
+  assert(spinOver(12) < coasting * 0.6);
 });
 
 test("an upward flick throws both dice into an arc from their release poses", () => {

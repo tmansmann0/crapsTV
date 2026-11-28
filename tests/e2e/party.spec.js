@@ -263,8 +263,8 @@ test("TV and phones complete a session, reconnect and export a recap", async ({
     await phone.bringToFront();
     await openAdminSection(phone, "Game Rules");
     await expect(
-      phone.getByRole("checkbox", { name: "Second Wind" }),
-    ).not.toBeChecked();
+      phone.getByRole("combobox", { name: "Second Wind", exact: true }),
+    ).toHaveValue("off");
     await openAdminSection(phone, "Table");
     await phone.getByRole("button", { name: "Open the table" }).click();
     await phone.getByRole("tab", { name: "Play", exact: true }).waitFor();

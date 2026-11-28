@@ -127,10 +127,11 @@ export class RoomHub {
           playerId === room.adminId,
           message.cost,
         );
+        this.send(id, { type: "jukebox-queued", trackId: message.trackId });
       } else {
         if (playerId !== room.adminId)
           throw Error("Only the table host can manage the jukebox.");
-        this.jukebox.control(message);
+        await this.jukebox.control(message);
       }
     } catch (error) {
       if (this.state === room)

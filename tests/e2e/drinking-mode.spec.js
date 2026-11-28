@@ -150,7 +150,10 @@ test("two phones verify top-ups and complete a required drink assignment", async
     const requestVerification = add.getByRole("button", {
       name: /Request verification/,
     });
-    const hostDrinksTab = host.getByRole("tab", { name: "Drinks", exact: true });
+    const hostDrinksTab = host.getByRole("tab", {
+      name: "Drinks",
+      exact: true,
+    });
     await addDrink.selectOption("shot");
     await addQuantity.fill("2");
     await offerDrink.selectOption("sip");
@@ -180,7 +183,25 @@ test("two phones verify top-ups and complete a required drink assignment", async
       "6500",
     );
     await expect(addDrink).toHaveValue("shot");
-    await expect(addQuantity).toHaveValue("3");
+    await expect(addQuantity).toHaveValue("1");
+
+    await addQuantity.fill("2");
+    await requestVerification.click();
+    await expect(
+      add.getByText(/Waiting for verification · 2 shots/),
+    ).toBeVisible();
+    await add.getByRole("button", { name: "Cancel top-up" }).click();
+    await expect(addQuantity).toHaveValue("1");
+
+    await addQuantity.fill("2");
+    hub.receive("Alice", { type: "add-bot", name: "Ruby" });
+    await add.getByRole("button", { name: "Add chips +$40" }).click();
+    await expect(host.locator("[data-bank-value]")).toHaveAttribute(
+      "data-bank-value",
+      "10500",
+    );
+    await expect(addQuantity).toHaveValue("1");
+    await expect(addDrink).toHaveValue("shot");
     await expect(offerQuantity).toHaveValue("4");
     expect(errors).toEqual([]);
   } finally {

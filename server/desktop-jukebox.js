@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
+import { createMpvPlaybackControl } from "./mpv-playback-control.js";
 import {
   MAX_JUKEBOX_QUEUE,
   restoreJukeboxSettings,
@@ -86,27 +87,36 @@ export function nativeMusic({
     },
     play(track) {
       if (!videoId.test(track.id)) throw Error("Invalid YouTube video.");
-      const child = spawn(
-        mpv,
-        [
-          "--no-config",
-          "--load-scripts=no",
-          "--vid=no",
-          "--audio-display=no",
-          "--force-window=no",
-          "--no-resume-playback",
-          "--network-timeout=15",
-          `--volume=${level}`,
-          `--script-opt=ytdl_hook-ytdl_path=${ytdlp}`,
-          "--ytdl-raw-options=ignore-config=,no-playlist=,socket-timeout=8,retries=0",
-          "--",
-          `https://www.youtube.com/watch?v=${track.id}`,
-        ],
-        { stdio: "ignore", windowsHide: true },
-      );
-      let failure, killTimer;
-      const done = new Promise((resolve) => {
-        const playbackTimer = setTimeout(
+      const playback = createMpvPlaybackControl();
+      let child;
+      try {
+        child = spawn(
+          mpv,
+          [
+            "--no-config",
+            `--input-ipc-server=${playback.path}`,
+            "--load-scripts=no",
+            "--vid=no",
+            "--audio-display=no",
+            "--force-window=no",
+            "--no-resume-playback",
+            "--network-timeout=15",
+            `--volume=${level}`,
+            `--script-opt=ytdl_hook-ytdl_path=${ytdlp}`,
+            "--ytdl-raw-options=ignore-config=,no-playlist=,socket-timeout=8,retries=0",
+            "--",
+            `https://www.youtube.com/watch?v=${track.id}`,
+          ],
+          { stdio: "ignore", windowsHide: true },
+        );
+      } catch (error) {
+        playback.close();
+        throw error;
+      }
+      let failure, killTimer, playbackTimer;
+      const watchPlayback = () => {
+        clearTimeout(playbackTimer);
+        playbackTimer = setTimeout(
           () => {
             failure = "Playback timed out.";
             stop();
@@ -114,6 +124,9 @@ export function nativeMusic({
           (track.duration + 90) * 1000,
         );
         playbackTimer.unref();
+      };
+      watchPlayback();
+      const done = new Promise((resolve) => {
         child.once("error", (error) => {
           failure =
             error.code === "ENOENT"
@@ -121,6 +134,7 @@ export function nativeMusic({
               : "mpv could not start playback.";
         });
         child.once("close", (code) => {
+          playback.close();
           clearTimeout(playbackTimer);
           clearTimeout(killTimer);
           resolve(
@@ -136,7 +150,16 @@ export function nativeMusic({
         killTimer = setTimeout(() => child.kill("SIGKILL"), 1500);
         killTimer.unref();
       }
-      return { done, stop };
+      return {
+        done,
+        stop,
+        async setPaused(paused) {
+          await playback.setPaused(paused);
+          if (paused) clearTimeout(playbackTimer);
+          else if (child.exitCode === null && child.signalCode === null)
+            watchPlayback();
+        },
+      };
     },
   };
 }
@@ -152,6 +175,8 @@ export class DesktopJukebox {
     this.queue = [];
     this.current = null;
     this.active = null;
+    this.paused = false;
+    this.pauseChange = null;
     this.videoDisplay = null;
     this.notice = null;
     this.defaultSettings = restoreJukeboxSettings({ enabled });
@@ -159,13 +184,14 @@ export class DesktopJukebox {
   }
 
   snapshot(joined, clientId) {
-    const state = { playing: !!this.current };
+    const state = { playing: !!this.current && !this.paused };
     if (
       this.settings.enabled &&
       (this.current || this.queue.length || this.notice)
     )
       state.tv = {
         title: this.current?.title ?? null,
+        ...(this.paused && { paused: true }),
         next: this.queue.find((track) => !track.pending)?.title ?? null,
         queued: this.queue.length,
         failed: !!this.notice,
@@ -174,13 +200,16 @@ export class DesktopJukebox {
       this.settings.enabled &&
       clientId &&
       clientId === this.videoDisplay &&
-      this.active?.video
+      this.active?.video &&
+      !this.active.stopped
     )
-      state.video = this.active.video;
+      state.video = { ...this.active.video, paused: this.paused };
     if (joined)
       Object.assign(state, {
         ...this.settings,
         current: this.current,
+        paused: this.paused,
+        pausePending: !!this.pauseChange,
         queue: this.queue.slice(),
         notice: this.notice,
       });
@@ -307,6 +336,8 @@ export class DesktopJukebox {
         this.clear();
         return;
       }
+    } else if (message.action === "pause" || message.action === "play") {
+      return this.setPaused(message.action === "pause");
     } else if (message.action === "skip") {
       this.stopCurrent();
       return;
@@ -337,8 +368,37 @@ export class DesktopJukebox {
     this.publish();
   }
 
+  async setPaused(paused) {
+    if (!this.settings.enabled) throw Error("Music mode is off.");
+    if (this.pauseChange) throw Error("Playback is already changing.");
+    if (this.paused === paused) return;
+
+    const change = { active: this.active };
+    this.pauseChange = change;
+    this.publish();
+    try {
+      try {
+        await change.active?.setPaused(paused);
+      } catch {
+        if (this.pauseChange !== change) return;
+        // An audio failure can switch to the video before the command returns.
+        if (this.active === change.active && !change.active.stopped)
+          throw Error("Playback could not be changed. Try again.");
+      }
+      if (this.pauseChange !== change) return;
+      if (this.active !== change.active) this.active?.setPaused(paused);
+      this.paused = paused;
+    } finally {
+      if (this.pauseChange === change) {
+        this.pauseChange = null;
+        this.advance();
+        this.publish();
+      }
+    }
+  }
+
   advance() {
-    if (this.active) return;
+    if (this.active || this.paused || this.pauseChange) return;
     const index = this.queue.findIndex((track) => !track.pending);
     if (index === -1) return;
     const [track] = this.queue.splice(index, 1);
@@ -355,6 +415,8 @@ export class DesktopJukebox {
     if (!this.videoDisplay) return false;
     const video = { id: track.id, attempt: randomUUID() };
     let resolve, timer;
+    let paused = this.paused;
+    let started = false;
     const done = new Promise((done) => {
       resolve = done;
     });
@@ -362,19 +424,29 @@ export class DesktopJukebox {
       clearTimeout(timer);
       resolve(error);
     };
-    const expire = (wait) => {
+    const watchPlayback = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => finish("The YouTube player timed out."), wait);
+      if (paused) return;
+      timer = setTimeout(
+        () => finish("The YouTube player timed out."),
+        started ? (track.duration + 180) * 1000 : videoStartTimeout,
+      );
       timer.unref();
     };
-    expire(videoStartTimeout);
+    watchPlayback();
     this.followPlayback(track, {
       video,
       done,
       stop: () => finish(null),
+      setPaused(value) {
+        paused = value;
+        watchPlayback();
+      },
       report(status) {
-        if (status === "playing") expire((track.duration + 180) * 1000);
-        else if (status === "ended") finish(null);
+        if (status === "playing") {
+          started = true;
+          watchPlayback();
+        } else if (status === "ended") finish(null);
         else if (status === "error")
           finish("The YouTube player could not play this track.");
       },
@@ -416,6 +488,8 @@ export class DesktopJukebox {
     if (refund) for (const track of this.queue) this.refund(track);
     this.queue = [];
     this.notice = null;
+    this.paused = false;
+    this.pauseChange = null;
     this.stopCurrent();
     this.publish();
   }

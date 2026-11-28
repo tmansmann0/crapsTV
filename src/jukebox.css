@@ -167,9 +167,13 @@
 .jukebox .jukebox-now small {
   color: #e7e0ca;
 }
-.jukebox button.jukebox-skip {
+.jukebox-playback {
+  display: flex;
+  gap: 4px;
+}
+.jukebox .jukebox-playback button {
+  border: 1px solid #fffaf050;
   color: var(--jk-paper);
-  border-color: #fffaf050;
 }
 .jukebox-section {
   margin-top: 18px;

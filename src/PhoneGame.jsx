@@ -38,7 +38,7 @@ import {
 import { validBetChoices } from "./bet-options.js";
 import {
   HOUSE_RULES,
-  activeHouseRulePass,
+  activeTableHouseRulePass,
   canPassDice,
   isHouseRuleForSale,
 } from "./house-rules.js";
@@ -1072,7 +1072,7 @@ function PlayPanel({
   ].filter(Boolean);
   return (
     <div className="pg-play">
-      <div className="pg-rack">
+      <div className={`pg-rack${needsDrinkCredit ? " is-drink-credit" : ""}`}>
         {needsDrinkCredit ? (
           <div className="pg-reup is-rack">
             <span>Below the table minimum.</span>
@@ -1755,6 +1755,7 @@ export default function PhoneGame({
     );
   const [presentation, setPresentation] = useState(null);
   const [drinkDrafts, setDrinkDrafts] = useState({});
+  const previousBuyIn = useRef(player.buyIn);
   const previousSnapshot = useRef(null);
   const reconnectBaseline = useRef(null);
   const amount = sum(bundle);
@@ -1762,12 +1763,27 @@ export default function PhoneGame({
   const selectedRow = rows.find((row) => row.id === selectedId) || null;
   const stake = sum(player.bets.map((b) => b.amount));
   const drinkingMode = !!state.config.drinkingMode;
+  const pendingTopUpId = state.drinkRequests?.find(
+    (request) => request.kind === "credit" && request.from === player.id,
+  )?.id;
+  useEffect(() => {
+    // Bot-approved top-ups arrive already credited, with no pending request.
+    const credited = player.buyIn > previousBuyIn.current;
+    previousBuyIn.current = player.buyIn;
+    if (!drinkingMode || (!pendingTopUpId && !credited)) return;
+    setDrinkDrafts((current) =>
+      (current.credit?.quantity ?? "1") === "1"
+        ? current
+        : { ...current, credit: { ...current.credit, quantity: "1" } },
+    );
+  }, [drinkingMode, pendingTopUpId, player.buyIn]);
   const learnEnabled = !!state.config.teach;
-  const shopRules = Object.keys(HOUSE_RULES).filter(
-    (rule) =>
-      isHouseRuleForSale(state.config, rule) ||
-      activeHouseRulePass(player, rule, state.rolls.length),
-  );
+  const shopRules = Object.keys(HOUSE_RULES).flatMap((rule) => {
+    const pass = activeTableHouseRulePass(state, rule);
+    return pass || isHouseRuleForSale(state.config, rule)
+      ? [{ rule, pass }]
+      : [];
+  });
   const houseRulesOpen = shopRules.length > 0;
   const houseRulePrompt = state.houseRulePrompt;
   const triggeredRules = (state.lastRoll?.houseRulesTriggered ?? []).filter(
@@ -2180,6 +2196,7 @@ export default function PhoneGame({
           />
         )}
         <main
+          key={tab}
           className="pg-main"
           role="tabpanel"
           id={`pg-panel-${tab}`}

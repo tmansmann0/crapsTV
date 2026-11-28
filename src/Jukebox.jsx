@@ -6,6 +6,8 @@ import {
   Disc3,
   ListMusic,
   Music2,
+  Pause,
+  Play,
   Search,
   SlidersHorizontal,
   SkipForward,
@@ -64,6 +66,11 @@ export default function Jukebox({
   const canRequest = connected && state.mode !== "off";
   const canQueue =
     canRequest && (state.cost === 0 || (playing && bank >= state.cost));
+  const canSearch =
+    canRequest &&
+    !search.pending &&
+    !search.queueing &&
+    query.trim().length >= 2;
   const content = (
     <>
       <header className="jukebox-heading">
@@ -95,8 +102,7 @@ export default function Jukebox({
         role="search"
         onSubmit={(event) => {
           event.preventDefault();
-          if (canRequest && !search.pending && query.trim().length >= 2)
-            send({ type: "jukebox-search", query });
+          if (canSearch) send({ type: "jukebox-search", query });
         }}
       >
         <label className="jukebox-field">
@@ -116,7 +122,7 @@ export default function Jukebox({
         <button
           type="submit"
           className="jukebox-button jukebox-search-button"
-          disabled={!canRequest || search.pending || query.trim().length < 2}
+          disabled={!canSearch}
         >
           Search
         </button>
@@ -142,24 +148,40 @@ export default function Jukebox({
           </p>
         )}
       </div>
-      {state.current && (
+      {(state.current || state.paused) && (
         <section className="jukebox-now" aria-labelledby="jukebox-playing">
           <span className="jukebox-disc">
             <Disc3 size={23} aria-hidden="true" />
           </span>
           <div>
-            <h3 id="jukebox-playing">Now playing</h3>
-            <Track track={state.current} requester />
+            <h3 id="jukebox-playing">
+              {state.paused ? "Playback paused" : "Now playing"}
+            </h3>
+            {state.current && <Track track={state.current} requester />}
           </div>
           {isHost && (
-            <button
-              type="button"
-              className="jukebox-button jukebox-skip"
-              disabled={!connected}
-              onClick={() => control("skip")}
-            >
-              <SkipForward size={16} aria-hidden="true" /> Skip
-            </button>
+            <div className="jukebox-playback">
+              <button
+                type="button"
+                className="jukebox-icon"
+                aria-label={state.paused ? "Play music" : "Pause music"}
+                disabled={!connected || state.pausePending}
+                onClick={() => control(state.paused ? "play" : "pause")}
+              >
+                {state.paused ? <Play size={20} /> : <Pause size={20} />}
+              </button>
+              {state.current && (
+                <button
+                  type="button"
+                  className="jukebox-icon"
+                  aria-label="Skip song"
+                  disabled={!connected || state.pausePending}
+                  onClick={() => control("skip")}
+                >
+                  <SkipForward size={20} />
+                </button>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -176,7 +198,9 @@ export default function Jukebox({
                 <button
                   className="jukebox-button"
                   type="button"
-                  disabled={!canQueue || queued.has(track.id)}
+                  disabled={
+                    !canQueue || !!search.queueing || queued.has(track.id)
+                  }
                   aria-label={`Queue ${track.title}`}
                   onClick={() =>
                     send({
@@ -186,7 +210,11 @@ export default function Jukebox({
                     })
                   }
                 >
-                  {queued.has(track.id) ? "Queued" : "Queue"}
+                  {search.queueing === track.id
+                    ? "Queueing…"
+                    : queued.has(track.id)
+                      ? "Queued"
+                      : "Queue"}
                 </button>
               </li>
             ))}
