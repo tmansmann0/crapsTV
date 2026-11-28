@@ -38,7 +38,7 @@ import {
   HOUSE_RULES,
   HOUSE_RULE_OFFER_SETTINGS,
   HOUSE_RULE_SETTINGS,
-  activeHouseRulePass,
+  activeTableHouseRulePass,
   canHandOffDice,
   canPassDice,
   houseRuleAccess,
@@ -808,8 +808,8 @@ export function buyHouseRule(s, id, rule, quote) {
   );
   const completedRolls = s.rolls.length;
   assert(
-    !activeHouseRulePass(player, rule, completedRolls),
-    "You already have this house rule.",
+    !activeTableHouseRulePass(s, rule),
+    "This rule is already active for the table.",
   );
   const terms = houseRuleOffer(rules, rule);
   const { label, setting } = HOUSE_RULES[rule];
@@ -835,7 +835,7 @@ export function buyHouseRule(s, id, rule, quote) {
   };
   log(
     s,
-    `${player.name} bought ${label} for ${money(terms.price)} in chips.`,
+    `${player.name} bought ${label} for the table (${money(terms.price)} in chips).`,
     "house-rule-purchased",
   );
 }
@@ -1335,17 +1335,16 @@ function throwSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-function houseRuleAttempt(rule, access, player) {
+function houseRuleAttempt(rule, access) {
   return {
     rule,
     label: HOUSE_RULES[rule].label,
     target: access.target,
     value: access.value,
-    ...(access.personal && { playerId: player.id, playerName: player.name }),
   };
 }
 
-function rollHouseRule(rule, access, player, announce) {
+function rollHouseRule(rule, access, announce) {
   const bucketSize = Math.floor(0x100000000 / 36);
   const limit = announce ? CHANCE_HOP_LIMIT : bucketSize * 36;
   let draw = throwSeed();
@@ -1358,7 +1357,7 @@ function rollHouseRule(rule, access, player, announce) {
   ];
   const roll = dice[0] + dice[1];
   const attempt = {
-    ...houseRuleAttempt(rule, access, player),
+    ...houseRuleAttempt(rule, access),
     dice,
     roll,
     hit: roll <= access.target,
@@ -1418,22 +1417,17 @@ export function beginRoll(
   assert(timeline, "The dice did not settle. Please throw again.");
   const rules = s.config.houseRules;
   const announce = rules?.announce === true;
-  const shooter = s.players.find((player) => player.id === s.shooterId);
-  const access = houseRuleAccess(rules, "secondWind", shooter, s.rolls.length);
+  const access = houseRuleAccess(s, "secondWind");
   if (
     access &&
     (access.target > 1 || announce) &&
     timeline.dice[0] + timeline.dice[1] === 7
   ) {
     if (announce && deferHouseRules) {
-      timeline.houseRuleAttempt = houseRuleAttempt(
-        "secondWind",
-        access,
-        shooter,
-      );
+      timeline.houseRuleAttempt = houseRuleAttempt("secondWind", access);
       secondWindThrows.set(timeline, options);
     } else {
-      const attempt = rollHouseRule("secondWind", access, shooter, announce);
+      const attempt = rollHouseRule("secondWind", access, announce);
       if (attempt.hit) {
         timeline = settledThrow(options);
         assert(timeline, "The dice did not settle. Please throw again.");
@@ -1515,19 +1509,17 @@ export function finishRoll(
   if (s.throw?.secondWind)
     houseRuleValues.secondWind =
       s.throw.houseRuleAttempt?.target ?? rules.secondWindTarget;
-  const checkRule = (rule, player) => {
-    const access = houseRuleAccess(rules, rule, player, s.rolls.length);
-    if (!access) return null;
-    const key = access.personal ? `${rule}:${player.id}` : rule;
-    if (!chanceRolls.has(key))
-      chanceRolls.set(
-        key,
-        deferHouseRules
-          ? houseRuleAttempt(rule, access, player)
-          : rollHouseRule(rule, access, player, rules.announce),
-      );
-    attempts.set(key, chanceRolls.get(key));
-    const attempt = attempts.get(key);
+  const checkRule = (rule) => {
+    let attempt = chanceRolls.get(rule);
+    if (!attempt) {
+      const access = houseRuleAccess(s, rule);
+      if (!access) return null;
+      attempt = deferHouseRules
+        ? houseRuleAttempt(rule, access)
+        : rollHouseRule(rule, access, rules.announce);
+      chanceRolls.set(rule, attempt);
+    }
+    attempts.set(rule, attempt);
     return attempt.hit ? attempt : null;
   };
   const recordHit = (attempt) => {
@@ -1552,12 +1544,7 @@ export function finishRoll(
   const hotHand = pointHit && hand.made === 3;
   const tableJackpot = newJackpotPoint && hand.points.length === 3;
   const housePassAvailable =
-    pointHit &&
-    canHandOffDice(s, shooterId) &&
-    !!checkRule(
-      "passTheDice",
-      players.find((p) => p.id === shooterId),
-    );
+    pointHit && canHandOffDice(s, shooterId) && !!checkRule("passTheDice");
   for (const p of players) {
     if (p.botDrinkLoad) p.botDrinkLoad *= 0.84;
     const before = equity(p),
@@ -1622,7 +1609,7 @@ export function finishRoll(
             result === "win" &&
             pointHit &&
             dice[0] === dice[1] &&
-            (attempt = checkRule("hardPoint", p))
+            (attempt = checkRule("hardPoint"))
           ) {
             multiplier = attempt.value / 100;
             recordHit(attempt);
@@ -1630,7 +1617,7 @@ export function finishRoll(
             result === "win" &&
             !oldPoint &&
             total === 7 &&
-            (attempt = checkRule("luckySeven", p))
+            (attempt = checkRule("luckySeven"))
           ) {
             multiplier = attempt.value / 100;
             recordHit(attempt);
@@ -1639,7 +1626,7 @@ export function finishRoll(
             !oldPoint &&
             !crapless &&
             !b.point &&
-            (attempt = checkRule("crapsCashback", p))
+            (attempt = checkRule("crapsCashback"))
           ) {
             cashback = Math.floor((b.amount * attempt.value) / 100);
             recordHit(attempt);
@@ -1736,12 +1723,12 @@ export function finishRoll(
     };
     const rollProfit = equity(p) - before;
     if (hotHand && rollProfit > 0) {
-      const attempt = checkRule("hotHand", p);
+      const attempt = checkRule("hotHand");
       if (attempt)
         award(attempt, Math.floor((rollProfit * attempt.value) / 100));
     }
     if (tableJackpot && hand.jackpotPlayers.includes(p.id)) {
-      const attempt = checkRule("tableJackpot", p);
+      const attempt = checkRule("tableJackpot");
       if (attempt) award(attempt, attempt.value);
     }
     p.stats.rolls++;

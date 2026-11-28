@@ -13,7 +13,6 @@ import { money } from "./game.js";
 import {
   DEFAULT_HOUSE_RULES,
   HOUSE_RULES,
-  activeHouseRulePass,
   describeHouseRuleTarget,
   formatHouseRulePayout,
   houseRuleOffer,
@@ -55,14 +54,16 @@ export default function HouseRulesShop({
         <h2 id="pg-rule-shop-title">
           <Sparkles size={22} aria-hidden="true" /> House Rules
         </h2>
-        <p>Use chips to buy perks that last for a set number of table rolls.</p>
+        <p>
+          Buy upgrades for the whole table. Each lasts for a set number of
+          rolls.
+        </p>
       </header>
       <ul>
-        {rules.map((rule) => {
+        {rules.map(({ rule, pass }) => {
           const { label, detail, setting } = HOUSE_RULES[rule];
           const Icon = ruleIcons[rule] ?? Sparkles;
           const offer = houseRuleOffer(config, rule);
-          const pass = activeHouseRulePass(player, rule, state.rolls.length);
           const terms = pass ?? offer;
           const remaining = pass
             ? pass.expiresAfterRoll - state.rolls.length
@@ -84,11 +85,7 @@ export default function HouseRulesShop({
                 <h3>{label}</h3>
                 {pass && <span className="pg-rule-active">Active</span>}
               </div>
-              <p>
-                {rule === "secondWind"
-                  ? "When you shoot, an initial 7 can be rerolled once."
-                  : detail}
-              </p>
+              <p>{detail}</p>
               {describeValue[rule] && (
                 <strong className="pg-rule-value">
                   {describeValue[rule](value)}

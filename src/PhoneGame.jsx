@@ -38,7 +38,7 @@ import {
 import { validBetChoices } from "./bet-options.js";
 import {
   HOUSE_RULES,
-  activeHouseRulePass,
+  activeTableHouseRulePass,
   canPassDice,
   isHouseRuleForSale,
 } from "./house-rules.js";
@@ -1778,11 +1778,12 @@ export default function PhoneGame({
     );
   }, [drinkingMode, pendingTopUpId, player.buyIn]);
   const learnEnabled = !!state.config.teach;
-  const shopRules = Object.keys(HOUSE_RULES).filter(
-    (rule) =>
-      isHouseRuleForSale(state.config, rule) ||
-      activeHouseRulePass(player, rule, state.rolls.length),
-  );
+  const shopRules = Object.keys(HOUSE_RULES).flatMap((rule) => {
+    const pass = activeTableHouseRulePass(state, rule);
+    return pass || isHouseRuleForSale(state.config, rule)
+      ? [{ rule, pass }]
+      : [];
+  });
   const houseRulesOpen = shopRules.length > 0;
   const houseRulePrompt = state.houseRulePrompt;
   const triggeredRules = (state.lastRoll?.houseRulesTriggered ?? []).filter(
